@@ -1,6 +1,5 @@
 package com.intellij.plugin.applescript.lang.parser;
 
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService;
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand;
@@ -18,7 +17,9 @@ public class ParsableScriptSuiteRegistryHelper {
   private static ParsableScriptHelper scriptHelper;
 
   private static ParsableScriptHelper getParsableScriptHelper() {
-    scriptHelper = scriptHelper != null ? scriptHelper : ServiceManager.getService(AppleScriptSystemDictionaryRegistryService.class);
+    if (scriptHelper == null) {
+      scriptHelper = AppleScriptSystemDictionaryRegistryService.getInstance();
+    }
     return scriptHelper;
   }
 

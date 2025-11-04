@@ -3,7 +3,6 @@ package com.intellij.plugin.applescript.lang.ide.annotator;
 import com.intellij.lang.annotation.Annotation;
 import com.intellij.lang.annotation.AnnotationHolder;
 import com.intellij.lang.annotation.Annotator;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.editor.colors.CodeInsightColors;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
 import com.intellij.openapi.util.text.StringUtil;
@@ -105,8 +104,8 @@ public class AppleScriptColorAnnotator implements Annotator {
 
   private void annotateApplicationReference(@NotNull AnnotationHolder holder, @NotNull AppleScriptApplicationReference appRef, boolean error) {
     String appName = AppleScriptPsiImplUtil.getNameFromApplicationReference(appRef);
-    AppleScriptSystemDictionaryRegistryService dictionaryRegistryService = ServiceManager.getService
-        (AppleScriptSystemDictionaryRegistryService.class);
+    AppleScriptSystemDictionaryRegistryService dictionaryRegistryService =
+        AppleScriptSystemDictionaryRegistryService.getInstance();
 
     if (dictionaryRegistryService == null || StringUtil.isEmptyOrSpaces(appName)) return;
 
@@ -126,7 +125,7 @@ public class AppleScriptColorAnnotator implements Annotator {
         }
       } else {
         AppleScriptProjectDictionaryService dictionaryProjectService =
-            ServiceManager.getService(appRef.getProject(), AppleScriptProjectDictionaryService.class);
+            appRef.getProject().getService(AppleScriptProjectDictionaryService.class);
         ApplicationDictionary dictionary = dictionaryProjectService.getDictionary(appName);
         if (dictionary == null) dictionary = dictionaryProjectService.createDictionary(appName);
         if (dictionary == null) {
@@ -141,7 +140,7 @@ public class AppleScriptColorAnnotator implements Annotator {
       }
     } else {
       AppleScriptProjectDictionaryService dictionaryProjectService = 
-          ServiceManager.getService(appRef.getProject(), AppleScriptProjectDictionaryService.class);
+          appRef.getProject().getService(AppleScriptProjectDictionaryService.class);
       ApplicationDictionary dictionary = dictionaryProjectService.getDictionary(appName);
       if (dictionary == null) dictionaryProjectService.createDictionary(appName);
     }

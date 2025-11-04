@@ -2,7 +2,6 @@ package com.intellij.plugin.applescript.lang.ide.actions;
 
 import com.intellij.ide.IdeView;
 import com.intellij.openapi.actionSystem.*;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
@@ -21,7 +20,7 @@ public class LoadDictionaryAction extends AnAction {
     final boolean chooseMultiple = StringUtil.isEmpty(appName);
     FileChooserDescriptor descriptor = new FileChooserDescriptor(true, true, false, false, false, chooseMultiple);
     FileChooser.chooseFiles(descriptor, project, directoryFile, files -> {
-      AppleScriptProjectDictionaryService projectDictionaryRegistry = ServiceManager.getService(project, AppleScriptProjectDictionaryService
+      AppleScriptProjectDictionaryService projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService
           .class);
       if (projectDictionaryRegistry == null) return;
 

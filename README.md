@@ -18,12 +18,14 @@ This plugin, provides support for writing and executing scripts with an [AppleSc
 ![add_dictionary.png](https://github.com/human87/AppleScript-IDEA/blob/master/img/add_dictionary.png)
 
 
-Choose either the application bundle or application dictionary file if the application is not installed but it’s dictionary file is available (xml or sdef extensions):
+Choose either the application bundle or application dictionary file if the application is not installed,
+but its dictionary file is available (xml or sdef extensions):
 
 ![choose_dictionary.png](https://github.com/human87/AppleScript-IDEA/blob/master/img/choose_dictionary.png)
 The action is also available via File menu (File | Load Dictionary).
 
-For example, you can choose dictionary file to load when working on Windows or Linux. Running scripts will not be possible but intellisense will work:
+For example, you can choose dictionary file to load when working on Windows or Linux.
+Running scripts will not be possible, but IntelliSense will work:
 
 ![browse_doc.png](https://github.com/human87/AppleScript-IDEA/blob/master/img/browse_doc.png)
 

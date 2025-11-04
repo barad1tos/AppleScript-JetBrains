@@ -1,5 +1,7 @@
 package com.intellij.plugin.applescript.lang.ide.sdef;
 
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.components.Service;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.LocalFileSystem;
@@ -20,7 +22,8 @@ import java.util.Map;
 /**
  * class for managing and querying dictionaries for the project
  */
-public class AppleScriptProjectDictionaryService {
+@Service(Service.Level.PROJECT)
+public final class AppleScriptProjectDictionaryService {
 
   private static final Logger LOG = Logger.getInstance("#" + AppleScriptProjectDictionaryService.class.getName());
 
@@ -31,10 +34,9 @@ public class AppleScriptProjectDictionaryService {
   // Dictionaries, which were created for this project in current session
   private final Map<String, ApplicationDictionary> dictionaryMap = new HashMap<>();
 
-  public AppleScriptProjectDictionaryService(@NotNull Project project,
-                                             @NotNull AppleScriptSystemDictionaryRegistryService dictionaryRegistryService) {
+  public AppleScriptProjectDictionaryService(@NotNull Project project) {
     this.project = project;
-    this.dictionaryRegistryService = dictionaryRegistryService;
+    this.dictionaryRegistryService = ApplicationManager.getApplication().getService(AppleScriptSystemDictionaryRegistryService.class);
   }
 
   /**
