@@ -2,7 +2,6 @@ package com.intellij.plugin.applescript.lang.ide.completion;
 
 import com.intellij.codeInsight.completion.*;
 import com.intellij.codeInsight.lookup.LookupElementBuilder;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.patterns.PsiElementPattern;
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService;
@@ -43,8 +42,8 @@ public class ApplicationNameCompletionContributor extends CompletionContributor 
                                         ProcessingContext context,
                                         @NotNull CompletionResultSet result) {
 
-            AppleScriptSystemDictionaryRegistryService systemDictionaryRegistry = ServiceManager.getService
-                (AppleScriptSystemDictionaryRegistryService.class);
+            AppleScriptSystemDictionaryRegistryService systemDictionaryRegistry =
+                AppleScriptSystemDictionaryRegistryService.getInstance();
             if (systemDictionaryRegistry != null) {
               List<String> appNameList = new ArrayList<>();
               if (SystemInfo.isMac) {

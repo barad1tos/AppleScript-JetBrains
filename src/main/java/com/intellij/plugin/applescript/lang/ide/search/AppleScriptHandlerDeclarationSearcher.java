@@ -13,7 +13,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public class AppleScriptHandlerDeclarationSearcher extends PomDeclarationSearcher {
   @Override
-  public void findDeclarationsAt(@NotNull PsiElement element, int offsetInElement, Consumer<PomTarget> consumer) {
+  public void findDeclarationsAt(@NotNull PsiElement element, int offsetInElement, Consumer<? super PomTarget> consumer) {
     if (element instanceof AppleScriptSelectorId) {
       AppleScriptHandlerInterleavedParameters handler;
       final PsiElement contextElement = element.getContext() != null ? element.getContext().getContext() : null;

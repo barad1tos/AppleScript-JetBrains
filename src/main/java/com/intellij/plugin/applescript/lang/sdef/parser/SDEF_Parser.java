@@ -1,6 +1,5 @@
 package com.intellij.plugin.applescript.lang.sdef.parser;
 
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
@@ -123,8 +122,7 @@ public class SDEF_Parser {
     PsiFile origPsiFile = origXmlElement != null ? origXmlElement.getContainingFile() : null;
     if (origPsiFile instanceof XmlFile) {
       xmlFile = (XmlFile) origPsiFile;
-      AppleScriptSystemDictionaryRegistryService dictionaryService = ServiceManager.getService(AppleScriptSystemDictionaryRegistryService
-          .class);
+      AppleScriptSystemDictionaryRegistryService dictionaryService = AppleScriptSystemDictionaryRegistryService.getInstance();
       VirtualFile vFile = origPsiFile.getVirtualFile();
       DictionaryInfo dInfo = dictionaryService.getDictionaryInfoByApplicationPath(vFile.getPath());
       if (dInfo != null) {
@@ -156,8 +154,8 @@ public class SDEF_Parser {
 //        ((IncludedXmlTag) suiteTag).getOriginal().getContainingFile();
         //as there is assertion error (java.lang.AssertionError: File accessed outside allowed roots),
         // we are trying to find if the dictionary file for this included dictionary was already generated
-        AppleScriptSystemDictionaryRegistryService dictionarySystemRegistry = ServiceManager
-            .getService(AppleScriptSystemDictionaryRegistryService.class);
+        AppleScriptSystemDictionaryRegistryService dictionarySystemRegistry =
+            AppleScriptSystemDictionaryRegistryService.getInstance();
         VirtualFile vFile;
         File ioFile = null;
         DictionaryInfo dInfo = dictionarySystemRegistry.getDictionaryInfoByApplicationPath(includedFile.getPath());

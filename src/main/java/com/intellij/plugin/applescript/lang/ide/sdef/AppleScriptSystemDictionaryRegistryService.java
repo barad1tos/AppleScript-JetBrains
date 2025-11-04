@@ -3,8 +3,15 @@ package com.intellij.plugin.applescript.lang.ide.sdef;
 import com.google.common.io.Files;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.PathManager;
-import com.intellij.openapi.components.ServiceManager;
+import com.intellij.openapi.components.BaseState;
+import com.intellij.openapi.components.RoamingType;
+import com.intellij.openapi.components.Service;
+import com.intellij.openapi.components.SimplePersistentStateComponent;
+import com.intellij.openapi.components.State;
+import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.fileTypes.FileType;
+import com.intellij.openapi.fileTypes.FileTypeManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.text.StringUtil;
@@ -17,6 +24,9 @@ import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand;
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary;
 import com.intellij.plugin.applescript.lang.util.MyStopVisitingException;
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl;
+import com.intellij.util.xmlb.annotations.AbstractCollection;
+import com.intellij.util.xmlb.annotations.CollectionBean;
+import com.intellij.util.xmlb.annotations.Tag;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
@@ -36,9 +46,20 @@ import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
-public class AppleScriptSystemDictionaryRegistryService implements ParsableScriptHelper {
+@Service(Service.Level.APP)
+@State(name = AppleScriptSystemDictionaryRegistryService.COMPONENT_NAME,
+    storages = @Storage(value = "appleScriptCachedDictionariesInfo.xml", roamingType = RoamingType.PER_OS))
+public final class AppleScriptSystemDictionaryRegistryService
+    extends SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.State>
+    implements ParsableScriptHelper {
 
   private static final Logger LOG = Logger.getInstance("#" + AppleScriptSystemDictionaryRegistryService.class.getName());
+  static final String COMPONENT_NAME = "AppleScriptSystemDictionaryRegistryComponent";
+
+  @NotNull
+  public static AppleScriptSystemDictionaryRegistryService getInstance() {
+    return ApplicationManager.getApplication().getService(AppleScriptSystemDictionaryRegistryService.class);
+  }
 
   //persisted data
   private final Map<String, DictionaryInfo> dictionaryInfoMap = new HashMap<>();
@@ -68,6 +89,15 @@ public class AppleScriptSystemDictionaryRegistryService implements ParsableScrip
   private final Map<String, HashSet<String>> stdEnumerationNameToApplicationNameSetMap = new HashMap<>();
   private final Map<String, HashSet<String>> stdEnumeratorConstantNameToApplicationNameListMap = new HashMap<>();
 
+  private void registerSdefExtension() {
+    ApplicationManager.getApplication().runWriteAction(() -> {
+      FileType fileType = FileTypeManager.getInstance().getFileTypeByExtension("xml");
+      if (fileType != null) {
+        FileTypeManager.getInstance().associateExtension(fileType, "sdef");
+      }
+    });
+  }
+
   private void removeDictionaryInfo(@NotNull String applicationName) {
     dictionaryInfoMap.remove(applicationName);
     notScriptableApplicationList.add(applicationName);
@@ -92,17 +122,42 @@ public class AppleScriptSystemDictionaryRegistryService implements ParsableScrip
     return scriptingAdditions;
   }
 
-  public AppleScriptSystemDictionaryRegistryService(@NotNull AppleScriptSystemDictionaryRegistryComponent systemDictionaryRegistry) {
+  public AppleScriptSystemDictionaryRegistryService() {
+    super(new State());
     try {
-      initDictionariesInfoFromCache(systemDictionaryRegistry);
+      registerSdefExtension();
+      initDictionariesInfoFromCache(getState());
       initStandardSuite();
-//    initDictionariesFromCachedFiles();
       discoverInstalledApplicationNames();
     } catch (Exception e) {
-      LOG.error("Error while initializing service: " + e.getCause());
-    } finally {
-      systemDictionaryRegistry.setDictionaryService(this);
+      LOG.error("Error while initializing service", e);
     }
+  }
+
+  @Override
+  public void loadState(@NotNull State state) {
+    super.loadState(state);
+    try {
+      initDictionariesInfoFromCache(state);
+    } catch (Exception e) {
+      LOG.error("Error while loading state for AppleScript dictionaries", e);
+    }
+  }
+
+  public void updateState() {
+    State state = getState();
+    Collection<DictionaryInfo> dictionaryInfos = dictionaryInfoMap.values();
+    state.dictionariesInfo = new DictionaryInfo.State[dictionaryInfos.size()];
+    Iterator<DictionaryInfo> iterator = dictionaryInfos.iterator();
+    for (int i = 0; i < state.dictionariesInfo.length; i++) {
+      state.dictionariesInfo[i] = iterator.next().getState();
+    }
+    if (state.notScriptableApplications == null) {
+      state.notScriptableApplications = new ArrayList<>();
+    } else {
+      state.notScriptableApplications.clear();
+    }
+    state.notScriptableApplications.addAll(notScriptableApplicationList);
   }
 
   /**
@@ -110,9 +165,15 @@ public class AppleScriptSystemDictionaryRegistryService implements ParsableScrip
    *
    * @param systemDictionaryRegistry application component, which saves/loads the data
    */
-  private void initDictionariesInfoFromCache(@NotNull AppleScriptSystemDictionaryRegistryComponent systemDictionaryRegistry) {
-    notScriptableApplicationList.addAll(systemDictionaryRegistry.getNotScriptableApplications());
-    for (DictionaryInfo.State dInfoState : systemDictionaryRegistry.getDictionariesPersistedInfo()) {
+  private void initDictionariesInfoFromCache(@NotNull State state) {
+    notScriptableApplicationList.clear();
+    if (state.notScriptableApplications != null) {
+      notScriptableApplicationList.addAll(state.notScriptableApplications);
+    }
+    if (state.dictionariesInfo == null) {
+      return;
+    }
+    for (DictionaryInfo.State dInfoState : state.dictionariesInfo) {
       String appName = dInfoState.applicationName;
       String dictionaryUrl = dInfoState.dictionaryUrl;
       String applicationUrl = dInfoState.applicationUrl;
@@ -120,6 +181,7 @@ public class AppleScriptSystemDictionaryRegistryService implements ParsableScrip
         File dictionaryFile = !StringUtil.isEmpty(dictionaryUrl) ? new File(dictionaryUrl) : null;
         File applicationFile = !StringUtil.isEmpty(applicationUrl) ? new File(applicationUrl) : null;
         if (dictionaryFile != null && dictionaryFile.exists()) {
+          dictionaryInfoMap.remove(appName);
           DictionaryInfo dInfo = new DictionaryInfo(appName, dictionaryFile, applicationFile);
           addDictionaryInfo(dInfo);
         }
@@ -265,7 +327,7 @@ public class AppleScriptSystemDictionaryRegistryService implements ParsableScrip
   public List<AppleScriptCommand> findApplicationCommands(@NotNull Project project, @NotNull String applicationName,
                                                           @NotNull String commandName) {
     AppleScriptProjectDictionaryService projectDictionaryRegistry =
-        ServiceManager.getService(project, AppleScriptProjectDictionaryService.class);
+        project.getService(AppleScriptProjectDictionaryService.class);
     ApplicationDictionary dictionary = projectDictionaryRegistry.getDictionary(applicationName);
     //among dictionaries there should always be Standard Additions dictionaries checked BUT
     //if there was no command in that dictionaries found, we should initialize new dictionary here for the project
@@ -460,6 +522,15 @@ public class AppleScriptSystemDictionaryRegistryService implements ParsableScrip
     LOG.warn("Initialization failed for application [" + applicationName + "].");
     removeDictionaryInfo(applicationName);
     return false;
+  }
+
+  static class State extends BaseState {
+    @Tag("applicationsInfo")
+    @AbstractCollection(surroundWithTag = false)
+    DictionaryInfo.State[] dictionariesInfo = new DictionaryInfo.State[0];
+
+    @CollectionBean
+    List<String> notScriptableApplications = new ArrayList<>();
   }
 
   /**

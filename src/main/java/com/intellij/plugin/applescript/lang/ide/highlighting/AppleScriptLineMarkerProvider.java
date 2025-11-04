@@ -3,7 +3,6 @@ package com.intellij.plugin.applescript.lang.ide.highlighting;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo;
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider;
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder;
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptProjectDictionaryService;
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary;
@@ -22,8 +21,8 @@ public class AppleScriptLineMarkerProvider extends RelatedItemLineMarkerProvider
     if (element instanceof AppleScriptApplicationReference) {
       PsiElement leafNode = PsiTreeUtil.firstChild(element);
       if (leafNode == null) return;
-      AppleScriptProjectDictionaryService dictionaryService = ServiceManager.getService(element.getProject(),
-          AppleScriptProjectDictionaryService.class);
+      AppleScriptProjectDictionaryService dictionaryService =
+          element.getProject().getService(AppleScriptProjectDictionaryService.class);
       AppleScriptApplicationReference appRef = (AppleScriptApplicationReference) element;
       String appName = appRef.getApplicationName();
       if (dictionaryService == null || StringUtil.isEmpty(appName)) return;

@@ -1,60 +1,57 @@
-buildscript {
-    repositories {
-        mavenCentral()
-        maven {
-            url "https://oss.sonatype.org/content/repositories/snapshots/"
-        }
-        maven {
-            url 'https://dl.bintray.com/jetbrains/intellij-plugin-service'
-        }
-    }
-    dependencies {
-        classpath "org.jetbrains.intellij.plugins:gradle-intellij-plugin:1.1.4"
-    }
-}
-
 plugins {
-    id "org.jetbrains.intellij" version "1.1.4"
+    id 'java'
+    id 'org.jetbrains.intellij' version '1.17.3'
 }
 
-apply plugin: 'idea'
-apply plugin: 'org.jetbrains.intellij'
-apply plugin: 'java'
+group = 'com.intellij.plugin'
+version = '0.130'
 
-intellij {
-    type = 'IC'
-    version = '2021.2' // https://www.jetbrains.com/intellij-repository/[releases|snapshots]
-    pluginName = 'AppleScript Support'
-    updateSinceUntilBuild = false
-    plugins = [
-            'java',
-            'PsiViewer:212-SNAPSHOT'
-    ]
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
 }
 
-compileJava {
-    sourceCompatibility = '11'
-    targetCompatibility = '11'
+repositories {
+    mavenCentral()
+    flatDir {
+        dirs 'lib'
+    }
 }
 
 sourceSets {
     main {
         java {
-            srcDirs 'src/main/gen'
+            srcDirs 'src/main/java', 'src/main/gen'
         }
-        resources{
+        resources {
+            srcDirs 'src/main/resources'
             exclude '**.bnf'
             exclude '**.flex'
         }
     }
 }
 
-group 'com.intellij.plugin'
-version '0.121'
+intellij {
+    version = '2024.1'
+    type = 'IC'
+    plugins = []
+}
 
-repositories {
-    flatDir {
-        dirs 'lib'
-    }
-    mavenCentral()
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Jar).configureEach {
+    archiveBaseName = 'AppleScript-IDEA'
+    destinationDirectory = file("$buildDir/libs")
+}
+
+tasks.patchPluginXml {
+    sinceBuild.set('241')
+    untilBuild.set('')
+}
+
+tasks.withType(ProcessResources).configureEach {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

@@ -20,7 +20,7 @@ public class AppleScriptFileType extends LanguageFileType {
   @NotNull
   @Override
   public String getName() {
-    return "AppleScript file";
+    return "AppleScript";
   }
 
   @NotNull
