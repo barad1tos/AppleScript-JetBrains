@@ -467,7 +467,9 @@ private boolean_constant ::= true|false
 
 applicationReference ::= applicationName [of THE_KW? machine machineName (of THE_KW? zone appleTalkZoneName)?] | THE_KW? currentApplicationConstant
 {methods=[getApplicationName]}
-private applicationName ::= <<parseApplicationName tellStatementStartCondition>> //id? STRING_LITERAL
+
+private applicationName ::= (APPLICATION|APP)? (STRING_LITERAL | identifier)
+                         | <<parseApplicationName tellStatementStartCondition>>
 
 private machineName ::= STRING_LITERAL
 private appleTalkZoneName ::= STRING_LITERAL
