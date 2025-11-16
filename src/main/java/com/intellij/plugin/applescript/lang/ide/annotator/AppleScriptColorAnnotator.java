@@ -34,7 +34,10 @@ public class AppleScriptColorAnnotator implements Annotator {
                                            final @Nullable PsiElement element,
                                            final @Nullable TextAttributesKey attributeKey) {
     if (element != null && attributeKey != null) {
-      holder.createInfoAnnotation(element, null).setTextAttributes(attributeKey);
+      holder.newAnnotation(com.intellij.lang.annotation.HighlightSeverity.INFORMATION, "")
+          .range(element)
+          .textAttributes(attributeKey)
+          .create();
     }
   }
 
@@ -75,7 +78,9 @@ public class AppleScriptColorAnnotator implements Annotator {
       if (appRef != null) {
         annotateApplicationReference(holder, appRef, true);
       }
-      holder.createErrorAnnotation(element, "Incomplete expression");
+      holder.newAnnotation(com.intellij.lang.annotation.HighlightSeverity.ERROR, "Incomplete expression")
+          .range(element)
+          .create();
     }
     // duplicated labels
     if (elementType == HANDLER_LABELED_PARAMETERS_DEFINITION ||
@@ -92,8 +97,10 @@ public class AppleScriptColorAnnotator implements Annotator {
                 newLabelName = type.toString().toLowerCase().replaceAll("_", " ");
               }
             }
-            holder.createErrorAnnotation(childElement, "Duplicated parameter label '" + labelName + "'")
-                .registerFix(new RenameParameterLabelQuickFix((AppleScriptHandlerParameterLabel) childElement, newLabelName));
+            holder.newAnnotation(com.intellij.lang.annotation.HighlightSeverity.ERROR, "Duplicated parameter label '" + labelName + "'")
+                .range(childElement)
+                .withFix(new RenameParameterLabelQuickFix((AppleScriptHandlerParameterLabel) childElement, newLabelName))
+                .create();
           }
           labelNames.add(labelName);
         }
@@ -117,11 +124,16 @@ public class AppleScriptColorAnnotator implements Annotator {
       }
       if (!StringUtil.isEmpty(warningReason)) {
         if (error) {
-          Annotation appAnnotation = holder.createErrorAnnotation(appRef, warningReason);
-          appAnnotation.setTextAttributes(CodeInsightColors.WARNINGS_ATTRIBUTES);
-          appAnnotation.registerFix(new AddApplicationDictionaryQuickFix(appName));
+          holder.newAnnotation(com.intellij.lang.annotation.HighlightSeverity.ERROR, warningReason)
+              .range(appRef)
+              .textAttributes(CodeInsightColors.WARNINGS_ATTRIBUTES)
+              .withFix(new AddApplicationDictionaryQuickFix(appName))
+              .create();
         } else {
-          holder.createWarningAnnotation(appRef, warningReason).registerFix(new AddApplicationDictionaryQuickFix(appName));
+          holder.newAnnotation(com.intellij.lang.annotation.HighlightSeverity.WARNING, warningReason)
+              .range(appRef)
+              .withFix(new AddApplicationDictionaryQuickFix(appName))
+              .create();
         }
       } else {
         AppleScriptProjectDictionaryService dictionaryProjectService =
@@ -130,11 +142,15 @@ public class AppleScriptColorAnnotator implements Annotator {
         if (dictionary == null) dictionary = dictionaryProjectService.createDictionary(appName);
         if (dictionary == null) {
           if (error) {
-            Annotation appAnnotation = holder.createErrorAnnotation(appRef, "Unknown app \"" + appName + "\"?");
-            appAnnotation.setTextAttributes(CodeInsightColors.WARNINGS_ATTRIBUTES);
-            appAnnotation.registerFix(new AddApplicationDictionaryQuickFix(appName));
+            holder.newAnnotation(com.intellij.lang.annotation.HighlightSeverity.ERROR, "Unknown app \"" + appName + "\"?")
+                .range(appRef)
+                .textAttributes(CodeInsightColors.WARNINGS_ATTRIBUTES)
+                .withFix(new AddApplicationDictionaryQuickFix(appName))
+                .create();
           } else {
-            holder.createWarningAnnotation(appRef, "Unknown app \"" + appName + "\"?");
+            holder.newAnnotation(com.intellij.lang.annotation.HighlightSeverity.WARNING, "Unknown app \"" + appName + "\"?")
+                .range(appRef)
+                .create();
           }
         }
       }
