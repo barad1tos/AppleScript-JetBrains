@@ -39,7 +39,7 @@ public class AppleScriptDictionaryComponentReferencesSearch implements QueryExec
     if (parts.isEmpty())
       return true;
     final String componentName = dictionaryComponent.getName(); //or just getName()...
-    final PsiSearchHelper helper = PsiSearchHelper.SERVICE.getInstance(element.getProject());
+    final PsiSearchHelper helper = PsiSearchHelper.getInstance(element.getProject());
 
     String searchWord = parts.get(0);
     return searchWord.isEmpty() || helper.processElementsWithWord(new MyOccurrenceProcessor(dictionaryComponent, componentName, consumer), 

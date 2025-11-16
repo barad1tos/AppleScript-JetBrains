@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.lang.formatter;
 
 import com.intellij.formatting.Block;
+import com.intellij.formatting.FormattingContext;
 import com.intellij.formatting.FormattingModel;
 import com.intellij.formatting.FormattingModelBuilder;
 import com.intellij.lang.ASTNode;
@@ -26,7 +27,9 @@ import org.jetbrains.annotations.Nullable;
 public class AppleScriptFormattingModelBuilder implements FormattingModelBuilder {
   @NotNull
   @Override
-  public FormattingModel createModel(PsiElement element, CodeStyleSettings settings) {
+  public FormattingModel createModel(@NotNull FormattingContext formattingContext) {
+    PsiElement element = formattingContext.getPsiElement();
+    CodeStyleSettings settings = formattingContext.getCodeStyleSettings();
     PsiFile containingFile = element.getContainingFile().getViewProvider().getPsi(AppleScriptLanguage.INSTANCE);
     assert containingFile != null : element.getContainingFile();
     ASTNode astNode = containingFile.getNode();

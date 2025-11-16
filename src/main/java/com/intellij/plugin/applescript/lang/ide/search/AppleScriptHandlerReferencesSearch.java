@@ -54,7 +54,7 @@ public class AppleScriptHandlerReferencesSearch implements QueryExecutor<PsiRefe
     if (parts.isEmpty())
       return true;
     final String handlerSelector = handler.getSelector(); //or just getName()...
-    final PsiSearchHelper helper = PsiSearchHelper.SERVICE.getInstance(element.getProject());
+    final PsiSearchHelper helper = PsiSearchHelper.getInstance(element.getProject());
 
 
     String firstSelector = parts.get(0).getSelectorPart();
