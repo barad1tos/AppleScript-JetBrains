@@ -41,26 +41,26 @@ public class AppleScriptColorAnnotator implements Annotator {
   @Override
   public void annotate(final @NotNull PsiElement element, final @NotNull AnnotationHolder holder) {
     IElementType elementType = element.getNode().getElementType();
-    if (element instanceof PsiReference || element instanceof AppleScriptHandlerCall) {
+    // Don't check dictionary elements for unresolved references at all
+    // This prevents false positives when application dictionaries are not loaded
+    if (element instanceof AppleScriptHandlerCall) {
       PsiElement resolveResult = null;
       PsiReference ref = element.getReference();
       if (ref != null) {
         resolveResult = element.getReference().resolve();
       }
       if (resolveResult == null) {
-        if (element instanceof AppleScriptHandlerCall) {
-          AppleScriptHandlerCall handlerCall = (AppleScriptHandlerCall) element;
-          for (AppleScriptHandlerArgument argument : handlerCall.getArguments()) {
-            createInfoAnnotation(holder, argument.getArgumentSelector(), AppleScriptSyntaxHighlighterColors.UNRESOLVED_REFERENCE);
-          }
-        } else createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.UNRESOLVED_REFERENCE);
+        AppleScriptHandlerCall handlerCall = (AppleScriptHandlerCall) element;
+        for (AppleScriptHandlerArgument argument : handlerCall.getArguments()) {
+          createInfoAnnotation(holder, argument.getArgumentSelector(), AppleScriptSyntaxHighlighterColors.UNRESOLVED_REFERENCE);
+        }
       }
     }
     if (element instanceof AppleScriptDictionaryCommandName) {
       createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR);
     } else if (element instanceof AppleScriptCommandParameterSelector) {
       createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR);
-    } else if (element instanceof AppleScriptDictionaryClassName || element instanceof AppleScriptDictionaryClassIdentifierPlural) {
+    } else if (element instanceof AppleScriptDictionaryClassName || element instanceof AppleScriptDictionaryClassIdentifierPlural || element instanceof AppleScriptBuiltInClassIdentifier) {
       createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR);
     } else if (element instanceof AppleScriptDictionaryPropertyName) {
       createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR);
