@@ -158,7 +158,7 @@ public class AppleScriptDictionaryResolveProcessor extends AppleScriptPsiScopePr
     DictionaryComponent res = null;
     if (element instanceof AppleScriptCommandHandlerCall) {
       res = importedDictionary.findCommand(myElementName);
-    } else if (element instanceof AppleScriptDictionaryClassName) {
+    } else if (element instanceof AppleScriptDictionaryClassName || element instanceof AppleScriptBuiltInClassIdentifier) {
       res = importedDictionary.findClass(myElementName);
     } else if (element instanceof AppleScriptDictionaryPropertyName) {
       res = importedDictionary.findProperty(myElementName);
