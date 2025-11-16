@@ -556,7 +556,7 @@ varAccessDeclaration ::= variableGlobalDeclaration|variableLocalDeclaration
 implements="com.intellij.plugin.applescript.psi.AppleScriptComponent"}
 
 //AppleScript propertyDeclaration
-scriptPropertyDeclaration ::= (property|prop) propertyLabelIdentifier COLON propertyInitializerExpression
+scriptPropertyDeclaration ::= (property|prop) propertyLabelIdentifier [COLON propertyInitializerExpression]
 {mixin="com.intellij.plugin.applescript.psi.impl.AbstractAppleScriptComponent"
 implements="com.intellij.plugin.applescript.psi.AppleScriptComponent"}
 
