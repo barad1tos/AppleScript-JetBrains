@@ -559,22 +559,24 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
    */
   public static boolean parseApplicationName(PsiBuilder b, int l, Parser tellStatementStartCondition) {
     if (!recursion_guard_(b, l, "parseApplicationName")) return false;
-    boolean r;
+    boolean r = false;
     consumeToken(b, THE_KW);
-    if (!nextTokenIs(b, "", APPLICATION, APP)) return false;
 
+    // APPLICATION or APP tokens are optional - try to consume them
     PsiBuilder.Marker mCls = enter_section_(b, l, _NONE_, "<parse application name>");
-    r = consumeToken(b, APPLICATION);
-    if (!r) r = consumeToken(b, APP);
-    exit_section_(b, l, mCls, DICTIONARY_CLASS_NAME, r, false, null);
+    boolean hasAppToken = consumeToken(b, APPLICATION);
+    if (!hasAppToken) hasAppToken = consumeToken(b, APP);
+    exit_section_(b, l, mCls, DICTIONARY_CLASS_NAME, hasAppToken, false, null);
 
+    // Check if we have a STRING_LITERAL or ID for the application name
     if (!nextTokenIs(b, "", STRING_LITERAL, ID)) return false;
-    PsiBuilder.Marker mProp = enter_section_(b, l, _NONE_, "<parse application name>");
-    boolean idReference = consumeToken(b, ID);
-    exit_section_(b, l, mProp, DICTIONARY_PROPERTY_NAME, idReference, false, null);
-    PsiBuilder.Marker m = enter_section_(b);
+
+    // Get the application name string before consuming the token
     String applicationNameString = b.getTokenText();
+
+    // Try to consume STRING_LITERAL first, then ID
     r = consumeToken(b, STRING_LITERAL);
+    if (!r) r = consumeToken(b, ID);
 
     // if this is start of <tell compound> or <tell simple> or <using terms from> statements, push the application name
     // which dictionary will be consulted for terms parsing (only the last pushed application is queried)
@@ -584,7 +586,6 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
         pushTargetApplicationName(b, applicationNameString);
       }
     }
-    exit_section_(b, m, null, r);
     return r;
   }
 
