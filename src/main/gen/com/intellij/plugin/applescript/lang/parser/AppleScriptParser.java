@@ -6557,8 +6557,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     Marker m = enter_section_(b, l, _NONE_, SCRIPT_PROPERTY_DECLARATION, "<script property declaration>");
     r = scriptPropertyDeclaration_0(b, l + 1);
     r = r && propertyLabelIdentifier(b, l + 1);
-    r = r && consumeToken(b, COLON);
-    r = r && propertyInitializerExpression(b, l + 1);
+    r = r && scriptPropertyDeclaration_1(b, l + 1);
     exit_section_(b, l, m, r, false, null);
     return r;
   }
@@ -6571,6 +6570,17 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     r = consumeToken(b, PROPERTY);
     if (!r) r = consumeToken(b, PROP);
     exit_section_(b, m, null, r);
+    return r;
+  }
+
+  // [COLON propertyInitializerExpression]
+  private static boolean scriptPropertyDeclaration_1(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "scriptPropertyDeclaration_1")) return false;
+    boolean r = true;
+    if (nextTokenIs(b, COLON)) {
+      r = consumeToken(b, COLON);
+      r = r && propertyInitializerExpression(b, l + 1);
+    }
     return r;
   }
 
