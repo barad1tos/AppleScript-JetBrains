@@ -107,7 +107,59 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     // Could be command from Cocoa Standard library which was not yet checked, because applicationName == ScriptingAdditions.
     // The could happen when parsing <using terms from scripting additions> stms
     r = parseCommandNameForApplication(b, l + 1, parsedName, ApplicationDictionary.COCOA_STANDARD_LIBRARY, checkStdLib);
-    return r;
+    if (r) return true;
+    // Last-resort fallback for well-known multi-word StandardAdditions commands.
+    // Async dict loading in production IDEs can leave the StdLib registry empty
+    // when the parser runs first; once that happens, every `do shell script` /
+    // `do script` cascades into bogus errors that hide every subsequent issue.
+    // Hard-recognize a small set of literal command shapes so we degrade
+    // gracefully — the annotator still verifies semantics against the real dict.
+    return parseWellKnownCommandFallback(b, l + 1, parsedName);
+  }
+
+  /**
+   * Recognises a fixed set of multi-word StandardAdditions commands by literal token
+   * text + token-type shape. Returns true and sets parsedName when matched, leaving
+   * the lexer positioned after the consumed command name; the caller's normal
+   * parameter parsing then handles the rest of the call.
+   *
+   * Currently covers `do shell script` and `do script` — the two commonly-broken
+   * patterns reported when Music or similar third-party dicts are merely discovered
+   * but not populated. Add more entries here only when reproducible.
+   */
+  private static boolean parseWellKnownCommandFallback(PsiBuilder b, int l, Ref<String> parsedName) {
+    if (!recursion_guard_(b, l, "parseWellKnownCommandFallback")) return false;
+    if (b.getTokenType() != VAR_IDENTIFIER) return false;
+    if (!"do".equals(b.getTokenText())) return false;
+    // do shell script  →  VAR_IDENTIFIER VAR_IDENTIFIER SCRIPT
+    if (b.lookAhead(1) == VAR_IDENTIFIER && b.lookAhead(2) == SCRIPT) {
+      PsiBuilder.Marker m = b.mark();
+      String first = b.getTokenText();
+      b.advanceLexer();
+      if (!"shell".equals(b.getTokenText())) {
+        m.rollbackTo();
+        return false;
+      }
+      String second = b.getTokenText();
+      b.advanceLexer();
+      String third = b.getTokenText();
+      b.advanceLexer();
+      m.drop();
+      parsedName.set(first + " " + second + " " + third);
+      return true;
+    }
+    // do script  →  VAR_IDENTIFIER SCRIPT
+    if (b.lookAhead(1) == SCRIPT) {
+      PsiBuilder.Marker m = b.mark();
+      String first = b.getTokenText();
+      b.advanceLexer();
+      String second = b.getTokenText();
+      b.advanceLexer();
+      m.drop();
+      parsedName.set(first + " " + second);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -142,6 +194,19 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     // TODO: 06/12/15 may be try to avoid creating PSI here!..
     List<AppleScriptCommand> allCommandsWithName = getAllCommandsWithName(b, parsedCommandName.get(), toldApplicationName, areThereUseStatements,
             applicationsToImport);
+
+    // Fallback path: command name was recognized syntactically (multi-word, e.g.
+    // 'do shell script' via parseWellKnownCommandFallback) but no matching command
+    // definition was loaded yet. Consume one expression as the direct parameter so
+    // the rest of the line parses; without this the call expression ends at the
+    // command name and the upstream rule trips on the unconsumed argument tokens.
+    if (allCommandsWithName.isEmpty() && parsedCommandName.get() != null && parsedCommandName.get().contains(" ")) {
+      consumeToken(b, OF);
+      PsiBuilder.Marker pm = enter_section_(b, l, _NONE_, "<fallback direct parameter>");
+      boolean paramR = com.intellij.plugin.applescript.lang.parser.AppleScriptParser.expression(b, l + 1);
+      exit_section_(b, l, pm, DIRECT_PARAMETER_VAL, paramR, false, null);
+      return true;
+    }
 
     for (AppleScriptCommand command : allCommandsWithName) {
       r = parseParametersForCommand(b, l + 1, command);
