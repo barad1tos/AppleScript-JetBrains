@@ -39,7 +39,7 @@ abstract class AbstractDictionaryReferenceElement :
         if (!maxScope.isEmpty()) {
             for (el in maxScope) {
                 PsiTreeUtil.treeWalkUp(resolveProcessor, getElement(), el, ResolveState.initial())
-                resolveResult = resolveProcessor.myResult
+                resolveResult = resolveProcessor.getMyResult()
                 if (resolveResult != null) {
                     res.add(resolveResult)
                     break
@@ -48,7 +48,7 @@ abstract class AbstractDictionaryReferenceElement :
         }
         if (res.isEmpty()) {
             PsiTreeUtil.treeWalkUp(resolveProcessor, getElement(), null, ResolveState.initial())
-            resolveResult = resolveProcessor.myResult
+            resolveResult = resolveProcessor.getMyResult()
             if (resolveResult != null) {
                 res.add(resolveResult)
             }
