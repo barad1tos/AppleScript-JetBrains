@@ -60,7 +60,7 @@ abstract class AbstractAppleScriptHandlerCall(node: ASTNode) :
         override fun resolveInner(incompleteCode: Boolean, containingFile: PsiFile): Array<ResolveResult> {
             val resolveProcessor = AppleScriptResolveProcessor(getHandlerSelector())
             PsiTreeUtil.treeWalkUp(resolveProcessor, this@AbstractAppleScriptHandlerCall, null, ResolveState.initial())
-            return AppleScriptResolveUtil.toCandidateInfoArray(listOf(resolveProcessor.result))
+            return AppleScriptResolveUtil.toCandidateInfoArray(listOf(resolveProcessor.getResult()))
         }
 
         override fun isReferenceTo(element: PsiElement): Boolean {
