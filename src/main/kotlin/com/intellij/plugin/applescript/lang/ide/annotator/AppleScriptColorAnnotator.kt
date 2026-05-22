@@ -110,7 +110,11 @@ class AppleScriptColorAnnotator : Annotator {
                         .withFix(AddApplicationDictionaryQuickFix(appName))
                         .create()
                 } else {
-                    holder.newAnnotation(HighlightSeverity.WARNING, warningReason!!)
+                    // WEAK_WARNING keeps the marker out of the Problems panel and the
+                    // editor gutter while preserving the tooltip and the quick-fix —
+                    // a missing third-party .app is not something the user can act on
+                    // automatically, so we don't want the noise on every tell block.
+                    holder.newAnnotation(HighlightSeverity.WEAK_WARNING, warningReason!!)
                         .range(appRef)
                         .withFix(AddApplicationDictionaryQuickFix(appName))
                         .create()
@@ -127,7 +131,8 @@ class AppleScriptColorAnnotator : Annotator {
                             .withFix(AddApplicationDictionaryQuickFix(appName))
                             .create()
                     } else {
-                        holder.newAnnotation(HighlightSeverity.WARNING, "Unknown app \"$appName\"?")
+                        // Same WEAK_WARNING rationale as the warning-reason branch above.
+                        holder.newAnnotation(HighlightSeverity.WEAK_WARNING, "Unknown app \"$appName\"?")
                             .range(appRef)
                             .create()
                     }
