@@ -94,8 +94,18 @@ interface ApplicationDictionary : DictionarySuite {
         @JvmField
         val APP_BUNDLE_DIRECTORIES: Array<String> = arrayOf(
             "/Applications",
+            // macOS Catalina (10.15) moved bundled apps (Music, TV, Podcasts,
+            // App Store, Stocks, Books, Home, …) here. Without this entry the
+            // dictionary registry hits notFoundApplicationList on every script
+            // targeting them, even when the apps are installed and running.
+            "/System/Applications",
+            "/System/Applications/Utilities",
             "/System/Library/CoreServices",
             "/Library/ScriptingAdditions",
+            // User-installed apps under ~/Applications. System.getProperty
+            // resolves at class init time, which matches everything else
+            // here being a static path.
+            System.getProperty("user.home") + "/Applications",
         )
     }
 }
