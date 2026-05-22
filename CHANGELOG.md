@@ -17,6 +17,7 @@ The plugin is now compatible with modern JetBrains IDEs (2024.3+) and is fully r
 - Plugin loads on current JetBrains IDEs (the 0.130 series did not).
 - SDEF dictionary parsing for application bundles is more robust on macOS Ventura and newer (XXE-hardened SAXBuilder configuration while still honouring Apple's `sdef.dtd` DOCTYPE).
 - Resolver no longer trips a known nullability mismatch around the dictionary root tag during the first SDEF parse.
+- Scripts targeting an application whose dictionary isn't loaded (missing `.app`, fresh project, stale snapshot) no longer cascade into spurious `end`/`on error`/`tell` parser errors. The parser now accepts two-word composite identifiers like `album artist of x` or `library playlist 1 whose id is N` as bareword references, leaving unresolved-name reporting to the annotator. Single-token chains (`count of items`) keep their previous behaviour.
 
 ### Changed
 
