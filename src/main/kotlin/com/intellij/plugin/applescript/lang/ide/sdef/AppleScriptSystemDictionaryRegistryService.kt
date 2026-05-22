@@ -38,6 +38,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.util.Arrays
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.script.ScriptException
 import javax.script.ScriptEngineManager
@@ -52,30 +53,30 @@ class AppleScriptSystemDictionaryRegistryService :
     ParsableScriptHelper {
 
     // persisted data
-    private val dictionaryInfoMap: MutableMap<String, DictionaryInfo> = HashMap()
-    private val notScriptableApplicationList: HashSet<String> = HashSet()
+    private val dictionaryInfoMap: MutableMap<String, DictionaryInfo> = ConcurrentHashMap()
+    private val notScriptableApplicationList: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     // scripting additions installed in the system
-    private val scriptingAdditions: HashSet<String> = HashSet()
-    private val notFoundApplicationList: HashSet<String> = HashSet()
-    private val discoveredApplicationNames: HashSet<String> = HashSet()
+    private val scriptingAdditions: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val notFoundApplicationList: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val discoveredApplicationNames: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     private var xCodeApplicationFile: File? = null
 
-    private val applicationNameToClassNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToClassNamePluralSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToCommandNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToRecordNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToPropertySetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToEnumerationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToEnumeratorConstantNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdClassNameToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdClassNamePluralToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdCommandNameToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdRecordNameToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdPropertyNameToDictionarySetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdEnumerationNameToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap<String, HashSet<String>> = HashMap()
+    private val applicationNameToClassNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToClassNamePluralSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToCommandNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToRecordNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToPropertySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToEnumerationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToEnumeratorConstantNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdClassNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdClassNamePluralToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdCommandNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdRecordNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdPropertyNameToDictionarySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdEnumerationNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
 
     init {
         try {
@@ -112,9 +113,12 @@ class AppleScriptSystemDictionaryRegistryService :
 
     internal fun getDictionaryInfoList(): Collection<DictionaryInfo> = dictionaryInfoMap.values
 
-    fun getNotScriptableApplicationList(): HashSet<String> = notScriptableApplicationList
+    // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
+    fun getNotScriptableApplicationList(): HashSet<String> = HashSet(notScriptableApplicationList)
 
-    override fun getScriptingAdditions(): HashSet<String> = scriptingAdditions
+    // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
+    // TODO(v1.1 SDEF-05): once DictionaryIndexes lands, narrow the interface to a read-only Set.
+    override fun getScriptingAdditions(): HashSet<String> = HashSet(scriptingAdditions)
 
     override fun loadState(state: PersistedState) {
         super.loadState(state)
@@ -808,7 +812,8 @@ class AppleScriptSystemDictionaryRegistryService :
 
     fun getCachedApplicationNames(): Collection<String> = dictionaryInfoMap.keys
 
-    fun getDiscoveredApplicationNames(): HashSet<String> = discoveredApplicationNames
+    // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
+    fun getDiscoveredApplicationNames(): HashSet<String> = HashSet(discoveredApplicationNames)
 
     fun isDictionaryInitialized(applicationName: String): Boolean =
         dictionaryInfoMap[applicationName]?.isInitialized() == true
@@ -998,7 +1003,7 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun parseElementsForApplication(
             xmlElements: List<Element>,
             applicationName: String,
-            objectTagNameToApplicationNameListMap: MutableMap<String, HashSet<String>>,
+            objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
         ) {
             for (applicationObjectTag in xmlElements) {
                 parseSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)
@@ -1008,7 +1013,7 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun parseHashElementsForApplication(
             xmlElements: List<Element>,
             applicationName: String,
-            objectTagNameToApplicationNameListMap: MutableMap<String, HashSet<String>>,
+            objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
         ) {
             for (applicationObjectTag in xmlElements) {
                 hashSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)
@@ -1018,7 +1023,7 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun parseSimpleElementForObject(
             suiteObjectElement: Element,
             applicationName: String,
-            objectNameToApplicationNameSetMap: MutableMap<String, HashSet<String>>,
+            objectNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>>,
         ) {
             val objectName = suiteObjectElement.getAttributeValue("name")
             val code = suiteObjectElement.getAttributeValue("code")
@@ -1029,7 +1034,7 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun hashSimpleElementForObject(
             suiteObjectElement: Element,
             applicationName: String,
-            objectNameToApplicationNameListMap: MutableMap<String, HashSet<String>>,
+            objectNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
         ) {
             val objectName = suiteObjectElement.getAttributeValue("name")
             val code = suiteObjectElement.getAttributeValue("code")
@@ -1040,37 +1045,26 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun updateApplicationNameSetFor(
             applicationObjectName: String,
             applicationName: String,
-            applicationNameSetMap: MutableMap<String, HashSet<String>>,
+            applicationNameSetMap: MutableMap<String, MutableSet<String>>,
         ) {
-            val appNameSetForObject = applicationNameSetMap[applicationObjectName]
-            updateSetForMappedObjectName(applicationObjectName, applicationName, applicationNameSetMap, appNameSetForObject)
-        }
-
-        private fun updateSetForMappedObjectName(
-            objectName: String,
-            nameToAdd: String,
-            objectNameToNameSetMap: MutableMap<String, HashSet<String>>,
-            existingSet: HashSet<String>?,
-        ) {
-            var nameSetForObject = existingSet
-            if (nameSetForObject == null) {
-                nameSetForObject = HashSet()
-                if (!StringUtil.isEmpty(objectName)) {
-                    objectNameToNameSetMap[objectName] = nameSetForObject
-                }
-            }
-            if (!nameSetForObject.contains(nameToAdd)) {
-                nameSetForObject.add(nameToAdd)
+            if (StringUtil.isEmpty(applicationObjectName)) return
+            // Atomic get-or-put-and-mutate per D-03: ConcurrentHashMap.compute serialises
+            // the (lookup, allocate, insert, add) tuple inside a single bucket lock.
+            applicationNameSetMap.compute(applicationObjectName) { _, existing ->
+                (existing ?: ConcurrentHashMap.newKeySet<String>()).also { it.add(applicationName) }
             }
         }
 
         private fun updateObjectNameSetForApplication(
             applicationObjectName: String,
             applicationName: String,
-            applicationNameSetMap: MutableMap<String, HashSet<String>>,
+            applicationNameSetMap: MutableMap<String, MutableSet<String>>,
         ) {
-            val objectNameSetForApplication = applicationNameSetMap[applicationName]
-            updateSetForMappedObjectName(applicationName, applicationObjectName, applicationNameSetMap, objectNameSetForApplication)
+            if (StringUtil.isEmpty(applicationName)) return
+            // Atomic get-or-put-and-mutate per D-03.
+            applicationNameSetMap.compute(applicationName) { _, existing ->
+                (existing ?: ConcurrentHashMap.newKeySet<String>()).also { it.add(applicationObjectName) }
+            }
         }
 
         private fun startsWithWord(string: String, prefix: String): Boolean =
