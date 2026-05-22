@@ -11,7 +11,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.codeStyle.CodeStyleManager;
-import com.intellij.testFramework.fixtures.LightCodeInsightFixtureTestCase;
+import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 import com.intellij.usageView.UsageInfo;
 
 import java.util.Collection;
@@ -20,7 +20,7 @@ import java.util.List;
 /**
  * Created by Andrey on 20/12/15.
  */
-public class AppleScriptCodeInsightTest extends LightCodeInsightFixtureTestCase {
+public class AppleScriptCodeInsightTest extends BasePlatformTestCase {
 
   private final String myTestDataDir = "src/test/resources/testData/";
 
@@ -73,13 +73,9 @@ public class AppleScriptCodeInsightTest extends LightCodeInsightFixtureTestCase 
 
   public void testFormatter() {
     myFixture.configureByFiles("format/test_block_indent.scpt");
-//    CodeStyleSettingsManager.getSettings(getProject()).SPACE_AROUND_ASSIGNMENT_OPERATORS = true;
-    new WriteCommandAction.Simple(getProject()) {
-      @Override
-      protected void run() throws Throwable {
+    WriteCommandAction.runWriteCommandAction(getProject(), () -> {
         CodeStyleManager.getInstance(getProject()).reformat(myFixture.getFile());
-      }
-    }.execute();
+    });
     myFixture.checkResultByFile("format/test_block_indent_result.scpt");
   }
 
