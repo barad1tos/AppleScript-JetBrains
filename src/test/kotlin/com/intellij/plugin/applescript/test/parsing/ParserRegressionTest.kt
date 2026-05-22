@@ -30,6 +30,10 @@ class ParserRegressionTest : BasePlatformTestCase() {
 
     fun testMusicScript() = assertNoParserErrors("music_script.scpt")
 
+    fun testCountOfArgv() = assertNoParserErrors("count_of_argv.scpt")
+
+    fun testDoShellScript() = assertNoParserErrors("do_shell_script.scpt")
+
     private fun assertNoParserErrors(fileName: String) {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)

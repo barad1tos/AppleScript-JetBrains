@@ -950,26 +950,28 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
   /**
    * Last-resort acceptor for two-word composite identifiers ("album artist", "library playlist")
    * when no application sdef matched the token — typically because the target .app isn't
-   * installed on the host or the bundled snapshot is stale. Single barewords are NOT caught
+   * installed on the host, the bundled snapshot is stale, or the registry cached an app name
+   * without populating its dictionary with the queried property. Single barewords are NOT caught
    * here: the parser already handles "<id> of x" via referenceExpression + objectReference
    * chaining (e.g. count/length/first of nameExt), and a single-token fallback would reshape
    * those existing PSI trees. The two-word case is the one the parser otherwise can't represent
-   * — without it, scripts targeting an unloaded app cascade into panic-mode errors.
+   * — without it, scripts targeting an under-resolved app cascade into panic-mode errors.
    *
-   * Two safety gates keep behavior identical to baseline when conditions don't warrant the fix:
-   *   1. Target application's dictionary must NOT be initialized. Once loaded, the normal
-   *      dictionary lookups above are authoritative and any fallback here would over-claim.
-   *   2. Anchor token after the composite must fit the position:
-   *      - property: of / in
-   *      - class:    of / in / whose / where / digits (positional index)
+   * Anchor gates the look-ahead to prevent grabbing unrelated identifier pairs:
+   *   - property: of / in
+   *   - class:    of / in / whose / where / digits (positional index)
+   *
+   * Note: we deliberately do NOT gate on ensureKnownApplicationInitialized — that returns true
+   * for apps merely discovered in /Applications without the queried property actually being
+   * loaded, so gating there leaves users staring at cascade errors in real IDEs while headless
+   * tests stay green. Composite fallback is safe to always run after lookups fail: by the
+   * time we get here, every "real" dictionary path has already declined the token.
    */
   private static boolean parseFallbackBareIdentifier(PsiBuilder b, int l, int mode) {
     if (!recursion_guard_(b, l, "parseFallbackBareIdentifier")) return false;
     if (b.getTokenType() != VAR_IDENTIFIER) return false;
     if (b.lookAhead(1) != VAR_IDENTIFIER) return false;
     if (!isFallbackAnchor(b.lookAhead(2), mode)) return false;
-    String app = getTargetApplicationName(b);
-    if (ParsableScriptSuiteRegistryHelper.ensureKnownApplicationInitialized(app)) return false;
     b.advanceLexer();
     b.advanceLexer();
     return true;
