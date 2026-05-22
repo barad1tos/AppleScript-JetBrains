@@ -1,0 +1,353 @@
+package com.intellij.plugin.applescript.psi.sdef.impl
+
+import com.github.markusbernhardt.proxy.util.PListParser
+import com.intellij.lang.Language
+import com.intellij.navigation.ItemPresentation
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.plugin.applescript.AppleScriptIcons
+import com.intellij.plugin.applescript.AppleScriptLanguage
+import com.intellij.plugin.applescript.lang.ide.AppleScriptDocHelper
+import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
+import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
+import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
+import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
+import com.intellij.plugin.applescript.lang.sdef.CommandDirectParameter
+import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
+import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumeration
+import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumerator
+import com.intellij.plugin.applescript.lang.sdef.DictionaryRecord
+import com.intellij.plugin.applescript.lang.sdef.Suite
+import com.intellij.plugin.applescript.lang.sdef.parser.SDEF_Parser
+import com.intellij.plugin.applescript.psi.AppleScriptExpression
+import com.intellij.plugin.applescript.psi.AppleScriptIdentifier
+import com.intellij.plugin.applescript.psi.impl.AppleScriptElementPresentation
+import com.intellij.plugin.applescript.psi.sdef.DictionaryIdentifier
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
+import com.intellij.psi.PsiManager
+import com.intellij.psi.impl.FakePsiElement
+import com.intellij.psi.xml.XmlAttribute
+import com.intellij.psi.xml.XmlAttributeValue
+import com.intellij.psi.xml.XmlFile
+import com.intellij.psi.xml.XmlTag
+import com.intellij.util.IncorrectOperationException
+import com.intellij.util.ui.JBImageIcon
+import com.intellij.util.ui.JBUI
+import org.apache.commons.imaging.ImageReadException
+import org.apache.commons.imaging.formats.icns.IcnsImageParser
+import java.awt.Image
+import java.awt.image.BufferedImage
+import java.io.File
+import java.io.IOException
+import java.util.LinkedHashSet
+import javax.swing.Icon
+
+/**
+ * PSI representation of one SDEF dictionary. Owns the suite registry plus per-name lookup maps for
+ * commands / classes / records / properties / enumerations, eagerly initialised at construction by
+ * parsing the bundled XmlFile via [SDEF_Parser]. Bundle metadata (application name, icon) is read
+ * from the .app's Info.plist + ICNS resource when available.
+ */
+class ApplicationDictionaryImpl(
+    private val project: Project,
+    dictionaryXmlFile: XmlFile,
+    private var applicationName: String,
+    private val applicationBundleFile: File?,
+) : FakePsiElement(),
+    ApplicationDictionary {
+
+    private val dictionaryFile: VirtualFile = dictionaryXmlFile.virtualFile
+    private var applicationIcon: Icon? = null
+    private val includedFiles: MutableList<PsiFile> = ArrayList()
+    private var dictionaryName: String = ""
+    private var documentation: String? = null
+
+    private var myRootTag: XmlTag? = null
+    private val mySuites: MutableList<Suite> = ArrayList()
+    private val dictionaryPropertyMap: MutableMap<String, AppleScriptPropertyDefinition> = HashMap()
+    private val dictionaryRecordMap: MutableMap<String, DictionaryRecord> = HashMap()
+    private val dictionaryEnumeratorMap: MutableMap<String, DictionaryEnumerator> = HashMap()
+    private val dictionaryEnumerationMap: MutableMap<String, DictionaryEnumeration> = HashMap()
+    private val dictionaryCommandMap: MutableMap<String, AppleScriptCommand> = HashMap()
+
+    @Suppress("unused")
+    private val dictionaryCommands: MutableSet<AppleScriptCommand> = LinkedHashSet()
+    private val dictionaryClassMap: MutableMap<String, AppleScriptClass> = HashMap()
+    private val dictionaryClassToPluralNameMap: MutableMap<String, AppleScriptClass> = HashMap()
+    private val dictionaryClassByCodeMap: MutableMap<String, AppleScriptClass> = HashMap()
+
+    init {
+        readDictionaryFromXmlFile(dictionaryXmlFile)
+        applicationBundleFile?.let { setIconFromBundle(it) }
+        if (StringUtil.isEmpty(dictionaryName)) {
+            dictionaryName = applicationName
+        }
+        LOG.info(
+            "Dictionary [$dictionaryName] for application [$applicationName] initialized " +
+                "In project[${project.name}]  Commands: ${dictionaryCommandMap.size}. " +
+                "Classes: ${dictionaryClassMap.size}",
+        )
+    }
+
+    /** Resolve the dictionary icon from the application bundle's Info.plist + ICNS resource. */
+    private fun setIconFromBundle(applicationBundleFile: File) {
+        try {
+            val appUrl = applicationBundleFile.path
+            val infoPlist = File("$appUrl/Contents/Info.plist")
+            if (!infoPlist.exists() || infoPlist.isDirectory) return
+            var dict: PListParser.Dict? = null
+            try {
+                dict = PListParser.load(infoPlist)
+            } catch (e: PListParser.XmlParseException) {
+                LOG.warn("Can not parse Info.plist for $applicationName: ${e.message}")
+            } catch (e: IOException) {
+                LOG.warn("Can not parse Info.plist for $applicationName: ${e.message}")
+            }
+            var imgFilename: Any? = dict?.get("CFBundleIconFile")
+            if (imgFilename == null) {
+                imgFilename = applicationName // best-effort guess
+            }
+            var fileName = imgFilename.toString()
+            fileName = if (fileName.endsWith(".icns")) fileName else "$fileName.icns"
+
+            val icnsFile = File("$appUrl/Contents/Resources/$fileName")
+            if (!icnsFile.exists() || icnsFile.isDirectory) return
+
+            val parser = IcnsImageParser()
+            // TODO: 25/12/15 verify memory management for the BufferedImage list.
+            val list: List<BufferedImage>? = parser.getAllBufferedImages(icnsFile)
+            if (list.isNullOrEmpty()) return
+
+            val index = if (list.size > 1) list.size - 1 else 0
+            val size = JBUI.scale(13)
+            val img: Image = list[index].getScaledInstance(size, size, Image.SCALE_SMOOTH)
+            applicationIcon = JBImageIcon(img)
+        } catch (e: ImageReadException) {
+            e.printStackTrace()
+        } catch (e: IOException) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun processInclude(includedFile: XmlFile): PsiFile? {
+        if (includedFile.isValid) {
+            val document = includedFile.document
+            if (document != null) {
+                val rootTag = document.rootTag
+                if (rootTag != null) {
+                    SDEF_Parser.parseRootTag(this, rootTag)
+                }
+            }
+            includedFiles.add(includedFile)
+            println("Processed included file: $includedFile")
+            LOG.debug("Processed included file:: $includedFile")
+        }
+        return includedFile
+    }
+
+    override fun getProject(): Project = project
+
+    override fun addSuite(suite: Suite): Boolean = mySuites.add(suite)
+
+    override fun getDictionaryFile(): VirtualFile = dictionaryFile
+
+    override fun getDictionaryEnumerationMap(): Map<String, DictionaryEnumeration> = dictionaryEnumerationMap
+
+    override fun getDictionaryEnumeratorMap(): Map<String, DictionaryEnumerator> = dictionaryEnumeratorMap
+
+    override fun getDictionaryRecordMap(): Map<String, DictionaryRecord> = dictionaryRecordMap
+
+    override fun getDictionaryCommandMap(): Map<String, AppleScriptCommand> = dictionaryCommandMap
+
+    override fun getDictionaryClassMap(): Map<String, AppleScriptClass> = dictionaryClassMap
+
+    override fun findClass(name: String?): AppleScriptClass? = dictionaryClassMap[name]
+
+    override fun getParameterNamesForCommand(name: String): List<String>? =
+        dictionaryCommandMap[name]?.getParameterNames()
+
+    override fun findDirectParameterForCommand(commandName: String): CommandDirectParameter? =
+        dictionaryCommandMap[commandName]?.getDirectParameter()
+
+    override fun findProperty(name: String): AppleScriptPropertyDefinition? = dictionaryPropertyMap[name]
+
+    // TODO: 06/12/15 redefine equals and hash code for AppleScriptCommand and store HashSet, not the Map
+    override fun findAllCommandsWithName(name: String): List<AppleScriptCommand> {
+        val result = ArrayList<AppleScriptCommand>(1)
+        dictionaryCommandMap[name]?.let { result.add(it) }
+        return result
+    }
+
+    override fun findEnumerator(name: String): DictionaryEnumerator? = dictionaryEnumeratorMap[name]
+
+    override fun findClassByPluralName(pluralForm: String): AppleScriptClass? =
+        dictionaryClassToPluralNameMap[pluralForm]
+
+    override fun findEnumeration(name: String): DictionaryEnumeration? = dictionaryEnumerationMap[name]
+
+    override fun addCommand(command: AppleScriptCommand): Boolean =
+        dictionaryCommandMap.put(command.getName(), command) == null
+
+    override fun addClass(appleScriptClass: AppleScriptClass): Boolean {
+        val previous = dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)
+        appleScriptClass.getCode()?.let { dictionaryClassByCodeMap[it] = appleScriptClass }
+        dictionaryClassToPluralNameMap[appleScriptClass.getPluralClassName()] = appleScriptClass
+        for (property in appleScriptClass.getProperties()) {
+            addProperty(property)
+        }
+        return previous == null
+    }
+
+    override fun getIcon(open: Boolean): Icon = applicationIcon ?: AppleScriptIcons.OPEN_DICTIONARY
+
+    override fun getPresentation(): ItemPresentation = AppleScriptElementPresentation(this)
+
+    override fun findClassByCode(code: String): AppleScriptClass? = dictionaryClassByCodeMap[code]
+
+    override fun addProperty(property: AppleScriptPropertyDefinition): Boolean =
+        dictionaryPropertyMap.put(property.getName(), property) == null
+
+    override fun addEnumeration(enumeration: DictionaryEnumeration): Boolean {
+        val previous = dictionaryEnumerationMap.put(enumeration.getName(), enumeration)
+        for (enumerator in enumeration.getEnumerators().orEmpty()) {
+            dictionaryEnumeratorMap[enumerator.getName()] = enumerator
+        }
+        return previous == null
+    }
+
+    override fun getDocumentation(): String = buildString {
+        append(getType()).append(" <b>").append(getName()).append("</b>")
+        append("<p>")
+        for (suite in mySuites) {
+            append("<br>    <b>")
+            AppleScriptDocHelper.appendElementLink(this, suite, suite.getName())
+            append("</b><br>")
+        }
+        append("</p>")
+    }
+
+    override fun getCode(): String? = null
+
+    override fun getCocoaClassName(): String? = null
+
+    override fun isScriptProperty(): Boolean = false
+
+    override fun isHandler(): Boolean = false
+
+    override fun getOriginalDeclaration(): PsiElement? = null
+
+    override fun isObjectProperty(): Boolean = false
+
+    override fun isVariable(): Boolean = false
+
+    override fun findAssignedValue(): AppleScriptExpression? = null
+
+    override fun getName(): String = dictionaryName
+
+    override fun getApplicationName(): String = applicationName
+
+    @Throws(IncorrectOperationException::class)
+    override fun setName(name: String): PsiElement {
+        dictionaryName = name
+        return this
+    }
+
+    override fun getNameIdentifiers(): List<String> = applicationName.split("\\s+".toRegex())
+
+    override fun getQualifiedPath(): String = "dictionary:${getName()}/${getQualifiedName()}"
+
+    override fun getQualifiedName(): String = "${getType()}:${getCode()}"
+
+    override fun getDescription(): String? = null
+
+    override fun getLanguage(): Language = AppleScriptLanguage
+
+    override fun getDictionaryPropertyMap(): Map<String, AppleScriptPropertyDefinition> = dictionaryPropertyMap
+
+    override fun addRecord(record: DictionaryRecord) {
+        dictionaryRecordMap[record.getName()] = record
+        for (prop in record.getProperties()) {
+            dictionaryPropertyMap[prop.getName()] = prop
+        }
+    }
+
+    override fun getParent(): PsiElement? = PsiManager.getInstance(getProject()).findFile(getDictionaryFile())
+
+    override fun getSuite(): Suite? = null
+
+    override fun getDictionaryParentComponent(): DictionaryComponent? = null
+
+    override fun getType(): String = "dictionary"
+
+    override fun setDescription(description: String?) = Unit
+
+    override fun setDictionaryDoc(documentation: String?) {
+        this.documentation = documentation
+    }
+
+    override fun getDictionary(): ApplicationDictionary = this
+
+    private fun readDictionaryFromXmlFile(xmlFile1: XmlFile) {
+        if (xmlFile1.isValid) {
+            xmlFile1.rootTag?.let { setRootTag(it) }
+            SDEF_Parser.parse(xmlFile1, this)
+            LOG.debug("Dictionary loaded. Virtual file: $xmlFile1")
+        }
+    }
+
+    override fun getIdentifier(): AppleScriptIdentifier {
+        // Mirrors the Java original — NPEs if myRootTag was never set, which would itself indicate a
+        // construction/lifecycle bug (the constructor always assigns rootTag via readDictionaryFromXmlFile).
+        val rootTag = myRootTag!!
+        var myIdentifier: DictionaryIdentifier? = null
+        val titleAttr: XmlAttribute? = rootTag.getAttribute("title")
+        if (titleAttr != null) {
+            val attrValue: XmlAttributeValue? = titleAttr.valueElement
+            if (attrValue != null) {
+                myIdentifier = DictionaryIdentifierImpl(this, getName(), attrValue)
+            }
+        }
+        return myIdentifier ?: DictionaryIdentifierImpl(this, getName(), rootTag)
+    }
+
+    override fun getNameIdentifier(): PsiElement = getIdentifier()
+
+    override fun setRootTag(myRootTag: XmlTag): ApplicationDictionary {
+        this.myRootTag = myRootTag
+        return this
+    }
+
+    override fun getRootTag(): XmlTag? = myRootTag
+
+    override fun findSuiteByName(suiteCode: String): Suite? {
+        for (suite in mySuites) {
+            if (suiteCode == suite.getName()) return suite
+        }
+        return null
+    }
+
+    override fun findSuiteByCode(suiteCode: String): Suite? {
+        for (suite in mySuites) {
+            if (suiteCode == suite.getCode()) return suite
+        }
+        return null
+    }
+
+    override fun findCommand(name: String?): AppleScriptCommand? = dictionaryCommandMap[name]
+
+    override fun getAllCommands(): Collection<AppleScriptCommand> = dictionaryCommandMap.values
+
+    override fun getApplicationBundle(): File? = applicationBundleFile
+
+    companion object {
+        @JvmField
+        val LOG: Logger = Logger.getInstance("#${ApplicationDictionaryImpl::class.java.name}")
+
+        @JvmStatic
+        fun extensionSupported(extension: String?): Boolean =
+            extension != null && ApplicationDictionary.SUPPORTED_DICTIONARY_EXTENSIONS.contains(extension.lowercase())
+    }
+}
