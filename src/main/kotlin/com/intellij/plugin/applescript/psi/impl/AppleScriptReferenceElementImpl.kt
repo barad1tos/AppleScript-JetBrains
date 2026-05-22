@@ -38,7 +38,7 @@ abstract class AppleScriptReferenceElementImpl(node: ASTNode) :
 
     protected open fun multiResolveInner(incompleteCode: Boolean): Array<ResolveResult> {
         val elements = ResolveCache.getInstance(project)
-            .resolveWithCaching(this, AppleScriptResolver.INSTANCE, true, incompleteCode)
+            .resolveWithCaching(this, AppleScriptResolver, true, incompleteCode)
         return AppleScriptResolveUtil.toCandidateInfoArray(elements)
     }
 
@@ -100,13 +100,13 @@ abstract class AppleScriptReferenceElementImpl(node: ASTNode) :
 
     override fun getVariants(): Array<Any> {
         val elements: List<PsiElement>? = ResolveCache.getInstance(project)
-            .resolveWithCaching(this, AppleScriptComponentScopeResolver.INSTANCE, true, true)
+            .resolveWithCaching(this, AppleScriptComponentScopeResolver, true, true)
 
         val resolveProcessor = AppleScriptDictionaryResolveProcessor(project, canonicalText)
         val state = ResolveState.initial()
             .put(AppleScriptDictionaryResolveProcessor.COLLECT_ALL_DECLARATIONS, true)
         PsiTreeUtil.treeWalkUp(resolveProcessor, getElement(), null, state)
-        val dictionaryComponents: List<DictionaryComponent> = resolveProcessor.filteredResult
+        val dictionaryComponents: List<DictionaryComponent> = resolveProcessor.getFilteredResult()
 
         val lookupElements = mutableListOf<LookupElement>()
         elements?.forEach { addLookupElement(lookupElements, it) }
