@@ -3,13 +3,13 @@ package com.intellij.plugin.applescript.test.parsing;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.psi.PsiFile;
 import com.intellij.testFramework.ParsingTestCase;
-import com.intellij.testFramework.fixtures.LightPlatformCodeInsightFixtureTestCase;
+import com.intellij.testFramework.fixtures.BasePlatformTestCase;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-public abstract class AbstractParsingFixtureTestCase extends LightPlatformCodeInsightFixtureTestCase {
+public abstract class AbstractParsingFixtureTestCase extends BasePlatformTestCase {
 
   private static final Logger LOG = Logger.getInstance("#" + AbstractParsingFixtureTestCase.class.getName());
 

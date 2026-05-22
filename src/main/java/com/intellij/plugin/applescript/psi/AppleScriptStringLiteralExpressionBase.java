@@ -33,10 +33,10 @@ public abstract class AppleScriptStringLiteralExpressionBase extends AppleScript
     return new StringLiteralEscaper(this);
   }
 
-  public static class StringLiteralEscaper extends LiteralTextEscaper<AppleScriptStringLiteralExpression> {
+  public static class StringLiteralEscaper extends LiteralTextEscaper<AppleScriptStringLiteralExpressionBase> {
     private int[] sourceOffsets;
 
-    StringLiteralEscaper(@NotNull AppleScriptStringLiteralExpression host) {
+    StringLiteralEscaper(@NotNull AppleScriptStringLiteralExpressionBase host) {
       super(host);
     }
 
