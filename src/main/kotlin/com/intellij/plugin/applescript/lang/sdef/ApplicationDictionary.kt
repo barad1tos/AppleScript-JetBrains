@@ -42,7 +42,7 @@ interface ApplicationDictionary : DictionarySuite {
 
     fun setRootTag(myRootTag: XmlTag): ApplicationDictionary
 
-    fun getRootTag(): XmlTag
+    fun getRootTag(): XmlTag?
 
     fun getAllCommands(): Collection<AppleScriptCommand>
 
