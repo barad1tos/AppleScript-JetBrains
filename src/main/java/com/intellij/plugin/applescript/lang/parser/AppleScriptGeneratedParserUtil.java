@@ -907,7 +907,29 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     // sdef isn't loaded (e.g. Music on a machine without Music.app) cascade into
     // panic-mode errors after the first composite property like "album artist of x".
     // Semantic resolution is the annotator's job — parser stays syntax-only here.
+    if (parseKeywordAsPropertyFallback(b, l + 1)) return true;
     return parseFallbackBareIdentifier(b, l + 1, FALLBACK_PROPERTY);
+  }
+
+  /**
+   * AppleScript reserves a handful of words (count, length, ...) that have their own
+   * grammar rules for the prefix form ('count items', 'length of x' via lengthCommand).
+   * The countCommandExpression rule, in particular, requires either '[typeSpecifier]
+   * composite_value' or 'number of ...' after `count` — so the postfix property-style
+   * 'count of argv' is not accepted by the grammar and bubbles up as a cascade trigger.
+   *
+   * This fallback fires only when the regular dictionary lookups above declined the
+   * current token AND the token is one of the keyword names that should be allowed
+   * in property position. Anchor is 'of' / 'in' so we don't wrap a bare `count`
+   * statement.
+   */
+  private static boolean parseKeywordAsPropertyFallback(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "parseKeywordAsPropertyFallback")) return false;
+    if (b.getTokenType() != COUNT) return false;
+    IElementType ahead = b.lookAhead(1);
+    if (ahead != OF && ahead != IN) return false;
+    b.advanceLexer();
+    return true;
   }
 
   /**
