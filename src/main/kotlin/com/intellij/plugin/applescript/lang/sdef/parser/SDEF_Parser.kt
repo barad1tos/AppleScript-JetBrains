@@ -51,9 +51,6 @@ object SDEF_Parser {
         println("Start parsing xml file --- $file ---")
         LOG.debug("Start parsing xml file --- $file ---")
 
-        // The interface signature claims non-null but ApplicationDictionaryImpl returns the raw field
-        // which is null until first set — mirrors the Java original verbatim until Phase 4f.
-        @Suppress("SENSELESS_COMPARISON")
         if (parsedDictionary.getRootTag() == null) {
             file.rootTag?.let { parsedDictionary.setRootTag(it) }
         }

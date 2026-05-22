@@ -31,5 +31,5 @@ class DictionaryRecordDefinition : AbstractDictionaryComponent<Suite>, Dictionar
         this.properties = properties
     }
 
-    override fun getSuite(): Suite = dictionaryParentComponent
+    override fun getSuite(): Suite = getDictionaryParentComponent()
 }
