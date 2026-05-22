@@ -48,7 +48,11 @@ sourceSets {
 }
 
 dependencies {
-    implementation(libs.kotlinx.coroutines.core)
+    // kotlinx-coroutines-core is intentionally NOT declared as a runtime dep —
+    // IntelliJ Platform 2024.3+ ships its own pinned coroutines (1.8.x) and shading
+    // ours on top triggers NoSuchMethodError at runtime
+    // (CancellableContinuation.tryResume signature drift). When v1.1 needs coroutines
+    // we use the platform-bundled instance via compileOnly + JBR's transitive copy.
     implementation(libs.commons.imaging)
     implementation(libs.proxy.vole)
 
@@ -154,8 +158,23 @@ tasks {
         // every installed macOS application (247 on dev box).
         // Both will be rewritten in Phases 3 (PSI rewrite) and 4 (SDEF rewrite).
         // For the green baseline we only run lexer tests; CI passes deterministically.
+        // Phase 8: parser regression suite runs only with -PincludeHeavyTests=true.
+        // BasePlatformTestCase boots a full fixture (~30s) + scans /Applications, so
+        // it's gated to avoid bloating CI but available for local fix-loop work.
+        val includeHeavy = providers.gradleProperty("includeHeavyTests").orNull == "true"
         filter {
             includeTestsMatching("com.intellij.plugin.applescript.test.lexer.*")
+            if (includeHeavy) {
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.HandlersParsingTestCase")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellParsingTestCase")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.DictionaryConstantParsingTestCase")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.StandardAdditionsParsingTestCase")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.LiveSamplesParsingTestCase")
+                // DictionariesRandomParsingTestCase + TellApplicationMusicTest scan installed
+                // /Applications and depend on host-machine state — kept out to avoid flakiness.
+            }
         }
     }
 }

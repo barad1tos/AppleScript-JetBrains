@@ -902,7 +902,12 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
       r = tryToParseApplicationProperty(b, l + 1, ApplicationDictionary.COCOA_STANDARD_LIBRARY);
       if (r) return true;
     }
-    return false;
+    // Dictionary-less fallback: accept a bareword or "<id> <id>" composite when
+    // anchored by 'of' / 'in' / ':'. Without this, scripts targeting an app whose
+    // sdef isn't loaded (e.g. Music on a machine without Music.app) cascade into
+    // panic-mode errors after the first composite property like "album artist of x".
+    // Semantic resolution is the annotator's job — parser stays syntax-only here.
+    return parseFallbackBareIdentifier(b, l + 1, FALLBACK_PROPERTY);
   }
 
   /**
@@ -926,11 +931,54 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     final Ref<String> currentTokenText = new Ref<String>();
     currentTokenText.set(s);
     r = parseDictionaryClassName(b, l + 1, currentTokenText, isPluralForm, toldApplicationName, areThereUseStatements, applicationsToImportFrom);
-    return r;
+    if (r) return true;
+    // Dictionary-less fallback: accept a bareword or "<id> <id>" composite when
+    // anchored by an index literal ("library playlist 1"), a 'whose'/'where'
+    // filter clause, or by an 'of'/'in' object-reference connector. Mirrors the
+    // property-name fallback below; same rationale — parser stays syntax-only.
+    return parseFallbackBareIdentifier(b, l + 1, FALLBACK_CLASS);
   }
 
   public static boolean parseCheckForUseStatements(PsiBuilder b, int l) {
     return recursion_guard_(b, l, "parseCheckForUseStatements") && b.getUserData(WAS_USE_STATEMENT_USED) == Boolean.TRUE;
+  }
+
+  /** Fallback mode: parser tried every dictionary lookup and none matched. */
+  private static final int FALLBACK_PROPERTY = 0;
+  private static final int FALLBACK_CLASS = 1;
+
+  /**
+   * Last-resort acceptor for two-word composite identifiers ("album artist", "library playlist")
+   * when no application sdef matched the token — typically because the target .app isn't
+   * installed on the host or the bundled snapshot is stale. Single barewords are NOT caught
+   * here: the parser already handles "<id> of x" via referenceExpression + objectReference
+   * chaining (e.g. count/length/first of nameExt), and a single-token fallback would reshape
+   * those existing PSI trees. The two-word case is the one the parser otherwise can't represent
+   * — without it, scripts targeting an unloaded app cascade into panic-mode errors.
+   *
+   * Two safety gates keep behavior identical to baseline when conditions don't warrant the fix:
+   *   1. Target application's dictionary must NOT be initialized. Once loaded, the normal
+   *      dictionary lookups above are authoritative and any fallback here would over-claim.
+   *   2. Anchor token after the composite must fit the position:
+   *      - property: of / in
+   *      - class:    of / in / whose / where / digits (positional index)
+   */
+  private static boolean parseFallbackBareIdentifier(PsiBuilder b, int l, int mode) {
+    if (!recursion_guard_(b, l, "parseFallbackBareIdentifier")) return false;
+    if (b.getTokenType() != VAR_IDENTIFIER) return false;
+    if (b.lookAhead(1) != VAR_IDENTIFIER) return false;
+    if (!isFallbackAnchor(b.lookAhead(2), mode)) return false;
+    String app = getTargetApplicationName(b);
+    if (ParsableScriptSuiteRegistryHelper.ensureKnownApplicationInitialized(app)) return false;
+    b.advanceLexer();
+    b.advanceLexer();
+    return true;
+  }
+
+  private static boolean isFallbackAnchor(IElementType t, int mode) {
+    if (t == OF || t == IN) return true;
+    if (mode == FALLBACK_CLASS) return t == DIGITS || t == WHOSE || t == WHERE;
+    return false;
   }
 
   /**
