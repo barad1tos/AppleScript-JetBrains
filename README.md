@@ -1,6 +1,8 @@
 # How to AppleScript in IDEA
 
-This plugin, provides support for writing and executing scripts with an [AppleScript](https://developer.apple.com/library/mac/documentation/AppleScript/Conceptual/AppleScriptLangGuide/introduction/ASLR_intro.html) language in IntelliJ-base IDEs.
+This plugin provides support for writing and executing scripts in the [AppleScript](https://developer.apple.com/library/mac/documentation/AppleScript/Conceptual/AppleScriptLangGuide/introduction/ASLR_intro.html) language inside JetBrains IDEs.
+
+> **1.0.0** — full Kotlin rewrite targeting IntelliJ 2024.3+ with the modern IntelliJ Platform Gradle Plugin 2.x. Existing 0.130 users get an in-IDE auto-update from Marketplace.
 
 
 [![](https://github.com/human87/AppleScript-IDEA/blob/master/img/quick_demo.gif "AppleScript scripting demo")](https://twitter.com/appcode/status/750380127431917568)

@@ -107,7 +107,59 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     // Could be command from Cocoa Standard library which was not yet checked, because applicationName == ScriptingAdditions.
     // The could happen when parsing <using terms from scripting additions> stms
     r = parseCommandNameForApplication(b, l + 1, parsedName, ApplicationDictionary.COCOA_STANDARD_LIBRARY, checkStdLib);
-    return r;
+    if (r) return true;
+    // Last-resort fallback for well-known multi-word StandardAdditions commands.
+    // Async dict loading in production IDEs can leave the StdLib registry empty
+    // when the parser runs first; once that happens, every `do shell script` /
+    // `do script` cascades into bogus errors that hide every subsequent issue.
+    // Hard-recognize a small set of literal command shapes so we degrade
+    // gracefully — the annotator still verifies semantics against the real dict.
+    return parseWellKnownCommandFallback(b, l + 1, parsedName);
+  }
+
+  /**
+   * Recognises a fixed set of multi-word StandardAdditions commands by literal token
+   * text + token-type shape. Returns true and sets parsedName when matched, leaving
+   * the lexer positioned after the consumed command name; the caller's normal
+   * parameter parsing then handles the rest of the call.
+   *
+   * Currently covers `do shell script` and `do script` — the two commonly-broken
+   * patterns reported when Music or similar third-party dicts are merely discovered
+   * but not populated. Add more entries here only when reproducible.
+   */
+  private static boolean parseWellKnownCommandFallback(PsiBuilder b, int l, Ref<String> parsedName) {
+    if (!recursion_guard_(b, l, "parseWellKnownCommandFallback")) return false;
+    if (b.getTokenType() != VAR_IDENTIFIER) return false;
+    if (!"do".equals(b.getTokenText())) return false;
+    // do shell script  →  VAR_IDENTIFIER VAR_IDENTIFIER SCRIPT
+    if (b.lookAhead(1) == VAR_IDENTIFIER && b.lookAhead(2) == SCRIPT) {
+      PsiBuilder.Marker m = b.mark();
+      String first = b.getTokenText();
+      b.advanceLexer();
+      if (!"shell".equals(b.getTokenText())) {
+        m.rollbackTo();
+        return false;
+      }
+      String second = b.getTokenText();
+      b.advanceLexer();
+      String third = b.getTokenText();
+      b.advanceLexer();
+      m.drop();
+      parsedName.set(first + " " + second + " " + third);
+      return true;
+    }
+    // do script  →  VAR_IDENTIFIER SCRIPT
+    if (b.lookAhead(1) == SCRIPT) {
+      PsiBuilder.Marker m = b.mark();
+      String first = b.getTokenText();
+      b.advanceLexer();
+      String second = b.getTokenText();
+      b.advanceLexer();
+      m.drop();
+      parsedName.set(first + " " + second);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -142,6 +194,19 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     // TODO: 06/12/15 may be try to avoid creating PSI here!..
     List<AppleScriptCommand> allCommandsWithName = getAllCommandsWithName(b, parsedCommandName.get(), toldApplicationName, areThereUseStatements,
             applicationsToImport);
+
+    // Fallback path: command name was recognized syntactically (multi-word, e.g.
+    // 'do shell script' via parseWellKnownCommandFallback) but no matching command
+    // definition was loaded yet. Consume one expression as the direct parameter so
+    // the rest of the line parses; without this the call expression ends at the
+    // command name and the upstream rule trips on the unconsumed argument tokens.
+    if (allCommandsWithName.isEmpty() && parsedCommandName.get() != null && parsedCommandName.get().contains(" ")) {
+      consumeToken(b, OF);
+      PsiBuilder.Marker pm = enter_section_(b, l, _NONE_, "<fallback direct parameter>");
+      boolean paramR = com.intellij.plugin.applescript.lang.parser.AppleScriptParser.expression(b, l + 1);
+      exit_section_(b, l, pm, DIRECT_PARAMETER_VAL, paramR, false, null);
+      return true;
+    }
 
     for (AppleScriptCommand command : allCommandsWithName) {
       r = parseParametersForCommand(b, l + 1, command);
@@ -902,7 +967,34 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
       r = tryToParseApplicationProperty(b, l + 1, ApplicationDictionary.COCOA_STANDARD_LIBRARY);
       if (r) return true;
     }
-    return false;
+    // Dictionary-less fallback: accept a bareword or "<id> <id>" composite when
+    // anchored by 'of' / 'in' / ':'. Without this, scripts targeting an app whose
+    // sdef isn't loaded (e.g. Music on a machine without Music.app) cascade into
+    // panic-mode errors after the first composite property like "album artist of x".
+    // Semantic resolution is the annotator's job — parser stays syntax-only here.
+    if (parseKeywordAsPropertyFallback(b, l + 1)) return true;
+    return parseFallbackBareIdentifier(b, l + 1, FALLBACK_PROPERTY);
+  }
+
+  /**
+   * AppleScript reserves a handful of words (count, length, ...) that have their own
+   * grammar rules for the prefix form ('count items', 'length of x' via lengthCommand).
+   * The countCommandExpression rule, in particular, requires either '[typeSpecifier]
+   * composite_value' or 'number of ...' after `count` — so the postfix property-style
+   * 'count of argv' is not accepted by the grammar and bubbles up as a cascade trigger.
+   *
+   * This fallback fires only when the regular dictionary lookups above declined the
+   * current token AND the token is one of the keyword names that should be allowed
+   * in property position. Anchor is 'of' / 'in' so we don't wrap a bare `count`
+   * statement.
+   */
+  private static boolean parseKeywordAsPropertyFallback(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "parseKeywordAsPropertyFallback")) return false;
+    if (b.getTokenType() != COUNT) return false;
+    IElementType ahead = b.lookAhead(1);
+    if (ahead != OF && ahead != IN) return false;
+    b.advanceLexer();
+    return true;
   }
 
   /**
@@ -926,11 +1018,56 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     final Ref<String> currentTokenText = new Ref<String>();
     currentTokenText.set(s);
     r = parseDictionaryClassName(b, l + 1, currentTokenText, isPluralForm, toldApplicationName, areThereUseStatements, applicationsToImportFrom);
-    return r;
+    if (r) return true;
+    // Dictionary-less fallback: accept a bareword or "<id> <id>" composite when
+    // anchored by an index literal ("library playlist 1"), a 'whose'/'where'
+    // filter clause, or by an 'of'/'in' object-reference connector. Mirrors the
+    // property-name fallback below; same rationale — parser stays syntax-only.
+    return parseFallbackBareIdentifier(b, l + 1, FALLBACK_CLASS);
   }
 
   public static boolean parseCheckForUseStatements(PsiBuilder b, int l) {
     return recursion_guard_(b, l, "parseCheckForUseStatements") && b.getUserData(WAS_USE_STATEMENT_USED) == Boolean.TRUE;
+  }
+
+  /** Fallback mode: parser tried every dictionary lookup and none matched. */
+  private static final int FALLBACK_PROPERTY = 0;
+  private static final int FALLBACK_CLASS = 1;
+
+  /**
+   * Last-resort acceptor for two-word composite identifiers ("album artist", "library playlist")
+   * when no application sdef matched the token — typically because the target .app isn't
+   * installed on the host, the bundled snapshot is stale, or the registry cached an app name
+   * without populating its dictionary with the queried property. Single barewords are NOT caught
+   * here: the parser already handles "<id> of x" via referenceExpression + objectReference
+   * chaining (e.g. count/length/first of nameExt), and a single-token fallback would reshape
+   * those existing PSI trees. The two-word case is the one the parser otherwise can't represent
+   * — without it, scripts targeting an under-resolved app cascade into panic-mode errors.
+   *
+   * Anchor gates the look-ahead to prevent grabbing unrelated identifier pairs:
+   *   - property: of / in
+   *   - class:    of / in / whose / where / digits (positional index)
+   *
+   * Note: we deliberately do NOT gate on ensureKnownApplicationInitialized — that returns true
+   * for apps merely discovered in /Applications without the queried property actually being
+   * loaded, so gating there leaves users staring at cascade errors in real IDEs while headless
+   * tests stay green. Composite fallback is safe to always run after lookups fail: by the
+   * time we get here, every "real" dictionary path has already declined the token.
+   */
+  private static boolean parseFallbackBareIdentifier(PsiBuilder b, int l, int mode) {
+    if (!recursion_guard_(b, l, "parseFallbackBareIdentifier")) return false;
+    if (b.getTokenType() != VAR_IDENTIFIER) return false;
+    if (b.lookAhead(1) != VAR_IDENTIFIER) return false;
+    if (!isFallbackAnchor(b.lookAhead(2), mode)) return false;
+    b.advanceLexer();
+    b.advanceLexer();
+    return true;
+  }
+
+  private static boolean isFallbackAnchor(IElementType t, int mode) {
+    if (t == OF || t == IN) return true;
+    if (mode == FALLBACK_CLASS) return t == DIGITS || t == WHOSE || t == WHERE;
+    return false;
   }
 
   /**
