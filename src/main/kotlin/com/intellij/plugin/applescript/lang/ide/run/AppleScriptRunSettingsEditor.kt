@@ -1,0 +1,57 @@
+@file:Suppress("DEPRECATION")
+
+package com.intellij.plugin.applescript.lang.ide.run
+
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
+import com.intellij.openapi.options.ConfigurationException
+import com.intellij.openapi.options.SettingsEditor
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.openapi.util.text.StringUtil
+import javax.swing.JCheckBox
+import javax.swing.JComponent
+import javax.swing.JPanel
+import javax.swing.JTextField
+
+class AppleScriptRunSettingsEditor(
+    @Suppress("unused") private val project: Project,
+    private val runConfiguration: AppleScriptRunConfiguration,
+) : SettingsEditor<AppleScriptRunConfiguration>() {
+
+    // Initialised by the IntelliJ UI Designer instrumentation from AppleScriptRunSettingsEditor.form.
+    private lateinit var mainPanel: JPanel
+    private lateinit var scriptTextField: TextFieldWithBrowseButton
+    private lateinit var parametersTextField: JTextField
+    private lateinit var scriptOptionsTextField: JTextField
+    private lateinit var showAppleEventsCheckBox: JCheckBox
+
+    init {
+        val descriptor = FileChooserDescriptor(true, false, false, false, false, false)
+        scriptTextField.addBrowseFolderListener("Chose script", "Please choose script to run", project, descriptor)
+    }
+
+    override fun resetEditorFrom(configuration: AppleScriptRunConfiguration) {
+        val scriptPath = configuration.scriptPath
+        if (!StringUtil.isEmpty(scriptPath)) {
+            scriptTextField.text = scriptPath!!
+            val parts = scriptPath.split("/")
+            if (parts.isNotEmpty()) runConfiguration.name = parts.last()
+        }
+        configuration.scriptParameters?.let { if (it.isNotEmpty()) parametersTextField.text = it }
+        configuration.scriptOptions?.let { if (it.isNotEmpty()) scriptOptionsTextField.text = it }
+        showAppleEventsCheckBox.isSelected = configuration.showAppleEvents
+    }
+
+    @Throws(ConfigurationException::class)
+    override fun applyEditorTo(configuration: AppleScriptRunConfiguration) {
+        configuration.scriptPath = scriptTextField.text.trim()
+        configuration.scriptParameters = parametersTextField.text.trim()
+        configuration.scriptOptions = scriptOptionsTextField.text.trim()
+        configuration.showAppleEvents = showAppleEventsCheckBox.isSelected
+    }
+
+    override fun createEditor(): JComponent = mainPanel
+
+    val scriptName: String?
+        get() = runConfiguration.scriptPath
+}
