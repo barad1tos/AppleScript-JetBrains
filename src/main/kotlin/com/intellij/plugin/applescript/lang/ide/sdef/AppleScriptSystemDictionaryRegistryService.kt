@@ -38,6 +38,8 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.util.Arrays
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.script.ScriptException
 import javax.script.ScriptEngineManager
@@ -52,30 +54,39 @@ class AppleScriptSystemDictionaryRegistryService :
     ParsableScriptHelper {
 
     // persisted data
-    private val dictionaryInfoMap: MutableMap<String, DictionaryInfo> = HashMap()
-    private val notScriptableApplicationList: HashSet<String> = HashSet()
+    private val dictionaryInfoMap: MutableMap<String, DictionaryInfo> = ConcurrentHashMap()
+    private val notScriptableApplicationList: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     // scripting additions installed in the system
-    private val scriptingAdditions: HashSet<String> = HashSet()
-    private val notFoundApplicationList: HashSet<String> = HashSet()
-    private val discoveredApplicationNames: HashSet<String> = HashSet()
+    private val scriptingAdditions: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val notFoundApplicationList: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val discoveredApplicationNames: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     private var xCodeApplicationFile: File? = null
 
-    private val applicationNameToClassNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToClassNamePluralSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToCommandNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToRecordNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToPropertySetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToEnumerationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val applicationNameToEnumeratorConstantNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdClassNameToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdClassNamePluralToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdCommandNameToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdRecordNameToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdPropertyNameToDictionarySetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdEnumerationNameToApplicationNameSetMap: MutableMap<String, HashSet<String>> = HashMap()
-    private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap<String, HashSet<String>> = HashMap()
+    private val applicationNameToClassNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToClassNamePluralSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToCommandNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToRecordNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToPropertySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToEnumerationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToEnumeratorConstantNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdClassNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdClassNamePluralToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdCommandNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdRecordNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdPropertyNameToDictionarySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdEnumerationNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+
+    /**
+     * Released exactly once when [init] finishes (including the catch-Exception branch — see [init] finally).
+     * Readers in [ParsableScriptHelper] gate against this:
+     *   - Boolean predicates (parser hot path) use `if (initLatch.count > 0L) return false` — never block.
+     *   - Collection-returning resolvers use `initLatch.await(2, TimeUnit.SECONDS)` — bounded wait.
+     * See ARCHITECTURE.md section 7 and PITFALLS.md section 7.1.
+     */
+    private val initLatch: CountDownLatch = CountDownLatch(1)
 
     init {
         try {
@@ -85,6 +96,9 @@ class AppleScriptSystemDictionaryRegistryService :
             discoverInstalledApplicationNames()
         } catch (e: Exception) {
             LOG.error("Error while initializing service", e)
+        } finally {
+            // D-05: release on the failure path too, so readers never deadlock on a failed init.
+            initLatch.countDown()
         }
     }
 
@@ -112,9 +126,12 @@ class AppleScriptSystemDictionaryRegistryService :
 
     internal fun getDictionaryInfoList(): Collection<DictionaryInfo> = dictionaryInfoMap.values
 
-    fun getNotScriptableApplicationList(): HashSet<String> = notScriptableApplicationList
+    // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
+    fun getNotScriptableApplicationList(): HashSet<String> = HashSet(notScriptableApplicationList)
 
-    override fun getScriptingAdditions(): HashSet<String> = scriptingAdditions
+    // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
+    // TODO(v1.1 SDEF-05): once DictionaryIndexes lands, narrow the interface to a read-only Set.
+    override fun getScriptingAdditions(): HashSet<String> = HashSet(scriptingAdditions)
 
     override fun loadState(state: PersistedState) {
         super.loadState(state)
@@ -199,6 +216,7 @@ class AppleScriptSystemDictionaryRegistryService :
             !isInUnknownList(anyApplicationName) && getInitializedInfo(anyApplicationName) != null
 
     override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean {
+        if (initLatch.count > 0L) return false
         if (discoveredApplicationNames.contains(knownApplicationName)) {
             val dInfo = dictionaryInfoMap[knownApplicationName]
             return dInfo != null && (dInfo.isInitialized() || initializeDictionaryFromInfo(dInfo)) ||
@@ -209,32 +227,47 @@ class AppleScriptSystemDictionaryRegistryService :
 
     // ParsableScriptHelper methods
 
-    override fun isStdLibClass(name: String): Boolean = stdClassNameToApplicationNameSetMap.containsKey(name)
+    override fun isStdLibClass(name: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return stdClassNameToApplicationNameSetMap.containsKey(name)
+    }
 
     override fun isApplicationClass(applicationName: String, className: String): Boolean {
+        if (initLatch.count > 0L) return false
         val classNameSet = applicationNameToClassNameSetMap[applicationName]
         return classNameSet != null && classNameSet.contains(className)
     }
 
-    override fun isStdLibClassPluralName(pluralName: String): Boolean =
-        stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
+    override fun isStdLibClassPluralName(pluralName: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
+    }
 
     override fun isApplicationClassPluralName(applicationName: String, pluralClassName: String): Boolean {
+        if (initLatch.count > 0L) return false
         val pluralClassNameSet = applicationNameToClassNamePluralSetMap[applicationName]
         return pluralClassNameSet != null && pluralClassNameSet.contains(pluralClassName)
     }
 
-    override fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean =
-        isNameWithPrefixExist(classNamePrefix, stdClassNameToApplicationNameSetMap.keys)
+    override fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(classNamePrefix, stdClassNameToApplicationNameSetMap.keys)
+    }
 
-    override fun isClassWithPrefixExist(applicationName: String, classNamePrefix: String): Boolean =
-        isNameWithPrefixExist(classNamePrefix, applicationNameToClassNameSetMap[applicationName])
+    override fun isClassWithPrefixExist(applicationName: String, classNamePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(classNamePrefix, applicationNameToClassNameSetMap[applicationName])
+    }
 
-    override fun isStdClassPluralWithPrefixExist(namePrefix: String): Boolean =
-        isNameWithPrefixExist(namePrefix, stdClassNamePluralToApplicationNameSetMap.keys)
+    override fun isStdClassPluralWithPrefixExist(namePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(namePrefix, stdClassNamePluralToApplicationNameSetMap.keys)
+    }
 
-    override fun isClassPluralWithPrefixExist(applicationName: String, pluralClassNamePrefix: String): Boolean =
-        isNameWithPrefixExist(pluralClassNamePrefix, applicationNameToClassNamePluralSetMap[applicationName])
+    override fun isClassPluralWithPrefixExist(applicationName: String, pluralClassNamePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(pluralClassNamePrefix, applicationNameToClassNamePluralSetMap[applicationName])
+    }
 
     private fun isNameWithPrefixExist(namePrefix: String, nameSet: Set<String>?): Boolean {
         if (nameSet == null) return false
@@ -244,20 +277,29 @@ class AppleScriptSystemDictionaryRegistryService :
         return false
     }
 
-    override fun isStdCommand(name: String): Boolean = stdCommandNameToApplicationNameSetMap.containsKey(name)
+    override fun isStdCommand(name: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return stdCommandNameToApplicationNameSetMap.containsKey(name)
+    }
 
     override fun isApplicationCommand(applicationName: String, commandName: String): Boolean {
+        if (initLatch.count > 0L) return false
         val appCommands = applicationNameToCommandNameSetMap[applicationName]
         return appCommands != null && appCommands.contains(commandName)
     }
 
-    override fun isCommandWithPrefixExist(applicationName: String, commandNamePrefix: String): Boolean =
-        isNameWithPrefixExist(commandNamePrefix, applicationNameToCommandNameSetMap[applicationName])
+    override fun isCommandWithPrefixExist(applicationName: String, commandNamePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(commandNamePrefix, applicationNameToCommandNameSetMap[applicationName])
+    }
 
-    override fun isStdCommandWithPrefixExist(namePrefix: String): Boolean =
-        isNameWithPrefixExist(namePrefix, stdCommandNameToApplicationNameSetMap.keys)
+    override fun isStdCommandWithPrefixExist(namePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(namePrefix, stdCommandNameToApplicationNameSetMap.keys)
+    }
 
     override fun findStdCommands(project: Project, commandName: String): Collection<AppleScriptCommand> {
+        if (!initLatch.await(2, TimeUnit.SECONDS)) return emptyList()
         val appNameList = stdCommandNameToApplicationNameSetMap[commandName] ?: return HashSet(0)
         val result = HashSet<AppleScriptCommand>()
         for (applicationName in appNameList) {
@@ -271,6 +313,7 @@ class AppleScriptSystemDictionaryRegistryService :
         applicationName: String,
         commandName: String,
     ): List<AppleScriptCommand> {
+        if (!initLatch.await(2, TimeUnit.SECONDS)) return emptyList()
         val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
         // Among the loaded dictionaries the standard additions should always be present, but if the command
         // was not found there a new dictionary may need to be initialised here for the project — once.
@@ -282,32 +325,47 @@ class AppleScriptSystemDictionaryRegistryService :
         return ArrayList(0)
     }
 
-    override fun isStdProperty(name: String): Boolean = stdPropertyNameToDictionarySetMap.containsKey(name)
+    override fun isStdProperty(name: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return stdPropertyNameToDictionarySetMap.containsKey(name)
+    }
 
-    override fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean =
-        isNameWithPrefixExist(namePrefix, stdPropertyNameToDictionarySetMap.keys)
+    override fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(namePrefix, stdPropertyNameToDictionarySetMap.keys)
+    }
 
     override fun isApplicationProperty(applicationName: String, propertyName: String): Boolean {
+        if (initLatch.count > 0L) return false
         val propertySet = applicationNameToPropertySetMap[applicationName]
         return propertySet != null && propertySet.contains(propertyName)
     }
 
-    override fun isPropertyWithPrefixExist(applicationName: String, propertyNamePrefix: String): Boolean =
-        isNameWithPrefixExist(propertyNamePrefix, applicationNameToPropertySetMap[applicationName])
+    override fun isPropertyWithPrefixExist(applicationName: String, propertyNamePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(propertyNamePrefix, applicationNameToPropertySetMap[applicationName])
+    }
 
-    override fun isStdConstant(name: String): Boolean =
-        stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
+    override fun isStdConstant(name: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
+    }
 
     override fun isApplicationConstant(applicationName: String, constantName: String): Boolean {
+        if (initLatch.count > 0L) return false
         val applicationConstantSet = applicationNameToEnumeratorConstantNameSetMap[applicationName]
         return applicationConstantSet != null && applicationConstantSet.contains(constantName)
     }
 
-    override fun isStdConstantWithPrefixExist(namePrefix: String): Boolean =
-        isNameWithPrefixExist(namePrefix, stdEnumeratorConstantNameToApplicationNameListMap.keys)
+    override fun isStdConstantWithPrefixExist(namePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(namePrefix, stdEnumeratorConstantNameToApplicationNameListMap.keys)
+    }
 
-    override fun isConstantWithPrefixExist(applicationName: String, namePrefix: String): Boolean =
-        isNameWithPrefixExist(namePrefix, applicationNameToEnumeratorConstantNameSetMap[applicationName])
+    override fun isConstantWithPrefixExist(applicationName: String, namePrefix: String): Boolean {
+        if (initLatch.count > 0L) return false
+        return isNameWithPrefixExist(namePrefix, applicationNameToEnumeratorConstantNameSetMap[applicationName])
+    }
 
     /** Initialise from cached, previously generated files. */
     @Suppress("unused")
@@ -808,7 +866,8 @@ class AppleScriptSystemDictionaryRegistryService :
 
     fun getCachedApplicationNames(): Collection<String> = dictionaryInfoMap.keys
 
-    fun getDiscoveredApplicationNames(): HashSet<String> = discoveredApplicationNames
+    // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
+    fun getDiscoveredApplicationNames(): HashSet<String> = HashSet(discoveredApplicationNames)
 
     fun isDictionaryInitialized(applicationName: String): Boolean =
         dictionaryInfoMap[applicationName]?.isInitialized() == true
@@ -998,7 +1057,7 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun parseElementsForApplication(
             xmlElements: List<Element>,
             applicationName: String,
-            objectTagNameToApplicationNameListMap: MutableMap<String, HashSet<String>>,
+            objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
         ) {
             for (applicationObjectTag in xmlElements) {
                 parseSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)
@@ -1008,7 +1067,7 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun parseHashElementsForApplication(
             xmlElements: List<Element>,
             applicationName: String,
-            objectTagNameToApplicationNameListMap: MutableMap<String, HashSet<String>>,
+            objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
         ) {
             for (applicationObjectTag in xmlElements) {
                 hashSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)
@@ -1018,7 +1077,7 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun parseSimpleElementForObject(
             suiteObjectElement: Element,
             applicationName: String,
-            objectNameToApplicationNameSetMap: MutableMap<String, HashSet<String>>,
+            objectNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>>,
         ) {
             val objectName = suiteObjectElement.getAttributeValue("name")
             val code = suiteObjectElement.getAttributeValue("code")
@@ -1029,7 +1088,7 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun hashSimpleElementForObject(
             suiteObjectElement: Element,
             applicationName: String,
-            objectNameToApplicationNameListMap: MutableMap<String, HashSet<String>>,
+            objectNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
         ) {
             val objectName = suiteObjectElement.getAttributeValue("name")
             val code = suiteObjectElement.getAttributeValue("code")
@@ -1040,37 +1099,26 @@ class AppleScriptSystemDictionaryRegistryService :
         private fun updateApplicationNameSetFor(
             applicationObjectName: String,
             applicationName: String,
-            applicationNameSetMap: MutableMap<String, HashSet<String>>,
+            applicationNameSetMap: MutableMap<String, MutableSet<String>>,
         ) {
-            val appNameSetForObject = applicationNameSetMap[applicationObjectName]
-            updateSetForMappedObjectName(applicationObjectName, applicationName, applicationNameSetMap, appNameSetForObject)
-        }
-
-        private fun updateSetForMappedObjectName(
-            objectName: String,
-            nameToAdd: String,
-            objectNameToNameSetMap: MutableMap<String, HashSet<String>>,
-            existingSet: HashSet<String>?,
-        ) {
-            var nameSetForObject = existingSet
-            if (nameSetForObject == null) {
-                nameSetForObject = HashSet()
-                if (!StringUtil.isEmpty(objectName)) {
-                    objectNameToNameSetMap[objectName] = nameSetForObject
-                }
-            }
-            if (!nameSetForObject.contains(nameToAdd)) {
-                nameSetForObject.add(nameToAdd)
+            if (StringUtil.isEmpty(applicationObjectName)) return
+            // Atomic get-or-put-and-mutate per D-03: ConcurrentHashMap.compute serialises
+            // the (lookup, allocate, insert, add) tuple inside a single bucket lock.
+            applicationNameSetMap.compute(applicationObjectName) { _, existing ->
+                (existing ?: ConcurrentHashMap.newKeySet<String>()).also { it.add(applicationName) }
             }
         }
 
         private fun updateObjectNameSetForApplication(
             applicationObjectName: String,
             applicationName: String,
-            applicationNameSetMap: MutableMap<String, HashSet<String>>,
+            applicationNameSetMap: MutableMap<String, MutableSet<String>>,
         ) {
-            val objectNameSetForApplication = applicationNameSetMap[applicationName]
-            updateSetForMappedObjectName(applicationName, applicationObjectName, applicationNameSetMap, objectNameSetForApplication)
+            if (StringUtil.isEmpty(applicationName)) return
+            // Atomic get-or-put-and-mutate per D-03.
+            applicationNameSetMap.compute(applicationName) { _, existing ->
+                (existing ?: ConcurrentHashMap.newKeySet<String>()).also { it.add(applicationObjectName) }
+            }
         }
 
         private fun startsWithWord(string: String, prefix: String): Boolean =
