@@ -78,6 +78,36 @@ intellijPlatform {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
             untilBuild = provider { null }
         }
+        // Pull the 1.0.0 section out of CHANGELOG.md so the Marketplace listing stays in sync.
+        // The plugin verifier expects HTML, so the conversion is intentionally minimal — Marketplace
+        // accepts the resulting markdown-flavoured HTML, and the CHANGELOG.md remains the source of truth.
+        changeNotes = providers.fileContents(layout.projectDirectory.file("CHANGELOG.md")).asText.map { raw ->
+            val startMarker = "## [1.0.0]"
+            val nextSection = "\n## ["
+            val startIndex = raw.indexOf(startMarker).takeIf { it >= 0 } ?: 0
+            val endIndex = raw.indexOf(nextSection, startIndex + startMarker.length).takeIf { it > 0 } ?: raw.length
+            raw.substring(startIndex, endIndex).trim()
+        }
+    }
+
+    // Signing materialises lazily — only when CERTIFICATE_CHAIN_PATH is set in the env.
+    // Avoids evaluating an empty path at configuration time (Gradle rejects empty File coercion).
+    val certificatePath = providers.environmentVariable("CERTIFICATE_CHAIN_PATH")
+    if (certificatePath.isPresent && certificatePath.get().isNotEmpty()) {
+        signing {
+            certificateChainFile = layout.projectDirectory.file(certificatePath.get())
+            privateKeyFile = layout.projectDirectory.file(
+                providers.environmentVariable("PRIVATE_KEY_PATH").get(),
+            )
+            password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
+        }
+    }
+
+    publishing {
+        // Token from the JetBrains Marketplace dev hub (1Password) via PUBLISH_TOKEN env var.
+        // Stable channel only — preserves the auto-update path for existing 0.130 users.
+        token = providers.environmentVariable("PUBLISH_TOKEN")
+        channels = listOf("default")
     }
 
     pluginVerification {
