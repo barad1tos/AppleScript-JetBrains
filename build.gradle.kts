@@ -36,10 +36,14 @@ repositories {
 sourceSets {
     named("main") {
         java.srcDirs("src/main/java", "src/main/gen")
+        kotlin.srcDirs("src/main/kotlin")
         resources {
             srcDirs("src/main/resources")
             exclude("**.bnf", "**.flex")
         }
+    }
+    named("test") {
+        kotlin.srcDirs("src/test/kotlin")
     }
 }
 
