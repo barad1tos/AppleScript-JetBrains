@@ -2,6 +2,12 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [1.0.1] - YYYY-MM-DD
+
+### Fixed
+
+- Resolved a data race in the dictionary registry that could cause sporadic `NullPointerException`s or brief IDE hangs when an AppleScript file was opened or completion was triggered while the plugin was still warming up. Affected users typically saw the issue right after IDE startup or after a project switch.
+
 ## [1.0.0] - 2026-05-22
 
 The plugin is now compatible with modern JetBrains IDEs (2024.3+) and is fully rewritten in Kotlin.
