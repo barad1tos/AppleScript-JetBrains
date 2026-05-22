@@ -1,29 +1,59 @@
-# Build artifacts
+# Build outputs
 build/
-.gradle/
+build.nosync/
+build*/
 out/
 *.class
 *.jar
 
-# IDE files
+# Gradle
+.gradle/
+.gradle-user/
+gradle/wrapper/dists/
+
+# IDE — IntelliJ
 .idea/
 *.iml
 *.iws
 *.ipr
+
+# IDE — Eclipse
 .classpath
 .project
 .settings/
 
-# Generated files  
+# IDE — VS Code
+.vscode/
+
+# Generated parser/lexer code
 gen/
 src/main/gen/
 
 # macOS
 .DS_Store
+.AppleDouble
+.LSOverride
 
-# Test files
+# Manual test scripts (working artifacts)
 test_*.applescript
 update_test_data*.py
+regenerate_test_data.sh
 
-# Gradle wrapper user files
-.gradle-user/
+# Working/handoff artifacts from past sessions
+INTEGRATION_TEST_RESULTS.txt
+TASK_6_COMPLETION_SUMMARY.txt
+docs/
+reports/
+
+# Local planning (GSD working artifacts)
+.planning/
+
+# Agent / tool state
+.serena/
+.trunk/
+.claude/
+
+# Kotlin / Gradle convenience
+kotlin-js-store/
+hs_err_pid*.log
+.intellijPlatform/
