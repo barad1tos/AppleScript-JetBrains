@@ -220,4 +220,139 @@ tasks {
             }
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Plan 03-01 (v1.2 / COROUTINE-01..07): Wave 0 verification scaffolding.
+    // Three custom Gradle tasks enforce the coroutines wiring discipline at
+    // build time. Wired into `check` so every CI run gates on them.
+    // ---------------------------------------------------------------------
+
+    val verifyNoBundledCoroutines by registering {
+        group = "verification"
+        description = "Fails if kotlinx-coroutines appears on runtimeClasspath. " +
+            "Coroutines MUST be compileOnly — see PITFALLS section 3.1 + Phase 7 NoSuchMethodError."
+        doLast {
+            val runtime = configurations.runtimeClasspath.get().resolve()
+            val bad = runtime.filter { it.name.startsWith("kotlinx-coroutines") }
+            require(bad.isEmpty()) {
+                "kotlinx-coroutines must be compileOnly. Found on runtimeClasspath:\n" +
+                    bad.joinToString("\n  ", prefix = "  ") { it.absolutePath } +
+                    "\nFix: change `implementation(...)` -> `compileOnly(...)` in build.gradle.kts."
+            }
+        }
+    }
+
+    val verifyNoRunBlocking by registering {
+        group = "verification"
+        description = "Fails if `runBlocking` appears in src/main/kotlin/. " +
+            "PITFALLS section 3.2 — runBlocking on EDT deadlocks the IDE. " +
+            "Test code may use runBlocking; this gate only scans production sources. " +
+            "Note: \\brunBlocking\\b does NOT match runBlockingCancellable (different word) — " +
+            "the Platform-blessed bridge for background-thread blocking-on-suspend remains allowed."
+        val productionKotlin = layout.projectDirectory.dir("src/main/kotlin")
+        inputs.dir(productionKotlin)
+        doLast {
+            val matches = mutableListOf<String>()
+            productionKotlin.asFile.walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .forEach { file ->
+                    file.useLines { lines ->
+                        lines.forEachIndexed { idx, line ->
+                            if (Regex("""\brunBlocking\b""").containsMatchIn(line)) {
+                                matches.add("${file.relativeTo(rootDir)}:${idx + 1}: ${line.trim()}")
+                            }
+                        }
+                    }
+                }
+            require(matches.isEmpty()) {
+                "runBlocking is forbidden in production code (PITFALLS section 3.2). Found:\n" +
+                    matches.joinToString("\n  ", prefix = "  ")
+            }
+        }
+    }
+
+    // CI drift gate per D-07 / COROUTINE-07.
+    //
+    // Strategy B per RESEARCH section 10 Q4 fallback (executor-confirmed during
+    // Plan 03-01 execution): walk each verifier IDE distribution's lib/ for
+    // `kotlinx-coroutines-slf4j-<VERSION>.jar`. The slf4j jar filename is a
+    // reliable proxy for the bundled core fork version (verified 2026-05-23:
+    // in 2024.3+/2025.x core is merged into app.jar; only slf4j ships
+    // standalone). Compared against gradle/coroutinesBundledVersions.json.
+    //
+    // Why not Strategy A (`intellijPlatform.productInfo.layoutItems`): that
+    // property exposes only the main bundled IDE's product info — not all
+    // three verifier IDEs declared in pluginVerification.ides{}. The
+    // `intellijPluginVerifierIdes` Gradle configuration also only resolves the
+    // main IDE at task execution time. The only access path that materialises
+    // ALL three verifier IDE directories is the `getIdes()`
+    // ConfigurableFileCollection on the `verifyPlugin` task itself — which we
+    // read via reflection here to bypass Kotlin name-shadowing inside the
+    // tasks { ... } block scope.
+    val verifyBundledCoroutinesVersions by registering {
+        group = "verification"
+        description = "Fails if the bundled kotlinx-coroutines fork version drifts " +
+            "between releases. Strategy B (filesystem walk of verifier IDE lib/ dirs): " +
+            "infers core version from standalone kotlinx-coroutines-slf4j-<VERSION>.jar " +
+            "(core itself is merged into app.jar in 2024.3+/2025.x — verified)."
+        val snapshotFile = layout.projectDirectory.file("gradle/coroutinesBundledVersions.json")
+        inputs.file(snapshotFile)
+        doLast {
+            @Suppress("UNCHECKED_CAST")
+            val expected: Map<String, String> = (groovy.json.JsonSlurper()
+                .parse(snapshotFile.asFile) as Map<String, Any?>)
+                .let { json ->
+                    (json["versions"] as Map<*, *>)
+                        .mapKeys { it.key.toString() }
+                        .mapValues { it.value.toString() }
+                }
+
+            // Access verifyPlugin's getIdes() ConfigurableFileCollection via
+            // reflection — direct Kotlin property access conflicts with the
+            // intellijPlatform extension's `PluginVerification.Ides` type
+            // inside the tasks { ... } block scope.
+            val verifyTask = project.tasks.named("verifyPlugin").get()
+            val idesMethod = verifyTask::class.java.methods
+                .firstOrNull { it.name == "getIdes" && it.parameterCount == 0 }
+                ?: error("verifyPlugin task does not expose getIdes() — IntelliJ Platform Gradle Plugin API changed?")
+            val ideFiles = (idesMethod.invoke(verifyTask) as org.gradle.api.file.ConfigurableFileCollection).files
+            val ideDirs = ideFiles.filter { it.isDirectory }
+
+            val slf4jRegex = Regex("""kotlinx-coroutines-slf4j-(\d+\.\d+\.\d+(?:-intellij(?:-\d+)?)?)\.jar""")
+            val ideKeyRegex = Regex("""ideaIC-(\d+\.\d+(?:\.\d+(?:\.\d+)?)?)-""")
+            val resolved: Map<String, String> = ideDirs.mapNotNull { ideDir ->
+                val ideKey = ideKeyRegex.find(ideDir.name)?.groupValues?.get(1) ?: return@mapNotNull null
+                val libDir = ideDir.resolve("lib").takeIf { it.isDirectory } ?: return@mapNotNull null
+                val slf4jJar = libDir.listFiles()
+                    ?.firstOrNull { it.name.startsWith("kotlinx-coroutines-slf4j-") && it.name.endsWith(".jar") }
+                    ?: return@mapNotNull null
+                val match = slf4jRegex.find(slf4jJar.name) ?: return@mapNotNull null
+                // Strip the build counter (-intellij-NN -> -intellij) so the snapshot
+                // pins to the API-stable form rather than the patch counter.
+                val version = match.groupValues[1].replace(Regex("""-intellij-\d+$"""), "-intellij")
+                ideKey to version
+            }.toMap()
+
+            val drift = expected.entries
+                .filter { (ide, expectedVer) ->
+                    val actual = resolved[ide]
+                    actual == null || actual != expectedVer
+                }
+                .joinToString("\n") { (ide, expectedVer) ->
+                    "  $ide expected=$expectedVer actual=${resolved[ide] ?: "MISSING"}"
+                }
+
+            if (drift.isNotEmpty()) {
+                error(
+                    "Bundled kotlinx-coroutines version drift detected:\n$drift\n" +
+                        "Fix: review the version change against PITFALLS section 3.1 signature " +
+                        "drift catalog, then update gradle/coroutinesBundledVersions.json IF compatible."
+                )
+            }
+        }
+    }
+
+    named("check") {
+        dependsOn(verifyNoBundledCoroutines, verifyNoRunBlocking, verifyBundledCoroutinesVersions)
+    }
 }

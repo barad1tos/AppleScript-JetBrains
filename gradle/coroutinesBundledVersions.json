@@ -1,0 +1,10 @@
+{
+  "_schemaVersion": 1,
+  "_doc": "Bundled kotlinx-coroutines fork version per verifier IDE. Drift = CI fail per COROUTINE-07. Refresh requires explicit human review against PITFALLS §3.1 signature drift catalog. Inferred from lib/kotlinx-coroutines-slf4j-<VERSION>.jar filename (core merged into app.jar in 2024.3+).",
+  "_lastReviewed": "2026-05-23",
+  "versions": {
+    "2024.3.7.1": "1.8.0-intellij",
+    "2025.1.7.1": "1.8.0-intellij",
+    "2025.2.6.2": "1.10.1-intellij"
+  }
+}
