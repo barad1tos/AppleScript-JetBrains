@@ -1,3 +1,4 @@
+import java.time.Duration
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
@@ -136,6 +137,31 @@ intellijPlatform {
             "-mute",
             "ForbiddenPluginIdPrefix,TemplateWordInPluginId,TemplateWordInPluginName",
         )
+    }
+}
+
+// SDEF-14 (D-13/D-14): runIdeHeadlessSmoke boots IDEA in headless mode against the
+// AppleScript fixtures under src/test/resources/testData/runIde and asserts three
+// Phase 8 invariants (composite 2-token fallback, BASIC completion non-empty on
+// `play `, WEAK_WARNING annotator severity on unresolved app refs). Registered via
+// the v2.16.0 `intellijPlatformTesting.runIde.registering { task { ... } }` DSL so the
+// Platform plugin wires the IDE classpath + sandbox automatically.
+val runIdeHeadlessSmoke by intellijPlatformTesting.runIde.registering {
+    task {
+        group = "verification"
+        description = "Boot IDEA headless against AppleScript fixtures, assert Phase 8 invariants."
+
+        jvmArgs(
+            "-Djava.awt.headless=true",
+            "-Didea.ApplicationStarter.command=applescript-smoke",
+            "-Didea.suppress.statistics.report=true",
+            "-Didea.is.internal=false",
+            "-Dapplescript.smoke.fixtureRoot=${file("src/test/resources/testData/runIde").absolutePath}",
+        )
+        // 3-minute Gradle-level cap (T-02-S mitigation). CI also enforces its own job
+        // timeout. CONTEXT D-13 expected wall-time is ~75s; this leaves headroom for
+        // cold IDE boot on the first CI run after a cache miss.
+        timeout.set(Duration.ofMinutes(3))
     }
 }
 

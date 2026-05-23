@@ -44,12 +44,27 @@ jobs:
       - name: Run tests
         run: ./gradlew test --stacktrace
 
+      # SDEF-14: headless smoke runs ONLY on Linux to avoid bloating CI matrix.
+      # The smoke verifies plugin/IDE wiring (composite parser fallback, completion,
+      # WEAK_WARNING severity); per-platform compatibility is already covered by the
+      # `verify` job which exercises 2024.3 / 2025.1 / 2025.2.
+      - name: Run runIde headless smoke
+        if: matrix.os == 'ubuntu-latest'
+        run: ./gradlew runIdeHeadlessSmoke --stacktrace
+
       - name: Upload test reports
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports-${{ matrix.os }}
           path: build/reports/tests/
+
+      - name: Upload smoke logs
+        if: failure() && matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs
+          path: build/idea-sandbox/**/log/
 
   verify:
     name: Verify Plugin
