@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.lang.ide.annotator
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.Annotator
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.text.StringUtil
@@ -99,7 +100,7 @@ class AppleScriptColorAnnotator : Annotator {
         if (!dictionaryRegistryService.isDictionaryInitialized(appName!!)) {
             var warningReason = checkWarningReason(appName, dictionaryRegistryService)
             if (warningReason == null && !dictionaryRegistryService.ensureDictionaryInitialized(appName)) {
-                println("Re-checking warning reason for $appName")
+                LOG.debug("Re-checking warning reason for {}", appName)
                 warningReason = checkWarningReason(appName, dictionaryRegistryService)
             }
             if (!StringUtil.isEmpty(warningReason)) {
@@ -158,6 +159,8 @@ class AppleScriptColorAnnotator : Annotator {
     }
 
     private companion object {
+        private val LOG: Logger = Logger.getInstance("#${AppleScriptColorAnnotator::class.java.name}")
+
         private fun createInfoAnnotation(
             holder: AnnotationHolder,
             element: PsiElement?,

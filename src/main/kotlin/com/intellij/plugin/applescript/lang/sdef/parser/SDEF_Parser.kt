@@ -48,7 +48,6 @@ object SDEF_Parser {
 
     @JvmStatic
     fun parse(file: XmlFile, parsedDictionary: ApplicationDictionary) {
-        println("Start parsing xml file --- $file ---")
         LOG.debug("Start parsing xml file --- $file ---")
 
         if (parsedDictionary.getRootTag() == null) {
@@ -68,7 +67,6 @@ object SDEF_Parser {
                 parseRootTag(parsedDictionary, rootTag)
             }
         }
-        println("parsing completed for file.")
         LOG.debug("parsing completed for file.")
     }
 
