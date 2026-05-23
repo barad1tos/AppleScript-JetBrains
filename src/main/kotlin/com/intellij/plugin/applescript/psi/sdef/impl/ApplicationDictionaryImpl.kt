@@ -43,7 +43,6 @@ import java.awt.Image
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.IOException
-import java.util.LinkedHashSet
 import javax.swing.Icon
 
 /**
@@ -74,9 +73,6 @@ class ApplicationDictionaryImpl(
     // explicitly deferred this fix here. v1.3 service split lifts `indexes`
     // wholesale into `SdefIndexService` without touching any consumer site.
     private val indexes: DictionaryIndexes = DictionaryIndexes()
-
-    @Suppress("unused")
-    private val dictionaryCommands: MutableSet<AppleScriptCommand> = LinkedHashSet()
 
     init {
         readDictionaryFromXmlFile(dictionaryXmlFile)
@@ -141,7 +137,6 @@ class ApplicationDictionaryImpl(
                 }
             }
             includedFiles.add(includedFile)
-            println("Processed included file: $includedFile")
             LOG.debug("Processed included file:: $includedFile")
         }
         return includedFile
