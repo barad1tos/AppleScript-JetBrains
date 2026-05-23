@@ -87,6 +87,17 @@ jobs:
       - name: Verify plugin structure
         run: ./gradlew verifyPluginStructure --stacktrace
 
+      # COROUTINE-07: bundled-coroutines drift gate runs before the heavy
+      # verifier so version drift on any verifier IDE short-circuits the job
+      # at PR review time. The three tasks also run transitively via
+      # `./gradlew build` in the build job, but the verify job invokes only
+      # `verifyPlugin*` directly — so we wire the gate explicitly here too.
+      # If this step ever fails, treat as a Platform-bundled fork drift event
+      # (D-07 / 03-CONTEXT.md `<deferred>` "Phase 3 -> Post-v2.0 Backlog");
+      # incident playbook is authored at first-incident time, not pre-emptively.
+      - name: Verify coroutines wiring (Phase 3 drift gate)
+        run: ./gradlew verifyNoBundledCoroutines verifyNoRunBlocking verifyBundledCoroutinesVersions --stacktrace
+
       - name: Verify plugin against target IDEs
         run: ./gradlew verifyPlugin --stacktrace
 
