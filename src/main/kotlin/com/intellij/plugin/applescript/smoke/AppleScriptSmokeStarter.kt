@@ -3,14 +3,14 @@ package com.intellij.plugin.applescript.smoke
 import com.intellij.codeInsight.completion.CodeCompletionHandlerBase
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
-import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.impl.ProjectUtil
-import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ApplicationStarter
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.impl.DocumentMarkupModel
+import com.intellij.openapi.editor.markup.HighlighterLayer
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
@@ -33,11 +33,11 @@ import kotlin.system.exitProcess
  * asserts three Phase 8 invariants:
  *
  *  1. Composite 2-token fallback parses `tell application "Music" to play track 1` with
- *     zero `PsiErrorElement` nodes (Phase 8 D-15 invariant — fallback methods in
+ *     zero [PsiErrorElement] nodes (Phase 8 D-15 invariant — fallback methods in
  *     `AppleScriptGeneratedParserUtil`).
  *  2. `BASIC` completion on `play ` produces a non-empty active lookup (validates the
  *     `CommandCompletionContributor` wiring end-to-end).
- *  3. `AppleScriptColorAnnotator` emits `WEAK_WARNING` (NOT `WARNING`) for
+ *  3. [AppleScriptColorAnnotator] emits `WEAK_WARNING` (NOT `WARNING`) for
  *     `tell application "NoSuchApp_xyz" to activate` (Phase 8 D-15: missing-app refs
  *     must stay out of the Problems panel + editor gutter).
  *
@@ -45,15 +45,22 @@ import kotlin.system.exitProcess
  * from `-Dapplescript.smoke.fixtureRoot=<path>` (set by the `runIdeHeadlessSmoke` Gradle
  * task to `src/test/resources/testData/runIde`).
  *
- * Project-bootstrap recipe: `ProjectUtil.openOrImport(Path, null, true)` is the primary
- * path — it mirrors the IDE's File -> Open lifecycle and gives a real `Project` +
- * `PsiManager`. If it returns null on a given platform version, the fallback uses
- * `ProjectManagerEx.openProject(Path, OpenProjectTask)`. Both paths are documented in
- * `02-02-SUMMARY.md`.
+ * Project-bootstrap recipe: [ProjectUtil.openOrImport] is the primary path — it mirrors
+ * the IDE's File -> Open lifecycle and gives a real [Project] + [PsiManager]. If it
+ * returns null on a given platform version, the fallback uses
+ * [ProjectManagerEx.openProject] with a static [OpenProjectTask.build] no-arg call
+ * (the public factory that does not depend on the internal Kotlin-DSL builder).
  *
- * Threading: every PSI / `DaemonCodeAnalyzer` interaction runs inside
- * `ApplicationManager.invokeAndWait { ... }` (Pattern C - EDT contract). Error handling
- * catches `RuntimeException` only; `Error` propagates (Pattern B).
+ * Threading: every PSI / [DaemonCodeAnalyzer] interaction runs inside
+ * `ApplicationManager.invokeAndWait { ... }` (Pattern C — EDT contract). Error handling
+ * catches [RuntimeException] only; [Error] propagates (Pattern B).
+ *
+ * Public-API-only policy: the assertion path uses [DocumentMarkupModel.forDocument]
+ * (public, in `editor-ui-ex/api-dump.txt`) + [HighlighterLayer] constants (public, in
+ * `editor-ui-api/api-dump.txt`) to inspect daemon-produced highlighters instead of
+ * `DaemonCodeAnalyzerImpl.getHighlights` (internal, `*Impl` package). This satisfies the
+ * project rule "no internal APIs in plugin code" (see
+ * `memory/feedback_no_internal_apis.md`).
  */
 class AppleScriptSmokeStarter : ApplicationStarter {
 
@@ -201,23 +208,35 @@ class AppleScriptSmokeStarter : ApplicationStarter {
         }
         val targetRange = TextRange(targetOffset, targetOffset + targetText.length)
 
-        val weak = DaemonCodeAnalyzerImpl
-            .getHighlights(document, HighlightSeverity.WEAK_WARNING, project)
-            .filter { hi -> targetRange.intersects(hi.startOffset, hi.endOffset) }
-        val warn = DaemonCodeAnalyzerImpl
-            .getHighlights(document, HighlightSeverity.WARNING, project)
-            .filter { hi -> hi.severity == HighlightSeverity.WARNING && targetRange.intersects(hi.startOffset, hi.endOffset) }
+        // PUBLIC API path: inspect the document's daemon-managed MarkupModel instead of
+        // reaching into DaemonCodeAnalyzerImpl.getHighlights (which is @ApiStatus.Internal
+        // and lives in *.impl package — both forbidden by the no-internal-apis rule).
+        //
+        // DocumentMarkupModel.forDocument is published in `editor-ui-ex/api-dump.txt`
+        // (the *vetted* public API surface, NOT api-dump-unreviewed). RangeHighlighter +
+        // HighlighterLayer constants are in `editor-ui-api/api-dump.txt`. The daemon
+        // tags every produced highlighter with its severity-layer (WEAK_WARNING /
+        // WARNING / ERROR), so layer-equality is a stable proxy for severity comparison
+        // that survives across 2024.3 -> 2025.x without depending on HighlightInfo
+        // (which itself lives in the impl package).
+        val markup = DocumentMarkupModel.forDocument(document, project, false)
+        val overlapping = markup.allHighlighters.filter { highlighter ->
+            targetRange.intersects(highlighter.startOffset, highlighter.endOffset)
+        }
+        val weakCount = overlapping.count { it.layer == HighlighterLayer.WEAK_WARNING }
+        val warnCount = overlapping.count { it.layer == HighlighterLayer.WARNING }
 
-        if (weak.isEmpty()) {
+        if (weakCount == 0) {
             failures.add(
-                "Phase 8 D-15 broken: expected >=1 WEAK_WARNING over '$targetText' in ${file.name}, " +
-                    "got 0 (warn count=${warn.size})",
+                "Phase 8 D-15 broken: expected >=1 WEAK_WARNING-layer highlighter over " +
+                    "'$targetText' in ${file.name}, got 0 (warn count=$warnCount, " +
+                    "total overlapping=${overlapping.size})",
             )
         }
-        if (warn.isNotEmpty()) {
+        if (warnCount > 0) {
             failures.add(
-                "Phase 8 D-15 broken: expected 0 WARNING over '$targetText' in ${file.name}, " +
-                    "got ${warn.size} (severity should be WEAK_WARNING)",
+                "Phase 8 D-15 broken: expected 0 WARNING-layer highlighter over " +
+                    "'$targetText' in ${file.name}, got $warnCount (severity should be WEAK_WARNING)",
             )
         }
     }
@@ -238,11 +257,15 @@ class AppleScriptSmokeStarter : ApplicationStarter {
     }
 
     /**
-     * Project bootstrap: `ProjectUtil.openOrImport` is the primary path (mirrors the
+     * Project bootstrap: [ProjectUtil.openOrImport] is the primary path (mirrors the
      * File -> Open lifecycle). Falls back to
-     * `ProjectManagerEx.getInstanceEx().openProject(Path, OpenProjectTask)` only if the
-     * primary returns null. Both options land us with a real `Project` + `PsiManager`
-     * for the assertions.
+     * [ProjectManagerEx.openProject] only if the primary returns null. Both options land
+     * us with a real [Project] + [PsiManager] for the assertions.
+     *
+     * Public-API-only fallback: uses the no-arg static [OpenProjectTask.build] factory
+     * (published in `ide-core-impl/api-dump.txt` — the vetted surface), NOT the internal
+     * Kotlin-DSL `OpenProjectTask { ... }` extension that lives in
+     * `com.intellij.ide.impl.OpenProjectTaskKt` and triggers `INTERNAL_API_USAGES`.
      */
     private fun openOrCreateProject(fixtureDir: Path): Project? {
         val primary = try {
@@ -254,10 +277,11 @@ class AppleScriptSmokeStarter : ApplicationStarter {
         if (primary != null) return primary
 
         // Fallback path - useful if openOrImport semantics shift between platform minor
-        // versions. We keep the call surface narrow: openProject(Path, OpenProjectTask)
-        // is available across 2024.3 -> 2025.x.
+        // versions. OpenProjectTask.build() returns a default-configured task that
+        // matches the previous `OpenProjectTask {}` empty-DSL call site (no
+        // customizations needed for the smoke fixture).
         return try {
-            ProjectManagerEx.getInstanceEx().openProject(fixtureDir, OpenProjectTask {})
+            ProjectManagerEx.getInstanceEx().openProject(fixtureDir, OpenProjectTask.build())
         } catch (exception: RuntimeException) {
             LOG.warn("ProjectManagerEx.openProject fallback threw for $fixtureDir", exception)
             null
