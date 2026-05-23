@@ -15,7 +15,7 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
-import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
+import com.intellij.plugin.applescript.lang.sdef.extensionSupported
 
 class LoadDictionaryAction : AnAction() {
 
@@ -41,7 +41,7 @@ class LoadDictionaryAction : AnAction() {
                     project.getService(AppleScriptProjectDictionaryService::class.java) ?: return@chooseFiles
 
                 for (file in files) {
-                    if (!ApplicationDictionaryImpl.extensionSupported(file.extension)) continue
+                    if (!extensionSupported(file.extension)) continue
 
                     if (chooseMultiple) {
                         val applicationName: String? =

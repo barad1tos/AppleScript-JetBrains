@@ -22,8 +22,8 @@ import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
+import com.intellij.plugin.applescript.lang.sdef.extensionSupported
 import com.intellij.plugin.applescript.lang.util.MyStopVisitingException
-import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.util.xmlb.annotations.AbstractCollection
 import com.intellij.util.xmlb.annotations.CollectionBean
 import com.intellij.util.xmlb.annotations.Tag
@@ -193,7 +193,7 @@ class AppleScriptSystemDictionaryRegistryService :
             appsDirVFile,
             object : VirtualFileVisitor<VirtualFile>(VirtualFileVisitor.limit(APP_DEPTH_SEARCH)) {
                 override fun visitFile(file: VirtualFile): Boolean {
-                    if (ApplicationDictionaryImpl.extensionSupported(file.extension)) {
+                    if (extensionSupported(file.extension)) {
                         if ("xml" != file.extension) {
                             discoveredApplicationNames.add(file.nameWithoutExtension)
                         }
@@ -478,7 +478,7 @@ class AppleScriptSystemDictionaryRegistryService :
     @Synchronized
     fun createAndInitializeInfo(applicationIoFile: File, applicationName: String): DictionaryInfo? {
         val appExtension: String = Files.getFileExtension(applicationIoFile.path)
-        if (!ApplicationDictionaryImpl.extensionSupported(appExtension)) return null
+        if (!extensionSupported(appExtension)) return null
         if (!applicationIoFile.exists()) return null
         if (getDictionaryInfo(applicationName) != null) {
             LOG.warn(

@@ -395,9 +395,5 @@ class ApplicationDictionaryImpl(
     companion object {
         @JvmField
         val LOG: Logger = Logger.getInstance("#${ApplicationDictionaryImpl::class.java.name}")
-
-        @JvmStatic
-        fun extensionSupported(extension: String?): Boolean =
-            extension != null && ApplicationDictionary.SUPPORTED_DICTIONARY_EXTENSIONS.contains(extension.lowercase())
     }
 }
