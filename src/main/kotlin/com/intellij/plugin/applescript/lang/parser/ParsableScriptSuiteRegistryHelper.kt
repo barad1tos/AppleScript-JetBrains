@@ -106,4 +106,16 @@ object ParsableScriptSuiteRegistryHelper {
 
     @JvmStatic
     fun getScriptingAdditions(): HashSet<String> = scriptHelper.getScriptingAdditions()
+
+    // D-01 / D-04 facade dispatchers — additive, no existing method touched (D-08 parser-util
+    // contract preserved). The two new booleans live on the registry-service class (NOT the
+    // ParsableScriptHelper interface), so these proxies go via getInstance() directly.
+
+    @JvmStatic
+    fun isInitialized(): Boolean =
+        AppleScriptSystemDictionaryRegistryService.getInstance().isInitialized()
+
+    @JvmStatic
+    fun areAppDictionariesIndexed(): Boolean =
+        AppleScriptSystemDictionaryRegistryService.getInstance().areAppDictionariesIndexed()
 }
