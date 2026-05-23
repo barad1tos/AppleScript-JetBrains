@@ -83,8 +83,13 @@ open class AppleScriptCommandImpl :
             sb.append("<p><b>Parameters:</b></p>")
         }
         if (p != null) {
-            sb.append(indent).append(indent).append(p.getTypeSpecifier()).append(" : ")
-                .append(StringUtil.notNullize(p.getDescription())).append("<br>")
+            // Plan 02-03: `CommandDirectParameter` is now a `data class`; read leaf
+            // fields via property syntax to avoid the Kotlin platform-declaration
+            // clash that explicit `fun getX()` forwarders would create (the data
+            // class already synthesises `getTypeSpecifier`/`getDescription` JVM
+            // accessors for Java callers).
+            sb.append(indent).append(indent).append(p.typeSpecifier).append(" : ")
+                .append(StringUtil.notNullize(p.description)).append("<br>")
         }
         for (par in params) {
             val (op, cl) = if (par.isOptional()) "[" to "]" else "" to ""
@@ -94,8 +99,10 @@ open class AppleScriptCommandImpl :
         }
         val res = getResult()
         if (res != null) {
+            // Plan 02-03: `CommandResult` is now a `data class`; same reasoning as
+            // `CommandDirectParameter` above — property syntax for Kotlin readers.
             sb.append("<p>").append("<b>Returns:</b></p>").append(indent).append(indent)
-                .append(res.getType()).append(" : ").append(StringUtil.notNullize(res.getDescription()))
+                .append(res.type).append(" : ").append(StringUtil.notNullize(res.description))
         }
         return sb.toString()
     }
