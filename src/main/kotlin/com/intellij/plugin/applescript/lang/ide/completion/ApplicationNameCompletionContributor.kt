@@ -27,6 +27,14 @@ class ApplicationNameCompletionContributor : CompletionContributor() {
                     result: CompletionResultSet,
                 ) {
                     val systemDictionaryRegistry = AppleScriptSystemDictionaryRegistryService.getInstance()
+                    // PITFALLS Pattern J — integration lifecycle gate. Short-circuit BEFORE the
+                    // app-name enumeration when the catalog isn't ready. PITFALLS §7.1 prevention
+                    // pattern: register restart so the IDE re-triggers completion automatically
+                    // once `appsReady` completes mid-session (Context7 SDK explicit).
+                    if (!systemDictionaryRegistry.areAppDictionariesIndexed()) {
+                        result.restartCompletionWhenNothingMatches()
+                        return
+                    }
                     val appNameList = ArrayList<String>()
                     if (SystemInfo.isMac) {
                         appNameList.addAll(systemDictionaryRegistry.getDiscoveredApplicationNames())

@@ -9,6 +9,7 @@ import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.patterns.PlatformPatterns.psiElement
 import com.intellij.patterns.StandardPatterns
 import com.intellij.plugin.applescript.AppleScriptFile
+import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTokenTypesSets
 import com.intellij.plugin.applescript.psi.AppleScriptTypes
 import com.intellij.psi.PsiComment
@@ -33,6 +34,18 @@ class KeywordCompletionContributor : CompletionContributor() {
 
                     val node = position.node
                     if (node.elementType === AppleScriptTypes.STRING_LITERAL) return
+
+                    // PITFALLS Pattern J — integration lifecycle gate. Keywords come from
+                    // StandardAdditions / CocoaStandard SDEFs (parser fast path), so we gate on
+                    // `isInitialized()` (standard-library readiness) rather than the full
+                    // app-discovery facade. PITFALLS §7.1 prevention pattern: register restart
+                    // so the IDE re-triggers completion automatically once `standardReady`
+                    // completes mid-session (Context7 SDK explicit).
+                    val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+                    if (!registryService.isInitialized()) {
+                        completionResultSet.restartCompletionWhenNothingMatches()
+                        return
+                    }
 
                     for (kwElem in AppleScriptTokenTypesSets.KEYWORDS.types) {
                         completionResultSet.addElement(
