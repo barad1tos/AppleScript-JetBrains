@@ -198,6 +198,11 @@ tasks {
             // default suite so any annotation drift on PersistedState / DictionaryInfo.State
             // trips on the next CI build, not after the next user upgrade wipes their cache.
             includeTestsMatching("com.intellij.plugin.applescript.test.persistence.*")
+            // SDEF-01 / SDEF-02 (plan 02-03): leaf data-class equality + CommandData /
+            // AppleScriptCommandBuilder freeze invariants. Pure JUnit 4 unit tests (no
+            // BasePlatformTestCase, no /Applications scan) — fast enough to run
+            // unconditionally; gates PITFALLS §1.1-§1.4 against regression.
+            includeTestsMatching("com.intellij.plugin.applescript.test.sdef.*")
             if (includeHeavy) {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
