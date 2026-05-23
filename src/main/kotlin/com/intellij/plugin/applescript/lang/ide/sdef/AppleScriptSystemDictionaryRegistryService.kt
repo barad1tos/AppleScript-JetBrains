@@ -1,6 +1,5 @@
 package com.intellij.plugin.applescript.lang.ide.sdef
 
-import com.google.common.io.Files
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.BaseState
@@ -37,6 +36,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.Arrays
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -477,7 +478,9 @@ class AppleScriptSystemDictionaryRegistryService :
      */
     @Synchronized
     fun createAndInitializeInfo(applicationIoFile: File, applicationName: String): DictionaryInfo? {
-        val appExtension: String = Files.getFileExtension(applicationIoFile.path)
+        // Kotlin stdlib File.extension: suffix after the last '.' WITHOUT the dot,
+        // matches the Guava Files.getFileExtension behaviour byte-for-byte.
+        val appExtension: String = applicationIoFile.extension
         if (!extensionSupported(appExtension)) return null
         if (!applicationIoFile.exists()) return null
         if (getDictionaryInfo(applicationName) != null) {
@@ -666,7 +669,8 @@ class AppleScriptSystemDictionaryRegistryService :
      * @return the [DictionaryInfo] for this application, or null
      */
     private fun createDictionaryInfoForApplication(applicationName: String, applicationIoFile: File): DictionaryInfo? {
-        val appExtension = Files.getFileExtension(applicationIoFile.path)
+        // Kotlin stdlib File.extension: suffix after the last '.' WITHOUT the dot.
+        val appExtension = applicationIoFile.extension
         if (!SystemInfo.isMac && !("xml" == appExtension || "sdef" == appExtension)) return null
         LOG.debug("=== Caching Dictionary for application [$applicationName] ===")
         val serializePath = serializeDictionaryPathForApplication(applicationName)
@@ -820,7 +824,14 @@ class AppleScriptSystemDictionaryRegistryService :
                         if (targetFile.exists() && targetFile.delete()) {
                             LOG.debug("Existing target file deleted: $targetFile")
                         }
-                        Files.copy(applicationDictionaryFile, targetFile)
+                        // Guava's Files.copy(File, File) defaulted to overwrite; java.nio
+                        // does not — pass REPLACE_EXISTING explicitly to preserve semantics
+                        // (D-11). The pre-delete above also guards the read-after-write race.
+                        Files.copy(
+                            applicationDictionaryFile.toPath(),
+                            targetFile.toPath(),
+                            StandardCopyOption.REPLACE_EXISTING,
+                        )
                     } catch (e: IOException) {
                         LOG.error("Failed to move file $applicationDictionaryFile to cache directory: $targetFile")
                         e.printStackTrace()
