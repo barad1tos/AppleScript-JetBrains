@@ -162,6 +162,9 @@ tasks {
         // BasePlatformTestCase boots a full fixture (~30s) + scans /Applications, so
         // it's gated to avoid bloating CI but available for local fix-loop work.
         val includeHeavy = providers.gradleProperty("includeHeavyTests").orNull == "true"
+        if (includeHeavy) {
+            systemProperty("includeHeavyTests", "true")
+        }
         filter {
             includeTestsMatching("com.intellij.plugin.applescript.test.lexer.*")
             if (includeHeavy) {
@@ -172,6 +175,7 @@ tasks {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.DictionaryConstantParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.StandardAdditionsParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.LiveSamplesParsingTestCase")
+                includeTestsMatching("com.intellij.plugin.applescript.test.concurrency.*")
                 // DictionariesRandomParsingTestCase + TellApplicationMusicTest scan installed
                 // /Applications and depend on host-machine state — kept out to avoid flakiness.
             }
