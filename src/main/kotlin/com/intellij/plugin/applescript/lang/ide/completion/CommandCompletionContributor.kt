@@ -7,6 +7,7 @@ import com.intellij.codeInsight.completion.CompletionResultSet
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.patterns.PlatformPatterns.psiElement
+import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.psi.sdef.AppleScriptCommandHandlerCall
 import com.intellij.psi.PsiElement
@@ -26,6 +27,17 @@ class CommandCompletionContributor : CompletionContributor() {
                     context: ProcessingContext,
                     result: CompletionResultSet,
                 ) {
+                    // PITFALLS Pattern J — integration lifecycle gate. Short-circuit BEFORE any
+                    // expensive symbol enumeration when the app catalog isn't ready yet.
+                    // PITFALLS §7.1 prevention pattern: register restart so the IDE re-triggers
+                    // completion automatically once `appsReady` completes mid-session (Context7
+                    // SDK explicit; `CompletionResultSet.restartCompletionWhenNothingMatches()`
+                    // is part of the public IntelliJ Platform API).
+                    val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+                    if (!registryService.areAppDictionariesIndexed()) {
+                        result.restartCompletionWhenNothingMatches()
+                        return
+                    }
                     var handlerCallExpression: AppleScriptCommandHandlerCall? =
                         PsiTreeUtil.getParentOfType(parameters.position, AppleScriptCommandHandlerCall::class.java)
                     val elemAtCaret: PsiElement? = parameters.originalFile.findElementAt(parameters.offset)
