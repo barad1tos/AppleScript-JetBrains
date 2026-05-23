@@ -128,7 +128,7 @@ class AppleScriptSystemDictionaryRegistryService(
      *
      * Order is load-bearing for the cold-start state machine (CoroutineColdStartTest Pattern L lock):
      *   1. `registerSdefExtension()` under `withContext(Dispatchers.EDT)` — write-action requires EDT
-     *      (RECURRING_PITFALLS.md Pattern C — NEVER `Dispatchers.Main`).
+     *      (RECURRING_PITFALLS.md Pattern C — NEVER the `Main` dispatcher).
      *   2. `initDictionariesInfoFromCache(state)` — restore persisted dictionary entries.
      *   3. `initStandardSuite()` — parse StandardAdditions + CocoaStandard.
      *   4. Complete `standardReady` with `Result.success(Unit)` — parser fast path unblocks.
@@ -278,14 +278,27 @@ class AppleScriptSystemDictionaryRegistryService(
         }
     }
 
-    private fun discoverInstalledApplicationNames() {
-        for (applicationsDirectory in ApplicationDictionary.APP_BUNDLE_DIRECTORIES) {
-            val appsDirVFile = LocalFileSystem.getInstance().findFileByPath(applicationsDirectory)
-            if (appsDirVFile != null && appsDirVFile.exists()) {
-                discoverApplicationsInDirectory(appsDirVFile)
+    /**
+     * Walks the standard application-bundle directories (Phase 8 invariant — `APP_BUNDLE_DIRECTORIES`
+     * preserves `/System/Applications`, `/System/Applications/Utilities`, `~/Applications`) and
+     * registers any discovered `.app` / `.osax` / `.sdef` / `.xml` bundles into
+     * [discoveredApplicationNames].
+     *
+     * Plan 03-04 / D-02: explicit `withContext(ioDispatcher)` boundary — defence-in-depth even though
+     * the only production caller ([runInitChain]) is already launched on `ioDispatcher`. The explicit
+     * `suspend` signature advertises the dispatcher contract to readers and future callers
+     * (RECURRING_PITFALLS.md Pattern C — EDT must NEVER walk `/Applications`).
+     */
+    private suspend fun discoverInstalledApplicationNames() {
+        withContext(ioDispatcher) {
+            for (applicationsDirectory in ApplicationDictionary.APP_BUNDLE_DIRECTORIES) {
+                val appsDirVFile = LocalFileSystem.getInstance().findFileByPath(applicationsDirectory)
+                if (appsDirVFile != null && appsDirVFile.exists()) {
+                    discoverApplicationsInDirectory(appsDirVFile)
+                }
             }
+            LOG.info("List of installed applications initialized. Count: ${discoveredApplicationNames.size}")
         }
-        LOG.info("List of installed applications initialized. Count: ${discoveredApplicationNames.size}")
     }
 
     private fun discoverApplicationsInDirectory(appsDirVFile: VirtualFile) {
@@ -828,7 +841,15 @@ class AppleScriptSystemDictionaryRegistryService(
         if (!targetFile.parentFile.exists() && !targetFile.parentFile.mkdirs()) return null
         try {
             if (!SystemInfo.isMac && ("xml" == appExtension || "sdef" == appExtension)) {
-                fileGenerated = copyDictionaryFileToCacheDir(applicationName, applicationIoFile, targetFile, true)
+                // Plan 03-04 / D-02: copyDictionaryFileToCacheDir is now `suspend` and dispatches
+                // its I/O onto ioDispatcher. Bridge via runBlockingCancellable since this caller is
+                // a non-suspend, @Synchronized chain reachable from non-EDT background threads
+                // (parser bottom-half, init pipeline). The EDT guards on findStdCommands /
+                // findApplicationCommands (Codex MEDIUM 1) prevent EDT entry to the synchronous
+                // facade surface; non-EDT entry paths are safe for runBlockingCancellable.
+                fileGenerated = runBlockingCancellable {
+                    copyDictionaryFileToCacheDir(applicationName, applicationIoFile, targetFile, true)
+                }
             } else if (SystemInfo.isMac) {
                 val cmdName = if ("xml" == appExtension || "sdef" == appExtension) "cat" else "sdef"
                 fileGenerated = doGenerateDictionaryFile(applicationName, serializePath, cmdName, applicationIoFile.path)
@@ -838,16 +859,22 @@ class AppleScriptSystemDictionaryRegistryService(
             notScriptableApplicationList.add(e.getApplicationName())
         } catch (e: DeveloperToolsNotInstalledException) {
             LOG.warn("Generation failed: ${e.message}")
-            // DispatchThread is needed for the write action in copyDictionaryFileToCacheDir().
-            if (ApplicationManager.getApplication().isDispatchThread) {
-                LOG.warn("Will try to find application scripting definition file...")
-                val sdefFile = findSdefForApplication(applicationIoFile)
-                if (sdefFile != null && sdefFile.exists()) {
-                    fileGenerated = copyDictionaryFileToCacheDir(applicationName, sdefFile, targetFile, true)
-                } else {
-                    LOG.warn("Scripting definition was not found for application ${applicationIoFile.absolutePath}")
-                    notScriptableApplicationList.add(applicationName)
+            // Codex MEDIUM 3 / Plan 03-04: the legacy dispatch-thread guard here is REMOVED.
+            // The previous behaviour required EDT because copyDictionaryFileToCacheDir was
+            // EDT-bound; v1.2 routes that file copy through `withContext(ioDispatcher)`, so the
+            // recovery path is always available regardless of caller thread. The remaining
+            // dispatch-thread sites in this file are exclusively the two EDT guards on the
+            // bounded-wait facades (`findStdCommands` / `findApplicationCommands`) per
+            // Codex MEDIUM 1.
+            LOG.warn("Will try to find application scripting definition file...")
+            val sdefFile = findSdefForApplication(applicationIoFile)
+            if (sdefFile != null && sdefFile.exists()) {
+                fileGenerated = runBlockingCancellable {
+                    copyDictionaryFileToCacheDir(applicationName, sdefFile, targetFile, true)
                 }
+            } else {
+                LOG.warn("Scripting definition was not found for application ${applicationIoFile.absolutePath}")
+                notScriptableApplicationList.add(applicationName)
             }
         } finally {
             if (!fileGenerated) {
@@ -958,35 +985,50 @@ class AppleScriptSystemDictionaryRegistryService(
         return false
     }
 
-    /** Copy the application dictionary file into the IDE's cache directory. */
-    private fun copyDictionaryFileToCacheDir(
+    /**
+     * Copy the application dictionary file into the IDE's cache directory.
+     *
+     * Plan 03-04 / D-02 (Codex MEDIUM 3): the legacy dispatch-thread early-exit guard has been
+     * REMOVED. The entire body now runs under `withContext(ioDispatcher)`, so the EDT-block check
+     * is obsolete — structured-concurrency dispatch supersedes the manual guard. Previously the
+     * body short-circuited when off the dispatch thread, leaving the cache untouched; under v1.2 the
+     * function is invoked from suspend callers (or wrapped via `runBlockingCancellable` from
+     * background threads, never EDT) and always performs the copy on `ioDispatcher`.
+     *
+     * RECURRING_PITFALLS.md Pattern A: the IOException catch now uses `LOG.error("...", e)` so the
+     * exception chain is preserved through the structured-concurrency dispatch and the previous
+     * `e.printStackTrace()` silent-stdout failure mode is gone.
+     */
+    private suspend fun copyDictionaryFileToCacheDir(
         applicationName: String,
         applicationDictionaryFile: File,
         targetFile: File,
         rewrite: Boolean,
     ): Boolean {
         if (!targetFile.parentFile.exists()) return false
-        if (ApplicationManager.getApplication().isDispatchThread && (!targetFile.exists() || rewrite)) {
-            ApplicationManager.getApplication().runWriteAction(
-                Runnable {
-                    try {
-                        if (targetFile.exists() && targetFile.delete()) {
-                            LOG.debug("Existing target file deleted: $targetFile")
-                        }
-                        // Guava's Files.copy(File, File) defaulted to overwrite; java.nio
-                        // does not — pass REPLACE_EXISTING explicitly to preserve semantics
-                        // (D-11). The pre-delete above also guards the read-after-write race.
-                        Files.copy(
-                            applicationDictionaryFile.toPath(),
-                            targetFile.toPath(),
-                            StandardCopyOption.REPLACE_EXISTING,
-                        )
-                    } catch (e: IOException) {
-                        LOG.error("Failed to move file $applicationDictionaryFile to cache directory: $targetFile")
-                        e.printStackTrace()
+
+        val needsCopy = !targetFile.exists() || rewrite
+        if (needsCopy) {
+            // File I/O on ioDispatcher — Pattern C: NEVER the Main dispatcher.
+            withContext(ioDispatcher) {
+                try {
+                    if (targetFile.exists() && targetFile.delete()) {
+                        LOG.debug("Existing target file deleted: $targetFile")
                     }
-                },
-            )
+                    // Guava's Files.copy(File, File) defaulted to overwrite; java.nio
+                    // does not — pass REPLACE_EXISTING explicitly to preserve semantics
+                    // (D-11). The pre-delete above also guards the read-after-write race.
+                    Files.copy(
+                        applicationDictionaryFile.toPath(),
+                        targetFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING,
+                    )
+                } catch (e: IOException) {
+                    // Pattern A: log with the exception chain so cancellation / IDE log routing
+                    // sees the cause. Previously `e.printStackTrace()` silently dumped to stdout.
+                    LOG.error("Failed to move file $applicationDictionaryFile to cache directory: $targetFile", e)
+                }
+            }
         } else {
             LOG.debug("Generated file already exists for application $applicationName")
         }
