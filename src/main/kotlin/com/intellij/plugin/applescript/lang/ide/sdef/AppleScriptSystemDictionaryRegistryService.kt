@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.lang.ide.sdef
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.components.RoamingType
@@ -11,6 +12,7 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
@@ -26,12 +28,21 @@ import com.intellij.plugin.applescript.lang.util.MyStopVisitingException
 import com.intellij.util.xmlb.annotations.AbstractCollection
 import com.intellij.util.xmlb.annotations.CollectionBean
 import com.intellij.util.xmlb.annotations.Tag
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.jdom.Document
 import org.jdom.Element
 import org.jdom.JDOMException
 import org.jdom.Namespace
 import org.jdom.input.SAXBuilder
 import org.jdom.output.XMLOutputter
+import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -40,7 +51,6 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.Arrays
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import javax.script.ScriptException
 import javax.script.ScriptEngineManager
@@ -50,8 +60,13 @@ import javax.script.ScriptEngineManager
     name = AppleScriptSystemDictionaryRegistryService.COMPONENT_NAME,
     storages = [Storage(value = "appleScriptCachedDictionariesInfo.xml", roamingType = RoamingType.PER_OS)],
 )
-class AppleScriptSystemDictionaryRegistryService :
-    SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()),
+class AppleScriptSystemDictionaryRegistryService(
+    // serviceScope is exposed `internal` so ServiceScopeLifecycleIntegrationTest can read its Job
+    // tree. Same-module test code naturally accesses `internal` members — no @VisibleForTesting
+    // needed on constructor parameters (annotation does not target value parameters in Kotlin).
+    internal val serviceScope: CoroutineScope,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()),
     ParsableScriptHelper {
 
     // persisted data
@@ -81,27 +96,111 @@ class AppleScriptSystemDictionaryRegistryService :
     private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
 
     /**
-     * Released exactly once when [init] finishes (including the catch-Exception branch — see [init] finally).
-     * Readers in [ParsableScriptHelper] gate against this:
-     *   - Boolean predicates (parser hot path) use `if (initLatch.count > 0L) return false` — never block.
-     *   - Collection-returning resolvers use `initLatch.await(2, TimeUnit.SECONDS)` — bounded wait.
-     * See ARCHITECTURE.md section 7 and PITFALLS.md section 7.1.
+     * Two-stage gating primitives replacing the Phase 1 [java.util.concurrent.CountDownLatch] (D-01, D-04).
+     *
+     * Typed as `CompletableDeferred<Result<Unit>>` per Codex HIGH 1 so failed init is communicated via
+     * `complete(Result.failure(...))` (NOT `completeExceptionally(...)`). `isCompleted` alone is NOT
+     * a success signal — readers must additionally check `getCompleted().isSuccess`. The two facades
+     * [isInitialized] and [areAppDictionariesIndexed] encapsulate this success-semantic predicate.
+     *
+     * Exposed `@VisibleForTesting internal` so AppCommandGatingTest + DeferredFailureSemanticsTest +
+     * ServiceScopeLifecycleIntegrationTest can drive / inspect them deterministically.
      */
-    private val initLatch: CountDownLatch = CountDownLatch(1)
+    @VisibleForTesting
+    internal val standardReady: CompletableDeferred<Result<Unit>> = CompletableDeferred()
+
+    @VisibleForTesting
+    internal val appsReady: CompletableDeferred<Result<Unit>> = CompletableDeferred()
 
     init {
-        try {
-            registerSdefExtension()
-            initDictionariesInfoFromCache(state)
-            initStandardSuite()
-            discoverInstalledApplicationNames()
-        } catch (e: Exception) {
-            LOG.error("Error while initializing service", e)
-        } finally {
-            // D-05: release on the failure path too, so readers never deadlock on a failed init.
-            initLatch.countDown()
+        // Constructor returns immediately (COROUTINE-05 non-blocking-init invariant). The launch is
+        // fire-and-forget; structured concurrency guarantees cancellation on plugin unload / app
+        // shutdown via the injected [serviceScope] (RESEARCH §3 verified). `ioDispatcher` is injected
+        // (Codex HIGH 2) so tests pass `StandardTestDispatcher` for deterministic runCurrent /
+        // advanceUntilIdle control of init progression.
+        serviceScope.launch(ioDispatcher) {
+            runInitChain()
         }
     }
+
+    /**
+     * Two-stage init pipeline run inside [serviceScope] on [ioDispatcher].
+     *
+     * Order is load-bearing for the cold-start state machine (CoroutineColdStartTest Pattern L lock):
+     *   1. `registerSdefExtension()` under `withContext(Dispatchers.EDT)` — write-action requires EDT
+     *      (RECURRING_PITFALLS.md Pattern C — NEVER `Dispatchers.Main`).
+     *   2. `initDictionariesInfoFromCache(state)` — restore persisted dictionary entries.
+     *   3. `initStandardSuite()` — parse StandardAdditions + CocoaStandard.
+     *   4. Complete `standardReady` with `Result.success(Unit)` — parser fast path unblocks.
+     *   5. `discoverInstalledApplicationNames()` — walk the `/Applications` directory tree.
+     *   6. Complete `appsReady` with `Result.success(Unit)` — completion/annotator paths unblock.
+     *
+     * Exception handling (RECURRING_PITFALLS.md Pattern B compliance):
+     *   - Catch [CancellationException] FIRST and re-throw — never swallow structured cancellation.
+     *   - Catch [Throwable] (not [Exception]) and `LOG.error` — captures `Error` subclasses too.
+     *   - `finally` block completes any not-yet-completed deferred with `Result.failure(...)` so the
+     *     facades see `isCompleted && isFailure` → return `false` (not-ready) rather than a
+     *     false-positive "ready" for a failed init (Codex HIGH 1, Pattern G).
+     */
+    private suspend fun runInitChain() {
+        try {
+            withContext(Dispatchers.EDT) { registerSdefExtension() }
+            initDictionariesInfoFromCache(state)
+            initStandardSuite()
+            standardReady.complete(Result.success(Unit))
+            discoverInstalledApplicationNames()
+            appsReady.complete(Result.success(Unit))
+        } catch (e: CancellationException) {
+            // Pattern B: structured cancellation re-thrown to honour the coroutine contract.
+            throw e
+        } catch (t: Throwable) {
+            // Pattern B: Throwable (not Exception) — captures Error subclasses too.
+            LOG.error("Error while initializing service", t)
+        } finally {
+            // Codex HIGH 1: complete with Result.failure so facades see isCompleted && isFailure
+            // → return false. NOT `completeExceptionally` (which would make `await()` throw at
+            // callers and lose the success-vs-failure distinction at the facade boundary).
+            if (!standardReady.isCompleted) {
+                standardReady.complete(
+                    Result.failure(IllegalStateException("standardReady init failed")),
+                )
+            }
+            if (!appsReady.isCompleted) {
+                appsReady.complete(
+                    Result.failure(IllegalStateException("appsReady init failed")),
+                )
+            }
+        }
+    }
+
+    /**
+     * Returns `true` only when the standard SDEF suite (StandardAdditions + CocoaStandard) has been
+     * parsed AND indexed successfully. A completed-but-failed [standardReady] (init threw before the
+     * `Result.success(Unit)` line) returns `false` — readers see "not ready" rather than a
+     * false-positive "ready" for a failed init (Codex HIGH 1, RECURRING_PITFALLS.md Pattern G).
+     *
+     * Distinct from [areAppDictionariesIndexed]: this facade reflects the parser fast path readiness
+     * (standard-library suite only), while [areAppDictionariesIndexed] reflects the full
+     * `/Applications` discovery sweep (Gemini LOW 3).
+     *
+     * @return `true` if [standardReady] completed successfully; `false` if pending OR failed.
+     */
+    fun isInitialized(): Boolean =
+        standardReady.isCompleted && standardReady.getCompleted().isSuccess
+
+    /**
+     * Returns `true` only when the full application catalog discovery has completed successfully.
+     * Completion contributors and the annotator gate on this facade. A failed [appsReady] returns
+     * `false` — readers see "not ready" rather than a false-positive "ready" for a failed
+     * app-discovery sweep (Codex HIGH 1, RECURRING_PITFALLS.md Pattern G).
+     *
+     * Distinct from [isInitialized]: this facade reflects the full app-discovery pipeline, while
+     * [isInitialized] reflects only the standard-library readiness (Gemini LOW 3).
+     *
+     * @return `true` if [appsReady] completed successfully; `false` if pending OR failed.
+     */
+    fun areAppDictionariesIndexed(): Boolean =
+        appsReady.isCompleted && appsReady.getCompleted().isSuccess
 
     private fun registerSdefExtension() {
         ApplicationManager.getApplication().runWriteAction(
@@ -217,7 +316,8 @@ class AppleScriptSystemDictionaryRegistryService :
             !isInUnknownList(anyApplicationName) && getInitializedInfo(anyApplicationName) != null
 
     override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean {
-        if (initLatch.count > 0L) return false
+        // D-04: app-name resolver path — gated on full app-discovery sweep (appsReady).
+        if (!areAppDictionariesIndexed()) return false
         if (discoveredApplicationNames.contains(knownApplicationName)) {
             val dInfo = dictionaryInfoMap[knownApplicationName]
             return dInfo != null && (dInfo.isInitialized() || initializeDictionaryFromInfo(dInfo)) ||
@@ -229,44 +329,44 @@ class AppleScriptSystemDictionaryRegistryService :
     // ParsableScriptHelper methods
 
     override fun isStdLibClass(name: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return stdClassNameToApplicationNameSetMap.containsKey(name)
     }
 
     override fun isApplicationClass(applicationName: String, className: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         val classNameSet = applicationNameToClassNameSetMap[applicationName]
         return classNameSet != null && classNameSet.contains(className)
     }
 
     override fun isStdLibClassPluralName(pluralName: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
     }
 
     override fun isApplicationClassPluralName(applicationName: String, pluralClassName: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         val pluralClassNameSet = applicationNameToClassNamePluralSetMap[applicationName]
         return pluralClassNameSet != null && pluralClassNameSet.contains(pluralClassName)
     }
 
     override fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(classNamePrefix, stdClassNameToApplicationNameSetMap.keys)
     }
 
     override fun isClassWithPrefixExist(applicationName: String, classNamePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(classNamePrefix, applicationNameToClassNameSetMap[applicationName])
     }
 
     override fun isStdClassPluralWithPrefixExist(namePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(namePrefix, stdClassNamePluralToApplicationNameSetMap.keys)
     }
 
     override fun isClassPluralWithPrefixExist(applicationName: String, pluralClassNamePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(pluralClassNamePrefix, applicationNameToClassNamePluralSetMap[applicationName])
     }
 
@@ -279,28 +379,52 @@ class AppleScriptSystemDictionaryRegistryService :
     }
 
     override fun isStdCommand(name: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return stdCommandNameToApplicationNameSetMap.containsKey(name)
     }
 
     override fun isApplicationCommand(applicationName: String, commandName: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         val appCommands = applicationNameToCommandNameSetMap[applicationName]
         return appCommands != null && appCommands.contains(commandName)
     }
 
     override fun isCommandWithPrefixExist(applicationName: String, commandNamePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(commandNamePrefix, applicationNameToCommandNameSetMap[applicationName])
     }
 
     override fun isStdCommandWithPrefixExist(namePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(namePrefix, stdCommandNameToApplicationNameSetMap.keys)
     }
 
+    /**
+     * Bounded-wait resolver for standard-suite commands.
+     *
+     * Codex MEDIUM 1 + Gemini LOW 1: EDT guard at entry — never blocks the UI thread.
+     * Codex HIGH 5: split-gate — waits on [standardReady] (parser fast path readiness only).
+     * Codex HIGH 1: timeout returns `null`, failure returns `isFailure` → both yield empty list.
+     * Gemini LOW 2: `LOG.warn` records the 2s timeout site for slow-init diagnostics.
+     */
     override fun findStdCommands(project: Project, commandName: String): Collection<AppleScriptCommand> {
-        if (!initLatch.await(2, TimeUnit.SECONDS)) return emptyList()
+        if (ApplicationManager.getApplication().isDispatchThread) {
+            LOG.warn("findStdCommands called from EDT; returning empty list to avoid 2s freeze")
+            return emptyList()
+        }
+        if (!isInitialized()) {
+            val gate = runBlockingCancellable {
+                withTimeoutOrNull(2_000) { standardReady.await() }
+            }
+            if (gate == null) {
+                LOG.warn("findStdCommands: 2s timeout waiting on standardReady — returning emptyList")
+                return emptyList()
+            }
+            if (gate.isFailure) {
+                // Codex HIGH 1: init failed — treat as not-ready.
+                return emptyList()
+            }
+        }
         val appNameList = stdCommandNameToApplicationNameSetMap[commandName] ?: return HashSet(0)
         val result = HashSet<AppleScriptCommand>()
         for (applicationName in appNameList) {
@@ -309,12 +433,37 @@ class AppleScriptSystemDictionaryRegistryService :
         return result
     }
 
+    /**
+     * Bounded-wait resolver for app-scoped commands.
+     *
+     * Codex MEDIUM 1 + Gemini LOW 1: EDT guard at entry — never blocks the UI thread.
+     * Codex HIGH 5: split-gate — waits on [appsReady] (NOT [standardReady]). App-scoped command
+     * lookup must not proceed before the full `/Applications` discovery sweep completes, otherwise
+     * the reader sees an empty/partial app catalog. AppCommandGatingTest locks this invariant.
+     * Codex HIGH 1: timeout returns `null`, failure returns `isFailure` → both yield empty list.
+     * Gemini LOW 2: `LOG.warn` records the 2s timeout site for slow-init diagnostics.
+     */
     override fun findApplicationCommands(
         project: Project,
         applicationName: String,
         commandName: String,
     ): List<AppleScriptCommand> {
-        if (!initLatch.await(2, TimeUnit.SECONDS)) return emptyList()
+        if (ApplicationManager.getApplication().isDispatchThread) {
+            LOG.warn("findApplicationCommands called from EDT; returning empty list to avoid 2s freeze")
+            return emptyList()
+        }
+        if (!areAppDictionariesIndexed()) {
+            val gate = runBlockingCancellable {
+                withTimeoutOrNull(2_000) { appsReady.await() }
+            }
+            if (gate == null) {
+                LOG.warn("findApplicationCommands: 2s timeout waiting on appsReady — returning emptyList")
+                return emptyList()
+            }
+            if (gate.isFailure) {
+                return emptyList()
+            }
+        }
         val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
         // Among the loaded dictionaries the standard additions should always be present, but if the command
         // was not found there a new dictionary may need to be initialised here for the project — once.
@@ -327,44 +476,44 @@ class AppleScriptSystemDictionaryRegistryService :
     }
 
     override fun isStdProperty(name: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return stdPropertyNameToDictionarySetMap.containsKey(name)
     }
 
     override fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(namePrefix, stdPropertyNameToDictionarySetMap.keys)
     }
 
     override fun isApplicationProperty(applicationName: String, propertyName: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         val propertySet = applicationNameToPropertySetMap[applicationName]
         return propertySet != null && propertySet.contains(propertyName)
     }
 
     override fun isPropertyWithPrefixExist(applicationName: String, propertyNamePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(propertyNamePrefix, applicationNameToPropertySetMap[applicationName])
     }
 
     override fun isStdConstant(name: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
     }
 
     override fun isApplicationConstant(applicationName: String, constantName: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         val applicationConstantSet = applicationNameToEnumeratorConstantNameSetMap[applicationName]
         return applicationConstantSet != null && applicationConstantSet.contains(constantName)
     }
 
     override fun isStdConstantWithPrefixExist(namePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(namePrefix, stdEnumeratorConstantNameToApplicationNameListMap.keys)
     }
 
     override fun isConstantWithPrefixExist(applicationName: String, namePrefix: String): Boolean {
-        if (initLatch.count > 0L) return false
+        if (!isInitialized()) return false
         return isNameWithPrefixExist(namePrefix, applicationNameToEnumeratorConstantNameSetMap[applicationName])
     }
 
