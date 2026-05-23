@@ -121,6 +121,25 @@ class AppleScriptSystemDictionaryRegistryService(
         serviceScope.launch(ioDispatcher) {
             runInitChain()
         }
+
+        // D-04 hybrid silent->visible UX (Plan 03-05). Sibling launch on serviceScope so it shares
+        // the same structured-concurrency parent as runInitChain — both children auto-cancel on
+        // plugin unload. The policy stays silent for the first `visibilityThreshold` (2s default,
+        // see DiscoveryProgressPolicy); if `appsReady` has not completed by then, surfaces a
+        // Task.Backgroundable indicator titled "AppleScript: indexing dictionaries…" with a
+        // cancel button. User cancel on the indicator does NOT cancel runInitChain — they are
+        // sibling children (T-03-cancel-leak mitigation per the plan's STRIDE register).
+        //
+        // Codex HIGH 3 — the timing decision + indicator surfacing lives in DiscoveryProgressPolicy,
+        // testable via a RecordingFake ProgressTaskCompat. Codex MEDIUM 4 — production uses
+        // `Task.Backgroundable(null, ...)` per spike outcome (see
+        // src/test/kotlin/com/intellij/plugin/applescript/test/spikes/WithBackgroundProgressNullProjectSpike.kt).
+        serviceScope.launch {
+            val policy = DiscoveryProgressPolicy(taskCompat = ProgressTaskCompatDefault())
+            policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
+                appsReady.await()
+            }
+        }
     }
 
     /**
