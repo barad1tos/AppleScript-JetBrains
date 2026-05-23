@@ -1,6 +1,13 @@
 [versions]
 kotlin = "2.3.21"
-kotlinx-coroutines = "1.10.1"
+# Lowest Common Denominator across verifier IDE matrix:
+#   2024.3.7.1 ships 1.8.0-intellij-11
+#   2025.1.7.1 ships 1.8.0-intellij-13
+#   2025.2.6.2 ships 1.10.1-intellij-4
+# Pinning to 1.8.0 = lowest API surface. Phase 7 incident: anything >= 1.10.x
+# adds methods absent from 1.8.x bundled forks. NEVER bump above LCD without
+# re-running the full verifier matrix.
+kotlinx-coroutines = "1.8.0"
 intellij-platform = "2.16.0"
 
 # Test
@@ -13,6 +20,9 @@ proxy-vole = "1.1.6"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+# v1.2 D-05: test artifact only; matches LCD so ABI lines up with bundled fork.
+# Per PITFALLS section 3.3 — version mismatch = NoSuchMethodError at test runtime.
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit-jupiter" }
