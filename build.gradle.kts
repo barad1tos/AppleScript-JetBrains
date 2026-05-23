@@ -49,11 +49,13 @@ sourceSets {
 }
 
 dependencies {
-    // kotlinx-coroutines-core is intentionally NOT declared as a runtime dep —
-    // IntelliJ Platform 2024.3+ ships its own pinned coroutines (1.8.x) and shading
-    // ours on top triggers NoSuchMethodError at runtime
-    // (CancellableContinuation.tryResume signature drift). When v1.1 needs coroutines
-    // we use the platform-bundled instance via compileOnly + JBR's transitive copy.
+    // v1.2 (Phase 3): kotlinx-coroutines-core is compileOnly-only.
+    // IntelliJ Platform 2024.3+ ships a patched fork (1.8.0-intellij-NN /
+    // 1.10.1-intellij-NN) merged into lib/app.jar. Shading our own copy
+    // triggers NoSuchMethodError: CancellableContinuation.tryResume — see
+    // Phase 7 incident. verifyNoBundledCoroutines enforces this at build time.
+    compileOnly(libs.kotlinx.coroutines.core)
+
     implementation(libs.commons.imaging)
     implementation(libs.proxy.vole)
 
@@ -71,6 +73,7 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
+    testImplementation(libs.kotlinx.coroutines.test)   // D-05 — TestDispatcher only
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
