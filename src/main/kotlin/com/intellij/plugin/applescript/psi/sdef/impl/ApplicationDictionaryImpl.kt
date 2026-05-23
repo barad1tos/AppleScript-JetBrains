@@ -68,29 +68,15 @@ class ApplicationDictionaryImpl(
 
     private var myRootTag: XmlTag? = null
     private val mySuites: MutableList<Suite> = ArrayList()
-    private val dictionaryPropertyMap: MutableMap<String, AppleScriptPropertyDefinition> = HashMap()
-    private val dictionaryRecordMap: MutableMap<String, DictionaryRecord> = HashMap()
-    private val dictionaryEnumeratorMap: MutableMap<String, DictionaryEnumerator> = HashMap()
-    private val dictionaryEnumerationMap: MutableMap<String, DictionaryEnumeration> = HashMap()
-    private val dictionaryCommandMap: MutableMap<String, AppleScriptCommand> = HashMap()
 
-    // D-02 closure (plan 02-04): secondary index keyed by command name → 0..N
-    // commands. The primary `dictionaryCommandMap` keeps its "first-by-name"
-    // contract (D-03 interface freeze — getDictionaryCommandMap returns
-    // Map<String, AppleScriptCommand>); this list-keyed companion lets
-    // `findAllCommandsWithName` return the full set of overloaded entries.
-    // Dedupe inside the list is by `CommandData` structural equality
-    // (CommandData synthesises equals/hashCode from name + code + parameters +
-    // result, so two impls with structurally-equal data collapse to one
-    // list entry). 02-05 wraps both maps into DictionaryIndexes with
-    // ConcurrentHashMap; for v1.1 the storage stays plain HashMap.
-    private val dictionaryCommandListMap: MutableMap<String, MutableList<AppleScriptCommand>> = HashMap()
+    // Plan 02-05 / D-07: the 9-map index cluster moved into [DictionaryIndexes]
+    // (CHM-backed). Closes the processInclude race latent since v1.0.0; Phase 1
+    // explicitly deferred this fix here. v1.3 service split lifts `indexes`
+    // wholesale into `SdefIndexService` without touching any consumer site.
+    private val indexes: DictionaryIndexes = DictionaryIndexes()
 
     @Suppress("unused")
     private val dictionaryCommands: MutableSet<AppleScriptCommand> = LinkedHashSet()
-    private val dictionaryClassMap: MutableMap<String, AppleScriptClass> = HashMap()
-    private val dictionaryClassToPluralNameMap: MutableMap<String, AppleScriptClass> = HashMap()
-    private val dictionaryClassByCodeMap: MutableMap<String, AppleScriptClass> = HashMap()
 
     init {
         readDictionaryFromXmlFile(dictionaryXmlFile)
@@ -100,8 +86,8 @@ class ApplicationDictionaryImpl(
         }
         LOG.info(
             "Dictionary [$dictionaryName] for application [$applicationName] initialized " +
-                "In project[${project.name}]  Commands: ${dictionaryCommandMap.size}. " +
-                "Classes: ${dictionaryClassMap.size}",
+                "In project[${project.name}]  Commands: ${indexes.dictionaryCommandMap.size}. " +
+                "Classes: ${indexes.dictionaryClassMap.size}",
         )
     }
 
@@ -167,59 +153,79 @@ class ApplicationDictionaryImpl(
 
     override fun getDictionaryFile(): VirtualFile = dictionaryFile
 
-    override fun getDictionaryEnumerationMap(): Map<String, DictionaryEnumeration> = dictionaryEnumerationMap
+    override fun getDictionaryEnumerationMap(): Map<String, DictionaryEnumeration> = indexes.dictionaryEnumerationMap
 
-    override fun getDictionaryEnumeratorMap(): Map<String, DictionaryEnumerator> = dictionaryEnumeratorMap
+    override fun getDictionaryEnumeratorMap(): Map<String, DictionaryEnumerator> = indexes.dictionaryEnumeratorMap
 
-    override fun getDictionaryRecordMap(): Map<String, DictionaryRecord> = dictionaryRecordMap
+    override fun getDictionaryRecordMap(): Map<String, DictionaryRecord> = indexes.dictionaryRecordMap
 
     // First-by-name contract preserved (D-03 interface freeze). Use
     // findAllCommandsWithName for 0..N entries on overloaded command names.
-    override fun getDictionaryCommandMap(): Map<String, AppleScriptCommand> = dictionaryCommandMap
+    override fun getDictionaryCommandMap(): Map<String, AppleScriptCommand> = indexes.dictionaryCommandMap
 
-    override fun getDictionaryClassMap(): Map<String, AppleScriptClass> = dictionaryClassMap
+    override fun getDictionaryClassMap(): Map<String, AppleScriptClass> = indexes.dictionaryClassMap
 
-    override fun findClass(name: String?): AppleScriptClass? = dictionaryClassMap[name]
+    // Null-name guard: `ConcurrentHashMap` rejects null keys with NPE, whereas
+    // the pre-fix `HashMap` returned null silently. The interface accepts
+    // `String?` so legitimate null inputs flow in (e.g. unresolved handler-call
+    // identifiers from the resolver path). Preserve original semantics.
+    override fun findClass(name: String?): AppleScriptClass? =
+        name?.let { indexes.dictionaryClassMap[it] }
 
     override fun getParameterNamesForCommand(name: String): List<String>? =
-        dictionaryCommandMap[name]?.getParameterNames()
+        indexes.dictionaryCommandMap[name]?.getParameterNames()
 
     override fun findDirectParameterForCommand(commandName: String): CommandDirectParameter? =
-        dictionaryCommandMap[commandName]?.getDirectParameter()
+        indexes.dictionaryCommandMap[commandName]?.getDirectParameter()
 
-    override fun findProperty(name: String): AppleScriptPropertyDefinition? = dictionaryPropertyMap[name]
+    override fun findProperty(name: String): AppleScriptPropertyDefinition? = indexes.dictionaryPropertyMap[name]
 
     // D-02: returns 0..N entries for overloaded command names. Dedupe inside the
     // backing list is by CommandData structural equality (see addCommand).
     // .toList() defensive copy so callers cannot mutate the backing list.
     override fun findAllCommandsWithName(name: String): List<AppleScriptCommand> =
-        dictionaryCommandListMap[name]?.toList() ?: emptyList()
+        indexes.dictionaryCommandListMap[name]?.toList() ?: emptyList()
 
-    override fun findEnumerator(name: String): DictionaryEnumerator? = dictionaryEnumeratorMap[name]
+    override fun findEnumerator(name: String): DictionaryEnumerator? = indexes.dictionaryEnumeratorMap[name]
 
     override fun findClassByPluralName(pluralForm: String): AppleScriptClass? =
-        dictionaryClassToPluralNameMap[pluralForm]
+        indexes.dictionaryClassToPluralNameMap[pluralForm]
 
-    override fun findEnumeration(name: String): DictionaryEnumeration? = dictionaryEnumerationMap[name]
+    override fun findEnumeration(name: String): DictionaryEnumeration? = indexes.dictionaryEnumerationMap[name]
 
     /**
      * Convention (locked, matched by SuiteImpl.addCommand): returns true on
      * first insert of a (name, command) pair, false on duplicate name. D-02
-     * also populates dictionaryCommandListMap so findAllCommandsWithName can
-     * return all overloaded entries; the list dedupes by CommandData structural
-     * equality so two impls with identical name + code + parameters + result
-     * (e.g. re-ingest of the same SDEF after a cache miss) collapse to one
-     * list entry, while genuinely overloaded commands (same name, different
-     * parameter signatures) co-exist as N entries.
+     * also populates `dictionaryCommandListMap` so [findAllCommandsWithName]
+     * can return all overloaded entries; the list dedupes by `CommandData`
+     * structural equality so two impls with identical name + code + parameters
+     * + result (e.g. re-ingest of the same SDEF after a cache miss) collapse
+     * to one list entry, while genuinely overloaded commands (same name,
+     * different parameter signatures) co-exist as N entries.
+     *
+     * Concurrency: the primary `dictionaryCommandMap.put` is atomic on
+     * `ConcurrentHashMap`. For the secondary list-map we use
+     * `computeIfAbsent` (CHM-atomic create-or-fetch) backed by a
+     * [java.util.concurrent.CopyOnWriteArrayList] so the per-name list's
+     * `any { … }` read concurrent with `.add(…)` from another thread is
+     * CME-free. The dedupe-then-add sequence is *not* atomic across writers
+     * for the same name; this is acceptable because (a) overload-by-name
+     * adds are rare in practice (parser walks each suite once), and (b) the
+     * worst case is a transient duplicate list entry on a structurally-equal
+     * re-insert race — the dedupe check eventually wins on the next
+     * `addCommand`-by-name. Strict atomicity would need a per-name mutex;
+     * the cost outweighs the benefit for the observed workload.
      */
     override fun addCommand(command: AppleScriptCommand): Boolean {
         val name = command.getName()
-        val wasNew = dictionaryCommandMap.put(name, command) == null
-        val list = dictionaryCommandListMap.getOrPut(name) { ArrayList(1) }
-        // Structural-equality dedupe via CommandData (D-02 closure). The cast
-        // is safe because the parser only ever instantiates
-        // AppleScriptCommandImpl; for unexpected impl types we fall back to
-        // reference equality, which is strictly more permissive (no
+        val wasNew = indexes.dictionaryCommandMap.put(name, command) == null
+        val list = indexes.dictionaryCommandListMap.computeIfAbsent(name) {
+            java.util.concurrent.CopyOnWriteArrayList<AppleScriptCommand>()
+        }
+        // Structural-equality dedupe via `CommandData` (D-02 closure). The
+        // cast is safe because the parser only ever instantiates
+        // [AppleScriptCommandImpl]; for unexpected impl types we fall back
+        // to reference equality, which is strictly more permissive (no
         // overload-by-content collapse) but never corrupts the list.
         val alreadyPresent = if (command is AppleScriptCommandImpl) {
             list.any { existing -> existing is AppleScriptCommandImpl && existing.commandData == command.commandData }
@@ -233,12 +239,12 @@ class ApplicationDictionaryImpl(
     /** Test-helper accessor for the secondary list-keyed index. */
     @org.jetbrains.annotations.TestOnly
     internal fun getDictionaryCommandListMap(): Map<String, List<AppleScriptCommand>> =
-        dictionaryCommandListMap.mapValues { it.value.toList() }
+        indexes.dictionaryCommandListMap.mapValues { it.value.toList() }
 
     override fun addClass(appleScriptClass: AppleScriptClass): Boolean {
-        val previous = dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)
-        appleScriptClass.getCode()?.let { dictionaryClassByCodeMap[it] = appleScriptClass }
-        dictionaryClassToPluralNameMap[appleScriptClass.getPluralClassName()] = appleScriptClass
+        val previous = indexes.dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)
+        appleScriptClass.getCode()?.let { indexes.dictionaryClassByCodeMap[it] = appleScriptClass }
+        indexes.dictionaryClassToPluralNameMap[appleScriptClass.getPluralClassName()] = appleScriptClass
         for (property in appleScriptClass.getProperties()) {
             addProperty(property)
         }
@@ -249,15 +255,15 @@ class ApplicationDictionaryImpl(
 
     override fun getPresentation(): ItemPresentation = AppleScriptElementPresentation(this)
 
-    override fun findClassByCode(code: String): AppleScriptClass? = dictionaryClassByCodeMap[code]
+    override fun findClassByCode(code: String): AppleScriptClass? = indexes.dictionaryClassByCodeMap[code]
 
     override fun addProperty(property: AppleScriptPropertyDefinition): Boolean =
-        dictionaryPropertyMap.put(property.getName(), property) == null
+        indexes.dictionaryPropertyMap.put(property.getName(), property) == null
 
     override fun addEnumeration(enumeration: DictionaryEnumeration): Boolean {
-        val previous = dictionaryEnumerationMap.put(enumeration.getName(), enumeration)
+        val previous = indexes.dictionaryEnumerationMap.put(enumeration.getName(), enumeration)
         for (enumerator in enumeration.getEnumerators().orEmpty()) {
-            dictionaryEnumeratorMap[enumerator.getName()] = enumerator
+            indexes.dictionaryEnumeratorMap[enumerator.getName()] = enumerator
         }
         return previous == null
     }
@@ -309,12 +315,12 @@ class ApplicationDictionaryImpl(
 
     override fun getLanguage(): Language = AppleScriptLanguage
 
-    override fun getDictionaryPropertyMap(): Map<String, AppleScriptPropertyDefinition> = dictionaryPropertyMap
+    override fun getDictionaryPropertyMap(): Map<String, AppleScriptPropertyDefinition> = indexes.dictionaryPropertyMap
 
     override fun addRecord(record: DictionaryRecord) {
-        dictionaryRecordMap[record.getName()] = record
+        indexes.dictionaryRecordMap[record.getName()] = record
         for (prop in record.getProperties()) {
-            dictionaryPropertyMap[prop.getName()] = prop
+            indexes.dictionaryPropertyMap[prop.getName()] = prop
         }
     }
 
@@ -380,9 +386,14 @@ class ApplicationDictionaryImpl(
         return null
     }
 
-    override fun findCommand(name: String?): AppleScriptCommand? = dictionaryCommandMap[name]
+    // Null-name guard: `ConcurrentHashMap` rejects null keys with NPE, whereas
+    // the pre-fix `HashMap` returned null silently. Preserve original semantics
+    // for callers like `AppleScriptDictionaryResolveProcessor` that pass
+    // unresolved identifiers (which may be null).
+    override fun findCommand(name: String?): AppleScriptCommand? =
+        name?.let { indexes.dictionaryCommandMap[it] }
 
-    override fun getAllCommands(): Collection<AppleScriptCommand> = dictionaryCommandMap.values
+    override fun getAllCommands(): Collection<AppleScriptCommand> = indexes.dictionaryCommandMap.values
 
     override fun getApplicationBundle(): File? = applicationBundleFile
 
