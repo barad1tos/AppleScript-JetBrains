@@ -2,11 +2,39 @@ package com.intellij.plugin.applescript.lang.sdef
 
 import com.intellij.psi.xml.XmlTag
 
+/**
+ * Hybrid PSI + immutable value type pattern (D-01 keystone of v1.1).
+ *
+ *  - The class extends `AbstractDictionaryComponent` → `DictionaryComponentBase` →
+ *    `FakePsiElement` so it remains a real PSI node (PsiManager caches,
+ *    `areElementsEquivalent`, Find Usages, rename refactoring all keep working).
+ *  - The class holds `private val data: SuiteDefinition` (immutable scalar value
+ *    type). Every scalar accessor (`isHidden`, `getName` via super, `getCode`
+ *    via super, `getDescription` via super) reads from `data`.
+ *  - The map / list cluster (`commandDefinitions`, `classDefinitionsMap`,
+ *    `classDefinitionToCodeMap`, `commandDefinitionToCodeMap`,
+ *    `propertyDefinitions`, `dictionaryRecordList`, `dictionaryEnumerationList`,
+ *    `dictionaryCommandMap`) stays in `SuiteImpl` as a building/lookup concern
+ *    for v1.1. The parser mutates these via `addX` methods during the two-pass
+ *    walk; lifting them into a hypothetical `SuiteIndexes` value class is v1.3
+ *    service-split scope (CONTEXT D-07 + ARCHITECTURE §3).
+ *  - Why not `data class : FakePsiElement`? PITFALLS §1.1 BLOCKER: synthesises
+ *    `equals`/`hashCode` from primary-constructor props, overriding the
+ *    platform's PSI identity contract.
+ *
+ * SDEF-11 fix (moved here from plan 02-06 per checker warning 5): the previous
+ * `addCommand` body returned `commandDefinitions.add(command) &&
+ * dictionaryCommandMap.put(name, command) != null` — the `!= null` clause
+ * inverts the documented contract because `Map.put` returns the OLD value
+ * (`null` on first insert). The fix matches the
+ * `ApplicationDictionaryImpl.addCommand` convention at line 191 (`== null`
+ * = first insert). Regression locked by `SuiteAddCommandTest`.
+ */
 class SuiteImpl :
     AbstractDictionaryComponent<ApplicationDictionary>,
     Suite {
 
-    private val hidden: Boolean
+    private val data: SuiteDefinition
     private val commandDefinitions: MutableList<AppleScriptCommand> = mutableListOf()
     private val classDefinitions: MutableList<AppleScriptClass> = mutableListOf()
     private val classDefinitionsMap: MutableMap<String, AppleScriptClass> = mutableMapOf()
@@ -23,7 +51,7 @@ class SuiteImpl :
         dictionary: ApplicationDictionary,
         xmlTagSuite: XmlTag,
     ) : super(dictionary, name, code, xmlTagSuite) {
-        this.hidden = false
+        this.data = SuiteBuilder(name = name, code = code).build()
     }
 
     constructor(
@@ -34,10 +62,13 @@ class SuiteImpl :
         description: String?,
         xmlTagSuite: XmlTag,
     ) : super(dictionary, name, code, xmlTagSuite, description) {
-        this.hidden = hidden
+        this.data = SuiteBuilder(name = name, code = code)
+            .hidden(hidden)
+            .description(description)
+            .build()
     }
 
-    override fun isHidden(): Boolean = hidden
+    override fun isHidden(): Boolean = data.hidden
 
     override fun getSuite(): Suite = this
 
@@ -91,8 +122,23 @@ class SuiteImpl :
         dictionaryRecordList.add(record)
     }
 
+    /**
+     * SDEF-11 fix (moved from plan 02-06 per checker warning 5). Convention
+     * matches ApplicationDictionaryImpl.addCommand at line 191:
+     *
+     *  - `true` on first insert of `(name, command)`.
+     *  - `false` on duplicate (a command with the same name was already present).
+     *
+     * The .add to `commandDefinitions` is unconditional (mirrors the pre-fix
+     * intent — the suite tracks every command it observes, even if the name-
+     * keyed map already had a same-named entry from an earlier insert). The
+     * code-keyed map is populated unconditionally too because callers expect
+     * `findCommandByCode` to resolve both the first and any later same-name
+     * command added to the suite. Regression lock: SuiteAddCommandTest.
+     */
     override fun addCommand(command: AppleScriptCommand): Boolean {
+        commandDefinitions.add(command)
         command.getCode()?.let { commandDefinitionToCodeMap[it] = command }
-        return commandDefinitions.add(command) && dictionaryCommandMap.put(command.getName(), command) != null
+        return dictionaryCommandMap.put(command.getName(), command) == null
     }
 }
