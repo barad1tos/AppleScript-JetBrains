@@ -99,9 +99,27 @@ class LeafDataClassTest {
         assertTrue(b.isOptional())
     }
 
+    /**
+     * Lightweight `AppleScriptCommand` stub via JDK dynamic proxy. Mockito is not
+     * on the project's test classpath, and hand-rolling an `object :
+     * AppleScriptCommand { ... }` literal would require implementing the full
+     * `DictionaryComponent` + `AppleScriptComponent` interface tree (~30 methods)
+     * just so the `data class` equality contract has a value to compare. The
+     * proxy intercepts `equals` / `hashCode` so the synthesised
+     * `CommandDirectParameter.equals` (which reads `myCommand`'s `equals`) gets
+     * reference identity, exactly what the test expects. Every other interface
+     * method returns `null` — none are exercised by the `data class` contract.
+     */
     private fun stubCommand(): AppleScriptCommand =
         Proxy.newProxyInstance(
             AppleScriptCommand::class.java.classLoader,
             arrayOf(AppleScriptCommand::class.java),
-        ) { _, _, _ -> null } as AppleScriptCommand
+        ) { proxy, method, args ->
+            when (method.name) {
+                "equals" -> proxy === args?.getOrNull(0)
+                "hashCode" -> System.identityHashCode(proxy)
+                "toString" -> "AppleScriptCommandStub@${System.identityHashCode(proxy)}"
+                else -> null
+            }
+        } as AppleScriptCommand
 }
