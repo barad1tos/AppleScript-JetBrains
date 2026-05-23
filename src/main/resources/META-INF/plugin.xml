@@ -57,6 +57,9 @@
     <colorSettingsPage implementationClass="com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptColorsAndFontsPage"/>
     <configurationType implementation="com.intellij.plugin.applescript.lang.ide.run.AppleScriptConfigurationType"/>
     <runConfigurationProducer implementation="com.intellij.plugin.applescript.lang.ide.run.AppleScriptConfigurationProducer"/>
+    <!-- SDEF-14: headless smoke entry point. Activates only when
+         -Didea.ApplicationStarter.command=applescript-smoke is set; dormant otherwise. -->
+    <applicationStarter implementation="com.intellij.plugin.applescript.smoke.AppleScriptSmokeStarter"/>
   </extensions>
 
   <actions>
