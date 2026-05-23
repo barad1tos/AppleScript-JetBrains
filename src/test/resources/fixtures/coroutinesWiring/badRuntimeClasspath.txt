@@ -1,0 +1,3 @@
+kotlinx-coroutines must be compileOnly. Found on runtimeClasspath:
+  <some absolute path>/kotlinx-coroutines-core-1.8.0.jar
+Fix: change `implementation(...)` -> `compileOnly(...)` in build.gradle.kts.
