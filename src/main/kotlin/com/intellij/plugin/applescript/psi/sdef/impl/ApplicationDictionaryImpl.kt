@@ -12,6 +12,7 @@ import com.intellij.plugin.applescript.AppleScriptLanguage
 import com.intellij.plugin.applescript.lang.ide.AppleScriptDocHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
+import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommandImpl
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.CommandDirectParameter
@@ -72,6 +73,18 @@ class ApplicationDictionaryImpl(
     private val dictionaryEnumeratorMap: MutableMap<String, DictionaryEnumerator> = HashMap()
     private val dictionaryEnumerationMap: MutableMap<String, DictionaryEnumeration> = HashMap()
     private val dictionaryCommandMap: MutableMap<String, AppleScriptCommand> = HashMap()
+
+    // D-02 closure (plan 02-04): secondary index keyed by command name → 0..N
+    // commands. The primary `dictionaryCommandMap` keeps its "first-by-name"
+    // contract (D-03 interface freeze — getDictionaryCommandMap returns
+    // Map<String, AppleScriptCommand>); this list-keyed companion lets
+    // `findAllCommandsWithName` return the full set of overloaded entries.
+    // Dedupe inside the list is by `CommandData` structural equality
+    // (CommandData synthesises equals/hashCode from name + code + parameters +
+    // result, so two impls with structurally-equal data collapse to one
+    // list entry). 02-05 wraps both maps into DictionaryIndexes with
+    // ConcurrentHashMap; for v1.1 the storage stays plain HashMap.
+    private val dictionaryCommandListMap: MutableMap<String, MutableList<AppleScriptCommand>> = HashMap()
 
     @Suppress("unused")
     private val dictionaryCommands: MutableSet<AppleScriptCommand> = LinkedHashSet()
@@ -160,6 +173,8 @@ class ApplicationDictionaryImpl(
 
     override fun getDictionaryRecordMap(): Map<String, DictionaryRecord> = dictionaryRecordMap
 
+    // First-by-name contract preserved (D-03 interface freeze). Use
+    // findAllCommandsWithName for 0..N entries on overloaded command names.
     override fun getDictionaryCommandMap(): Map<String, AppleScriptCommand> = dictionaryCommandMap
 
     override fun getDictionaryClassMap(): Map<String, AppleScriptClass> = dictionaryClassMap
@@ -174,12 +189,11 @@ class ApplicationDictionaryImpl(
 
     override fun findProperty(name: String): AppleScriptPropertyDefinition? = dictionaryPropertyMap[name]
 
-    // TODO: 06/12/15 redefine equals and hash code for AppleScriptCommand and store HashSet, not the Map
-    override fun findAllCommandsWithName(name: String): List<AppleScriptCommand> {
-        val result = ArrayList<AppleScriptCommand>(1)
-        dictionaryCommandMap[name]?.let { result.add(it) }
-        return result
-    }
+    // D-02: returns 0..N entries for overloaded command names. Dedupe inside the
+    // backing list is by CommandData structural equality (see addCommand).
+    // .toList() defensive copy so callers cannot mutate the backing list.
+    override fun findAllCommandsWithName(name: String): List<AppleScriptCommand> =
+        dictionaryCommandListMap[name]?.toList() ?: emptyList()
 
     override fun findEnumerator(name: String): DictionaryEnumerator? = dictionaryEnumeratorMap[name]
 
@@ -188,8 +202,38 @@ class ApplicationDictionaryImpl(
 
     override fun findEnumeration(name: String): DictionaryEnumeration? = dictionaryEnumerationMap[name]
 
-    override fun addCommand(command: AppleScriptCommand): Boolean =
-        dictionaryCommandMap.put(command.getName(), command) == null
+    /**
+     * Convention (locked, matched by SuiteImpl.addCommand): returns true on
+     * first insert of a (name, command) pair, false on duplicate name. D-02
+     * also populates dictionaryCommandListMap so findAllCommandsWithName can
+     * return all overloaded entries; the list dedupes by CommandData structural
+     * equality so two impls with identical name + code + parameters + result
+     * (e.g. re-ingest of the same SDEF after a cache miss) collapse to one
+     * list entry, while genuinely overloaded commands (same name, different
+     * parameter signatures) co-exist as N entries.
+     */
+    override fun addCommand(command: AppleScriptCommand): Boolean {
+        val name = command.getName()
+        val wasNew = dictionaryCommandMap.put(name, command) == null
+        val list = dictionaryCommandListMap.getOrPut(name) { ArrayList(1) }
+        // Structural-equality dedupe via CommandData (D-02 closure). The cast
+        // is safe because the parser only ever instantiates
+        // AppleScriptCommandImpl; for unexpected impl types we fall back to
+        // reference equality, which is strictly more permissive (no
+        // overload-by-content collapse) but never corrupts the list.
+        val alreadyPresent = if (command is AppleScriptCommandImpl) {
+            list.any { existing -> existing is AppleScriptCommandImpl && existing.commandData == command.commandData }
+        } else {
+            list.any { it === command }
+        }
+        if (!alreadyPresent) list.add(command)
+        return wasNew
+    }
+
+    /** Test-helper accessor for the secondary list-keyed index. */
+    @org.jetbrains.annotations.TestOnly
+    internal fun getDictionaryCommandListMap(): Map<String, List<AppleScriptCommand>> =
+        dictionaryCommandListMap.mapValues { it.value.toList() }
 
     override fun addClass(appleScriptClass: AppleScriptClass): Boolean {
         val previous = dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)

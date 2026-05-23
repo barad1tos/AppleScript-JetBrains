@@ -40,6 +40,16 @@ open class AppleScriptCommandImpl :
 
     private var data: CommandData
 
+    /**
+     * Read-only view of the immutable backing value. Exposed to the impl's
+     * own package + the `psi.sdef.impl` package (`internal`) so
+     * `ApplicationDictionaryImpl.addCommand` can dedupe overloaded inserts
+     * by structural CommandData equality (D-02 closure). Not part of the
+     * public `AppleScriptCommand` interface — that would be a v1.4 boundary
+     * change (D-03 freeze).
+     */
+    internal val commandData: CommandData get() = data
+
     @Suppress("MemberVisibilityCanBePrivate")
     var cocoaClass: String? = null
 
