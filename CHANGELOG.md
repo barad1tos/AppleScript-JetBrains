@@ -2,6 +2,17 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [1.1.0] - TBD
+
+### Fixed
+
+- Completion on overloaded AppleScript commands (same name across different suites) now lists all overloads instead of dropping to a single arbitrary one. Cmd+Click still navigates to a stable first-inserted overload, so existing workflows are unaffected.
+- Eliminated a long-standing race condition in dictionary `xi:include` processing that could surface as sporadic `NullPointerException`s or, more rarely, a `HashMap` resize stuck-spin when several scripts opened at once during plugin warm-up.
+
+### Removed
+
+- The hidden "Generate Script Object" action stub was deleted. It was never registered in the menu and never had a UX attached — no user-visible change.
+
 ## [1.0.1] - YYYY-MM-DD
 
 ### Fixed
