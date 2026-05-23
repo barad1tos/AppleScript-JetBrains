@@ -167,6 +167,11 @@ tasks {
         }
         filter {
             includeTestsMatching("com.intellij.plugin.applescript.test.lexer.*")
+            // SDEF-13 / D-14: persistence golden-fixture round-trip is a regression fence
+            // for the v1.0 wire format (5 frozen fields). Runs unconditionally in the
+            // default suite so any annotation drift on PersistedState / DictionaryInfo.State
+            // trips on the next CI build, not after the next user upgrade wipes their cache.
+            includeTestsMatching("com.intellij.plugin.applescript.test.persistence.*")
             if (includeHeavy) {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
