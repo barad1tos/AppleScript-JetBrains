@@ -589,24 +589,6 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     override fun isConstantWithPrefixExist(applicationName: String, namePrefix: String): Boolean =
         service<SdefIndexService>().lookupConstantWithPrefixExist(applicationName, namePrefix)
 
-    /** Initialise from cached, previously generated files. */
-    @Suppress("unused")
-    private fun initDictionariesFromCachedFiles() {
-        for (dictionaryInfo in dictionaryInfoMap.values) {
-            if (!initializeDictionaryFromInfo(dictionaryInfo)) {
-                LOG.warn(
-                    "Failed to initialize dictionary for application: ${dictionaryInfo.getApplicationName()}" +
-                        " from generated file ${dictionaryInfo.getDictionaryFile()}",
-                )
-            } else {
-                LOG.warn(
-                    "Failed to initialize dictionary for application: ${dictionaryInfo.getApplicationName()}" +
-                        "Dictionary file ${dictionaryInfo.getDictionaryFile()} is not valid",
-                )
-            }
-        }
-    }
-
     /**
      * Initialises dictionary information for [applicationName] either from a previously generated cached
      * dictionary file or by generating one. Standard folders are searched for the application's location.
