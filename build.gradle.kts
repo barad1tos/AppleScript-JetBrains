@@ -1,4 +1,5 @@
 import java.time.Duration
+import org.gradle.api.file.ConfigurableFileCollection
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
@@ -73,7 +74,8 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
-    testImplementation(libs.kotlinx.coroutines.test)   // D-05 — TestDispatcher only; core stripped by configurations block below
+    // D-05 — TestDispatcher only; core stripped by configurations block below
+    testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
@@ -364,7 +366,7 @@ tasks {
             val idesMethod = verifyTask::class.java.methods
                 .firstOrNull { it.name == "getIdes" && it.parameterCount == 0 }
                 ?: error("verifyPlugin task does not expose getIdes() — IntelliJ Platform Gradle Plugin API changed?")
-            val ideFiles = (idesMethod.invoke(verifyTask) as org.gradle.api.file.ConfigurableFileCollection).files
+            val ideFiles = (idesMethod.invoke(verifyTask) as ConfigurableFileCollection).files
             val ideDirs = ideFiles.filter { it.isDirectory }
 
             val slf4jRegex = Regex("""kotlinx-coroutines-slf4j-(\d+\.\d+\.\d+(?:-intellij(?:-\d+)?)?)\.jar""")
