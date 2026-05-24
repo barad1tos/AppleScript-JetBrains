@@ -73,10 +73,28 @@ dependencies {
     testImplementation(libs.junit4)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
-    testImplementation(libs.kotlinx.coroutines.test)   // D-05 — TestDispatcher only
+    testImplementation(libs.kotlinx.coroutines.test)   // D-05 — TestDispatcher only; core stripped by configurations block below
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+// Phase 03 gap 1 — strip vanilla kotlinx-coroutines-core from test classpaths so the
+// IntelliJ Platform's bundled fork (1.8.0-intellij-NN, merged into lib/app.jar) owns the
+// kotlinx.coroutines.* classes at test runtime. Both `-core` (KMP metadata) and `-core-jvm`
+// (JVM platform variant) must be excluded — Multiplatform resolution wires the platform jar
+// directly via the BOM, so per-dependency `exclude(...)` inside `testImplementation(...) { ... }`
+// does NOT propagate. Configuration-level exclude applies to every dep that transitively
+// brings the module in. Test code keeps TestDispatcher / TestScope / runTest from
+// kotlinx-coroutines-test-jvm; those reference kotlinx.coroutines.* classes that the bundled
+// fork supplies. See PITFALLS section 3.1 + DEBUG.md `## REVISION (2026-05-24T11:50)`.
+configurations.testCompileClasspath {
+    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+}
+configurations.testRuntimeClasspath {
+    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
+    exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
 }
 
 intellijPlatform {
@@ -229,15 +247,36 @@ tasks {
 
     val verifyNoBundledCoroutines by registering {
         group = "verification"
-        description = "Fails if kotlinx-coroutines appears on runtimeClasspath. " +
-            "Coroutines MUST be compileOnly — see PITFALLS section 3.1 + Phase 7 NoSuchMethodError."
+        description = "Fails if kotlinx-coroutines appears on runtimeClasspath OR if vanilla " +
+            "kotlinx-coroutines-core leaks onto testRuntimeClasspath. Production coroutines MUST be " +
+            "compileOnly; test runtime MUST resolve kotlinx.coroutines.* through the Platform-bundled " +
+            "fork (1.8.0-intellij-NN inside lib/app.jar) — see PITFALLS section 3.1 + Phase 7 " +
+            "NoSuchMethodError + Phase 03 gap 1 (vanilla 1.8.0 lacks runBlockingWithParallelismCompensation)."
         doLast {
             val runtime = configurations.runtimeClasspath.get().resolve()
-            val bad = runtime.filter { it.name.startsWith("kotlinx-coroutines") }
-            require(bad.isEmpty()) {
+            val badProd = runtime.filter { it.name.startsWith("kotlinx-coroutines") }
+            require(badProd.isEmpty()) {
                 "kotlinx-coroutines must be compileOnly. Found on runtimeClasspath:\n" +
-                    bad.joinToString("\n  ", prefix = "  ") { it.absolutePath } +
+                    badProd.joinToString("\n  ", prefix = "  ") { it.absolutePath } +
                     "\nFix: change `implementation(...)` -> `compileOnly(...)` in build.gradle.kts."
+            }
+
+            // Phase 03 gap 1 — vanilla kotlinx-coroutines-core on testRuntimeClasspath shadows the
+            // Platform-bundled intellij-NN fork; IntellijCoroutines.runBlockingWithParallelismCompensation
+            // (called by the IDE's indexing scanner) fails with NoSuchMethodError → every
+            // BasePlatformTestCase setUp deadlocks on IndexingTestUtil.waitUntilIndexesAreReady.
+            // kotlinx-coroutines-test (D-05) and kotlinx-coroutines-bom (transitive POM-only) are
+            // fine — only the standalone core jar is forbidden on test runtime.
+            val testRuntime = configurations.testRuntimeClasspath.get().resolve()
+            val badTest = testRuntime.filter {
+                it.name.startsWith("kotlinx-coroutines-core") && !it.name.contains("intellij")
+            }
+            require(badTest.isEmpty()) {
+                "Vanilla kotlinx-coroutines-core leaked onto testRuntimeClasspath (PITFALLS section 3.1 — " +
+                    "shadows the Platform-bundled fork's runBlockingWithParallelismCompensation):\n" +
+                    badTest.joinToString("\n  ", prefix = "  ") { it.absolutePath } +
+                    "\nFix: exclude transitive kotlinx-coroutines-core from testImplementation " +
+                    "(see Phase 03 DEBUG.md `## Revised Chosen Fix`)."
             }
         }
     }
