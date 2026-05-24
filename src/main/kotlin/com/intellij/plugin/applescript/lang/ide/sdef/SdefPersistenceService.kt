@@ -49,7 +49,7 @@ import kotlinx.coroutines.CoroutineScope
  * no `<applicationService>` entry needed in plugin.xml.
  */
 @Service(Service.Level.APP)
-class SdefPersistenceService @JvmOverloads constructor(
+class SdefPersistenceService constructor(
     @Suppress("unused") private val serviceScope: CoroutineScope,
 ) {
 
