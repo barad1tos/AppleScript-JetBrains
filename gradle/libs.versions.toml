@@ -23,6 +23,12 @@ kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-c
 # v1.2 D-05: test artifact only; matches LCD so ABI lines up with bundled fork.
 # Per PITFALLS section 3.3 — version mismatch = NoSuchMethodError at test runtime.
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+# Plan 03-10 (Option A): explicit Kotlin 2.x stdlib at test runtime. The K2 compiler
+# emits bytecode referencing kotlin/coroutines/jvm/internal/SpillingKt (introduced in
+# stdlib 2.0+); kotlinx-coroutines-test:1.8.0 transitively pulls kotlin-stdlib:1.9.21
+# which predates the helper. Pins to ${kotlin} so this stays in lockstep with the
+# compiler version. See DEBUG-stdlib.md (.planning/-local, Hard Rule #6).
+kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit-jupiter" }
