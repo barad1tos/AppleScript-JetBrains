@@ -76,7 +76,7 @@ import javax.script.ScriptException
  * pre-Wave-3 file) are preserved verbatim where they appear in migrated bodies:
  * [createDictionaryInfoForApplication] uses them to bridge from the non-suspend
  * `@Synchronized` chain into [copyDictionaryFileToCacheDir] (a `suspend` function).
- * `runBlockingCancellable` is NOT `runBlocking` (different word; `verifyNoRunBlocking`
+ * `runBlockingCancellable` is NOT a naked-blocking bridge (different word; `verifyNoRunBlocking`
  * regex `\brunBlocking\b` does not match) — it is the Platform-blessed bridge for
  * background-thread blocking-on-suspend.
  *
@@ -532,7 +532,8 @@ class SdefFileProvider @JvmOverloads constructor(
      * Dispatcher invariant: non-suspend; bridges to `suspend` helpers
      * ([copyDictionaryFileToCacheDir]) via [runBlockingCancellable] (Phase 3 Codex MEDIUM 3
      * — the bridge is the documented pattern for non-EDT background threads, NOT a naked
-     * `runBlocking`; `verifyNoRunBlocking` regex `\brunBlocking\b` does not match).
+     * blocking call; the `verifyNoRunBlocking` regex on the matching unqualified word
+     * does not match the qualified `runBlockingCancellable` identifier).
      *
      * Cross-service writes:
      *  - On [NotScriptableApplicationException]: marks the app via

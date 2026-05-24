@@ -478,6 +478,26 @@ tasks {
             // during discovery — that direction IS a real service dependency and remains
             // tracked in the graph).
             "SdefPersistenceService" to "ApplicationDiscoveryService",
+            // Wave 4 (Phase 4 SERVICE-04, plan 04-04): SdefFileProvider reaches back into the
+            // facade for two narrow data-hop reads:
+            //   1. AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal(name) —
+            //      O(1) lookup against the persisted @State-tagged dictionaryInfoMap. The facade is
+            //      the persisted-state owner (Pattern A — annotation tied to COMPONENT_NAME by
+            //      class identity; cannot move without breaking existing user caches per
+            //      PITFALLS 4.1). Wave 4 reads through this typed accessor rather than copying
+            //      the snapshot on every fetch.
+            //   2. AppleScriptSystemDictionaryRegistryService.initializeDictionaryFromInfoInternal —
+            //      delegates the parse step (parseDictionaryFile + map population) back to the
+            //      facade because the parser-index map cluster is Wave 5 SdefIndexService
+            //      territory; Wave 4 only owns file-generation.
+            //   3. AppleScriptSystemDictionaryRegistryService.newSecureSaxBuilderInternal —
+            //      XXE-hardened SAXBuilder factory. The other consumer (parseDictionaryFile) still
+            //      lives on the facade; co-location with the file-provider's mergeScriptingAdditions
+            //      moves with the parseDictionaryFile extraction in Wave 5.
+            // All three are DATA reads — the facade does not depend on SdefFileProvider's
+            // session-only file-generation state. Wave 5 may eliminate this allowlist entry once
+            // parseDictionaryFile + the parser map cluster migrate to SdefIndexService.
+            "SdefFileProvider" to "AppleScriptSystemDictionaryRegistryService",
         )
         val sdefPackage = layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef")
         inputs.dir(sdefPackage)
