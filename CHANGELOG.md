@@ -9,6 +9,10 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 - Dictionary loading no longer blocks IDE startup. AppleScript completion becomes available within seconds, while the full application catalog finishes indexing quietly in the background.
 - When dictionary indexing takes more than a couple of seconds, a cancellable progress indicator appears in the status bar so you can see what the plugin is doing — and stop it if you don't need application-aware completion in the current session.
 
+### Compatibility
+
+- Minimum supported IDE raised to 2025.1 (`sinceBuild = 251`). 2024.3 users should stay on the 1.1.x line; the IDE shipped with that release does not include the runtime support needed for the new background dictionary loading.
+
 ## [1.1.0] - TBD
 
 ### Fixed

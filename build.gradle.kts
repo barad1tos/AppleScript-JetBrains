@@ -155,7 +155,11 @@ intellijPlatform {
         // The structure view layer is one of the things being rewritten in
         // Phase 6, after which we can re-broaden verification.
         ides {
-            create(IntelliJPlatformType.IntellijIdeaCommunity, "2024.3.7.1")
+            // Plan 03-12 dropped 2024.3.7.1: ships Kotlin 2.0.21 in the Kotlin plugin
+            // (no kotlin/coroutines/jvm/internal/SpillingKt), which our K2 2.3.21 compiler
+            // emits calls to from suspend functions — production runtime would crash.
+            // 2025.1+ ships Kotlin 2.1+ with SpillingKt present. sinceBuild bumped to 251
+            // in gradle.properties; minimum supported IDE raised in CHANGELOG v1.2.0.
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.1.7.1")
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.2.6.2")
         }
