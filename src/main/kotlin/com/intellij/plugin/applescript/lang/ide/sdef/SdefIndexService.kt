@@ -1,0 +1,610 @@
+package com.intellij.plugin.applescript.lang.ide.sdef
+
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.runBlockingCancellable
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.text.StringUtil
+import com.intellij.plugin.applescript.lang.ide.sdef.results.IngestResult
+import com.intellij.plugin.applescript.lang.ide.sdef.results.SdefIndexSnapshot
+import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
+import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
+import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import org.jdom.Document
+import org.jdom.Element
+import org.jdom.JDOMException
+import org.jdom.Namespace
+import org.jdom.input.SAXBuilder
+import java.io.File
+import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * Phase 4 SERVICE-05 + SERVICE-09 (Wave 5): SDEF index ownership.
+ *
+ * CQRS per D-03:
+ * - WRITE: `suspend fun ingest(applicationName, xmlFile): IngestResult` — IO-aware, hermetic-test seam.
+ * - READ: sync `lookup*` methods — parser-util hot path; cannot suspend per FROZEN_CONTRACT.
+ *
+ * Owns:
+ * - 14 ConcurrentHashMap indexes (migrated byte-for-byte from facade lines 79-92).
+ * - 21 sync lookup methods (migrated 1:1 from facade `isXxx` bodies).
+ * - [findStdCommands] + [findApplicationCommands] (EDT-guarded + `runBlockingCancellable`
+ *   bounded-wait bridges preserved verbatim per Phase 3 Codex MEDIUM 1 + HIGH 5 / HIGH 1).
+ * - XML parsing pipeline (`parseDictionaryFile` + 3 element handlers + 7 companion helpers +
+ *   XXE-hardened `newSecureSaxBuilder` factory).
+ *
+ * Cycle-prevention (plan-checker iteration-1 BLOCKER 1 + iteration-2 BLOCKER mitigation):
+ *
+ * `isInitialized()` + `areAppDictionariesIndexed()` STAY on the facade because they own the
+ * Phase 3 `CompletableDeferred<Result<Unit>>` lifecycle (D-01 / D-04). SdefIndexService consults
+ * those facade-owned predicates via [ParsableScriptSuiteRegistryHelper] (the @JvmStatic shim in
+ * `lang/parser/`, NOT in the services list scanned by `verifyServiceDependencyGraph`). This
+ * avoids the `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` back-edge that DFS
+ * would otherwise detect as a cycle (the facade depends on SdefIndexService via the lookup
+ * trampolines added in Wave 5 Task 2).
+ *
+ * Dependencies (real service-graph edges):
+ * - service<AppleScriptProjectDictionaryService> — accessed from `findApplicationCommands` to
+ *   resolve project-scoped dictionaries; same pattern as pre-Wave-5 facade.
+ */
+@Service(Service.Level.APP)
+class SdefIndexService @JvmOverloads constructor(
+    @Suppress("UnusedPrivateProperty")
+    private val serviceScope: CoroutineScope,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) {
+
+    // ── 14 ConcurrentHashMap indexes (migrated byte-for-byte from facade lines 79-92) ──
+    // Application-scoped (7):
+    private val applicationNameToClassNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToClassNamePluralSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToCommandNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToRecordNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToPropertySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToEnumerationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val applicationNameToEnumeratorConstantNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+
+    // Std-scoped (7):
+    private val stdClassNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdClassNamePluralToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdCommandNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdRecordNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdPropertyNameToDictionarySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdEnumerationNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+
+    // ── CQRS WRITE seam — suspend ingest ────────────────────────────────────────
+
+    /**
+     * D-03 IO-aware write path. Suspending; runs on [ioDispatcher]. Hermetic-test seam:
+     * unit tests can pass synthetic SDEF XML temp files via
+     * `runTest { service.ingest("App", tempXmlFile) }` and observe the side-effects on the
+     * index maps via [snapshot] without any platform-fixture boot.
+     *
+     * RESEARCH §4 Assumption A2 closure: the Phase 2 [com.intellij.plugin.applescript.lang.sdef.Suite]
+     * type is an `interface`, not a `data class`, and the existing XML pipeline does NOT produce
+     * Suite values — it walks raw JDOM `Element`s directly into the maps. Wave 5 accordingly
+     * shapes `ingest` around the byte-for-byte-preserved JDOM pipeline; the `List<Suite>` shape
+     * sketched in the plan example would have required a parallel Suite construction layer that
+     * is out of scope for the FROZEN_CONTRACT-preserving migration. Documented in 04-05-SUMMARY
+     * deviations.
+     */
+    suspend fun ingest(applicationName: String, xmlFile: File): IngestResult = withContext(ioDispatcher) {
+        try {
+            val ok = parseDictionaryFile(xmlFile, applicationName)
+            if (ok) {
+                IngestResult.Success(
+                    suitesIngested = 1,
+                    commandsIndexed = applicationNameToCommandNameSetMap[applicationName]?.size ?: 0,
+                )
+            } else {
+                IngestResult.Failed(reason = "parseDictionaryFile returned false for $applicationName")
+            }
+        } catch (e: IOException) {
+            IngestResult.Failed(reason = "I/O error ingesting $applicationName: ${e.message}", cause = e)
+        } catch (e: JDOMException) {
+            IngestResult.Failed(reason = "XML parse error ingesting $applicationName: ${e.message}", cause = e)
+        }
+    }
+
+    /**
+     * Builds an immutable [SdefIndexSnapshot] from the current live indexes. Defensive copies
+     * (`toSet()` / `toMap()`) so callers cannot mutate live state through the returned snapshot.
+     */
+    fun snapshot(): SdefIndexSnapshot = SdefIndexSnapshot(
+        applicationNameToClassNameSet = applicationNameToClassNameSetMap.mapValues { it.value.toSet() },
+        applicationNameToClassNamePluralSet = applicationNameToClassNamePluralSetMap.mapValues { it.value.toSet() },
+        applicationNameToCommandNameSet = applicationNameToCommandNameSetMap.mapValues { it.value.toSet() },
+        applicationNameToRecordNameSet = applicationNameToRecordNameSetMap.mapValues { it.value.toSet() },
+        applicationNameToPropertySet = applicationNameToPropertySetMap.mapValues { it.value.toSet() },
+        applicationNameToEnumerationNameSet = applicationNameToEnumerationNameSetMap.mapValues { it.value.toSet() },
+        applicationNameToEnumeratorConstantNameSet = applicationNameToEnumeratorConstantNameSetMap
+            .mapValues { it.value.toSet() },
+        stdClassNameToApplicationNameSet = stdClassNameToApplicationNameSetMap.mapValues { it.value.toSet() },
+        stdClassNamePluralToApplicationNameSet = stdClassNamePluralToApplicationNameSetMap
+            .mapValues { it.value.toSet() },
+        stdCommandNameToApplicationNameSet = stdCommandNameToApplicationNameSetMap.mapValues { it.value.toSet() },
+        stdRecordNameToApplicationNameSet = stdRecordNameToApplicationNameSetMap.mapValues { it.value.toSet() },
+        stdPropertyNameToDictionarySet = stdPropertyNameToDictionarySetMap.mapValues { it.value.toSet() },
+        stdEnumerationNameToApplicationNameSet = stdEnumerationNameToApplicationNameSetMap
+            .mapValues { it.value.toSet() },
+        stdEnumeratorConstantNameToApplicationNameList = stdEnumeratorConstantNameToApplicationNameListMap
+            .mapValues { it.value.toSet() },
+    )
+
+    // ── 21 sync lookup methods (parser-util hot path; cannot suspend per FROZEN_CONTRACT) ──
+    // Each method preserves the facade's `if (!isInitialized()) return false` gate, but the
+    // gate now routes through [ParsableScriptSuiteRegistryHelper] (the @JvmStatic shim) to
+    // avoid the SdefIndexService -> facade back-edge that verifyServiceDependencyGraph would
+    // detect as a cycle.
+
+    fun lookupStdLibClass(name: String): Boolean {
+        if (!facadeInitialized()) return false
+        return stdClassNameToApplicationNameSetMap.containsKey(name)
+    }
+
+    fun lookupApplicationClass(applicationName: String, className: String): Boolean {
+        if (!facadeInitialized()) return false
+        val classNameSet = applicationNameToClassNameSetMap[applicationName]
+        return classNameSet != null && classNameSet.contains(className)
+    }
+
+    fun lookupStdLibClassPluralName(pluralName: String): Boolean {
+        if (!facadeInitialized()) return false
+        return stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
+    }
+
+    fun lookupApplicationClassPluralName(applicationName: String, pluralClassName: String): Boolean {
+        if (!facadeInitialized()) return false
+        val pluralClassNameSet = applicationNameToClassNamePluralSetMap[applicationName]
+        return pluralClassNameSet != null && pluralClassNameSet.contains(pluralClassName)
+    }
+
+    fun lookupStdClassWithPrefixExist(classNamePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(classNamePrefix, stdClassNameToApplicationNameSetMap.keys)
+    }
+
+    fun lookupClassWithPrefixExist(applicationName: String, classNamePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(classNamePrefix, applicationNameToClassNameSetMap[applicationName])
+    }
+
+    fun lookupStdClassPluralWithPrefixExist(namePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(namePrefix, stdClassNamePluralToApplicationNameSetMap.keys)
+    }
+
+    fun lookupClassPluralWithPrefixExist(applicationName: String, pluralClassNamePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(pluralClassNamePrefix, applicationNameToClassNamePluralSetMap[applicationName])
+    }
+
+    fun lookupStdCommand(name: String): Boolean {
+        if (!facadeInitialized()) return false
+        return stdCommandNameToApplicationNameSetMap.containsKey(name)
+    }
+
+    fun lookupApplicationCommand(applicationName: String, commandName: String): Boolean {
+        if (!facadeInitialized()) return false
+        val appCommands = applicationNameToCommandNameSetMap[applicationName]
+        return appCommands != null && appCommands.contains(commandName)
+    }
+
+    fun lookupCommandWithPrefixExist(applicationName: String, commandNamePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(commandNamePrefix, applicationNameToCommandNameSetMap[applicationName])
+    }
+
+    fun lookupStdCommandWithPrefixExist(namePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(namePrefix, stdCommandNameToApplicationNameSetMap.keys)
+    }
+
+    fun lookupStdProperty(name: String): Boolean {
+        if (!facadeInitialized()) return false
+        return stdPropertyNameToDictionarySetMap.containsKey(name)
+    }
+
+    fun lookupStdPropertyWithPrefixExist(namePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(namePrefix, stdPropertyNameToDictionarySetMap.keys)
+    }
+
+    fun lookupApplicationProperty(applicationName: String, propertyName: String): Boolean {
+        if (!facadeInitialized()) return false
+        val propertySet = applicationNameToPropertySetMap[applicationName]
+        return propertySet != null && propertySet.contains(propertyName)
+    }
+
+    fun lookupPropertyWithPrefixExist(applicationName: String, propertyNamePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(propertyNamePrefix, applicationNameToPropertySetMap[applicationName])
+    }
+
+    fun lookupStdConstant(name: String): Boolean {
+        if (!facadeInitialized()) return false
+        return stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
+    }
+
+    fun lookupApplicationConstant(applicationName: String, constantName: String): Boolean {
+        if (!facadeInitialized()) return false
+        val applicationConstantSet = applicationNameToEnumeratorConstantNameSetMap[applicationName]
+        return applicationConstantSet != null && applicationConstantSet.contains(constantName)
+    }
+
+    fun lookupStdConstantWithPrefixExist(namePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(namePrefix, stdEnumeratorConstantNameToApplicationNameListMap.keys)
+    }
+
+    fun lookupConstantWithPrefixExist(applicationName: String, namePrefix: String): Boolean {
+        if (!facadeInitialized()) return false
+        return isNameWithPrefixExist(namePrefix, applicationNameToEnumeratorConstantNameSetMap[applicationName])
+    }
+
+    /**
+     * Additional lookup helper (not in the 21 numbered list — used internally by
+     * [lookupStdProperty] tests; mirrors facade `isStdProperty`'s pair predicate).
+     */
+    fun lookupStdRecord(name: String): Boolean {
+        if (!facadeInitialized()) return false
+        return stdRecordNameToApplicationNameSetMap.containsKey(name)
+    }
+
+    // ── findStdCommands + findApplicationCommands (EDT-guarded + bounded-wait) ──
+
+    /**
+     * Bounded-wait resolver for standard-suite commands.
+     *
+     * Codex MEDIUM 1 + Gemini LOW 1: EDT guard at entry — never blocks the UI thread.
+     * Codex HIGH 5: split-gate — waits on `standardReady` (parser fast path readiness only) via
+     * the [ParsableScriptSuiteRegistryHelper.awaitStandardReady] proxy (added in Wave 5 Task 1).
+     * Codex HIGH 1: timeout returns `null`, failure returns `isFailure` → both yield empty list.
+     * Gemini LOW 2: `LOG.warn` records the 2s timeout site for slow-init diagnostics.
+     */
+    fun findStdCommands(project: Project, commandName: String): Collection<AppleScriptCommand> {
+        if (ApplicationManager.getApplication().isDispatchThread) {
+            LOG.warn("findStdCommands called from EDT; returning empty list to avoid 2s freeze")
+            return emptyList()
+        }
+        if (!facadeInitialized()) {
+            val gate = runBlockingCancellable {
+                withTimeoutOrNull(2_000) { ParsableScriptSuiteRegistryHelper.awaitStandardReady() }
+            }
+            if (gate == null) {
+                LOG.warn("findStdCommands: 2s timeout waiting on standardReady — returning emptyList")
+                return emptyList()
+            }
+            if (gate.isFailure) {
+                return emptyList()
+            }
+        }
+        val appNameList = stdCommandNameToApplicationNameSetMap[commandName] ?: return HashSet(0)
+        val result = HashSet<AppleScriptCommand>()
+        for (applicationName in appNameList) {
+            result.addAll(findApplicationCommands(project, applicationName, commandName))
+        }
+        return result
+    }
+
+    /**
+     * Bounded-wait resolver for app-scoped commands.
+     *
+     * EDT guard + bounded-wait on appsReady (via [ParsableScriptSuiteRegistryHelper.awaitAppsReady]
+     * proxy) — Phase 3 invariants preserved verbatim. AppCommandGatingTest locks this behaviour.
+     */
+    fun findApplicationCommands(
+        project: Project,
+        applicationName: String,
+        commandName: String,
+    ): List<AppleScriptCommand> {
+        if (ApplicationManager.getApplication().isDispatchThread) {
+            LOG.warn("findApplicationCommands called from EDT; returning empty list to avoid 2s freeze")
+            return emptyList()
+        }
+        if (!ParsableScriptSuiteRegistryHelper.areAppDictionariesIndexed()) {
+            val gate = runBlockingCancellable {
+                withTimeoutOrNull(2_000) { ParsableScriptSuiteRegistryHelper.awaitAppsReady() }
+            }
+            if (gate == null) {
+                LOG.warn("findApplicationCommands: 2s timeout waiting on appsReady — returning emptyList")
+                return emptyList()
+            }
+            if (gate.isFailure) {
+                return emptyList()
+            }
+        }
+        val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
+        // Among the loaded dictionaries the standard additions should always be present, but if
+        // the command was not found there a new dictionary may need to be initialised here for
+        // the project — once.
+        val dictionary = projectDictionaryRegistry.getDictionary(applicationName)
+            ?: projectDictionaryRegistry.createDictionary(applicationName)
+        if (dictionary != null) {
+            return dictionary.findAllCommandsWithName(commandName)
+        }
+        return ArrayList(0)
+    }
+
+    // ── XML parsing pipeline ──────────────────────────────────────────────────
+
+    /**
+     * Fills the internal structures with terms from an application dictionary file.
+     *
+     * Migrated byte-for-byte from facade `parseDictionaryFile`. Uses [newSecureSaxBuilder]
+     * (XXE-hardened) per T-04-05-02 threat mitigation.
+     *
+     * @return true if the file was parsed successfully
+     */
+    fun parseDictionaryFile(xmlFile: File, applicationName: String): Boolean {
+        val builder = newSecureSaxBuilder()
+        try {
+            val document: Document = builder.build(xmlFile)
+            val rootNode: Element = document.rootElement
+            val suiteElements: List<Element> = rootNode.children
+
+            if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
+                for (suiteElem in suiteElements) {
+                    parseSuiteElementForApplication(suiteElem, applicationName)
+                    parseSuiteElementForScriptingAdditions(suiteElem, applicationName)
+                }
+            } else {
+                for (suiteElem in suiteElements) {
+                    parseSuiteElementForApplication(suiteElem, applicationName)
+                }
+            }
+            return true
+        } catch (e: JDOMException) {
+            LOG.warn("Exception occurred while parsing dictionary file: ${e.message}")
+            e.printStackTrace()
+        } catch (e: IOException) {
+            LOG.warn("Exception occurred while parsing dictionary file: ${e.message}")
+        }
+        return false
+    }
+
+    private fun parseSuiteElementForScriptingAdditions(suiteElem: Element, applicationName: String) {
+        val suiteClasses: List<Element> = suiteElem.getChildren("class")
+        val suiteValueTypes: List<Element> = suiteElem.getChildren("value-type")
+        val suiteClassExtensions: List<Element> = suiteElem.getChildren("class-extension")
+        val suiteCommands: List<Element> = suiteElem.getChildren("command")
+        val recordTypeTags: List<Element> = suiteElem.getChildren("record-type")
+        val enumerationTags: List<Element> = suiteElem.getChildren("enumeration")
+
+        for (valType in suiteValueTypes) {
+            parseClassElement(applicationName, valType, false)
+        }
+
+        for (classTag in suiteClasses) {
+            parseClassElement(applicationName, classTag, false)
+            parseElementsForApplication(classTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)
+        }
+
+        for (classTag in suiteClassExtensions) {
+            parseClassElement(applicationName, classTag, false)
+            parseElementsForApplication(classTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)
+        }
+
+        parseElementsForApplication(suiteCommands, applicationName, stdCommandNameToApplicationNameSetMap)
+        parseElementsForApplication(recordTypeTags, applicationName, stdRecordNameToApplicationNameSetMap)
+
+        for (recordTag in recordTypeTags) {
+            parseElementsForApplication(recordTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)
+        }
+
+        parseElementsForApplication(enumerationTags, applicationName, stdEnumerationNameToApplicationNameSetMap)
+
+        for (enumerationTag in enumerationTags) {
+            parseElementsForApplication(
+                enumerationTag.getChildren("enumerator"),
+                applicationName,
+                stdEnumeratorConstantNameToApplicationNameListMap,
+            )
+        }
+    }
+
+    private fun parseSuiteElementForApplication(suiteElem: Element, applicationName: String) {
+        val xIncludeNs = Namespace.getNamespace("http://www.w3.org/2003/XInclude")
+        val xiIncludes: List<Element> = suiteElem.getChildren("include", xIncludeNs)
+        val suiteClasses: List<Element> = suiteElem.getChildren("class")
+        val suiteValueTypes: List<Element> = suiteElem.getChildren("value-type")
+        val suiteClassExtensions: List<Element> = suiteElem.getChildren("class-extension")
+        val suiteCommands: List<Element> = suiteElem.getChildren("command")
+        val recordTypeTags: List<Element> = suiteElem.getChildren("record-type")
+        val enumerationTags: List<Element> = suiteElem.getChildren("enumeration")
+
+        for (include in xiIncludes) {
+            var hrefIncl = include.getAttributeValue("href")
+            hrefIncl = hrefIncl.replace("localhost", "")
+            val inclFile = File(hrefIncl)
+            if (inclFile.exists()) {
+                parseDictionaryFile(inclFile, applicationName)
+            }
+        }
+
+        for (valType in suiteValueTypes) {
+            parseClassElement(applicationName, valType, false)
+        }
+
+        for (classTag in suiteClasses) {
+            parseClassElement(applicationName, classTag, false)
+            parseHashElementsForApplication(classTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)
+        }
+
+        for (classTag in suiteClassExtensions) {
+            parseClassElement(applicationName, classTag, false)
+            parseHashElementsForApplication(classTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)
+        }
+
+        parseHashElementsForApplication(suiteCommands, applicationName, applicationNameToCommandNameSetMap)
+        parseHashElementsForApplication(recordTypeTags, applicationName, applicationNameToRecordNameSetMap)
+
+        for (recordTag in recordTypeTags) {
+            parseHashElementsForApplication(recordTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)
+        }
+
+        parseHashElementsForApplication(enumerationTags, applicationName, applicationNameToEnumerationNameSetMap)
+
+        for (enumerationTag in enumerationTags) {
+            parseHashElementsForApplication(
+                enumerationTag.getChildren("enumerator"),
+                applicationName,
+                applicationNameToEnumeratorConstantNameSetMap,
+            )
+        }
+    }
+
+    private fun parseClassElement(applicationName: String, classElement: Element, isExtends: Boolean) {
+        // If isExtends → name is always "application".
+        val className = if (isExtends) classElement.getAttributeValue("extends") else classElement.getAttributeValue("name")
+        val code = classElement.getAttributeValue("code")
+        var pluralClassName = classElement.getAttributeValue("plural")
+        if (className == null || code == null) return
+        pluralClassName = if (!StringUtil.isEmpty(pluralClassName)) pluralClassName else "${className}s"
+
+        updateObjectNameSetForApplication(className, applicationName, applicationNameToClassNameSetMap)
+        updateObjectNameSetForApplication(pluralClassName, applicationName, applicationNameToClassNamePluralSetMap)
+        if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
+            updateApplicationNameSetFor(className, applicationName, stdClassNameToApplicationNameSetMap)
+            updateApplicationNameSetFor(pluralClassName, applicationName, stdClassNamePluralToApplicationNameSetMap)
+        }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private fun isNameWithPrefixExist(namePrefix: String, nameSet: Set<String>?): Boolean {
+        if (nameSet == null) return false
+        for (objectName in nameSet) {
+            if (startsWithWord(objectName, namePrefix)) return true
+        }
+        return false
+    }
+
+    /**
+     * Thin proxy to the facade's [com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.isInitialized]
+     * that bypasses the service-graph by going through Phase 3's @JvmStatic helper class
+     * ([ParsableScriptSuiteRegistryHelper], NOT in the services list scanned by
+     * `verifyServiceDependencyGraph`). This avoids the
+     * `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` back-edge that DFS would
+     * otherwise detect as a cycle (plan-checker BLOCKER 1 mitigation).
+     */
+    private fun facadeInitialized(): Boolean = ParsableScriptSuiteRegistryHelper.isInitialized()
+
+    companion object {
+        private val LOG: Logger = Logger.getInstance("#${SdefIndexService::class.java.name}")
+
+        @JvmStatic
+        fun getInstance(): SdefIndexService =
+            ApplicationManager.getApplication().getService(SdefIndexService::class.java)
+
+        // ── XML parser companion helpers (migrated byte-for-byte from facade companion) ──
+
+        /**
+         * SDEF files declare a DOCTYPE pointing at Apple's `sdef.dtd`, so disallowing DOCTYPE
+         * entirely would break parsing. Instead, harden the builder against XXE by refusing
+         * external DTDs, suppressing general/parameter entities and disabling entity expansion
+         * (defends against the Billion Laughs DoS).
+         *
+         * Phase 4 SERVICE-05 (Wave 5): migrated from facade companion. The single remaining
+         * consumer outside this service is [SdefFileProvider.mergeScriptingAdditions]; Wave 5
+         * exposes the factory via [newSecureSaxBuilderForFileProvider] so the Wave 4 data-hop
+         * allowlist entry can be retired.
+         */
+        internal fun newSecureSaxBuilder(): SAXBuilder {
+            val builder = SAXBuilder()
+            builder.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            builder.setFeature("http://xml.org/sax/features/external-general-entities", false)
+            builder.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            builder.expandEntities = false
+            return builder
+        }
+
+        /**
+         * Phase 4 SERVICE-05 (Wave 5) cross-service accessor: exposes the XXE-hardened SAXBuilder
+         * for [SdefFileProvider.mergeScriptingAdditions]. Same surface as the facade-side
+         * `newSecureSaxBuilderInternal` it replaces — Wave 5 co-locates the factory with its
+         * primary consumer ([parseDictionaryFile]) on this service.
+         */
+        @JvmStatic
+        fun newSecureSaxBuilderForFileProvider(): SAXBuilder = newSecureSaxBuilder()
+
+        private fun parseElementsForApplication(
+            xmlElements: List<Element>,
+            applicationName: String,
+            objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
+        ) {
+            for (applicationObjectTag in xmlElements) {
+                parseSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)
+            }
+        }
+
+        private fun parseHashElementsForApplication(
+            xmlElements: List<Element>,
+            applicationName: String,
+            objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
+        ) {
+            for (applicationObjectTag in xmlElements) {
+                hashSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)
+            }
+        }
+
+        private fun parseSimpleElementForObject(
+            suiteObjectElement: Element,
+            applicationName: String,
+            objectNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>>,
+        ) {
+            val objectName = suiteObjectElement.getAttributeValue("name")
+            val code = suiteObjectElement.getAttributeValue("code")
+            if (objectName == null || code == null) return
+            updateApplicationNameSetFor(objectName, applicationName, objectNameToApplicationNameSetMap)
+        }
+
+        private fun hashSimpleElementForObject(
+            suiteObjectElement: Element,
+            applicationName: String,
+            objectNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
+        ) {
+            val objectName = suiteObjectElement.getAttributeValue("name")
+            val code = suiteObjectElement.getAttributeValue("code")
+            if (objectName == null || code == null) return
+            updateObjectNameSetForApplication(objectName, applicationName, objectNameToApplicationNameListMap)
+        }
+
+        private fun updateApplicationNameSetFor(
+            applicationObjectName: String,
+            applicationName: String,
+            applicationNameSetMap: MutableMap<String, MutableSet<String>>,
+        ) {
+            if (StringUtil.isEmpty(applicationObjectName)) return
+            // Atomic get-or-put-and-mutate per D-03: ConcurrentHashMap.compute serialises
+            // the (lookup, allocate, insert, add) tuple inside a single bucket lock.
+            applicationNameSetMap.compute(applicationObjectName) { _, existing ->
+                (existing ?: ConcurrentHashMap.newKeySet<String>()).also { it.add(applicationName) }
+            }
+        }
+
+        private fun updateObjectNameSetForApplication(
+            applicationObjectName: String,
+            applicationName: String,
+            applicationNameSetMap: MutableMap<String, MutableSet<String>>,
+        ) {
+            if (StringUtil.isEmpty(applicationName)) return
+            // Atomic get-or-put-and-mutate per D-03.
+            applicationNameSetMap.compute(applicationName) { _, existing ->
+                (existing ?: ConcurrentHashMap.newKeySet<String>()).also { it.add(applicationObjectName) }
+            }
+        }
+
+        private fun startsWithWord(string: String, prefix: String): Boolean =
+            string.startsWith(prefix) && (prefix.length == string.length || ' ' == string[prefix.length])
+    }
+}
