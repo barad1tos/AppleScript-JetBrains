@@ -336,10 +336,9 @@ class SdefFileProvider @JvmOverloads constructor(
      * synchronous file-based; the resulting `.sdef` is registered via [createAndInitializeInfo]
      * which itself runs synchronously.
      *
-     * XXE hardening: uses [AppleScriptSystemDictionaryRegistryService.newSecureSaxBuilderInternal] —
-     * the Wave 4 minimal-displacement choice (newSecureSaxBuilder stays on the facade where
-     * its other consumer [AppleScriptSystemDictionaryRegistryService.parseDictionaryFile]
-     * still lives until Wave 5).
+     * XXE hardening: uses [SdefIndexService.newSecureSaxBuilderForFileProvider] — Wave 5
+     * co-located the factory with its primary consumer ([SdefIndexService.parseDictionaryFile])
+     * and exposes a typed cross-service accessor for this caller.
      *
      * Body migrated byte-for-byte from the pre-Wave-4 facade `mergeScriptingAdditions`.
      */
@@ -356,7 +355,7 @@ class SdefFileProvider @JvmOverloads constructor(
             val iterator = dictionaryFiles.iterator()
             if (!iterator.hasNext()) return null
             val first = iterator.next()
-            val builder = facade.newSecureSaxBuilderInternal()
+            val builder = SdefIndexService.newSecureSaxBuilderForFileProvider()
             val firstDocument: Document = builder.build(first)
             val firstRoot: Element = firstDocument.rootElement
             while (iterator.hasNext()) {

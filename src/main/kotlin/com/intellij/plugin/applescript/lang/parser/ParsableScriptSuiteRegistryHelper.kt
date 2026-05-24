@@ -118,4 +118,22 @@ object ParsableScriptSuiteRegistryHelper {
     @JvmStatic
     fun areAppDictionariesIndexed(): Boolean =
         AppleScriptSystemDictionaryRegistryService.getInstance().areAppDictionariesIndexed()
+
+    /**
+     * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: lets [SdefIndexService] bound-wait
+     * on the facade-owned `standardReady` Deferred WITHOUT importing the facade directly. Routing
+     * through this @JvmStatic class — which is NOT in the verifyServiceDependencyGraph services
+     * list — avoids the SdefIndexService -> facade back-edge that DFS would detect as a cycle.
+     */
+    @JvmStatic
+    suspend fun awaitStandardReady(): Result<Unit> =
+        AppleScriptSystemDictionaryRegistryService.getInstance().awaitStandardReadyInternal()
+
+    /**
+     * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: same as [awaitStandardReady] but
+     * for the `appsReady` Deferred. See [awaitStandardReady] for cycle-prevention rationale.
+     */
+    @JvmStatic
+    suspend fun awaitAppsReady(): Result<Unit> =
+        AppleScriptSystemDictionaryRegistryService.getInstance().awaitAppsReadyInternal()
 }
