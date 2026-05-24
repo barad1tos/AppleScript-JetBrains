@@ -60,11 +60,20 @@ import javax.script.ScriptEngineManager
     name = AppleScriptSystemDictionaryRegistryService.COMPONENT_NAME,
     storages = [Storage(value = "appleScriptCachedDictionariesInfo.xml", roamingType = RoamingType.PER_OS)],
 )
-class AppleScriptSystemDictionaryRegistryService(
+class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     // serviceScope is exposed `internal` so ServiceScopeLifecycleIntegrationTest can read its Job
     // tree. Same-module test code naturally accesses `internal` members — no @VisibleForTesting
     // needed on constructor parameters (annotation does not target value parameters in Kotlin).
     internal val serviceScope: CoroutineScope,
+    // @JvmOverloads on the primary constructor instructs the Kotlin compiler to emit a
+    // `(CoroutineScope)` JVM overload that delegates to `(CoroutineScope, Dispatchers.IO)`.
+    // The Platform service container expects exactly that single-arg signature for
+    // `@Service(Service.Level.APP)` services (per `InstantiateKt.findConstructor` —
+    // `[()void, (CoroutineScope)void, (Application)void, (ComponentManager)void]`).
+    // Without @JvmOverloads, Platform-instantiated `getInstance()` calls fail with
+    // InstantiationException; tests that construct the service manually with a
+    // `StandardTestDispatcher` still get the 2-arg overload for runCurrent / advanceUntilIdle
+    // determinism (Codex HIGH 2). Discovered during Phase 03 gap closure (DEBUG.md REVISION).
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()),
     ParsableScriptHelper {
