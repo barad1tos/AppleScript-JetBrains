@@ -14,15 +14,10 @@ import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtilCore
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.extensionSupported
-import com.intellij.plugin.applescript.lang.util.MyStopVisitingException
 import com.intellij.util.xmlb.annotations.AbstractCollection
 import com.intellij.util.xmlb.annotations.CollectionBean
 import com.intellij.util.xmlb.annotations.Tag
@@ -82,8 +77,12 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
 
     // scripting additions installed in the system
     private val scriptingAdditions: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    private val notFoundApplicationList: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    private val discoveredApplicationNames: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    // Phase 4 SERVICE-03 (plan 04-03, Wave 3): the `notFoundApplicationList` and
+    // `discoveredApplicationNames` ConcurrentHashMap-backed sets migrated to
+    // [ApplicationDiscoveryService]. Internal callers within this facade route through
+    // `service<ApplicationDiscoveryService>().X()` (init-time hot paths accept the
+    // O(1) service-lookup overhead; service<X>() is a static lookup, not a re-instantiation).
 
     private var xCodeApplicationFile: File? = null
 
@@ -270,7 +269,12 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     internal fun addDictionaryInfoInternal(info: DictionaryInfo): Boolean {
         val appName = info.getApplicationName()
         val wasAbsent = dictionaryInfoMap.put(appName, info) == null
-        discoveredApplicationNames.add(appName)
+        // Wave 3 (SERVICE-03): discoveredApplicationNames lives on ApplicationDiscoveryService.
+        // Internal caller routes through the service<X>() lookup — this is an init-time hot
+        // path during cache load, but the static service lookup is O(1) and the wave's
+        // architecture goal (single owner per state) overrides the hop-avoidance heuristic
+        // from Wave 2 (which was specific to the Pattern A back-edge into the facade itself).
+        service<ApplicationDiscoveryService>().addDiscoveredApplicationName(appName)
         notScriptableApplicationList.remove(appName)
         return wasAbsent
     }
@@ -371,11 +375,15 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
         notScriptableApplicationList.contains(applicationName)
 
     /**
-     * In-memory membership test on the "not found" list. Same routing rationale as
-     * [isNotScriptableInternal].
+     * In-memory membership test on the "not found" list. Wave 3 (SERVICE-03) migrated the
+     * backing storage to [ApplicationDiscoveryService.isInNotFoundList]; this internal
+     * helper preserves the call-site signature for the bounded-wait callers
+     * ([getInitializedInfo], [ensureDictionaryInitialized]) so the hot-path test surface
+     * does not change shape. The single-line forwarder costs one `service<X>()` lookup —
+     * acceptable on the bounded-wait paths (the dictionary parse / VFS walk dominates).
      */
     internal fun isInUnknownListInternal(applicationName: String): Boolean =
-        notFoundApplicationList.contains(applicationName)
+        service<ApplicationDiscoveryService>().isInNotFoundList(applicationName)
 
     /**
      * Add an application to the notScriptable persisted set; returns `true` if newly added.
@@ -469,41 +477,18 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     /**
      * Walks the standard application-bundle directories (Phase 8 invariant — `APP_BUNDLE_DIRECTORIES`
      * preserves `/System/Applications`, `/System/Applications/Utilities`, `~/Applications`) and
-     * registers any discovered `.app` / `.osax` / `.sdef` / `.xml` bundles into
-     * [discoveredApplicationNames].
+     * registers any discovered `.app` / `.osax` / `.sdef` bundles into the discovery service's
+     * in-memory name set.
      *
-     * Plan 03-04 / D-02: explicit `withContext(ioDispatcher)` boundary — defence-in-depth even though
-     * the only production caller ([runInitChain]) is already launched on `ioDispatcher`. The explicit
-     * `suspend` signature advertises the dispatcher contract to readers and future callers
-     * (RECURRING_PITFALLS.md Pattern C — EDT must NEVER walk `/Applications`).
+     * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
+     * [ApplicationDiscoveryService.discoverInstalledApplicationNames]. The body now lives on the
+     * service; the explicit `withContext(ioDispatcher)` boundary remains there (defence-in-depth
+     * even when the facade's [runInitChain] already launches on `ioDispatcher`). Public method
+     * name preserved verbatim — internal facade callers ([runInitChain]) and any future external
+     * callers see the same signature.
      */
-    private suspend fun discoverInstalledApplicationNames() {
-        withContext(ioDispatcher) {
-            for (applicationsDirectory in ApplicationDictionary.APP_BUNDLE_DIRECTORIES) {
-                val appsDirVFile = LocalFileSystem.getInstance().findFileByPath(applicationsDirectory)
-                if (appsDirVFile != null && appsDirVFile.exists()) {
-                    discoverApplicationsInDirectory(appsDirVFile)
-                }
-            }
-            LOG.info("List of installed applications initialized. Count: ${discoveredApplicationNames.size}")
-        }
-    }
-
-    private fun discoverApplicationsInDirectory(appsDirVFile: VirtualFile) {
-        VfsUtilCore.visitChildrenRecursively(
-            appsDirVFile,
-            object : VirtualFileVisitor<VirtualFile>(VirtualFileVisitor.limit(APP_DEPTH_SEARCH)) {
-                override fun visitFile(file: VirtualFile): Boolean {
-                    if (extensionSupported(file.extension)) {
-                        if ("xml" != file.extension) {
-                            discoveredApplicationNames.add(file.nameWithoutExtension)
-                        }
-                        return false
-                    }
-                    return file.isDirectory
-                }
-            },
-        )
+    suspend fun discoverInstalledApplicationNames() {
+        service<ApplicationDiscoveryService>().discoverInstalledApplicationNames()
     }
 
     /**
@@ -519,7 +504,10 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean {
         // D-04: app-name resolver path — gated on full app-discovery sweep (appsReady).
         if (!areAppDictionariesIndexed()) return false
-        if (discoveredApplicationNames.contains(knownApplicationName)) {
+        // Wave 3 (SERVICE-03): discoveredApplicationNames migrated to ApplicationDiscoveryService.
+        // Route the membership test through the typed-API method `containsDiscoveredApplication`
+        // — the predicate is O(1) on the service's ConcurrentHashMap.newKeySet backing.
+        if (service<ApplicationDiscoveryService>().containsDiscoveredApplication(knownApplicationName)) {
             val dInfo = dictionaryInfoMap[knownApplicationName]
             return dInfo != null && (dInfo.isInitialized() || initializeDictionaryFromInfo(dInfo)) ||
                 getInitializedInfo(knownApplicationName) != null
@@ -762,61 +750,20 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
         return null
     }
 
-    private fun findApplicationBundleFile(applicationName: String): File? {
-        if (!SystemInfo.isMac) {
-            notFoundApplicationList.add(applicationName)
-            return null
-        }
-        // Fast path: try standard locations first.
-        for (applicationsDirectory in ApplicationDictionary.APP_BUNDLE_DIRECTORIES) {
-            for (ext in ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS) {
-                val appBundleFilePath = "$applicationsDirectory/$applicationName.$ext"
-                val appFile = File(appBundleFilePath)
-                if (appFile.exists() && appFile.isFile) return appFile
-            }
-        }
-        // Fallback: recursive search.
-        for (applicationsDirectory in ApplicationDictionary.APP_BUNDLE_DIRECTORIES) {
-            val appDirectory = File(applicationsDirectory)
-            if (appDirectory.exists() && appDirectory.isDirectory) {
-                val appVDirectory = LocalFileSystem.getInstance().findFileByIoFile(appDirectory) ?: continue
-                val appBundleFile = findApplicationFileRecursively(appVDirectory, applicationName)
-                if (appBundleFile != null && appBundleFile.exists()) return appBundleFile
-            }
-        }
-        LOG.warn(
-            "No file was found for application: $applicationName in roots: " +
-                "${Arrays.toString(ApplicationDictionary.APP_BUNDLE_DIRECTORIES)}" +
-                " Adding application to unknown applications list.",
-        )
-        notFoundApplicationList.add(applicationName)
-        return null
-    }
-
-    private fun findApplicationFileRecursively(appDirectory: VirtualFile, applicationName: String): File? {
-        val fileVisitor = object : VirtualFileVisitor<VirtualFile>(
-            VirtualFileVisitor.limit(APP_DEPTH_SEARCH),
-            VirtualFileVisitor.SKIP_ROOT,
-            VirtualFileVisitor.NO_FOLLOW_SYMLINKS,
-        ) {
-            override fun visitFile(file: VirtualFile): Boolean {
-                if (ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(file.extension)) {
-                    if (applicationName == file.nameWithoutExtension) {
-                        throw MyStopVisitingException(file)
-                    }
-                    return false // do not search inside application bundles
-                }
-                return true
-            }
-        }
-        return try {
-            VfsUtilCore.visitChildrenRecursively(appDirectory, fileVisitor, MyStopVisitingException::class.java)
-            null
-        } catch (e: MyStopVisitingException) {
-            LOG.debug("Application file found for application $applicationName : ${e.result}")
-            File(e.result.path)
-        }
-    }
+    /**
+     * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
+     * [ApplicationDiscoveryService.findApplicationBundleFile]. The body now lives on the
+     * discovery service (including the EDT guard added in Wave 3 per RESEARCH Open Question 1
+     * + Phase 3 Codex MEDIUM 1). The pre-Wave-3 visibility was `private`; Wave 3 promotes
+     * to `public` to match the typed-API contract — no external callers existed pre-Wave-3,
+     * so the visibility widening is harmless.
+     *
+     * Internal callers within this facade ([getInitializedInfo]) continue to invoke this
+     * trampoline (NOT a `*Internal` helper) — the additional `service<X>()` lookup hop is
+     * acceptable on this code path (the recursive VFS walk dominates wall-clock time).
+     */
+    fun findApplicationBundleFile(applicationName: String): File? =
+        service<ApplicationDiscoveryService>().findApplicationBundleFile(applicationName)
 
     /**
      * Initialises dictionary information for an application from its bundle file (or `.xml`/`.sdef` file)
@@ -1071,7 +1018,8 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
             if (!fileGenerated) {
                 LOG.warn("Error occurred while generating file.")
                 if (targetFile.delete()) LOG.warn("Created file was deleted")
-            } else if (notFoundApplicationList.remove(applicationName)) {
+            } else if (service<ApplicationDiscoveryService>().removeFromNotFoundList(applicationName)) {
+                // Wave 3 (SERVICE-03): notFoundApplicationList migrated to ApplicationDiscoveryService.
                 LOG.debug("Application was removed from ignored list")
             }
         }
@@ -1246,11 +1194,20 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     /**
      * @return true if the application file was not found earlier in [findApplicationBundleFile]
      *
-     * Phase 4 SERVICE-02 trampoline: routes through [SdefPersistenceService.isInUnknownList]
-     * for external callers. Internal callers use [isInUnknownListInternal] directly.
+     * Phase 4 SERVICE-03 trampoline (Wave 3 re-route): routes through
+     * [ApplicationDiscoveryService.isInNotFoundList]. Wave 2 originally parked
+     * `isInUnknownList` on [SdefPersistenceService] as a temporary spot before
+     * [ApplicationDiscoveryService] existed; Wave 3 returns it to its rightful owner —
+     * the not-found list is a discovery artifact (NOT persisted, rebuilt per IDE session),
+     * so it belongs on the discovery service.
+     *
+     * External callers ([com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptColorAnnotator])
+     * see the same signature byte-for-byte; the re-route is invisible at the call site.
+     * Internal callers within this facade continue to use [isInUnknownListInternal] (which
+     * itself now forwards to the service — single source of truth).
      */
     fun isInUnknownList(applicationName: String): Boolean =
-        service<SdefPersistenceService>().isInUnknownList(applicationName)
+        service<ApplicationDiscoveryService>().isInNotFoundList(applicationName)
 
     private fun serializeDictionaryPathForApplication(applicationName: String): String {
         val unescaped = "$GENERATED_DICTIONARIES_SYSTEM_FOLDER/${applicationName}_generated.sdef"
@@ -1275,8 +1232,15 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
 
     fun getCachedApplicationNames(): Collection<String> = dictionaryInfoMap.keys
 
-    // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
-    fun getDiscoveredApplicationNames(): HashSet<String> = HashSet(discoveredApplicationNames)
+    /**
+     * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
+     * [ApplicationDiscoveryService.getDiscoveredApplicationNames]. Defensive snapshot
+     * semantics preserved (service returns a fresh `HashSet` per call). External callers
+     * ([com.intellij.plugin.applescript.lang.ide.completion.ApplicationNameCompletionContributor])
+     * see the same signature.
+     */
+    fun getDiscoveredApplicationNames(): HashSet<String> =
+        service<ApplicationDiscoveryService>().getDiscoveredApplicationNames()
 
     fun isDictionaryInitialized(applicationName: String): Boolean =
         dictionaryInfoMap[applicationName]?.isInitialized() == true
