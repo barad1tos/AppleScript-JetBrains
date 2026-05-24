@@ -453,6 +453,20 @@ tasks {
             "SdefIndexService",
             "AppleScriptSystemDictionaryRegistryService",
         )
+        // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
+        // back-edge from a service to the facade is a DATA dependency (reading state.X), not
+        // a service-graph dependency. RESEARCH §5 calls this out explicitly: "the back-edge
+        // from a service to the facade is modelled as a data hop, not a service hop" — the
+        // facade owns the @State-tagged PersistedState field, and the typed-API service reads
+        // it. Without this allowlist Pattern A (RESEARCH §2) is impossible to model.
+        //
+        // Add new entries here as later waves (3-5) introduce more services that read state
+        // via the facade. Never add an entry for a service-to-service edge that is a real
+        // service<X>() lookup hop — those are real service dependencies and MUST be modelled
+        // as graph edges so cycles are caught.
+        val dataHopAllowlist = setOf(
+            "SdefPersistenceService" to "AppleScriptSystemDictionaryRegistryService",
+        )
         val sdefPackage = layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef")
         inputs.dir(sdefPackage)
 
@@ -467,6 +481,8 @@ tasks {
                     val body = file.readText()
                     services.forEach { dep ->
                         if (dep == owner) return@forEach
+                        // Skip data-hop edges (RESEARCH §5).
+                        if (owner to dep in dataHopAllowlist) return@forEach
                         val patterns = listOf(
                             "service<$dep>",
                             "$dep.getInstance",
@@ -515,6 +531,12 @@ tasks {
                     logger.lifecycle("  $owner (leaf)")
                 } else {
                     logger.lifecycle("  $owner -> ${deps.joinToString(", ")}")
+                }
+            }
+            if (dataHopAllowlist.isNotEmpty()) {
+                logger.lifecycle("Data-hop edges (allowlisted — NOT counted as service-graph edges):")
+                dataHopAllowlist.forEach { (owner, dep) ->
+                    logger.lifecycle("  $owner --data--> $dep")
                 }
             }
         }
