@@ -77,6 +77,16 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
     testRuntimeOnly(libs.junit.vintage.engine)
     testRuntimeOnly(libs.junit.platform.launcher)
+    // Plan 03-10 (Option A — version skew, not shadow problem): supply Kotlin 2.x stdlib at
+    // test runtime. Compiler is 2.3.21, emits bytecode calling kotlin/coroutines/jvm/internal/
+    // SpillingKt (introduced in stdlib 2.0+). kotlinx-coroutines-test:1.8.0 transitively pulls
+    // kotlin-stdlib:1.9.21 which predates the helper -> background serviceScope.launch in the
+    // test environment crashes with NoClassDefFoundError on first suspend resumption. Gradle
+    // conflict resolution picks the higher version (this dep wins over the 1.9.21 transitive).
+    // Verifier IDEs have NO Platform-bundled kotlin-stdlib in lib/ (only the Kotlin plugin's
+    // compiler stdlib in plugins/Kotlin/kotlinc{,.ide}/lib/, not on testRuntimeClasspath), so
+    // the Plan 03-08 exclude-pattern shape does NOT apply here. See DEBUG-stdlib.md.
+    testRuntimeOnly(libs.kotlin.stdlib)
 }
 
 // Phase 03 gap 1 — strip vanilla kotlinx-coroutines-core from test classpaths so the
