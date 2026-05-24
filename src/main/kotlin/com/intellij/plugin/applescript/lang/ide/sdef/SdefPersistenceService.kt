@@ -2,6 +2,7 @@ package com.intellij.plugin.applescript.lang.ide.sdef
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import kotlinx.coroutines.CoroutineScope
 
@@ -91,12 +92,18 @@ class SdefPersistenceService constructor(
     /**
      * O(1) membership test on the in-memory "not found" list (apps that the discovery
      * walk recorded as missing from APP_BUNDLE_DIRECTORIES). This list is NOT persisted —
-     * it is rebuilt per IDE session. Routing it through this service centralises the
-     * read surface so future refactors (Wave 3 ApplicationDiscoveryService) can migrate
-     * the owner without touching every caller.
+     * it is rebuilt per IDE session.
+     *
+     * Wave 3 re-route (SERVICE-03, 04-03): the not-found list moved from the facade to
+     * [ApplicationDiscoveryService] where it belongs (discovery artifact, not persistence
+     * artifact). This service's surface remains for back-compat with the
+     * `SdefPersistenceServiceTest.testIsNotScriptableNegativeCase` test and any future
+     * caller that conceptually groups the "is this app known?" predicate near the
+     * persistence read API. The implementation forwards to the discovery service —
+     * single source of truth.
      */
     fun isInUnknownList(applicationName: String): Boolean =
-        facade().isInUnknownListInternal(applicationName)
+        service<ApplicationDiscoveryService>().isInNotFoundList(applicationName)
 
     /**
      * Add an application to the persisted notScriptable set; returns `true` if the

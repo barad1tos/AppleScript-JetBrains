@@ -466,6 +466,18 @@ tasks {
         // as graph edges so cycles are caught.
         val dataHopAllowlist = setOf(
             "SdefPersistenceService" to "AppleScriptSystemDictionaryRegistryService",
+            // Wave 3 (Phase 4 SERVICE-03, plan 04-03): SdefPersistenceService.isInUnknownList
+            // is a back-compat shim that forwards to ApplicationDiscoveryService — the not-found
+            // list moved to the discovery service (its rightful owner; it's a session-only
+            // discovery artifact, NOT a persistence artifact). The forwarder preserves the
+            // public surface of SdefPersistenceServiceTest (Wave 2) without violating the
+            // single-source-of-truth invariant. This is conceptually a session-data forwarder,
+            // NOT a service-graph dependency. Without this entry the cycle detector flags
+            // `SdefPersistenceService -> ApplicationDiscoveryService -> SdefPersistenceService`
+            // (ApplicationDiscoveryService consults SdefPersistenceService.isNotScriptable
+            // during discovery — that direction IS a real service dependency and remains
+            // tracked in the graph).
+            "SdefPersistenceService" to "ApplicationDiscoveryService",
         )
         val sdefPackage = layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef")
         inputs.dir(sdefPackage)
