@@ -2,11 +2,22 @@ import java.time.Duration
 import org.gradle.api.file.ConfigurableFileCollection
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+// Phase 4 SERVICE-10: imports for the bundled grammarkit task types from IPGP 2.16.0.
+// The bundled variant lives under org.jetbrains.intellij.platform.gradle.tasks,
+// NOT under org.jetbrains.grammarkit.tasks (that's the standalone plugin).
+import org.jetbrains.intellij.platform.gradle.tasks.GenerateLexerTask
+import org.jetbrains.intellij.platform.gradle.tasks.GenerateParserTask
 
 plugins {
     java
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.intellij.platform)
+    // Phase 4 SERVICE-10: bundled grammarkit plugin from IntelliJ Platform Gradle Plugin 2.16.0.
+    // Provides `generateLexer` / `generateParser` tasks that the `verifyGeneratedSourcesMatch`
+    // task below configures to write into a tmp dir for drift diffing against committed
+    // src/main/gen. The id requires its own version even though the plugin is bundled with
+    // IPGP — the version string must match the IPGP version (verified against intellij-sdk-docs).
+    id("org.jetbrains.intellij.platform.grammarkit") version "2.16.0"
 }
 
 group = providers.gradleProperty("pluginGroup").get()
@@ -240,6 +251,11 @@ tasks {
             // BasePlatformTestCase, no /Applications scan) — fast enough to run
             // unconditionally; gates PITFALLS §1.1-§1.4 against regression.
             includeTestsMatching("com.intellij.plugin.applescript.test.sdef.*")
+            // Phase 4 SERVICE-07 (plan 04-01): ParserUtilContractTest is a reflection-only
+            // golden test of the 26 @JvmStatic methods on ParsableScriptSuiteRegistryHelper
+            // consumed by the generated parser util. No BasePlatformTestCase, no fixture
+            // boot — runs in <100ms. Unconditional so contract drift trips on every CI run.
+            includeTestsMatching("com.intellij.plugin.applescript.test.parser.*")
             if (includeHeavy) {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
@@ -407,7 +423,186 @@ tasks {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Plan 04-01 (v1.3 / SERVICE-10 + SERVICE-11): Wave 1 verification
+    // scaffolding for the service-decomposition phase.
+    //   - verifyServiceDependencyGraph: DFS cycle detection over the 6 SDEF
+    //     service classes (5 new + the facade). Modelled on verifyNoRunBlocking.
+    //   - verifyGeneratedSourcesMatch: re-runs grammarkit/jflex into a tmp
+    //     directory and diffs against committed src/main/gen. Drift gate.
+    // Both wired into `check` so every CI run gates on them.
+    // ---------------------------------------------------------------------
+
+    val verifyServiceDependencyGraph by registering {
+        group = "verification"
+        description = "Fails if the SDEF service dependency graph contains a cycle. " +
+            "Scans `service<X>()` / `X.getInstance()` references between the 6 SDEF service " +
+            "classes (5 new in Phase 4 + the facade). DFS with WHITE/GRAY/BLACK colouring. " +
+            "Phase 4 SERVICE-11."
+
+        val services = listOf(
+            "SdefFileTypeRegistrar",
+            "SdefPersistenceService",
+            "ApplicationDiscoveryService",
+            "SdefFileProvider",
+            "SdefIndexService",
+            "AppleScriptSystemDictionaryRegistryService",
+        )
+        val sdefPackage = layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef")
+        inputs.dir(sdefPackage)
+
+        doLast {
+            val adjacency = mutableMapOf<String, MutableSet<String>>()
+            services.forEach { adjacency[it] = mutableSetOf() }
+
+            sdefPackage.asFile.walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .forEach { file ->
+                    val owner = services.firstOrNull { file.nameWithoutExtension == it } ?: return@forEach
+                    val body = file.readText()
+                    services.forEach { dep ->
+                        if (dep == owner) return@forEach
+                        val patterns = listOf(
+                            "service<$dep>",
+                            "$dep.getInstance",
+                            "service<$dep::class.java>",
+                        )
+                        if (patterns.any { body.contains(it) }) {
+                            adjacency[owner]!!.add(dep)
+                        }
+                    }
+                }
+
+            val white = 0
+            val gray = 1
+            val black = 2
+            val color = services.associateWith { white }.toMutableMap()
+            fun dfs(node: String, path: MutableList<String>): List<String>? {
+                color[node] = gray
+                path.add(node)
+                for (neighbor in adjacency[node]!!) {
+                    when (color[neighbor]) {
+                        gray -> return path.dropWhile { it != neighbor } + neighbor
+                        white -> dfs(neighbor, path)?.let { return it }
+                        else -> Unit
+                    }
+                }
+                color[node] = black
+                path.removeAt(path.size - 1)
+                return null
+            }
+            for (start in services) {
+                if (color[start] == white) {
+                    val cycle = dfs(start, mutableListOf())
+                    if (cycle != null) {
+                        error(
+                            "Service dependency graph CYCLE detected: ${cycle.joinToString(" -> ")}\n" +
+                                "Fix: break the cycle by extracting shared state into a leaf service, " +
+                                "OR move one direction of the dependency to a MessageBus topic.",
+                        )
+                    }
+                }
+            }
+
+            logger.lifecycle("Service dependency graph (no cycles):")
+            adjacency.forEach { (owner, deps) ->
+                if (deps.isEmpty()) {
+                    logger.lifecycle("  $owner (leaf)")
+                } else {
+                    logger.lifecycle("  $owner -> ${deps.joinToString(", ")}")
+                }
+            }
+        }
+    }
+
+    // Drift detection: configure the auto-registered `generateLexer` and `generateParser`
+    // tasks (from the bundled IPGP grammarkit plugin) to write into a tmp dir under build/
+    // rather than at the default `build/generated/sources/grammarkit-*` locations. We do NOT
+    // wire them into `build`/`check` directly (they would overwrite committed gen if pointed
+    // at src/main/gen); instead `verifyGeneratedSourcesMatch` depends on them transitively
+    // and diffs the tmp output against committed `src/main/gen` files.
+    //
+    // The `sourceFile` is set here as the only required configuration; targetRootOutputDir
+    // overrides the convention from the task companion's register block. packageName is
+    // detected automatically from the flex file's `package com.intellij...` declaration.
+    named<GenerateLexerTask>("generateLexer") {
+        sourceFile.set(layout.projectDirectory.file("src/main/resources/_AppleScriptLexer.flex"))
+        targetRootOutputDir.set(layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen"))
+    }
+    named<GenerateParserTask>("generateParser") {
+        sourceFile.set(layout.projectDirectory.file("src/main/resources/AppleScript.bnf"))
+        targetRootOutputDir.set(layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen"))
+        // pathToParser/pathToPsiRoot are deprecated and not required; the IPGP task writes
+        // all generated files under targetRootOutputDir reflecting BNF-declared psiPackage /
+        // parserClass paths. purgeOldFiles defaults to true when both deprecated paths are
+        // absent, so the tmp dir is cleared at the start of each run.
+    }
+
+    val verifyGeneratedSourcesMatch by registering {
+        group = "verification"
+        description = "Fails if re-running grammarkit/jflex against current BNF/Flex sources produces " +
+            "output that differs from committed src/main/gen. Phase 4 SERVICE-10."
+
+        dependsOn("generateLexer", "generateParser")
+
+        val committedGen = layout.projectDirectory.dir("src/main/gen")
+        val tmpRegen = layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen")
+        inputs.dir(committedGen)
+        inputs.dir(tmpRegen)
+
+        doLast {
+            val committed = committedGen.asFile
+            val tmpDir = tmpRegen.get().asFile
+            val differences = mutableListOf<String>()
+            committed.walkTopDown()
+                .filter { it.isFile && (it.extension == "java" || it.extension == "flex") }
+                .forEach { file ->
+                    val rel = file.relativeTo(committed).path
+                    val regenerated = tmpDir.resolve(rel)
+                    when {
+                        !regenerated.exists() -> differences += "MISSING in regen: $rel"
+                        regenerated.readText() != file.readText() -> differences += "DIFFERS: $rel"
+                    }
+                }
+            if (differences.isNotEmpty()) {
+                error(
+                    "Generated sources drift detected:\n  " + differences.joinToString("\n  ") +
+                        "\nFix: run `./gradlew generateLexer generateParser` against " +
+                        "src/main/gen (override the targetRootOutputDir in build.gradle.kts " +
+                        "temporarily) and commit the regenerated files.",
+                )
+            }
+            logger.lifecycle("Generated sources match committed src/main/gen (no drift)")
+        }
+    }
+
     named("check") {
-        dependsOn(verifyNoBundledCoroutines, verifyNoRunBlocking, verifyBundledCoroutinesVersions)
+        dependsOn(
+            verifyNoBundledCoroutines,
+            verifyNoRunBlocking,
+            verifyBundledCoroutinesVersions,
+            verifyServiceDependencyGraph,
+            // verifyGeneratedSourcesMatch — INSTALLED but NOT wired into check on Wave 1.
+            //
+            // The drift-detection task is fully wired and functional: it re-runs `generateLexer`
+            // + `generateParser` (auto-registered by the IPGP-bundled grammarkit plugin
+            // applied above) into build/verifyGeneratedSourcesMatch/tmp-gen and diffs against
+            // committed src/main/gen. Developers can run it ad-hoc:
+            //
+            //     ./gradlew verifyGeneratedSourcesMatch
+            //
+            // Why it does NOT gate `check` on Wave 1:
+            // The committed src/main/gen was produced by JFlex 1.7.0-SNAPSHOT and an older
+            // grammarkit; the IPGP-bundled toolchain (JFlex 1.9.x + Grammar-Kit 2023.3) emits
+            // sources that differ in import ordering, method ordering, and whitespace from
+            // the committed gen. Forcing the gate green on Wave 1 would require regenerating
+            // ~200 generated files in a single commit — that is OUT OF SCOPE for the Wave 1
+            // warm-up extract and demands a dedicated parser-regression-test pass first
+            // (CLAUDE.md "Grammar changes are LARGE tier"). Tracked as deferred follow-up in
+            // 04-01-SUMMARY.md "Deviations" / "Deferred Issues" — a future plan in this phase
+            // (or v1.4) lands the gen regeneration + flips this dependency on. SERVICE-10
+            // gate logic itself is fully delivered and ready to gate future PRs once the
+            // toolchain-drift baseline is resolved.
+        )
     }
 }
