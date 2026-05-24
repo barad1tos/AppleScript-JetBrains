@@ -1,3 +1,8 @@
+// AUDIT 2026-05-24: scanned for EDT-context pre-check assumptions. Found `isDispatchThread`
+// references at lines 44 and 61 — both are POSITIVE assertions inside `invokeAndWait { ... }`
+// blocks (asserting "we ARE on the EDT now", which IS true after invokeAndWait jumps to EDT).
+// These are correct usage, NOT the defective pattern fixed in Plan 03-11. File is compatible
+// with BasePlatformTestCase's EDT-by-default threading model.
 package com.intellij.plugin.applescript.test.concurrency
 
 import com.intellij.openapi.application.ApplicationManager

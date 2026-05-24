@@ -1,3 +1,7 @@
+// AUDIT 2026-05-24: scanned for EDT-context assumption patterns (assertFalse/assumeFalse on
+// isDispatchThread, @RunsInEdt/EdtRule, ThreadingAssertions); none found. File is compatible
+// with BasePlatformTestCase's EDT-by-default threading model. Audit performed during Plan 03-11
+// (DEBUG.md ADDENDUM Layer 5 sweep).
 package com.intellij.plugin.applescript.test.concurrency
 
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
