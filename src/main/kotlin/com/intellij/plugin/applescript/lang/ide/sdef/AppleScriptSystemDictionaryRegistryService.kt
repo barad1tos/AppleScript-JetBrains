@@ -156,7 +156,7 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
      *   1. `service<SdefFileTypeRegistrar>().register()` — Light Service owns the
      *      `withContext(Dispatchers.EDT)` + runWriteAction internally (Phase 4 SERVICE-01).
      *      RECURRING_PITFALLS.md Pattern C — write actions require EDT, NEVER the `Main` dispatcher.
-     *   2. `initDictionariesInfoFromCache(state)` — restore persisted dictionary entries.
+     *   2. `initDictionariesInfoFromCacheInternal(state)` — restore persisted dictionary entries.
      *   3. `initStandardSuite()` — parse StandardAdditions + CocoaStandard.
      *   4. Complete `standardReady` with `Result.success(Unit)` — parser fast path unblocks.
      *   5. `discoverInstalledApplicationNames()` — walk the `/Applications` directory tree.
@@ -175,7 +175,7 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
             // The Light Service owns the `withContext(Dispatchers.EDT)` + runWriteAction internally,
             // so the call site here is a single trampoline. Init-chain ordering preserved.
             service<SdefFileTypeRegistrar>().register()
-            initDictionariesInfoFromCache(state)
+            initDictionariesInfoFromCacheInternal(state)
             initStandardSuite()
             standardReady.complete(Result.success(Unit))
             discoverInstalledApplicationNames()
@@ -232,21 +232,165 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     fun areAppDictionariesIndexed(): Boolean =
         appsReady.isCompleted && appsReady.getCompleted().isSuccess
 
-    private fun removeDictionaryInfo(applicationName: String) {
+    // ---------------------------------------------------------------------------------------------
+    // Phase 4 SERVICE-02 (plan 04-02, Wave 2) — persistence trampolines + `internal *Internal`
+    // helpers used by [SdefPersistenceService].
+    //
+    // Pattern A from RESEARCH §2: the @State annotation, PersistedState inner class, and
+    // SimplePersistentStateComponent inheritance ALL stay on this facade. The service offers a
+    // typed API that forwards to the `internal *Internal` helpers below. External callers
+    // continue to use the public trampolines (addDictionaryInfo / removeDictionaryInfo /
+    // getDictionaryInfoList / getNotScriptableApplicationList / isNotScriptable /
+    // isInUnknownList / updateState) with byte-for-byte unchanged signatures. SDEF-13 golden
+    // fixture regression-locks the wire format — neither PersistedState nor DictionaryInfo.State
+    // is touched by this wave.
+    //
+    // Internal callers within this file invoke the `*Internal` helpers directly (NOT through
+    // the service trampoline) to avoid the extra service<X>() lookup hop on hot paths and to
+    // sidestep any circularity concerns during init.
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Remove a [DictionaryInfo] from the in-memory registry by application NAME and mark the
+     * application as notScriptable. Internal helper called by [initializeDictionaryFromInfo]
+     * when dictionary parsing fails. NOT the public [removeDictionaryInfo] trampoline (which
+     * takes an application PATH and routes through [SdefPersistenceService]).
+     */
+    internal fun removeDictionaryInfoInMemoryInternal(applicationName: String) {
         dictionaryInfoMap.remove(applicationName)
         notScriptableApplicationList.add(applicationName)
     }
 
-    private fun addDictionaryInfo(info: DictionaryInfo) {
-        dictionaryInfoMap[info.getApplicationName()] = info
-        discoveredApplicationNames.add(info.getApplicationName())
-        notScriptableApplicationList.remove(info.getApplicationName())
+    /**
+     * Register a [DictionaryInfo] in the in-memory registry. Returns `true` if the application
+     * was newly added (idempotent overwrite returns `true` for callers that need the
+     * "registered" predicate — matches the typed-API contract on [SdefPersistenceService]).
+     * Removes the application from the notScriptable list and adds it to the discovered set.
+     */
+    internal fun addDictionaryInfoInternal(info: DictionaryInfo): Boolean {
+        val appName = info.getApplicationName()
+        val wasAbsent = dictionaryInfoMap.put(appName, info) == null
+        discoveredApplicationNames.add(appName)
+        notScriptableApplicationList.remove(appName)
+        return wasAbsent
     }
 
-    internal fun getDictionaryInfoList(): Collection<DictionaryInfo> = dictionaryInfoMap.values
+    /**
+     * Trampoline (Phase 4 SERVICE-02): defers to [SdefPersistenceService.addDictionaryInfo],
+     * which routes back to [addDictionaryInfoInternal]. Kept on the facade for downstream
+     * callers that historically reached for it (none today — was `private` pre-Wave-2 — but
+     * the typed-API contract publishes it).
+     */
+    fun addDictionaryInfo(info: DictionaryInfo): Boolean =
+        service<SdefPersistenceService>().addDictionaryInfo(info)
 
-    // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
-    fun getNotScriptableApplicationList(): HashSet<String> = HashSet(notScriptableApplicationList)
+    /**
+     * Trampoline (Phase 4 SERVICE-02): defers to [SdefPersistenceService.removeDictionaryInfo],
+     * which routes back to [removeDictionaryInfoByPathInternal]. Takes an application PATH
+     * (`applicationFile.path`) and resolves the matching registry entry.
+     */
+    fun removeDictionaryInfo(applicationPath: String): Boolean =
+        service<SdefPersistenceService>().removeDictionaryInfo(applicationPath)
+
+    /**
+     * Defensive snapshot of the in-memory [DictionaryInfo] registry. Returns a [List], NOT the
+     * live `Map.values` view, so callers cannot accidentally mutate the registry through the
+     * returned reference.
+     */
+    internal fun dictionaryInfoSnapshotInternal(): List<DictionaryInfo> =
+        dictionaryInfoMap.values.toList()
+
+    /**
+     * Atomically replace the in-memory [DictionaryInfo] registry with [infos]. Used by
+     * [SdefPersistenceService.persistDictionaryInfoSnapshot] for batch imports. Clears the
+     * existing map then re-adds each entry via [addDictionaryInfoInternal] (which preserves
+     * the discoveredApplicationNames / notScriptable side effects).
+     */
+    internal fun replaceDictionaryInfoCollectionInternal(infos: Collection<DictionaryInfo>) {
+        dictionaryInfoMap.clear()
+        for (info in infos) {
+            addDictionaryInfoInternal(info)
+        }
+    }
+
+    /**
+     * Remove a [DictionaryInfo] by its application path. Returns `true` if a matching entry
+     * was found and removed. Standard libraries (no `applicationFile`) are matched by the
+     * well-known `CocoaStandard.sdef` suffix to preserve the historical
+     * [getDictionaryInfoByApplicationPath] resolution.
+     */
+    internal fun removeDictionaryInfoByPathInternal(applicationPath: String): Boolean {
+        for (entry in dictionaryInfoMap.entries) {
+            val appFile = entry.value.getApplicationFile()
+            if (appFile != null && appFile.path == applicationPath) {
+                dictionaryInfoMap.remove(entry.key)
+                return true
+            }
+        }
+        if (applicationPath.endsWith("CocoaStandard.sdef")) {
+            return dictionaryInfoMap.remove(ApplicationDictionary.COCOA_STANDARD_LIBRARY) != null
+        }
+        return false
+    }
+
+    /**
+     * Trampoline (Phase 4 SERVICE-02): defers to
+     * [SdefPersistenceService.readDictionaryInfoSnapshot]. External callers see a
+     * `Collection<DictionaryInfo>` view as before (List is-a Collection — type widening only).
+     * Previously `internal`; promoted to `public` here to match the typed-API contract
+     * (no external callers added — the visibility widening is harmless).
+     */
+    fun getDictionaryInfoList(): Collection<DictionaryInfo> =
+        service<SdefPersistenceService>().readDictionaryInfoSnapshot()
+
+    /**
+     * Defensive snapshot of the notScriptable set. Returns a [HashSet] to preserve the
+     * historical `getNotScriptableApplicationList(): HashSet<String>` return type (some
+     * callers may depend on the concrete `HashSet` API surface; Wave 6 may narrow to
+     * read-only `Set`).
+     */
+    internal fun notScriptableSnapshotInternal(): HashSet<String> =
+        HashSet(notScriptableApplicationList)
+
+    /**
+     * Trampoline (Phase 4 SERVICE-02): defers to
+     * [SdefPersistenceService.readNotScriptableSnapshot]. Returns `HashSet<String>` for
+     * back-compat with existing call sites (annotator, completion contributors).
+     */
+    fun getNotScriptableApplicationList(): HashSet<String> =
+        HashSet(service<SdefPersistenceService>().readNotScriptableSnapshot())
+
+    /**
+     * In-memory membership test on the notScriptable set. Routed through
+     * [SdefPersistenceService.isNotScriptable] for the public trampoline below; this internal
+     * variant is the actual data access used by internal callers (annotator-facing paths
+     * inside this facade like [getInitializedInfo]) to avoid the service lookup hop on hot
+     * paths.
+     */
+    internal fun isNotScriptableInternal(applicationName: String): Boolean =
+        notScriptableApplicationList.contains(applicationName)
+
+    /**
+     * In-memory membership test on the "not found" list. Same routing rationale as
+     * [isNotScriptableInternal].
+     */
+    internal fun isInUnknownListInternal(applicationName: String): Boolean =
+        notFoundApplicationList.contains(applicationName)
+
+    /**
+     * Add an application to the notScriptable persisted set; returns `true` if newly added.
+     * Idempotent. The persisted-state machinery serialises on its own cadence (per
+     * `getState()`), matching the v1.0 behaviour byte-for-byte (SDEF-13 fixture invariant).
+     */
+    internal fun addNotScriptableInternal(applicationName: String): Boolean =
+        notScriptableApplicationList.add(applicationName)
+
+    /**
+     * Remove an application from the notScriptable persisted set; returns `true` if the
+     * name was present and removed.
+     */
+    internal fun removeNotScriptableInternal(applicationName: String): Boolean =
+        notScriptableApplicationList.remove(applicationName)
 
     // Defensive snapshot: backing storage is concurrent; callers historically did not mutate this.
     // TODO(v1.1 SDEF-05): once DictionaryIndexes lands, narrow the interface to a read-only Set.
@@ -255,14 +399,33 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     override fun loadState(state: PersistedState) {
         super.loadState(state)
         try {
-            initDictionariesInfoFromCache(state)
+            // Phase 4 SERVICE-02 trampoline — routes through SdefPersistenceService for clean
+            // single-source-of-truth on the load path. The service's loadFromState delegates
+            // back to initDictionariesInfoFromCacheInternal on this facade; the indirection
+            // documents the architectural boundary while keeping the wire format byte-for-byte
+            // (the inner [PersistedState] class + DictionaryInfo.State annotations untouched).
+            service<SdefPersistenceService>().loadFromState(state)
         } catch (e: Exception) {
             LOG.error("Error while loading state for AppleScript dictionaries", e)
         }
     }
 
+    /**
+     * Trampoline (Phase 4 SERVICE-02): writes the in-memory registry into the persisted
+     * state via [SdefPersistenceService.writeToState], which routes to
+     * [writeToStateInternal] on this facade. Public method name preserved verbatim — Phase 3
+     * D-08 invariant.
+     */
     fun updateState() {
-        val state = state
+        service<SdefPersistenceService>().writeToState(state)
+    }
+
+    /**
+     * Writes the in-memory dictionary registry + notScriptable set back into [state].
+     * Body extracted from the pre-Wave-2 [updateState] method byte-for-byte (no behavioural
+     * drift — the SDEF-13 golden fixture regression-locks the resulting XML format).
+     */
+    internal fun writeToStateInternal(state: PersistedState) {
         val dictionaryInfos = dictionaryInfoMap.values
         state.dictionariesInfo = Array(dictionaryInfos.size) { DictionaryInfo.State() }
         val iterator = dictionaryInfos.iterator()
@@ -277,8 +440,14 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
         state.notScriptableApplications!!.addAll(notScriptableApplicationList)
     }
 
-    /** Fills [dictionaryInfoMap] from previously persisted [PersistedState]. */
-    private fun initDictionariesInfoFromCache(state: PersistedState) {
+    /**
+     * Fills [dictionaryInfoMap] from previously persisted [PersistedState].
+     *
+     * Body extracted from the pre-Wave-2 private `initDictionariesInfoFromCache` byte-for-byte.
+     * The SDEF-13 golden fixture regression-locks that the wire-format -> in-memory
+     * reconstruction is unchanged.
+     */
+    internal fun initDictionariesInfoFromCacheInternal(state: PersistedState) {
         notScriptableApplicationList.clear()
         state.notScriptableApplications?.let { notScriptableApplicationList.addAll(it) }
         val infos = state.dictionariesInfo
@@ -291,7 +460,7 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
                 val applicationFile = if (!StringUtil.isEmpty(applicationUrl)) File(applicationUrl!!) else null
                 if (dictionaryFile != null && dictionaryFile.exists()) {
                     dictionaryInfoMap.remove(appName)
-                    addDictionaryInfo(DictionaryInfo(appName!!, dictionaryFile, applicationFile))
+                    addDictionaryInfoInternal(DictionaryInfo(appName!!, dictionaryFile, applicationFile))
                 }
             }
         }
@@ -344,8 +513,8 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
      */
     fun ensureDictionaryInitialized(anyApplicationName: String): Boolean =
         ensureKnownApplicationDictionaryInitialized(anyApplicationName) ||
-            !StringUtil.isEmptyOrSpaces(anyApplicationName) && !isNotScriptable(anyApplicationName) &&
-            !isInUnknownList(anyApplicationName) && getInitializedInfo(anyApplicationName) != null
+            !StringUtil.isEmptyOrSpaces(anyApplicationName) && !isNotScriptableInternal(anyApplicationName) &&
+            !isInUnknownListInternal(anyApplicationName) && getInitializedInfo(anyApplicationName) != null
 
     override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean {
         // D-04: app-name resolver path — gated on full app-discovery sweep (appsReady).
@@ -574,8 +743,8 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
      * @return the [DictionaryInfo] of the generated and cached dictionary for the application, or null
      */
     fun getInitializedInfo(applicationName: String): DictionaryInfo? {
-        if (StringUtil.isEmptyOrSpaces(applicationName) || isNotScriptable(applicationName) ||
-            isInUnknownList(applicationName)
+        if (StringUtil.isEmptyOrSpaces(applicationName) || isNotScriptableInternal(applicationName) ||
+            isInUnknownListInternal(applicationName)
         ) {
             return null
         }
@@ -685,8 +854,11 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
             return dictionaryInfo.setInitialized(true)
         }
         // Parsing failed — remove the broken generated dictionary file from the cache.
+        // Routes to the in-memory helper (NOT the typed-API trampoline) because callers here
+        // identify the application by NAME, not by path. The public `removeDictionaryInfo`
+        // trampoline takes an `applicationPath`. SERVICE-02 invariant.
         LOG.warn("Initialization failed for application [$applicationName].")
-        removeDictionaryInfo(applicationName)
+        removeDictionaryInfoInMemoryInternal(applicationName)
         return false
     }
 
@@ -907,7 +1079,10 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
             val applicationBundle =
                 if (ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(appExtension)) applicationIoFile else null
             val dInfo = DictionaryInfo(applicationName, targetFile, applicationBundle)
-            addDictionaryInfo(dInfo)
+            // SERVICE-02: route to the in-memory helper directly (NOT through the typed-API
+            // trampoline) to avoid the service<X>() lookup hop on this init-time hot path
+            // and to keep the helper call self-contained inside the facade.
+            addDictionaryInfoInternal(dInfo)
             LOG.debug("Dictionary file generated for application [$applicationName]$targetFile")
             return dInfo
         }
@@ -1058,11 +1233,24 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
         return false
     }
 
-    /** @return true if `/usr/bin/sdef` invocation previously failed to generate a dictionary */
-    fun isNotScriptable(applicationName: String): Boolean = notScriptableApplicationList.contains(applicationName)
+    /**
+     * @return true if `/usr/bin/sdef` invocation previously failed to generate a dictionary
+     *
+     * Phase 4 SERVICE-02 trampoline: routes through [SdefPersistenceService.isNotScriptable]
+     * for external callers (annotator, completion contributors). Internal callers within
+     * this facade use [isNotScriptableInternal] directly.
+     */
+    fun isNotScriptable(applicationName: String): Boolean =
+        service<SdefPersistenceService>().isNotScriptable(applicationName)
 
-    /** @return true if the application file was not found earlier in [findApplicationBundleFile] */
-    fun isInUnknownList(applicationName: String): Boolean = notFoundApplicationList.contains(applicationName)
+    /**
+     * @return true if the application file was not found earlier in [findApplicationBundleFile]
+     *
+     * Phase 4 SERVICE-02 trampoline: routes through [SdefPersistenceService.isInUnknownList]
+     * for external callers. Internal callers use [isInUnknownListInternal] directly.
+     */
+    fun isInUnknownList(applicationName: String): Boolean =
+        service<SdefPersistenceService>().isInUnknownList(applicationName)
 
     private fun serializeDictionaryPathForApplication(applicationName: String): String {
         val unescaped = "$GENERATED_DICTIONARIES_SYSTEM_FOLDER/${applicationName}_generated.sdef"
