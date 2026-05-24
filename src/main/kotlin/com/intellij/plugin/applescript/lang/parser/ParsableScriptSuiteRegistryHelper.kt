@@ -118,4 +118,27 @@ object ParsableScriptSuiteRegistryHelper {
     @JvmStatic
     fun areAppDictionariesIndexed(): Boolean =
         AppleScriptSystemDictionaryRegistryService.getInstance().areAppDictionariesIndexed()
+
+    /**
+     * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: lets [SdefIndexService] bound-wait
+     * on the facade-owned `standardReady` Deferred WITHOUT importing the facade directly. Routing
+     * through this static-utility class (NOT in the `verifyServiceDependencyGraph` services list)
+     * avoids the SdefIndexService -> facade back-edge that DFS would detect as a cycle.
+     *
+     * NOT marked `@JvmStatic` (unlike the 26 frozen-contract methods above) because (a) the only
+     * caller is Kotlin code in `SdefIndexService` — no Java parser-util call site exists — and (b)
+     * `@JvmStatic suspend fun` emits a name-mangled JVM signature (the `-IoAF18A` suffix from
+     * `Result<Unit>`'s inline-class boxing) that would force [ParserUtilContractTest] to enumerate
+     * those mangled names. Keeping these proxies as plain object members preserves the contract
+     * count at the original 26.
+     */
+    suspend fun awaitStandardReady(): Result<Unit> =
+        AppleScriptSystemDictionaryRegistryService.getInstance().awaitStandardReadyInternal()
+
+    /**
+     * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: same as [awaitStandardReady] but
+     * for the `appsReady` Deferred. See [awaitStandardReady] for cycle-prevention rationale.
+     */
+    suspend fun awaitAppsReady(): Result<Unit> =
+        AppleScriptSystemDictionaryRegistryService.getInstance().awaitAppsReadyInternal()
 }
