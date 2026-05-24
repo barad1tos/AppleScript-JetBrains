@@ -9,7 +9,6 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
@@ -25,12 +24,6 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import org.jdom.Document
-import org.jdom.Element
-import org.jdom.JDOMException
-import org.jdom.Namespace
-import org.jdom.input.SAXBuilder
 import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
 import java.io.IOException
@@ -76,20 +69,14 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     // External callers continue to route through facade trampolines (see
     // `isXcodeInstalled`, `getScriptingAdditions`, `getDictionaryFile`, etc. below).
 
-    private val applicationNameToClassNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val applicationNameToClassNamePluralSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val applicationNameToCommandNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val applicationNameToRecordNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val applicationNameToPropertySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val applicationNameToEnumerationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val applicationNameToEnumeratorConstantNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val stdClassNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val stdClassNamePluralToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val stdCommandNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val stdRecordNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val stdPropertyNameToDictionarySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val stdEnumerationNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    // Phase 4 SERVICE-05 (plan 04-05, Wave 5): the 14 parser-index ConcurrentHashMap fields
+    // (applicationNameTo*Map + std*Map; class, classPlural, command, record, property,
+    // enumeration, enumeratorConstant — 7 application-scoped + 7 std-scoped) migrated to
+    // [SdefIndexService]. The 21 [ParsableScriptHelper] lookup methods + [findStdCommands]
+    // + [findApplicationCommands] are now trampolines below. The XML parsing pipeline
+    // (parseDictionaryFile + parseSuiteElementForApplication + parseSuiteElementForScriptingAdditions
+    // + parseClassElement + 7 companion helpers + newSecureSaxBuilder XXE-hardened factory)
+    // also migrated to the service.
 
     /**
      * Two-stage gating primitives replacing the Phase 1 [java.util.concurrent.CountDownLatch] (D-01, D-04).
@@ -220,6 +207,25 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
      */
     fun areAppDictionariesIndexed(): Boolean =
         appsReady.isCompleted && appsReady.getCompleted().isSuccess
+
+    /**
+     * Phase 4 SERVICE-05 (Wave 5) — bounded-wait helper exposed for [SdefIndexService].
+     *
+     * Routes the standardReady await through [ParsableScriptSuiteRegistryHelper.awaitStandardReady]
+     * (the @JvmStatic proxy added in Wave 5), which calls this helper. The static proxy class is
+     * NOT in the services list scanned by `verifyServiceDependencyGraph`, so the back-edge
+     * `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` is NOT introduced.
+     */
+    internal suspend fun awaitStandardReadyInternal(): Result<Unit> = standardReady.await()
+
+    /**
+     * Phase 4 SERVICE-05 (Wave 5) — bounded-wait helper exposed for [SdefIndexService].
+     *
+     * Same cycle-prevention rationale as [awaitStandardReadyInternal]: SdefIndexService consults
+     * this via the [ParsableScriptSuiteRegistryHelper.awaitAppsReady] @JvmStatic proxy in
+     * `lang/parser/`, not directly through `facade.getInstance()`.
+     */
+    internal suspend fun awaitAppsReadyInternal(): Result<Unit> = appsReady.await()
 
     // ---------------------------------------------------------------------------------------------
     // Phase 4 SERVICE-02 (plan 04-02, Wave 2) — persistence trampolines + `internal *Internal`
@@ -508,196 +514,80 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
         return false
     }
 
-    // ParsableScriptHelper methods
+    // ── ParsableScriptHelper trampolines (Wave 5) ────────────────────────────────────────
+    // Each method delegates to [SdefIndexService]; the 14 ConcurrentHashMap indexes that backed
+    // these lookups live on the service post-Wave-5. External callers ([ParsableScriptSuiteRegistryHelper]
+    // @JvmStatic proxies + parser-util) see byte-for-byte identical signatures.
 
-    override fun isStdLibClass(name: String): Boolean {
-        if (!isInitialized()) return false
-        return stdClassNameToApplicationNameSetMap.containsKey(name)
-    }
+    override fun isStdLibClass(name: String): Boolean =
+        service<SdefIndexService>().lookupStdLibClass(name)
 
-    override fun isApplicationClass(applicationName: String, className: String): Boolean {
-        if (!isInitialized()) return false
-        val classNameSet = applicationNameToClassNameSetMap[applicationName]
-        return classNameSet != null && classNameSet.contains(className)
-    }
+    override fun isApplicationClass(applicationName: String, className: String): Boolean =
+        service<SdefIndexService>().lookupApplicationClass(applicationName, className)
 
-    override fun isStdLibClassPluralName(pluralName: String): Boolean {
-        if (!isInitialized()) return false
-        return stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
-    }
+    override fun isStdLibClassPluralName(pluralName: String): Boolean =
+        service<SdefIndexService>().lookupStdLibClassPluralName(pluralName)
 
-    override fun isApplicationClassPluralName(applicationName: String, pluralClassName: String): Boolean {
-        if (!isInitialized()) return false
-        val pluralClassNameSet = applicationNameToClassNamePluralSetMap[applicationName]
-        return pluralClassNameSet != null && pluralClassNameSet.contains(pluralClassName)
-    }
+    override fun isApplicationClassPluralName(applicationName: String, pluralClassName: String): Boolean =
+        service<SdefIndexService>().lookupApplicationClassPluralName(applicationName, pluralClassName)
 
-    override fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(classNamePrefix, stdClassNameToApplicationNameSetMap.keys)
-    }
+    override fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean =
+        service<SdefIndexService>().lookupStdClassWithPrefixExist(classNamePrefix)
 
-    override fun isClassWithPrefixExist(applicationName: String, classNamePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(classNamePrefix, applicationNameToClassNameSetMap[applicationName])
-    }
+    override fun isClassWithPrefixExist(applicationName: String, classNamePrefix: String): Boolean =
+        service<SdefIndexService>().lookupClassWithPrefixExist(applicationName, classNamePrefix)
 
-    override fun isStdClassPluralWithPrefixExist(namePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(namePrefix, stdClassNamePluralToApplicationNameSetMap.keys)
-    }
+    override fun isStdClassPluralWithPrefixExist(namePrefix: String): Boolean =
+        service<SdefIndexService>().lookupStdClassPluralWithPrefixExist(namePrefix)
 
-    override fun isClassPluralWithPrefixExist(applicationName: String, pluralClassNamePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(pluralClassNamePrefix, applicationNameToClassNamePluralSetMap[applicationName])
-    }
+    override fun isClassPluralWithPrefixExist(applicationName: String, pluralClassNamePrefix: String): Boolean =
+        service<SdefIndexService>().lookupClassPluralWithPrefixExist(applicationName, pluralClassNamePrefix)
 
-    private fun isNameWithPrefixExist(namePrefix: String, nameSet: Set<String>?): Boolean {
-        if (nameSet == null) return false
-        for (objectName in nameSet) {
-            if (startsWithWord(objectName, namePrefix)) return true
-        }
-        return false
-    }
+    override fun isStdCommand(name: String): Boolean =
+        service<SdefIndexService>().lookupStdCommand(name)
 
-    override fun isStdCommand(name: String): Boolean {
-        if (!isInitialized()) return false
-        return stdCommandNameToApplicationNameSetMap.containsKey(name)
-    }
+    override fun isApplicationCommand(applicationName: String, commandName: String): Boolean =
+        service<SdefIndexService>().lookupApplicationCommand(applicationName, commandName)
 
-    override fun isApplicationCommand(applicationName: String, commandName: String): Boolean {
-        if (!isInitialized()) return false
-        val appCommands = applicationNameToCommandNameSetMap[applicationName]
-        return appCommands != null && appCommands.contains(commandName)
-    }
+    override fun isCommandWithPrefixExist(applicationName: String, commandNamePrefix: String): Boolean =
+        service<SdefIndexService>().lookupCommandWithPrefixExist(applicationName, commandNamePrefix)
 
-    override fun isCommandWithPrefixExist(applicationName: String, commandNamePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(commandNamePrefix, applicationNameToCommandNameSetMap[applicationName])
-    }
+    override fun isStdCommandWithPrefixExist(namePrefix: String): Boolean =
+        service<SdefIndexService>().lookupStdCommandWithPrefixExist(namePrefix)
 
-    override fun isStdCommandWithPrefixExist(namePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(namePrefix, stdCommandNameToApplicationNameSetMap.keys)
-    }
+    override fun findStdCommands(project: Project, commandName: String): Collection<AppleScriptCommand> =
+        service<SdefIndexService>().findStdCommands(project, commandName)
 
-    /**
-     * Bounded-wait resolver for standard-suite commands.
-     *
-     * Codex MEDIUM 1 + Gemini LOW 1: EDT guard at entry — never blocks the UI thread.
-     * Codex HIGH 5: split-gate — waits on [standardReady] (parser fast path readiness only).
-     * Codex HIGH 1: timeout returns `null`, failure returns `isFailure` → both yield empty list.
-     * Gemini LOW 2: `LOG.warn` records the 2s timeout site for slow-init diagnostics.
-     */
-    override fun findStdCommands(project: Project, commandName: String): Collection<AppleScriptCommand> {
-        if (ApplicationManager.getApplication().isDispatchThread) {
-            LOG.warn("findStdCommands called from EDT; returning empty list to avoid 2s freeze")
-            return emptyList()
-        }
-        if (!isInitialized()) {
-            val gate = runBlockingCancellable {
-                withTimeoutOrNull(2_000) { standardReady.await() }
-            }
-            if (gate == null) {
-                LOG.warn("findStdCommands: 2s timeout waiting on standardReady — returning emptyList")
-                return emptyList()
-            }
-            if (gate.isFailure) {
-                // Codex HIGH 1: init failed — treat as not-ready.
-                return emptyList()
-            }
-        }
-        val appNameList = stdCommandNameToApplicationNameSetMap[commandName] ?: return HashSet(0)
-        val result = HashSet<AppleScriptCommand>()
-        for (applicationName in appNameList) {
-            result.addAll(findApplicationCommands(project, applicationName, commandName))
-        }
-        return result
-    }
-
-    /**
-     * Bounded-wait resolver for app-scoped commands.
-     *
-     * Codex MEDIUM 1 + Gemini LOW 1: EDT guard at entry — never blocks the UI thread.
-     * Codex HIGH 5: split-gate — waits on [appsReady] (NOT [standardReady]). App-scoped command
-     * lookup must not proceed before the full `/Applications` discovery sweep completes, otherwise
-     * the reader sees an empty/partial app catalog. AppCommandGatingTest locks this invariant.
-     * Codex HIGH 1: timeout returns `null`, failure returns `isFailure` → both yield empty list.
-     * Gemini LOW 2: `LOG.warn` records the 2s timeout site for slow-init diagnostics.
-     */
     override fun findApplicationCommands(
         project: Project,
         applicationName: String,
         commandName: String,
-    ): List<AppleScriptCommand> {
-        if (ApplicationManager.getApplication().isDispatchThread) {
-            LOG.warn("findApplicationCommands called from EDT; returning empty list to avoid 2s freeze")
-            return emptyList()
-        }
-        if (!areAppDictionariesIndexed()) {
-            val gate = runBlockingCancellable {
-                withTimeoutOrNull(2_000) { appsReady.await() }
-            }
-            if (gate == null) {
-                LOG.warn("findApplicationCommands: 2s timeout waiting on appsReady — returning emptyList")
-                return emptyList()
-            }
-            if (gate.isFailure) {
-                return emptyList()
-            }
-        }
-        val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
-        // Among the loaded dictionaries the standard additions should always be present, but if the command
-        // was not found there a new dictionary may need to be initialised here for the project — once.
-        val dictionary = projectDictionaryRegistry.getDictionary(applicationName)
-            ?: projectDictionaryRegistry.createDictionary(applicationName)
-        if (dictionary != null) {
-            return dictionary.findAllCommandsWithName(commandName)
-        }
-        return ArrayList(0)
-    }
+    ): List<AppleScriptCommand> =
+        service<SdefIndexService>().findApplicationCommands(project, applicationName, commandName)
 
-    override fun isStdProperty(name: String): Boolean {
-        if (!isInitialized()) return false
-        return stdPropertyNameToDictionarySetMap.containsKey(name)
-    }
+    override fun isStdProperty(name: String): Boolean =
+        service<SdefIndexService>().lookupStdProperty(name)
 
-    override fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(namePrefix, stdPropertyNameToDictionarySetMap.keys)
-    }
+    override fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean =
+        service<SdefIndexService>().lookupStdPropertyWithPrefixExist(namePrefix)
 
-    override fun isApplicationProperty(applicationName: String, propertyName: String): Boolean {
-        if (!isInitialized()) return false
-        val propertySet = applicationNameToPropertySetMap[applicationName]
-        return propertySet != null && propertySet.contains(propertyName)
-    }
+    override fun isApplicationProperty(applicationName: String, propertyName: String): Boolean =
+        service<SdefIndexService>().lookupApplicationProperty(applicationName, propertyName)
 
-    override fun isPropertyWithPrefixExist(applicationName: String, propertyNamePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(propertyNamePrefix, applicationNameToPropertySetMap[applicationName])
-    }
+    override fun isPropertyWithPrefixExist(applicationName: String, propertyNamePrefix: String): Boolean =
+        service<SdefIndexService>().lookupPropertyWithPrefixExist(applicationName, propertyNamePrefix)
 
-    override fun isStdConstant(name: String): Boolean {
-        if (!isInitialized()) return false
-        return stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
-    }
+    override fun isStdConstant(name: String): Boolean =
+        service<SdefIndexService>().lookupStdConstant(name)
 
-    override fun isApplicationConstant(applicationName: String, constantName: String): Boolean {
-        if (!isInitialized()) return false
-        val applicationConstantSet = applicationNameToEnumeratorConstantNameSetMap[applicationName]
-        return applicationConstantSet != null && applicationConstantSet.contains(constantName)
-    }
+    override fun isApplicationConstant(applicationName: String, constantName: String): Boolean =
+        service<SdefIndexService>().lookupApplicationConstant(applicationName, constantName)
 
-    override fun isStdConstantWithPrefixExist(namePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(namePrefix, stdEnumeratorConstantNameToApplicationNameListMap.keys)
-    }
+    override fun isStdConstantWithPrefixExist(namePrefix: String): Boolean =
+        service<SdefIndexService>().lookupStdConstantWithPrefixExist(namePrefix)
 
-    override fun isConstantWithPrefixExist(applicationName: String, namePrefix: String): Boolean {
-        if (!isInitialized()) return false
-        return isNameWithPrefixExist(namePrefix, applicationNameToEnumeratorConstantNameSetMap[applicationName])
-    }
+    override fun isConstantWithPrefixExist(applicationName: String, namePrefix: String): Boolean =
+        service<SdefIndexService>().lookupConstantWithPrefixExist(applicationName, namePrefix)
 
     /** Initialise from cached, previously generated files. */
     @Suppress("unused")
@@ -775,11 +665,18 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     fun createAndInitializeInfo(applicationIoFile: File, applicationName: String): DictionaryInfo? =
         service<SdefFileProvider>().createAndInitializeInfo(applicationIoFile, applicationName)
 
-    /** @return true if dictionary terms were successfully initialised */
+    /**
+     * @return true if dictionary terms were successfully initialised
+     *
+     * Phase 4 SERVICE-05 (Wave 5): the parse step now routes through
+     * [SdefIndexService.parseDictionaryFile]; the 14 index maps live on the service.
+     * Failure-recovery branch (remove broken file from cache) still owned by the facade
+     * because it touches the @State-tagged [dictionaryInfoMap] (Pattern A invariant).
+     */
     private fun initializeDictionaryFromInfo(dictionaryInfo: DictionaryInfo): Boolean {
         val file = File(dictionaryInfo.getDictionaryFile().path)
         val applicationName = dictionaryInfo.getApplicationName()
-        if (file.exists() && parseDictionaryFile(file, applicationName)) {
+        if (file.exists() && service<SdefIndexService>().parseDictionaryFile(file, applicationName)) {
             return dictionaryInfo.setInitialized(true)
         }
         // Parsing failed — remove the broken generated dictionary file from the cache.
@@ -949,154 +846,12 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     fun isDictionaryInitialized(applicationName: String): Boolean =
         dictionaryInfoMap[applicationName]?.isInitialized() == true
 
-    /**
-     * Fills the internal structures with terms from an application dictionary file.
-     *
-     * @return true if the file was parsed successfully
-     */
-    private fun parseDictionaryFile(xmlFile: File, applicationName: String): Boolean {
-        val builder = newSecureSaxBuilder()
-        try {
-            val document: Document = builder.build(xmlFile)
-            val rootNode: Element = document.rootElement
-            val suiteElements: List<Element> = rootNode.children
-
-            if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
-                for (suiteElem in suiteElements) {
-                    parseSuiteElementForApplication(suiteElem, applicationName) // TODO: 26/12/15 remove?
-                    parseSuiteElementForScriptingAdditions(suiteElem, applicationName)
-                }
-            } else {
-                for (suiteElem in suiteElements) {
-                    parseSuiteElementForApplication(suiteElem, applicationName)
-                }
-            }
-            return true
-        } catch (e: JDOMException) {
-            LOG.warn("Exception occurred while parsing dictionary file: ${e.message}")
-            e.printStackTrace()
-        } catch (e: IOException) {
-            LOG.warn("Exception occurred while parsing dictionary file: ${e.message}")
-        }
-        return false
-    }
-
-    private fun parseSuiteElementForScriptingAdditions(suiteElem: Element, applicationName: String) {
-        val suiteClasses: List<Element> = suiteElem.getChildren("class")
-        val suiteValueTypes: List<Element> = suiteElem.getChildren("value-type")
-        val suiteClassExtensions: List<Element> = suiteElem.getChildren("class-extension")
-        val suiteCommands: List<Element> = suiteElem.getChildren("command")
-        val recordTypeTags: List<Element> = suiteElem.getChildren("record-type")
-        val enumerationTags: List<Element> = suiteElem.getChildren("enumeration")
-
-        for (valType in suiteValueTypes) {
-            parseClassElement(applicationName, valType, false)
-        }
-
-        for (classTag in suiteClasses) {
-            parseClassElement(applicationName, classTag, false)
-            parseElementsForApplication(classTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)
-        }
-
-        for (classTag in suiteClassExtensions) {
-            parseClassElement(applicationName, classTag, false)
-            parseElementsForApplication(classTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)
-        }
-
-        parseElementsForApplication(suiteCommands, applicationName, stdCommandNameToApplicationNameSetMap)
-        parseElementsForApplication(recordTypeTags, applicationName, stdRecordNameToApplicationNameSetMap)
-
-        for (recordTag in recordTypeTags) {
-            parseElementsForApplication(recordTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)
-        }
-
-        parseElementsForApplication(enumerationTags, applicationName, stdEnumerationNameToApplicationNameSetMap)
-
-        for (enumerationTag in enumerationTags) {
-            parseElementsForApplication(
-                enumerationTag.getChildren("enumerator"),
-                applicationName,
-                stdEnumeratorConstantNameToApplicationNameListMap,
-            )
-        }
-    }
-
-    private fun parseSuiteElementForApplication(suiteElem: Element, applicationName: String) {
-        val xIncludeNs = Namespace.getNamespace("http://www.w3.org/2003/XInclude")
-        val xiIncludes: List<Element> = suiteElem.getChildren("include", xIncludeNs)
-        val suiteClasses: List<Element> = suiteElem.getChildren("class")
-        val suiteValueTypes: List<Element> = suiteElem.getChildren("value-type")
-        val suiteClassExtensions: List<Element> = suiteElem.getChildren("class-extension")
-        val suiteCommands: List<Element> = suiteElem.getChildren("command")
-        val recordTypeTags: List<Element> = suiteElem.getChildren("record-type")
-        val enumerationTags: List<Element> = suiteElem.getChildren("enumeration")
-
-        for (include in xiIncludes) {
-            var hrefIncl = include.getAttributeValue("href")
-            hrefIncl = hrefIncl.replace("localhost", "")
-            val inclFile = File(hrefIncl)
-            if (inclFile.exists()) {
-                parseDictionaryFile(inclFile, applicationName)
-            }
-        }
-
-        for (valType in suiteValueTypes) {
-            parseClassElement(applicationName, valType, false)
-        }
-
-        for (classTag in suiteClasses) {
-            parseClassElement(applicationName, classTag, false)
-            parseHashElementsForApplication(classTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)
-        }
-
-        for (classTag in suiteClassExtensions) {
-            parseClassElement(applicationName, classTag, false)
-            parseHashElementsForApplication(classTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)
-        }
-
-        parseHashElementsForApplication(suiteCommands, applicationName, applicationNameToCommandNameSetMap)
-        parseHashElementsForApplication(recordTypeTags, applicationName, applicationNameToRecordNameSetMap)
-
-        for (recordTag in recordTypeTags) {
-            parseHashElementsForApplication(recordTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)
-        }
-
-        parseHashElementsForApplication(enumerationTags, applicationName, applicationNameToEnumerationNameSetMap)
-
-        for (enumerationTag in enumerationTags) {
-            parseHashElementsForApplication(
-                enumerationTag.getChildren("enumerator"),
-                applicationName,
-                applicationNameToEnumeratorConstantNameSetMap,
-            )
-        }
-    }
-
-    private fun parseClassElement(applicationName: String, classElement: Element, isExtends: Boolean) {
-        // If isExtends → name is always "application".
-        val className = if (isExtends) classElement.getAttributeValue("extends") else classElement.getAttributeValue("name")
-        val code = classElement.getAttributeValue("code")
-        var pluralClassName = classElement.getAttributeValue("plural")
-        if (className == null || code == null) return
-        pluralClassName = if (!StringUtil.isEmpty(pluralClassName)) pluralClassName else "${className}s"
-
-        updateObjectNameSetForApplication(className, applicationName, applicationNameToClassNameSetMap)
-        updateObjectNameSetForApplication(pluralClassName, applicationName, applicationNameToClassNamePluralSetMap)
-        if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
-            updateApplicationNameSetFor(className, applicationName, stdClassNameToApplicationNameSetMap)
-            updateApplicationNameSetFor(pluralClassName, applicationName, stdClassNamePluralToApplicationNameSetMap)
-        }
-    }
-
-    /**
-     * Phase 4 SERVICE-04 (Wave 4) internal accessor: exposes the companion's XXE-hardened
-     * [SAXBuilder] factory for [SdefFileProvider.mergeScriptingAdditions]. The factory
-     * stays on the facade because the other consumer [parseDictionaryFile] still lives
-     * here (Wave 5 SdefIndexService territory). Wave 5 will likely co-locate
-     * `newSecureSaxBuilder` with `parseDictionaryFile` on the index service; for Wave 4
-     * the minimal-displacement choice is to keep it where it is and expose it.
-     */
-    internal fun newSecureSaxBuilderInternal(): SAXBuilder = newSecureSaxBuilder()
+    // Phase 4 SERVICE-05 (Wave 5): parseDictionaryFile + parseSuiteElementForApplication +
+    // parseSuiteElementForScriptingAdditions + parseClassElement migrated to
+    // [SdefIndexService]. The XXE-hardened SAXBuilder factory (newSecureSaxBuilder) also
+    // moved; the Wave 4 facade-side `newSecureSaxBuilderInternal` is GONE — its single
+    // consumer ([SdefFileProvider.mergeScriptingAdditions]) now calls
+    // [SdefIndexService.newSecureSaxBuilderForFileProvider] directly.
 
     companion object {
         private val LOG: Logger = Logger.getInstance("#${AppleScriptSystemDictionaryRegistryService::class.java.name}")
@@ -1107,93 +862,9 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
         fun getInstance(): AppleScriptSystemDictionaryRegistryService =
             ApplicationManager.getApplication().getService(AppleScriptSystemDictionaryRegistryService::class.java)
 
-        /**
-         * SDEF files declare a DOCTYPE pointing at Apple's `sdef.dtd`, so disallowing DOCTYPE entirely would
-         * break parsing. Instead, harden the builder against XXE by refusing external DTDs, suppressing
-         * general/parameter entities and disabling entity expansion (defends against the Billion Laughs DoS).
-         *
-         * Phase 4 SERVICE-04 (Wave 4): consumed by [SdefFileProvider.mergeScriptingAdditions] via
-         * [newSecureSaxBuilderInternal] (exposed because the file-provider service needs access
-         * during JDOM-based scripting-addition merging). Wave 5 may co-locate this factory with
-         * `parseDictionaryFile` on [SdefIndexService] once that service is extracted.
-         */
-        private fun newSecureSaxBuilder(): SAXBuilder {
-            val builder = SAXBuilder()
-            builder.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-            builder.setFeature("http://xml.org/sax/features/external-general-entities", false)
-            builder.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-            builder.expandEntities = false
-            return builder
-        }
-
-        private fun parseElementsForApplication(
-            xmlElements: List<Element>,
-            applicationName: String,
-            objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
-        ) {
-            for (applicationObjectTag in xmlElements) {
-                parseSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)
-            }
-        }
-
-        private fun parseHashElementsForApplication(
-            xmlElements: List<Element>,
-            applicationName: String,
-            objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
-        ) {
-            for (applicationObjectTag in xmlElements) {
-                hashSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)
-            }
-        }
-
-        private fun parseSimpleElementForObject(
-            suiteObjectElement: Element,
-            applicationName: String,
-            objectNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>>,
-        ) {
-            val objectName = suiteObjectElement.getAttributeValue("name")
-            val code = suiteObjectElement.getAttributeValue("code")
-            if (objectName == null || code == null) return
-            updateApplicationNameSetFor(objectName, applicationName, objectNameToApplicationNameSetMap)
-        }
-
-        private fun hashSimpleElementForObject(
-            suiteObjectElement: Element,
-            applicationName: String,
-            objectNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
-        ) {
-            val objectName = suiteObjectElement.getAttributeValue("name")
-            val code = suiteObjectElement.getAttributeValue("code")
-            if (objectName == null || code == null) return
-            updateObjectNameSetForApplication(objectName, applicationName, objectNameToApplicationNameListMap)
-        }
-
-        private fun updateApplicationNameSetFor(
-            applicationObjectName: String,
-            applicationName: String,
-            applicationNameSetMap: MutableMap<String, MutableSet<String>>,
-        ) {
-            if (StringUtil.isEmpty(applicationObjectName)) return
-            // Atomic get-or-put-and-mutate per D-03: ConcurrentHashMap.compute serialises
-            // the (lookup, allocate, insert, add) tuple inside a single bucket lock.
-            applicationNameSetMap.compute(applicationObjectName) { _, existing ->
-                (existing ?: ConcurrentHashMap.newKeySet<String>()).also { it.add(applicationName) }
-            }
-        }
-
-        private fun updateObjectNameSetForApplication(
-            applicationObjectName: String,
-            applicationName: String,
-            applicationNameSetMap: MutableMap<String, MutableSet<String>>,
-        ) {
-            if (StringUtil.isEmpty(applicationName)) return
-            // Atomic get-or-put-and-mutate per D-03.
-            applicationNameSetMap.compute(applicationName) { _, existing ->
-                (existing ?: ConcurrentHashMap.newKeySet<String>()).also { it.add(applicationObjectName) }
-            }
-        }
-
-        private fun startsWithWord(string: String, prefix: String): Boolean =
-            string.startsWith(prefix) && (prefix.length == string.length || ' ' == string[prefix.length])
+        // Phase 4 SERVICE-05 (Wave 5): the XXE-hardened SAXBuilder factory + 7 XML element
+        // helpers + `startsWithWord` migrated to [SdefIndexService] companion. See
+        // [SdefIndexService.newSecureSaxBuilderForFileProvider] for the cross-service surface
+        // consumed by [SdefFileProvider.mergeScriptingAdditions].
     }
 }
