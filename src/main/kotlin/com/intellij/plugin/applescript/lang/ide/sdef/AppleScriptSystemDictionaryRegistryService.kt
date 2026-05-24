@@ -1,7 +1,6 @@
 package com.intellij.plugin.applescript.lang.ide.sdef
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.components.RoamingType
@@ -9,9 +8,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.SimplePersistentStateComponent
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.fileTypes.FileType
-import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
@@ -155,8 +153,9 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
      * Two-stage init pipeline run inside [serviceScope] on [ioDispatcher].
      *
      * Order is load-bearing for the cold-start state machine (CoroutineColdStartTest Pattern L lock):
-     *   1. `registerSdefExtension()` under `withContext(Dispatchers.EDT)` — write-action requires EDT
-     *      (RECURRING_PITFALLS.md Pattern C — NEVER the `Main` dispatcher).
+     *   1. `service<SdefFileTypeRegistrar>().register()` — Light Service owns the
+     *      `withContext(Dispatchers.EDT)` + runWriteAction internally (Phase 4 SERVICE-01).
+     *      RECURRING_PITFALLS.md Pattern C — write actions require EDT, NEVER the `Main` dispatcher.
      *   2. `initDictionariesInfoFromCache(state)` — restore persisted dictionary entries.
      *   3. `initStandardSuite()` — parse StandardAdditions + CocoaStandard.
      *   4. Complete `standardReady` with `Result.success(Unit)` — parser fast path unblocks.
@@ -172,7 +171,10 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
      */
     private suspend fun runInitChain() {
         try {
-            withContext(Dispatchers.EDT) { registerSdefExtension() }
+            // Phase 4 SERVICE-01 (plan 04-01): registerSdefExtension moved to SdefFileTypeRegistrar.
+            // The Light Service owns the `withContext(Dispatchers.EDT)` + runWriteAction internally,
+            // so the call site here is a single trampoline. Init-chain ordering preserved.
+            service<SdefFileTypeRegistrar>().register()
             initDictionariesInfoFromCache(state)
             initStandardSuite()
             standardReady.complete(Result.success(Unit))
@@ -229,17 +231,6 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
      */
     fun areAppDictionariesIndexed(): Boolean =
         appsReady.isCompleted && appsReady.getCompleted().isSuccess
-
-    private fun registerSdefExtension() {
-        ApplicationManager.getApplication().runWriteAction(
-            Runnable {
-                val fileType: FileType? = FileTypeManager.getInstance().getFileTypeByExtension("xml")
-                if (fileType != null) {
-                    FileTypeManager.getInstance().associateExtension(fileType, "sdef")
-                }
-            },
-        )
-    }
 
     private fun removeDictionaryInfo(applicationName: String) {
         dictionaryInfoMap.remove(applicationName)

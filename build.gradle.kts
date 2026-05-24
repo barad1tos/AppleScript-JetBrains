@@ -265,6 +265,11 @@ tasks {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.StandardAdditionsParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.LiveSamplesParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.concurrency.*")
+                // Phase 4 SERVICE-* (plan 04-01+): service unit tests use BasePlatformTestCase
+                // for the few cases where the extracted Light Service calls real Platform APIs
+                // (e.g. SdefFileTypeRegistrar.register touches FileTypeManager.associateExtension).
+                // Gated behind -PincludeHeavyTests=true so the default test suite stays fast.
+                includeTestsMatching("com.intellij.plugin.applescript.test.service.*")
                 // DictionariesRandomParsingTestCase + TellApplicationMusicTest scan installed
                 // /Applications and depend on host-machine state — kept out to avoid flakiness.
             }
