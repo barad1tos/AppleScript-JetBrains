@@ -277,6 +277,12 @@ tasks {
                 // (e.g. SdefFileTypeRegistrar.register touches FileTypeManager.associateExtension).
                 // Gated behind -PincludeHeavyTests=true so the default test suite stays fast.
                 includeTestsMatching("com.intellij.plugin.applescript.test.service.*")
+                // Phase 6 D-03 (plan 06-03): AppleScriptCodeInsightTest is BasePlatformTestCase-heavy
+                // (boots a full fixture, scans the bundled StandardAdditions/CocoaStandard SDEF for
+                // completion). It ran in NO CI filter before Phase 6 — wiring it here is what makes the
+                // D-03 content-anchor redesign actually execute. Gated under includeHeavy so the
+                // default suite stays fast.
+                includeTestsMatching("com.intellij.plugin.applescript.test.codeinsight.*")
                 // DictionariesRandomParsingTestCase + TellApplicationMusicTest scan installed
                 // /Applications and depend on host-machine state — kept out to avoid flakiness.
             }
