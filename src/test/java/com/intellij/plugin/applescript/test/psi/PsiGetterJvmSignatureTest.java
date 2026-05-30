@@ -23,6 +23,8 @@ package com.intellij.plugin.applescript.test.psi;
 
 import com.intellij.plugin.applescript.lang.sdef.AccessType;
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition;
+import com.intellij.plugin.applescript.lang.sdef.CommandParameter;
+import com.intellij.plugin.applescript.lang.sdef.Suite;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -60,6 +62,18 @@ public class PsiGetterJvmSignatureTest {
             "getAccessType():com.intellij.plugin.applescript.lang.sdef.AccessType",
             "getTypeSpecifier():java.lang.String",
             "setAccessType(com.intellij.plugin.applescript.lang.sdef.AccessType):void"
+        ),
+        // Wave 2 (plan 05-03) — clean leaf CommandParameter: a 3-getter copy of the pilot.
+        // isOptional keeps its is-prefix (Boolean), getTypeSpecifier/getMyCommand are plain getters.
+        CommandParameter.class, List.of(
+            "isOptional():boolean",                                               // is-prefix PRESERVED
+            "getTypeSpecifier():java.lang.String",
+            "getMyCommand():com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand"
+        ),
+        // Wave 2 (plan 05-03) — Suite barely converts: only isHidden() is a pure getter; every
+        // add*/find*/get*ByName member stays a fun (arg-taking / mutator) and is NOT frozen here.
+        Suite.class, List.of(
+            "isHidden():boolean"                                                  // is-prefix PRESERVED
         )
     );
 
