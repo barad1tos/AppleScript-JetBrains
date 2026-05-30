@@ -13,7 +13,7 @@ package com.intellij.plugin.applescript.lang.sdef
  *  - [suite] narrows `DictionaryComponent.suite: Suite?` to non-null `Suite` — converted in lockstep
  *    with the supertype this wave (05-04). JVM-visible as `getSuite()`.
  */
-interface AppleScriptClass : DictionaryComponent {
+sealed interface AppleScriptClass : DictionaryComponent {
 
     /** JVM-visible as `getContents()`. */
     val contents: List<AppleScriptClass>

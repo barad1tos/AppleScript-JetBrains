@@ -15,7 +15,7 @@ package com.intellij.plugin.applescript.lang.sdef
  * synthesized accessor stays `isClassProperty()` (NOT `getClassProperty()`); never let an IDE
  * "convert getter to property" drop the prefix.
  */
-interface AppleScriptPropertyDefinition : DictionaryComponent {
+sealed interface AppleScriptPropertyDefinition : DictionaryComponent {
 
     /** JVM-visible as `getPsiType()`. */
     val psiType: PsiType

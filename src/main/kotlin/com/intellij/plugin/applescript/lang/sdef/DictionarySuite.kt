@@ -1,6 +1,6 @@
 package com.intellij.plugin.applescript.lang.sdef
 
-interface DictionarySuite : DictionaryComponent {
+sealed interface DictionarySuite : DictionaryComponent {
 
     fun addCommand(command: AppleScriptCommand): Boolean
 
