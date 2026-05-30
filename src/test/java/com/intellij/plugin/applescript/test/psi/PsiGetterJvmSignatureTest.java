@@ -110,8 +110,9 @@ public class PsiGetterJvmSignatureTest {
 
     /**
      * Allowlist of parameter types referenced by {@link #FROZEN_GETTERS}. Resolving via a static Map
-     * (instead of {@code Class.forName(fqn)}) eliminates the CWE-470 unsafe-reflection surface even
-     * though every FQN here is a hardcoded literal in the same file (mirrors
+     * (instead of reflective class loading from an arbitrary FQN string) eliminates the CWE-470
+     * unsafe-reflection surface even though every FQN here is a hardcoded literal in the same file
+     * (mirrors
      * {@code ParserUtilContractTest.PARAM_TYPE_ALLOWLIST}). Return types are compared by name (see
      * {@link Method#getReturnType()}) and never resolved through this map.
      *
