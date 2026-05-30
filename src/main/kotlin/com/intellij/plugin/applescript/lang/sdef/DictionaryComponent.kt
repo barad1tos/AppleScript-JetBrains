@@ -21,7 +21,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptComponent
  *  - [description] / [setDescription] → `var description` (setDescription returns Unit).
  *  - [setDictionaryDoc] stays `fun` — no matching getter, so it is not a property.
  */
-interface DictionaryComponent : AppleScriptComponent {
+sealed interface DictionaryComponent : AppleScriptComponent {
 
     /** JVM-visible as `getDocumentation()`. */
     val documentation: String
