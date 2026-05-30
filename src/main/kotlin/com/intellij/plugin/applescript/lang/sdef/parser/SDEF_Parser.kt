@@ -231,7 +231,7 @@ object SDEF_Parser {
         classExtension.setDescription(classExtensionTag.getAttributeValue("description"))
 
         val propertyTags = classExtensionTag.findSubTags("property")
-        classExtension.setProperties(getPropertiesFromTags(classExtension, propertyTags))
+        classExtension.properties = getPropertiesFromTags(classExtension, propertyTags)
         return classExtension
     }
 
@@ -325,7 +325,7 @@ object SDEF_Parser {
                 )
             }
         }
-        aClass.setProperties(properties)
+        aClass.properties = properties
         return aClass
     }
 
@@ -409,8 +409,8 @@ object SDEF_Parser {
                 )
             }
         }
-        command.setDirectParameter(directParameter)
-        command.setParameters(commandParameters)
+        command.directParameter = directParameter
+        command.parameters = commandParameters
         return command
     }
 }

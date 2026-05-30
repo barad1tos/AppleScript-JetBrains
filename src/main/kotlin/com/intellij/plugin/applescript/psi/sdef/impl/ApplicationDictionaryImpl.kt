@@ -168,10 +168,10 @@ class ApplicationDictionaryImpl(
         name?.let { indexes.dictionaryClassMap[it] }
 
     override fun getParameterNamesForCommand(name: String): List<String>? =
-        indexes.dictionaryCommandMap[name]?.getParameterNames()
+        indexes.dictionaryCommandMap[name]?.parameterNames
 
     override fun findDirectParameterForCommand(commandName: String): CommandDirectParameter? =
-        indexes.dictionaryCommandMap[commandName]?.getDirectParameter()
+        indexes.dictionaryCommandMap[commandName]?.directParameter
 
     override fun findProperty(name: String): AppleScriptPropertyDefinition? = indexes.dictionaryPropertyMap[name]
 
@@ -239,8 +239,8 @@ class ApplicationDictionaryImpl(
     override fun addClass(appleScriptClass: AppleScriptClass): Boolean {
         val previous = indexes.dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)
         appleScriptClass.getCode()?.let { indexes.dictionaryClassByCodeMap[it] = appleScriptClass }
-        indexes.dictionaryClassToPluralNameMap[appleScriptClass.getPluralClassName()] = appleScriptClass
-        for (property in appleScriptClass.getProperties()) {
+        indexes.dictionaryClassToPluralNameMap[appleScriptClass.pluralClassName] = appleScriptClass
+        for (property in appleScriptClass.properties) {
             addProperty(property)
         }
         return previous == null

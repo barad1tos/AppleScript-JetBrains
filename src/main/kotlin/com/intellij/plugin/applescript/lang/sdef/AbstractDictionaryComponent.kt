@@ -98,16 +98,16 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
 
         when (val thisRef = this@AbstractDictionaryComponent) {
             is AppleScriptClass -> {
-                var parentClass: AppleScriptClass? = thisRef.getParentClass()
-                if (parentClass != null) {
+                var parent: AppleScriptClass? = thisRef.parentClass
+                if (parent != null) {
                     append(" [inh. ")
                     var ext = ""
                     var guard = 15
-                    while (parentClass != null && guard > 0) {
+                    while (parent != null && guard > 0) {
                         guard--
                         append(ext)
-                        AppleScriptDocHelper.appendElementLink(this, parentClass, parentClass.getName())
-                        parentClass = parentClass.getParentClass()
+                        AppleScriptDocHelper.appendElementLink(this, parent, parent.getName())
+                        parent = parent.parentClass
                         ext = " > "
                     }
                     append(" ]")
