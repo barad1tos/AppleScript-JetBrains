@@ -1,43 +1,74 @@
-# PSI-01 Sealing Audit — Phase 5 (v1.4 PSI Hierarchy + Property Syntax)
+# PSI-01 / PSI-05 Sealing Audit — Phase 5 (v1.4 PSI Hierarchy + Property Syntax)
 
-**Audited:** 2026-05-30
-**Method:** live `rg` over `src/main/gen/` (Grammar-Kit + JFlex output) for each interface.
-**Satisfies:** PSI-01 (seal-safe vs seal-blocked verdict per interface, each backed by a reproducible command).
+**Audited:** 2026-05-30 (PSI-01 gen-only) — **CORRECTED:** 2026-05-30 (PSI-05, cross-package-aware, plan 05-04)
+**Satisfies:** PSI-01 (initial gen-only verdict) + PSI-05 (the actual seal, with the corrected verdict below).
 
-## Method
+> **CORRECTION NOTICE (plan 05-04).** The original PSI-01 verdict column declared all 9 GROUP A
+> interfaces "SEAL-SAFE" on a **generated-Java-implementer-count-only** basis. The 05-02 sealing
+> pilot (`05-SEALING-PILOT-FINDING.md`) empirically falsified the assumption behind that method: the
+> binding constraint for a Kotlin `sealed interface` in THIS project is the **same-PACKAGE rule**
+> (compiler error: *"A class can only extend a sealed class or interface declared in the same
+> package"*), not the same-module rule, and it applies to ALL real implementers — including
+> hand-written Kotlin classes in a different package AND the JDK-dynamic-proxy stubs used in tests.
+> The gen-only count under-counts the true implementer set. The verdict column below is the
+> **corrected, cross-package + test-surface-aware** result, each row empirically compile/test-verified
+> in plan 05-04.
 
-For every candidate interface, the generated-Java implementer count is the deciding signal: an
-interface with **zero** `src/main/gen/` implementers is implemented exclusively by hand-written
-Kotlin in the same Gradle module, so a Kotlin `sealed interface` declaration compiles and is fully
-enforced (Kotlin 2.x same-module rule, post KT-29748). An interface with **one or more** generated
-implementers is SEAL-BLOCKED: `sealed` is Kotlin-metadata-only, the Java compiler ignores it, and a
-generated implementer can reach a `when` the Kotlin compiler believed exhaustive → runtime
-`NoWhenBranchMatchedException` (PITFALLS 5.1). D-04 (conservative) therefore seals ONLY the GROUP A
-set and leaves ALL GROUP B interfaces OPEN this phase.
+## Corrected Method (PSI-05)
 
-Each verdict row below cites the exact reproducible command. Run any row to reproduce its count:
+For each candidate interface, enumerate ALL real implementers across `src/main` (count
+`class X : Iface` / `: Iface(` / `implements Iface` DECLARATIONS only — NOT return-type or parameter
+usages), determine each implementer's package, and additionally check `src/test` for JDK
+`Proxy.newProxyInstance(arrayOf(Iface::class.java))` stubs. **Seal an interface ONLY IF every DIRECT
+subtype (interface or class) is declared in the SAME package as the interface AND no implementer is
+created via a mechanism that rejects sealed types (generated Java, JDK dynamic Proxy).** Each
+intended seal was compile-verified (`./gradlew compileKotlin compileJava`) and the seal that broke
+compile/test was reverted and marked seal-blocked.
+
+Key empirical findings (plan 05-04):
+- Kotlin 2.3.21 in this project enforces the **same-package** sealed rule. Sealing
+  `ApplicationDictionary` fails at `compileKotlin` because `ApplicationDictionaryImpl` lives in
+  `com.intellij.plugin.applescript.psi.sdef.impl` — a DIFFERENT package.
+- The same-package rule constrains **direct** subtypes only. `DictionaryComponent` / `DictionarySuite`
+  seal cleanly even though `ApplicationDictionaryImpl` is a *transitive* implementer, because their
+  only direct subtypes are interfaces (`ApplicationDictionary`, `AppleScriptCommand`, …) and abstract
+  classes (`AbstractDictionaryComponent`) all in `lang.sdef`.
+- JDK `Proxy.newProxyInstance` rejects a sealed interface with `IllegalArgumentException` at runtime.
+  Tests stub `AppleScriptCommand` and `Suite` this way (`SuiteAddCommandTest`,
+  `ApplicationDictionaryOverloadTest`, `LeafDataClassTest`) → sealing those two breaks the suite even
+  though they compile. `Proxy` only inspects the directly-named interface, so a proxy of the (open)
+  `AppleScriptCommand` is fine even when its supertype `DictionaryComponent` is sealed.
+
+## GROUP A — CORRECTED VERDICT (cross-package + test-surface aware)
+
+| # | Interface | Pkg | Direct impls (pkg) | Test Proxy stub? | Verdict |
+|---|-----------|-----|--------------------|------------------|---------|
+| 1 | `DictionaryComponent` | `lang.sdef` | `AbstractDictionaryComponent` (`lang.sdef`) + subtype interfaces (`lang.sdef`) | no | **SEALED** ✅ compile-verified |
+| 2 | `DictionarySuite` | `lang.sdef` | `ApplicationDictionary` interface (`lang.sdef`) | no | **SEALED** ✅ compile-verified |
+| 3 | `AppleScriptClass` | `lang.sdef` | `DictionaryClass` (`lang.sdef`) | no | **SEALED** ✅ compile-verified |
+| 4 | `AppleScriptPropertyDefinition` (pilot) | `lang.sdef` | `DictionaryPropertyImpl` (`lang.sdef`) | no | **SEALED** ✅ (pilot, 05-01) |
+| 5 | `CommandParameter` | `lang.sdef` | `CommandParameterImpl` (`lang.sdef`) | no | **SEALED** ✅ compile-verified |
+| 6 | `ApplicationDictionary` | `lang.sdef` | `ApplicationDictionaryImpl` (**`psi.sdef.impl`** — cross-pkg) | yes (`Suite`/`ApplicationDictionary`) | **SEAL-BLOCKED** ❌ cross-package impl (compileKotlin: same-package error) |
+| 7 | `AppleScriptCommand` | `lang.sdef` | `AppleScriptCommandImpl` (`lang.sdef`) | **yes** — `Proxy(arrayOf(AppleScriptCommand))` in 2 tests | **SEAL-BLOCKED** ❌ JDK-proxy test stub (IllegalArgumentException) |
+| 8 | `Suite` | `lang.sdef` | `SuiteImpl` (`lang.sdef`) | **yes** — `Proxy(arrayOf(Suite))` in 2 tests | **SEAL-BLOCKED** ❌ JDK-proxy test stub (IllegalArgumentException) |
+| 9 | `CommandDirectParameter` | `lang.sdef` | — (it is a `data class`, not an interface) | n/a | **N/A** — not an interface; PSI-06 data-class guard only |
+
+**Outcome: 5 of the 9 GROUP A interfaces are sealable; 4 are seal-blocked.** This is the expected,
+acceptable conservative result (D-04) — the truly-safe subset is sealed and the rest are documented
+with their empirical blocker. The original gen-only "9 SEAL-SAFE" verdict is SUPERSEDED by this row set.
+
+### Reproduce the corrected implementer enumeration
 
 ```bash
-rg -l "implements .*\b<Iface>\b|extends .*\b<Iface>\b" src/main/gen/ | wc -l
+# Direct class/object implementers per interface (DECLARATIONS only):
+for I in ApplicationDictionary DictionaryComponent DictionarySuite AppleScriptCommand \
+         AppleScriptClass AppleScriptPropertyDefinition Suite CommandParameter; do
+  echo "## $I"
+  rg -nU --multiline "(class|object)\s+\w+[^{]*?:\s*[^{]*?\b${I}\b" src/main/kotlin/
+done
+# Test JDK-proxy stubs that block sealing:
+rg -n "newProxyInstance|arrayOf\(\w+::class\.java\)" src/test/
 ```
-
-## GROUP A — SEAL-SAFE (0 generated-Java implementers each)
-
-All in package `com.intellij.plugin.applescript.lang.sdef` (hand-written Kotlin, same Gradle module).
-
-| # | Interface | Package | gen impls | Reproducible command | Verdict |
-|---|-----------|---------|-----------|----------------------|---------|
-| 1 | `ApplicationDictionary` | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bApplicationDictionary\b\|extends .*\bApplicationDictionary\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-| 2 | `DictionaryComponent` | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bDictionaryComponent\b\|extends .*\bDictionaryComponent\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-| 3 | `DictionarySuite` | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bDictionarySuite\b\|extends .*\bDictionarySuite\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-| 4 | `AppleScriptCommand` | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bAppleScriptCommand\b\|extends .*\bAppleScriptCommand\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-| 5 | `AppleScriptClass` | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bAppleScriptClass\b\|extends .*\bAppleScriptClass\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-| 6 | `AppleScriptPropertyDefinition` (pilot) | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bAppleScriptPropertyDefinition\b\|extends .*\bAppleScriptPropertyDefinition\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-| 7 | `Suite` | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bSuite\b\|extends .*\bSuite\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-| 8 | `CommandParameter` | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bCommandParameter\b\|extends .*\bCommandParameter\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-| 9 | `CommandDirectParameter` | `com.intellij.plugin.applescript.lang.sdef` | 0 | `rg -l "implements .*\bCommandDirectParameter\b\|extends .*\bCommandDirectParameter\b" src/main/gen/ \| wc -l` | **SEAL-SAFE** |
-
-All 9 verified live on 2026-05-30 (every command above returned `0`).
 
 ## GROUP B — SEAL-BLOCKED (≥1 generated-Java implementer)
 
@@ -93,16 +124,26 @@ in isolation:
    These getters must move together — never split `DictionaryComponent.getSuite` from its narrowing
    overrides across waves.
 
-## Sealing Permitted-Subtype Caveat (for the PSI-05 wave)
+## Sealing Permitted-Subtype Caveat — CORRECTED (plan 05-04)
 
-GROUP A Kotlin implementers span both the `com.intellij.plugin.applescript.lang.sdef` package AND the
-`com.intellij.plugin.applescript.psi.sdef.impl` package (e.g. `ApplicationDictionaryImpl`,
-`DictionaryIndexes`). Kotlin's sealed-interface rule (KT-29748, Kotlin 2.x) permits subtypes in the
-**same Gradle module** even across packages — and both packages are in the single `src/main/kotlin`
-source set of the same module. Therefore `sealed interface` compiles for the GROUP A set despite the
-cross-package implementer spread. The PSI-05 wave that actually adds `sealed` must verify the exact
-permitted-subtype set per declaration (the compiler enumerates it) and confirm no `when` site is left
-non-exhaustive.
+> The original note here claimed Kotlin's sealed rule permits subtypes in the **same Gradle module**
+> across packages (KT-29748). **Plan 05-04 empirically falsified that for THIS project:** sealing
+> `ApplicationDictionary` failed at `compileKotlin` with *"A class can only extend a sealed class or
+> interface declared in the same package"* — the binding rule here is **same PACKAGE**, not same
+> module. `ApplicationDictionaryImpl` lives in `psi.sdef.impl`, the interface in `lang.sdef`, so the
+> cross-package implementer blocks the seal.
+
+The correct permitted-subtype rule for this codebase:
+1. Only **direct** subtypes must be in the same package as the sealed interface (transitive
+   implementers reached through an intermediate same-package interface are fine — that is why
+   `DictionaryComponent`/`DictionarySuite` seal despite the cross-package `ApplicationDictionaryImpl`,
+   which only implements the open leaf `ApplicationDictionary`).
+2. JDK `Proxy.newProxyInstance(arrayOf(Iface::class.java))` in `src/test` is a real implementer
+   surface — `Proxy` throws `IllegalArgumentException` on a sealed interface. Any interface stubbed
+   this way is seal-blocked unless the stub is migrated to a real impl instance.
+3. No new exhaustive `when` site was added; existing `else` branches retained → no
+   `NoWhenBranchMatchedException` risk on the 5 sealed types (verified by the heavy
+   `ParserRegressionTest`, green except the pre-existing `testTracksWhose` grammar gap).
 
 ## Reproduction Note
 
