@@ -58,8 +58,8 @@ class CommandCompletionContributor : CompletionContributor() {
                     if (target is AppleScriptCommand) {
                         val sortedParams = ArrayList(target.getParameters()).apply {
                             sortWith { par1, par2 ->
-                                val o1 = par1.isOptional()
-                                val o2 = par2.isOptional()
+                                val o1 = par1.isOptional
+                                val o2 = par2.isOptional
                                 when {
                                     o1 == o2 -> 0
                                     !o1 && o2 -> -1
@@ -70,7 +70,7 @@ class CommandCompletionContributor : CompletionContributor() {
                         for (par in sortedParams) {
                             result.addElement(
                                 LookupElementBuilder.create(par)
-                                    .withBoldness(!par.isOptional())
+                                    .withBoldness(!par.isOptional)
                                     .withIcon(par.getIcon(0)),
                             )
                         }

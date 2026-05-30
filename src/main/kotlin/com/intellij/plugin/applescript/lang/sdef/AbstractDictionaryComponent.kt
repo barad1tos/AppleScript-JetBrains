@@ -115,7 +115,7 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
             }
 
             is CommandParameter -> {
-                val pType = StringUtil.notNullize(thisRef.getTypeSpecifier())
+                val pType = StringUtil.notNullize(thisRef.typeSpecifier)
                 append(" [").append(pType).append("]")
             }
 

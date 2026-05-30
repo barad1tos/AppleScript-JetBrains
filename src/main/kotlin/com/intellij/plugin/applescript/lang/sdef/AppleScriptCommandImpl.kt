@@ -143,8 +143,8 @@ open class AppleScriptCommandImpl :
                 .append(StringUtil.notNullize(p.description)).append("<br>")
         }
         for (par in params) {
-            val (op, cl) = if (par.isOptional()) "[" to "]" else "" to ""
-            val pType = StringUtil.notNullize(par.getTypeSpecifier())
+            val (op, cl) = if (par.isOptional) "[" to "]" else "" to ""
+            val pType = StringUtil.notNullize(par.typeSpecifier)
             sb.append(indent).append(indent).append(op).append("<b>").append(par.getName()).append("</b> ")
                 .append(pType).append(cl).append(" : ").append(par.getDescription()).append("<br>")
         }
@@ -173,8 +173,8 @@ open class AppleScriptCommandImpl :
         else CommandParameterData(
             name = p.getName(),
             code = p.getCode() ?: "",
-            type = p.getTypeSpecifier(),
-            optional = p.isOptional(),
+            type = p.typeSpecifier,
+            optional = p.isOptional,
             description = p.getDescription(),
         )
 }
