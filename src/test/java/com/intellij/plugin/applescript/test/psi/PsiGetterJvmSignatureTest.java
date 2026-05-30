@@ -22,6 +22,8 @@
 package com.intellij.plugin.applescript.test.psi;
 
 import com.intellij.plugin.applescript.lang.sdef.AccessType;
+import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass;
+import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand;
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition;
 import com.intellij.plugin.applescript.lang.sdef.CommandParameter;
 import com.intellij.plugin.applescript.lang.sdef.Suite;
@@ -74,6 +76,31 @@ public class PsiGetterJvmSignatureTest {
         // add*/find*/get*ByName member stays a fun (arg-taking / mutator) and is NOT frozen here.
         Suite.class, List.of(
             "isHidden():boolean"                                                  // is-prefix PRESERVED
+        ),
+        // Wave 2 (plan 05-03) — AppleScriptCommand PARSER HOT PATH. getParameters/getDirectParameter/
+        // getMandatoryParameters/getParameterNames are called from AppleScriptGeneratedParserUtil.java
+        // (lines 366-370, 719-862); a dropped JVM name here is a NoSuchMethodError on first parse.
+        // getParameterByName(String) stays fun (arg-taking) and setResult(...) stays fun (returns a
+        // value) — neither is a property getter, so neither is frozen as one here.
+        AppleScriptCommand.class, List.of(
+            "getParameters():java.util.List",
+            "getDirectParameter():com.intellij.plugin.applescript.lang.sdef.CommandDirectParameter",
+            "getMandatoryParameters():java.util.List",
+            "getResult():com.intellij.plugin.applescript.lang.sdef.CommandResult",
+            "getParameterNames():java.util.List"
+        ),
+        // Wave 2 (plan 05-03) — AppleScriptClass. getProperties is part of a getProperties/setProperties
+        // (Unit-returning) pair → var properties. setPluralClassName(...) RETURNS DictionaryClass and so
+        // stays fun (a Kotlin property setter must return Unit) — not frozen as a getter.
+        AppleScriptClass.class, List.of(
+            "getContents():java.util.List",
+            "getProperties():java.util.List",
+            "getParentClassName():java.lang.String",
+            "getParentClass():com.intellij.plugin.applescript.lang.sdef.AppleScriptClass",
+            "getElementNames():java.util.List",
+            "getElements():java.util.List",
+            "getRespondingCommands():java.util.List",
+            "getPluralClassName():java.lang.String"
         )
     );
 
