@@ -2,6 +2,16 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [1.4.0] - TBD
+
+### Changed
+
+- Internal modernization of the application-dictionary model. This is a maintenance release with no change to completion, navigation, documentation, or run-configuration behavior.
+
+### Compatibility
+
+- Verified against IntelliJ IDEA Community 2025.1 and 2025.2. Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2.)
+
 ## [1.3.0] - TBD
 
 ### Changed
