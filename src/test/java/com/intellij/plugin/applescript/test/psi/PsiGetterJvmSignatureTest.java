@@ -25,7 +25,9 @@ import com.intellij.plugin.applescript.lang.sdef.AccessType;
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass;
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand;
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition;
+import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary;
 import com.intellij.plugin.applescript.lang.sdef.CommandParameter;
+import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent;
 import com.intellij.plugin.applescript.lang.sdef.Suite;
 import org.junit.jupiter.api.Test;
 
@@ -101,6 +103,42 @@ public class PsiGetterJvmSignatureTest {
             "getElements():java.util.List",
             "getRespondingCommands():java.util.List",
             "getPluralClassName():java.lang.String"
+        ),
+        // Wave 3 (plan 05-04) — DictionaryComponent: the shared SDEF supertype. Every pure no-arg
+        // getter converts to a property; the Java-visible names stay getX()/getSuite()/getName() via
+        // property naming. getName() is the override-narrowing seam (overrides PsiNamedElement.getName());
+        // setDictionaryDoc(...) stays fun (no matching getter) and is NOT frozen as a getter here.
+        DictionaryComponent.class, List.of(
+            "getDocumentation():java.lang.String",
+            "getCode():java.lang.String",
+            "getCocoaClassName():java.lang.String",
+            "getName():java.lang.String",                                          // override-narrowing seam
+            "getNameIdentifiers():java.util.List",
+            "getQualifiedPath():java.lang.String",
+            "getQualifiedName():java.lang.String",
+            "getDescription():java.lang.String",
+            "getSuite():com.intellij.plugin.applescript.lang.sdef.Suite",
+            "getDictionaryParentComponent():com.intellij.plugin.applescript.lang.sdef.DictionaryComponent",
+            "getType():java.lang.String",
+            "getDictionary():com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary"
+        ),
+        // Wave 3 (plan 05-04) — ApplicationDictionary: the largest SDEF interface. ONLY the no-arg
+        // getters convert (getApplicationName/getRootTag/getDictionaryFile/getApplicationBundle/
+        // getAllCommands + the no-arg get*Map getters). setRootTag(...) RETURNS ApplicationDictionary
+        // and stays fun; every find*/process*/add*/arg-taking get* stays fun; the @JvmField companion
+        // constants are not getters. None of those are frozen here.
+        ApplicationDictionary.class, List.of(
+            "getDictionaryFile():com.intellij.openapi.vfs.VirtualFile",
+            "getApplicationBundle():java.io.File",
+            "getDictionaryEnumerationMap():java.util.Map",
+            "getDictionaryEnumeratorMap():java.util.Map",
+            "getDictionaryRecordMap():java.util.Map",
+            "getDictionaryCommandMap():java.util.Map",
+            "getDictionaryClassMap():java.util.Map",
+            "getDictionaryPropertyMap():java.util.Map",
+            "getApplicationName():java.lang.String",
+            "getRootTag():com.intellij.psi.xml.XmlTag",
+            "getAllCommands():java.util.Collection"
         )
     );
 
