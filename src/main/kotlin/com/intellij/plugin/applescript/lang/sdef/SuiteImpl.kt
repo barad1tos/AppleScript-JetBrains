@@ -70,41 +70,42 @@ class SuiteImpl :
 
     override val isHidden: Boolean get() = data.hidden
 
-    override fun getSuite(): Suite = this
+    override val suite: Suite get() = this
 
-    override fun getType(): String = "dictionary suite"
+    override val type: String get() = "dictionary suite"
 
-    override fun getDictionary(): ApplicationDictionary = myParent
+    override val dictionary: ApplicationDictionary get() = myParent
 
-    override fun getDocumentation(): String = buildString {
-        append("<html>")
-        append(super.getDocumentation())
-        val sep = "  ===================  "
-        append("<p>").append("COMMANDS").append("<br>")
-        for (command in commandDefinitions) {
-            append("<br>").append("<b>").append(sep).append("</b>")
-            val commandDoc = command.getDocumentation()
-            append("<p>").append(commandDoc.substring(commandDoc.indexOf("Command"))).append("</p>")
+    override val documentation: String
+        get() = buildString {
+            append("<html>")
+            append(super.documentation)
+            val sep = "  ===================  "
+            append("<p>").append("COMMANDS").append("<br>")
+            for (command in commandDefinitions) {
+                append("<br>").append("<b>").append(sep).append("</b>")
+                val commandDoc = command.documentation
+                append("<p>").append(commandDoc.substring(commandDoc.indexOf("Command"))).append("</p>")
+            }
+            append("</p>")
+            append("<p>").append("CLASSES").append("<br>")
+            for (aClass in classDefinitions) {
+                append("<br>").append("<b>").append(sep).append("</b>")
+                val classDoc = aClass.documentation
+                append("<p>").append(classDoc.substring(classDoc.indexOf("Class"))).append("</p>")
+            }
+            append("</p>")
+            append("</html>")
         }
-        append("</p>")
-        append("<p>").append("CLASSES").append("<br>")
-        for (aClass in classDefinitions) {
-            append("<br>").append("<b>").append(sep).append("</b>")
-            val classDoc = aClass.getDocumentation()
-            append("<p>").append(classDoc.substring(classDoc.indexOf("Class"))).append("</p>")
-        }
-        append("</p>")
-        append("</html>")
-    }
 
-    override fun getQualifiedPath(): String = "${getDictionary().getQualifiedPath()}/${getQualifiedName()}"
+    override val qualifiedPath: String get() = "${dictionary.qualifiedPath}/$qualifiedName"
 
-    override fun getQualifiedName(): String = getType().substring(11) + ":" + getCode()
+    override val qualifiedName: String get() = type.substring(11) + ":" + code
 
     override fun addClass(appleScriptClass: AppleScriptClass): Boolean {
         classDefinitions.add(appleScriptClass)
         classDefinitionsMap[appleScriptClass.getName()] = appleScriptClass
-        appleScriptClass.getCode()?.let { classDefinitionToCodeMap[it] = appleScriptClass }
+        appleScriptClass.code?.let { classDefinitionToCodeMap[it] = appleScriptClass }
         return true
     }
 
@@ -138,7 +139,7 @@ class SuiteImpl :
      */
     override fun addCommand(command: AppleScriptCommand): Boolean {
         commandDefinitions.add(command)
-        command.getCode()?.let { commandDefinitionToCodeMap[it] = command }
+        command.code?.let { commandDefinitionToCodeMap[it] = command }
         return dictionaryCommandMap.put(command.getName(), command) == null
     }
 }

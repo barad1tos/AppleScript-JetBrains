@@ -123,7 +123,7 @@ open class AppleScriptCommandImpl :
             .filter { !it.optional && it.name != "in" && it.name != "of" }
             .map { CommandParameterImpl(this, it, myXmlElement) }
 
-    override fun getCocoaClassName(): String? = cocoaClass
+    override val cocoaClassName: String? get() = cocoaClass
 
     override fun getDocFooter(): String {
         val sb = StringBuilder()
@@ -145,7 +145,7 @@ open class AppleScriptCommandImpl :
             val (op, cl) = if (par.isOptional) "[" to "]" else "" to ""
             val pType = StringUtil.notNullize(par.typeSpecifier)
             sb.append(indent).append(indent).append(op).append("<b>").append(par.getName()).append("</b> ")
-                .append(pType).append(cl).append(" : ").append(par.getDescription()).append("<br>")
+                .append(pType).append(cl).append(" : ").append(par.description).append("<br>")
         }
         val res = result
         if (res != null) {
@@ -157,7 +157,7 @@ open class AppleScriptCommandImpl :
         return sb.toString()
     }
 
-    override fun getSuite(): Suite = myParent
+    override val suite: Suite get() = myParent
 
     /**
      * Map any `CommandParameter` PSI element to its `CommandParameterData`
@@ -171,9 +171,9 @@ open class AppleScriptCommandImpl :
         if (p is CommandParameterImpl) p.data
         else CommandParameterData(
             name = p.getName(),
-            code = p.getCode() ?: "",
+            code = p.code ?: "",
             type = p.typeSpecifier,
             optional = p.isOptional,
-            description = p.getDescription(),
+            description = p.description,
         )
 }

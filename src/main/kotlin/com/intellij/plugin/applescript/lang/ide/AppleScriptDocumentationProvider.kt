@@ -10,7 +10,7 @@ class AppleScriptDocumentationProvider : AbstractDocumentationProvider() {
 
     override fun getQuickNavigateInfo(element: PsiElement, originalElement: PsiElement?): String? {
         if (element is DictionaryComponent) {
-            return "${element.getType()} \"${element.getName()}\" [ ${element.getDictionary().getName()} ]"
+            return "${element.type} \"${element.getName()}\" [ ${element.dictionary.getName()} ]"
         }
         return null
     }
@@ -21,7 +21,7 @@ class AppleScriptDocumentationProvider : AbstractDocumentationProvider() {
             else -> element.reference?.resolve()
         }
         if (targetElement is DictionaryComponent) {
-            return targetElement.getDocumentation()
+            return targetElement.documentation
         }
         return null
     }

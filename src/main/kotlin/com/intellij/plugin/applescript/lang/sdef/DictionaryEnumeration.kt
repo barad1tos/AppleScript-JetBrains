@@ -6,5 +6,6 @@ interface DictionaryEnumeration : DictionaryComponent {
 
     fun setEnumerators(enumerators: List<@JvmSuppressWildcards DictionaryEnumerator>?)
 
-    override fun getSuite(): Suite
+    /** JVM-visible as `getSuite()`; narrows `DictionaryComponent.suite` to non-null (05-04 lockstep). */
+    override val suite: Suite
 }

@@ -84,10 +84,10 @@ class DictionaryClass :
     // would invalidate these caches — but the parser two-pass only mutates
     // `properties`, not the name lists, so the snapshot is correct in practice.
     private val elementsLazy: List<AppleScriptClass> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        data.elementNames.mapNotNull { getDictionary().findClass(it) }
+        data.elementNames.mapNotNull { dictionary.findClass(it) }
     }
     private val respondingCommandsLazy: List<AppleScriptCommand> by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-        data.respondingCommandNames.mapNotNull { getDictionary().findCommand(it) }
+        data.respondingCommandNames.mapNotNull { dictionary.findCommand(it) }
     }
 
     override fun getDocFooter(): String = buildString {
@@ -109,11 +109,11 @@ class DictionaryClass :
             data = data.copy(properties = value)
         }
 
-    override fun getSuite(): Suite = myParent
+    override val suite: Suite get() = myParent
 
     override val parentClassName: String? get() = data.parentClassName
 
-    override val parentClass: AppleScriptClass? get() = getDictionary().findClass(data.parentClassName)
+    override val parentClass: AppleScriptClass? get() = dictionary.findClass(data.parentClassName)
 
     override val elementNames: List<String> get() = data.elementNames
 

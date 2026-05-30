@@ -230,32 +230,32 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
                     importedDict.getProject().getService(AppleScriptProjectDictionaryService::class.java)
                 val cocoaStandard: ApplicationDictionary? = dictionaryRegistry?.getCocoaStandardTerminology()
                 if (cocoaStandard != null) {
-                    for (dicConst: DictionaryEnumerator in importedDict.getDictionaryEnumeratorMap().values) {
+                    for (dicConst: DictionaryEnumerator in importedDict.dictionaryEnumeratorMap.values) {
                         if (cocoaStandard.findEnumerator(dicConst.getName()) == null) {
                             dictionaryComponents.add(dicConst)
                         }
                     }
-                    for (clz: AppleScriptClass in importedDict.getDictionaryClassMap().values) {
+                    for (clz: AppleScriptClass in importedDict.dictionaryClassMap.values) {
                         if (cocoaStandard.findClass(clz.getName()) == null) {
                             dictionaryComponents.add(clz)
                         }
                     }
-                    for (cmd: AppleScriptCommand in importedDict.getAllCommands()) {
+                    for (cmd: AppleScriptCommand in importedDict.allCommands) {
                         if (cocoaStandard.findCommand(cmd.getName()) == null) {
                             dictionaryComponents.add(cmd)
                         }
                     }
-                    for (prop: AppleScriptPropertyDefinition in importedDict.getDictionaryPropertyMap().values) {
+                    for (prop: AppleScriptPropertyDefinition in importedDict.dictionaryPropertyMap.values) {
                         if (cocoaStandard.findCommand(prop.getName()) == null) {
                             dictionaryComponents.add(prop)
                         }
                     }
                 }
             } else {
-                dictionaryComponents.addAll(importedDict.getDictionaryEnumeratorMap().values)
-                dictionaryComponents.addAll(importedDict.getDictionaryPropertyMap().values)
-                dictionaryComponents.addAll(importedDict.getDictionaryClassMap().values)
-                dictionaryComponents.addAll(importedDict.getAllCommands())
+                dictionaryComponents.addAll(importedDict.dictionaryEnumeratorMap.values)
+                dictionaryComponents.addAll(importedDict.dictionaryPropertyMap.values)
+                dictionaryComponents.addAll(importedDict.dictionaryClassMap.values)
+                dictionaryComponents.addAll(importedDict.allCommands)
             }
         }
     }

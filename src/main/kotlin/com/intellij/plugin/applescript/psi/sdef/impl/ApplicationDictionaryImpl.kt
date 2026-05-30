@@ -54,16 +54,16 @@ import javax.swing.Icon
 class ApplicationDictionaryImpl(
     private val project: Project,
     dictionaryXmlFile: XmlFile,
-    private var applicationName: String,
+    override var applicationName: String,
     private val applicationBundleFile: File?,
 ) : FakePsiElement(),
     ApplicationDictionary {
 
-    private val dictionaryFile: VirtualFile = dictionaryXmlFile.virtualFile
+    override val dictionaryFile: VirtualFile = dictionaryXmlFile.virtualFile
     private var applicationIcon: Icon? = null
     private val includedFiles: MutableList<PsiFile> = ArrayList()
     private var dictionaryName: String = ""
-    private var documentation: String? = null
+    private var dictionaryDocumentation: String? = null
 
     private var myRootTag: XmlTag? = null
     private val mySuites: MutableList<Suite> = ArrayList()
@@ -146,19 +146,17 @@ class ApplicationDictionaryImpl(
 
     override fun addSuite(suite: Suite): Boolean = mySuites.add(suite)
 
-    override fun getDictionaryFile(): VirtualFile = dictionaryFile
+    override val dictionaryEnumerationMap: Map<String, DictionaryEnumeration> get() = indexes.dictionaryEnumerationMap
 
-    override fun getDictionaryEnumerationMap(): Map<String, DictionaryEnumeration> = indexes.dictionaryEnumerationMap
+    override val dictionaryEnumeratorMap: Map<String, DictionaryEnumerator> get() = indexes.dictionaryEnumeratorMap
 
-    override fun getDictionaryEnumeratorMap(): Map<String, DictionaryEnumerator> = indexes.dictionaryEnumeratorMap
-
-    override fun getDictionaryRecordMap(): Map<String, DictionaryRecord> = indexes.dictionaryRecordMap
+    override val dictionaryRecordMap: Map<String, DictionaryRecord> get() = indexes.dictionaryRecordMap
 
     // First-by-name contract preserved (D-03 interface freeze). Use
     // findAllCommandsWithName for 0..N entries on overloaded command names.
-    override fun getDictionaryCommandMap(): Map<String, AppleScriptCommand> = indexes.dictionaryCommandMap
+    override val dictionaryCommandMap: Map<String, AppleScriptCommand> get() = indexes.dictionaryCommandMap
 
-    override fun getDictionaryClassMap(): Map<String, AppleScriptClass> = indexes.dictionaryClassMap
+    override val dictionaryClassMap: Map<String, AppleScriptClass> get() = indexes.dictionaryClassMap
 
     // Null-name guard: `ConcurrentHashMap` rejects null keys with NPE, whereas
     // the pre-fix `HashMap` returned null silently. The interface accepts
@@ -238,7 +236,7 @@ class ApplicationDictionaryImpl(
 
     override fun addClass(appleScriptClass: AppleScriptClass): Boolean {
         val previous = indexes.dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)
-        appleScriptClass.getCode()?.let { indexes.dictionaryClassByCodeMap[it] = appleScriptClass }
+        appleScriptClass.code?.let { indexes.dictionaryClassByCodeMap[it] = appleScriptClass }
         indexes.dictionaryClassToPluralNameMap[appleScriptClass.pluralClassName] = appleScriptClass
         for (property in appleScriptClass.properties) {
             addProperty(property)
@@ -263,20 +261,21 @@ class ApplicationDictionaryImpl(
         return previous == null
     }
 
-    override fun getDocumentation(): String = buildString {
-        append(getType()).append(" <b>").append(getName()).append("</b>")
-        append("<p>")
-        for (suite in mySuites) {
-            append("<br>    <b>")
-            AppleScriptDocHelper.appendElementLink(this, suite, suite.getName())
-            append("</b><br>")
+    override val documentation: String
+        get() = buildString {
+            append(type).append(" <b>").append(getName()).append("</b>")
+            append("<p>")
+            for (suite in mySuites) {
+                append("<br>    <b>")
+                AppleScriptDocHelper.appendElementLink(this, suite, suite.getName())
+                append("</b><br>")
+            }
+            append("</p>")
         }
-        append("</p>")
-    }
 
-    override fun getCode(): String? = null
+    override val code: String? get() = null
 
-    override fun getCocoaClassName(): String? = null
+    override val cocoaClassName: String? get() = null
 
     override fun isScriptProperty(): Boolean = false
 
@@ -292,25 +291,25 @@ class ApplicationDictionaryImpl(
 
     override fun getName(): String = dictionaryName
 
-    override fun getApplicationName(): String = applicationName
-
     @Throws(IncorrectOperationException::class)
     override fun setName(name: String): PsiElement {
         dictionaryName = name
         return this
     }
 
-    override fun getNameIdentifiers(): List<String> = applicationName.split("\\s+".toRegex())
+    override val nameIdentifiers: List<String> get() = applicationName.split("\\s+".toRegex())
 
-    override fun getQualifiedPath(): String = "dictionary:${getName()}/${getQualifiedName()}"
+    override val qualifiedPath: String get() = "dictionary:${getName()}/$qualifiedName"
 
-    override fun getQualifiedName(): String = "${getType()}:${getCode()}"
+    override val qualifiedName: String get() = "$type:$code"
 
-    override fun getDescription(): String? = null
+    override var description: String?
+        get() = null
+        set(_) = Unit
 
     override fun getLanguage(): Language = AppleScriptLanguage
 
-    override fun getDictionaryPropertyMap(): Map<String, AppleScriptPropertyDefinition> = indexes.dictionaryPropertyMap
+    override val dictionaryPropertyMap: Map<String, AppleScriptPropertyDefinition> get() = indexes.dictionaryPropertyMap
 
     override fun addRecord(record: DictionaryRecord) {
         indexes.dictionaryRecordMap[record.getName()] = record
@@ -319,21 +318,19 @@ class ApplicationDictionaryImpl(
         }
     }
 
-    override fun getParent(): PsiElement? = PsiManager.getInstance(getProject()).findFile(getDictionaryFile())
+    override fun getParent(): PsiElement? = PsiManager.getInstance(getProject()).findFile(dictionaryFile)
 
-    override fun getSuite(): Suite? = null
+    override val suite: Suite? get() = null
 
-    override fun getDictionaryParentComponent(): DictionaryComponent? = null
+    override val dictionaryParentComponent: DictionaryComponent? get() = null
 
-    override fun getType(): String = "dictionary"
-
-    override fun setDescription(description: String?) = Unit
+    override val type: String get() = "dictionary"
 
     override fun setDictionaryDoc(documentation: String?) {
-        this.documentation = documentation
+        this.dictionaryDocumentation = documentation
     }
 
-    override fun getDictionary(): ApplicationDictionary = this
+    override val dictionary: ApplicationDictionary get() = this
 
     private fun readDictionaryFromXmlFile(xmlFile1: XmlFile) {
         if (xmlFile1.isValid) {
@@ -365,7 +362,7 @@ class ApplicationDictionaryImpl(
         return this
     }
 
-    override fun getRootTag(): XmlTag? = myRootTag
+    override val rootTag: XmlTag? get() = myRootTag
 
     override fun findSuiteByName(suiteCode: String): Suite? {
         for (suite in mySuites) {
@@ -376,7 +373,7 @@ class ApplicationDictionaryImpl(
 
     override fun findSuiteByCode(suiteCode: String): Suite? {
         for (suite in mySuites) {
-            if (suiteCode == suite.getCode()) return suite
+            if (suiteCode == suite.code) return suite
         }
         return null
     }
@@ -388,9 +385,9 @@ class ApplicationDictionaryImpl(
     override fun findCommand(name: String?): AppleScriptCommand? =
         name?.let { indexes.dictionaryCommandMap[it] }
 
-    override fun getAllCommands(): Collection<AppleScriptCommand> = indexes.dictionaryCommandMap.values
+    override val allCommands: Collection<AppleScriptCommand> get() = indexes.dictionaryCommandMap.values
 
-    override fun getApplicationBundle(): File? = applicationBundleFile
+    override val applicationBundle: File? get() = applicationBundleFile
 
     companion object {
         @JvmField

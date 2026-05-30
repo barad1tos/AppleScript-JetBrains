@@ -33,14 +33,14 @@ object AppleScriptDocHelper {
     @JvmStatic
     fun appendElementLink(sb: StringBuilder, psiElement: AppleScriptPsiElement, label: String?): String? {
         val elementRef = when (psiElement) {
-            is AppleScriptClass -> "dictionary:${psiElement.getDictionary().getName()}$TYPE_SEPARATOR" +
-                "suite$ELEMENT_NAME_SEPARATOR${psiElement.getSuite().getName()}$TYPE_SEPARATOR" +
+            is AppleScriptClass -> "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
+                "suite$ELEMENT_NAME_SEPARATOR${psiElement.suite.getName()}$TYPE_SEPARATOR" +
                 "$URL_PREFIX_CLASS${psiElement.getName()}"
             is ApplicationDictionary -> "$URL_PREFIX_DICTIONARY${psiElement.getName()}"
-            is Suite -> "dictionary:${psiElement.getDictionary().getName()}$TYPE_SEPARATOR" +
+            is Suite -> "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
                 "$URL_PREFIX_SUITE${psiElement.getName()}"
-            is AppleScriptCommand -> "dictionary:${psiElement.getDictionary().getName()}$TYPE_SEPARATOR" +
-                "suite$ELEMENT_NAME_SEPARATOR${psiElement.getSuite().getName()}$TYPE_SEPARATOR" +
+            is AppleScriptCommand -> "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
+                "suite$ELEMENT_NAME_SEPARATOR${psiElement.suite.getName()}$TYPE_SEPARATOR" +
                 "$URL_PREFIX_COMMAND${psiElement.getName()}"
             else -> ""
         }
@@ -136,6 +136,6 @@ object AppleScriptDocHelper {
         val accessType = if (prop.accessType == AccessType.R) ", r/o" else ""
         sb.append("<b>").append(prop.getName()).append("</b> ")
             .append("(").append(prop.typeSpecifier).append(accessType)
-            .append(") : ").append(StringUtil.notNullize(prop.getDescription())).append("<br>")
+            .append(") : ").append(StringUtil.notNullize(prop.description)).append("<br>")
     }
 }

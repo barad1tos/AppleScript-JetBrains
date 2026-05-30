@@ -27,7 +27,7 @@ class AppleScriptDictionaryComponentReferencesSearch : QueryExecutor<PsiReferenc
         val element = queryParameters.elementToSearch
         val dictionaryComponent = element as? DictionaryComponent ?: return true
 
-        val parts = dictionaryComponent.getNameIdentifiers()
+        val parts = dictionaryComponent.nameIdentifiers
         if (parts.isEmpty()) return true
         val componentName = dictionaryComponent.getName()
         val helper = PsiSearchHelper.getInstance(element.project)

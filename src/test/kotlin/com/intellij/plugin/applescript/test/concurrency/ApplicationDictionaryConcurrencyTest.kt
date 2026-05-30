@@ -121,7 +121,7 @@ class ApplicationDictionaryConcurrencyTest : BasePlatformTestCase() {
                             // `Collection<AppleScriptCommand>` view — the prime
                             // race surface for `ConcurrentModificationException`
                             // against raw `HashMap.values`.
-                            dict.getAllCommands().toList()
+                            dict.allCommands.toList()
                         }
                     } catch (throwable: Throwable) {
                         firstFailure.compareAndSet(null, throwable)
@@ -156,7 +156,7 @@ class ApplicationDictionaryConcurrencyTest : BasePlatformTestCase() {
             // against `ConcurrentHashMap.put` every visible put is durable.
             // Plus 0 inserts for the Cocoa standard library cmds (empty XmlFile).
             val expectedTotal = mutators * iterations
-            val actualTotal = dict.getAllCommands().size
+            val actualTotal = dict.allCommands.size
             assertEquals(
                 "Lost commands during concurrent insert — primary `dictionaryCommandMap` " +
                     "missed ${expectedTotal - actualTotal} put(s). Raw HashMap.put under " +

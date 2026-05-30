@@ -6,31 +6,50 @@ import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import java.io.File
 
+/**
+ * GROUP A (0 gen-implementer) SDEF interface, largest of the family — Phase 5 (v1.4) property
+ * conversion (PSI-03). Extends `DictionarySuite` → `DictionaryComponent`.
+ *
+ * ONLY the pure no-arg getters convert to `val` properties (Java names preserved by property naming,
+ * locked by `PsiGetterJvmSignatureTest`). Conversion caveats (NON-NEGOTIABLE):
+ *  - [setRootTag] RETURNS `ApplicationDictionary` (not Unit) → cannot be a property setter; it stays
+ *    `fun` while [rootTag] is the read-only `val` getter.
+ *  - Every `find*` / `process*` / `add*` / arg-taking `get*` member stays `fun` (not a no-arg getter).
+ *  - The `companion object` `@JvmField` constants are NOT getters — left untouched.
+ */
 interface ApplicationDictionary : DictionarySuite {
 
     fun processInclude(includedFile: XmlFile): PsiFile?
 
     fun addSuite(suite: Suite): Boolean
 
-    fun getDictionaryFile(): VirtualFile
+    /** JVM-visible as `getDictionaryFile()`. */
+    val dictionaryFile: VirtualFile
 
-    fun getApplicationBundle(): File?
+    /** JVM-visible as `getApplicationBundle()`. */
+    val applicationBundle: File?
 
-    fun getDictionaryEnumerationMap(): Map<String, DictionaryEnumeration>
+    /** JVM-visible as `getDictionaryEnumerationMap()`. */
+    val dictionaryEnumerationMap: Map<String, DictionaryEnumeration>
 
-    fun getDictionaryEnumeratorMap(): Map<String, DictionaryEnumerator>
+    /** JVM-visible as `getDictionaryEnumeratorMap()`. */
+    val dictionaryEnumeratorMap: Map<String, DictionaryEnumerator>
 
-    fun getDictionaryRecordMap(): Map<String, DictionaryRecord>
+    /** JVM-visible as `getDictionaryRecordMap()`. */
+    val dictionaryRecordMap: Map<String, DictionaryRecord>
 
-    fun getDictionaryCommandMap(): Map<String, AppleScriptCommand>
+    /** JVM-visible as `getDictionaryCommandMap()`. */
+    val dictionaryCommandMap: Map<String, AppleScriptCommand>
 
-    fun getDictionaryClassMap(): Map<String, AppleScriptClass>
+    /** JVM-visible as `getDictionaryClassMap()`. */
+    val dictionaryClassMap: Map<String, AppleScriptClass>
 
     fun findClass(name: String?): AppleScriptClass?
 
     fun getParameterNamesForCommand(name: String): List<String>?
 
-    fun getApplicationName(): String
+    /** JVM-visible as `getApplicationName()`. */
+    val applicationName: String
 
     fun findEnumerator(name: String): DictionaryEnumerator?
 
@@ -38,13 +57,16 @@ interface ApplicationDictionary : DictionarySuite {
 
     fun findProperty(name: String): AppleScriptPropertyDefinition?
 
-    fun getDictionaryPropertyMap(): Map<String, AppleScriptPropertyDefinition>
+    /** JVM-visible as `getDictionaryPropertyMap()`. */
+    val dictionaryPropertyMap: Map<String, AppleScriptPropertyDefinition>
 
     fun setRootTag(myRootTag: XmlTag): ApplicationDictionary
 
-    fun getRootTag(): XmlTag?
+    /** JVM-visible as `getRootTag()`; paired mutator [setRootTag] stays `fun` (returns a value). */
+    val rootTag: XmlTag?
 
-    fun getAllCommands(): Collection<AppleScriptCommand>
+    /** JVM-visible as `getAllCommands()`. */
+    val allCommands: Collection<AppleScriptCommand>
 
     fun findCommand(name: String?): AppleScriptCommand?
 

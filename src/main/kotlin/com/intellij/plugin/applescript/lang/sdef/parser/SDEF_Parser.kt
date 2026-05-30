@@ -50,7 +50,7 @@ object SDEF_Parser {
     fun parse(file: XmlFile, parsedDictionary: ApplicationDictionary) {
         LOG.debug("Start parsing xml file --- $file ---")
 
-        if (parsedDictionary.getRootTag() == null) {
+        if (parsedDictionary.rootTag == null) {
             file.rootTag?.let { parsedDictionary.setRootTag(it) }
         }
         val document = file.document
@@ -212,7 +212,7 @@ object SDEF_Parser {
     ): AppleScriptClass? {
         val parentClassName = classExtensionTag.getAttributeValue("extends")
         val parentClass = dictionary.findClass(parentClassName)
-        var parentClassCode = parentClass?.getCode()
+        var parentClassCode = parentClass?.code
         val pluralName = classExtensionTag.getAttributeValue("plural")
         // TODO: parent class code could be NULL — would need to parse the included dictionary in that case.
         if (parentClassCode == null && parentClassName != null) {
@@ -228,7 +228,7 @@ object SDEF_Parser {
             suite, parentClassName, parentClassCode, classExtensionTag,
             null, elementNames, respondingCommands, pluralName,
         )
-        classExtension.setDescription(classExtensionTag.getAttributeValue("description"))
+        classExtension.description = classExtensionTag.getAttributeValue("description")
 
         val propertyTags = classExtensionTag.findSubTags("property")
         classExtension.properties = getPropertiesFromTags(classExtension, propertyTags)
@@ -305,7 +305,7 @@ object SDEF_Parser {
         val aClass: AppleScriptClass = DictionaryClass(
             suite, name, code, classTag, parentClassName, elementNames, respondingCommands, pluralName,
         )
-        aClass.setDescription(classTag.getAttributeValue("description"))
+        aClass.description = classTag.getAttributeValue("description")
 
         val properties = ArrayList<AppleScriptPropertyDefinition>()
         for (propTag in classTag.findSubTags("property")) {
@@ -352,7 +352,7 @@ object SDEF_Parser {
         val documentation = commandTag.getSubTagText("documentation")
 
         val command: AppleScriptCommand = AppleScriptCommandImpl(suite, name, code, commandTag)
-        command.setDescription(description)
+        command.description = description
         command.setDictionaryDoc(documentation)
 
         commandTag.findFirstSubTag("result")?.let { resultTag ->

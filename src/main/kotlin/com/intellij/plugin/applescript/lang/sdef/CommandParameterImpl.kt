@@ -84,5 +84,5 @@ class CommandParameterImpl :
 
     override val isOptional: Boolean get() = data.optional
 
-    override fun getSuite(): Suite = myCommand.getSuite()
+    override val suite: Suite get() = myCommand.suite
 }

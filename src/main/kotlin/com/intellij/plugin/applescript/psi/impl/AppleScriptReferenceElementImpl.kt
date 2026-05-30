@@ -133,7 +133,7 @@ abstract class AppleScriptReferenceElementImpl(node: ASTNode) :
         if (!el.isValid) return
         var builder: LookupElementBuilder = when (el) {
             is DictionaryComponent -> {
-                val dName = el.getDictionary().name
+                val dName = el.dictionary.getName()
                 LookupElementBuilder.createWithIcon(el).appendTailText("   $dName", true)
             }
 
