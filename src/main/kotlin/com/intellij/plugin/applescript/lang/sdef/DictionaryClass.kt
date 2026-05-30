@@ -92,37 +92,36 @@ class DictionaryClass :
 
     override fun getDocFooter(): String = buildString {
         AppleScriptDocHelper.appendClassAttributes(this, this@DictionaryClass)
-        val parentClass = getParentClass()
-        if (parentClass != null) {
+        val parent = parentClass
+        if (parent != null) {
             val indent = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
-            append("<p>").append(indent).append("INHERITED FROM ").append(parentClass.getName().uppercase()).append("</p>")
-            AppleScriptDocHelper.appendClassAttributes(this, parentClass)
+            append("<p>").append(indent).append("INHERITED FROM ").append(parent.getName().uppercase()).append("</p>")
+            AppleScriptDocHelper.appendClassAttributes(this, parent)
         }
         append("</HTML>")
     }
 
-    @Suppress("UNCHECKED_CAST")
-    override fun getContents(): List<AppleScriptClass> = emptyList()
+    override val contents: List<AppleScriptClass> get() = emptyList()
 
-    override fun getProperties(): List<AppleScriptPropertyDefinition> = data.properties
-
-    override fun setProperties(properties: List<AppleScriptPropertyDefinition>) {
-        data = data.copy(properties = properties)
-    }
+    override var properties: List<AppleScriptPropertyDefinition>
+        get() = data.properties
+        set(value) {
+            data = data.copy(properties = value)
+        }
 
     override fun getSuite(): Suite = myParent
 
-    override fun getParentClassName(): String? = data.parentClassName
+    override val parentClassName: String? get() = data.parentClassName
 
-    override fun getParentClass(): AppleScriptClass? = getDictionary().findClass(data.parentClassName)
+    override val parentClass: AppleScriptClass? get() = getDictionary().findClass(data.parentClassName)
 
-    override fun getElementNames(): List<String> = data.elementNames
+    override val elementNames: List<String> get() = data.elementNames
 
-    override fun getElements(): List<AppleScriptClass> = elementsLazy
+    override val elements: List<AppleScriptClass> get() = elementsLazy
 
-    override fun getRespondingCommands(): List<AppleScriptCommand> = respondingCommandsLazy
+    override val respondingCommands: List<AppleScriptCommand> get() = respondingCommandsLazy
 
-    override fun getPluralClassName(): String = data.pluralClassName
+    override val pluralClassName: String get() = data.pluralClassName
 
     override fun setPluralClassName(pluralClassName: String): DictionaryClass {
         if (!StringUtil.isEmpty(pluralClassName)) {

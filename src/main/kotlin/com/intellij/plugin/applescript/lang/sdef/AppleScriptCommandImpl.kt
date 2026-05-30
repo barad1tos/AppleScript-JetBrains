@@ -91,46 +91,45 @@ open class AppleScriptCommandImpl :
         return CommandParameterImpl(this, pData, myXmlElement)
     }
 
-    override fun getParameterNames(): List<String> = data.parameters.map { it.name }
+    override val parameterNames: List<String> get() = data.parameters.map { it.name }
 
-    override fun getParameters(): List<CommandParameter> =
-        data.parameters.map { CommandParameterImpl(this, it, myXmlElement) }
+    override var parameters: List<CommandParameter>
+        get() = data.parameters.map { CommandParameterImpl(this, it, myXmlElement) }
+        set(value) {
+            data = AppleScriptCommandBuilder(name = data.name, code = data.code)
+                .description(data.description)
+                .parameters(value.map { toParameterData(it) })
+                .directParameter(data.directParameter)
+                .result(data.result)
+                .build()
+        }
 
-    override fun getDirectParameter(): CommandDirectParameter? = data.directParameter
+    override var directParameter: CommandDirectParameter?
+        get() = data.directParameter
+        set(value) {
+            data = data.copy(directParameter = value)
+        }
 
-    override fun getResult(): CommandResult? = data.result
+    override val result: CommandResult? get() = data.result
 
     override fun setResult(result: CommandResult?): CommandResult? {
         data = data.copy(result = result)
         return result
     }
 
-    override fun getMandatoryParameters(): List<CommandParameter> =
+    override val mandatoryParameters: List<CommandParameter>
         // Workaround for "in" / "of" being detected as object references rather than parameters.
-        data.parameters
+        get() = data.parameters
             .filter { !it.optional && it.name != "in" && it.name != "of" }
             .map { CommandParameterImpl(this, it, myXmlElement) }
-
-    override fun setParameters(parameters: List<CommandParameter>) {
-        data = AppleScriptCommandBuilder(name = data.name, code = data.code)
-            .description(data.description)
-            .parameters(parameters.map { toParameterData(it) })
-            .directParameter(data.directParameter)
-            .result(data.result)
-            .build()
-    }
-
-    override fun setDirectParameter(directParameter: CommandDirectParameter?) {
-        data = data.copy(directParameter = directParameter)
-    }
 
     override fun getCocoaClassName(): String? = cocoaClass
 
     override fun getDocFooter(): String {
         val sb = StringBuilder()
         val indent = "&nbsp;&nbsp;&nbsp;&nbsp;"
-        val p = getDirectParameter()
-        val params = getParameters()
+        val p = directParameter
+        val params = parameters
         if (p != null || params.isNotEmpty()) {
             sb.append("<p><b>Parameters:</b></p>")
         }
@@ -148,7 +147,7 @@ open class AppleScriptCommandImpl :
             sb.append(indent).append(indent).append(op).append("<b>").append(par.getName()).append("</b> ")
                 .append(pType).append(cl).append(" : ").append(par.getDescription()).append("<br>")
         }
-        val res = getResult()
+        val res = result
         if (res != null) {
             // CommandResult is a `data class` (02-03) — same reasoning as
             // CommandDirectParameter above: property syntax for Kotlin readers.

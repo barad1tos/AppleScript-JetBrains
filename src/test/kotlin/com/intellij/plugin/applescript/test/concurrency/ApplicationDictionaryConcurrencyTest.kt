@@ -222,7 +222,7 @@ class ApplicationDictionaryConcurrencyTest : BasePlatformTestCase() {
         val params: List<CommandParameter> = parameters.map { pName ->
             CommandParameterImpl(cmd, pName, "----", false, "text", null, xmlTagStub)
         }
-        cmd.setParameters(params)
+        cmd.parameters = params
         return cmd
     }
 

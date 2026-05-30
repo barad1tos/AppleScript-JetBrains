@@ -56,7 +56,7 @@ class CommandCompletionContributor : CompletionContributor() {
 
                     val target = handlerCallExpression.reference.resolve()
                     if (target is AppleScriptCommand) {
-                        val sortedParams = ArrayList(target.getParameters()).apply {
+                        val sortedParams = ArrayList(target.parameters).apply {
                             sortWith { par1, par2 ->
                                 val o1 = par1.isOptional
                                 val o2 = par2.isOptional

@@ -94,8 +94,8 @@ object AppleScriptDocHelper {
 
     @JvmStatic
     fun appendClassAttributes(sb: StringBuilder, dictionaryClass: AppleScriptClass) {
-        val classElements: List<AppleScriptClass> = dictionaryClass.getElements()
-        val classProperties: List<AppleScriptPropertyDefinition> = dictionaryClass.getProperties()
+        val classElements: List<AppleScriptClass> = dictionaryClass.elements
+        val classProperties: List<AppleScriptPropertyDefinition> = dictionaryClass.properties
         val indent = "&nbsp;".repeat(8)
 
         if (classElements.isNotEmpty()) {
@@ -118,7 +118,7 @@ object AppleScriptDocHelper {
             }
             sb.append("</p>")
         }
-        val commandsToRespond: List<AppleScriptCommand> = dictionaryClass.getRespondingCommands()
+        val commandsToRespond: List<AppleScriptCommand> = dictionaryClass.respondingCommands
         if (commandsToRespond.isNotEmpty()) {
             sb.append("<p>").append(indent).append("RESPONDS TO: <br>").append(indent)
             val it = commandsToRespond.iterator()

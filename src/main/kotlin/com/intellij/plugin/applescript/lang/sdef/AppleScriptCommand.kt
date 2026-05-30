@@ -1,24 +1,45 @@
 package com.intellij.plugin.applescript.lang.sdef
 
+/**
+ * GROUP A (0 gen-implementer) SDEF interface — Phase 5 (v1.4) property conversion (PSI-03), PARSER
+ * HOT PATH. [parameters] and [directParameter] are read from `AppleScriptGeneratedParserUtil.java`
+ * (lines 366-370, 719-862) at parse time, so their Java-visible names `getParameters()` /
+ * `getDirectParameter()` are load-bearing — a divergence would be a runtime `NoSuchMethodError`.
+ *
+ * The Java names are preserved by **property-name choice** (NOT `@get:JvmName`, which is uncompilable
+ * on abstract interface accessors per 05-01) and locked by the reflective `PsiGetterJvmSignatureTest`.
+ *
+ * Conversion caveats (NON-NEGOTIABLE):
+ *  - [getParameterByName] takes an argument → NOT a property; stays `fun`.
+ *  - [setResult] RETURNS `CommandResult?` (not Unit) → cannot be a property setter; [result] is a
+ *    read-only `val` and `setResult` stays a separate `fun`.
+ *  - [parameters] / [directParameter] became `var` because their setters (`setParameters` /
+ *    `setDirectParameter`) return `Unit` — Kotlin synthesizes `setParameters(...)` /
+ *    `setDirectParameter(...)` for the matching `var`, preserving the existing mutation API.
+ *  - `getSuite()` narrows `DictionaryComponent.getSuite()`, which has not yet converted (05-04 owns
+ *    the supertype). It stays `override fun getSuite()` this wave — converting it now would break the
+ *    override against the still-`fun` supertype.
+ */
 interface AppleScriptCommand : DictionaryComponent {
 
     fun getParameterByName(name: String): CommandParameter?
 
-    fun getParameterNames(): List<String>
+    /** JVM-visible as `getParameterNames()`. */
+    val parameterNames: List<String>
 
-    fun getParameters(): List<CommandParameter>
+    /** JVM-visible as `getParameters()` / `setParameters(List)` — parser hot path. */
+    var parameters: List<@JvmSuppressWildcards CommandParameter>
 
-    fun getDirectParameter(): CommandDirectParameter?
+    /** JVM-visible as `getDirectParameter()` / `setDirectParameter(...)` — parser hot path. */
+    var directParameter: CommandDirectParameter?
 
-    fun getResult(): CommandResult?
+    /** JVM-visible as `getResult()`; paired mutator [setResult] stays `fun` (returns a value). */
+    val result: CommandResult?
 
     fun setResult(result: CommandResult?): CommandResult?
 
-    fun getMandatoryParameters(): List<CommandParameter>
-
-    fun setParameters(parameters: List<@JvmSuppressWildcards CommandParameter>)
-
-    fun setDirectParameter(directParameter: CommandDirectParameter?)
+    /** JVM-visible as `getMandatoryParameters()` — parser hot path. */
+    val mandatoryParameters: List<CommandParameter>
 
     override fun getSuite(): Suite
 }
