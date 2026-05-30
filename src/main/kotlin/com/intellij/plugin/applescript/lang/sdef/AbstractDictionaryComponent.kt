@@ -17,9 +17,9 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
     DictionaryComponentBase<P, XmlTag>,
     DictionaryComponent {
 
-    private val code: String
-    private val name: String
-    private var description: String? = null
+    private val backingCode: String
+    private val backingName: String
+    private var backingDescription: String? = null
 
     @Suppress("PropertyName")
     protected var docField: String? = null
@@ -31,9 +31,9 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
         myXmlTag: XmlTag,
         description: String?,
     ) : super(myXmlTag, parent) {
-        this.code = code
-        this.name = name
-        this.description = description
+        this.backingCode = code
+        this.backingName = name
+        this.backingDescription = description
     }
 
     protected constructor(
@@ -42,8 +42,8 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
         code: String,
         myXmlTag: XmlTag,
     ) : super(myXmlTag, parent) {
-        this.code = code
-        this.name = name
+        this.backingCode = code
+        this.backingName = name
     }
 
     override fun isScriptProperty(): Boolean = false
@@ -58,43 +58,49 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
 
     override fun findAssignedValue(): AppleScriptExpression? = null
 
-    override fun getName(): String = name
+    override fun getName(): String = backingName
 
-    override fun getNameIdentifiers(): List<String> = name.split("\\s+".toRegex())
+    override val nameIdentifiers: List<String>
+        get() = backingName.split("\\s+".toRegex())
 
-    override fun getQualifiedName(): String =
-        "${getDictionaryParentComponent().getQualifiedName()}/$shortQname"
+    override val qualifiedName: String
+        get() = "${dictionaryParentComponent!!.qualifiedName}/$shortQname"
 
     private val shortQname: String
-        get() = getType().substring(11) + ":" + getCode()
+        get() = type.substring(11) + ":" + code
 
-    override fun getQualifiedPath(): String =
-        "${getDictionaryParentComponent().getQualifiedPath()}/$shortQname"
+    override val qualifiedPath: String
+        get() = "${dictionaryParentComponent!!.qualifiedPath}/$shortQname"
 
-    override fun getType(): String {
-        val componentType = AppleScriptComponentType.typeOf(this)
-        return componentType?.toString()?.lowercase() ?: "dictionary reference"
-    }
+    override val type: String
+        get() {
+            val componentType = AppleScriptComponentType.typeOf(this)
+            return componentType?.toString()?.lowercase() ?: "dictionary reference"
+        }
 
-    override fun setDescription(description: String?) {
-        this.description = description
-    }
+    override var description: String?
+        get() = backingDescription
+        set(value) {
+            backingDescription = value
+        }
 
-    override fun getDictionary(): ApplicationDictionary = getSuite().getDictionary()
+    override val dictionary: ApplicationDictionary
+        get() = suite.dictionary
 
-    override fun getCocoaClassName(): String? = null
+    override val cocoaClassName: String?
+        get() = null
 
     protected open fun getDocHeader(): String = buildString {
         append("<b>")
-        AppleScriptDocHelper.appendElementLink(this, getDictionary(), getDictionary().getName())
+        AppleScriptDocHelper.appendElementLink(this, dictionary, dictionary.getName())
         append("</b> ").append(" Dictionary").append("<br>")
     }
 
     protected open fun getTypeDescription(): String = buildString {
         append("<p>")
-        val type = StringUtil.capitalizeWords(getType(), true)
-        val displayType = if (type.lowercase().contains("dictionary")) type.substring(10) else type
-        append(displayType).append(" <b>").append(name).append("</b>")
+        val capitalizedType = StringUtil.capitalizeWords(type, true)
+        val displayType = if (capitalizedType.lowercase().contains("dictionary")) capitalizedType.substring(10) else capitalizedType
+        append(displayType).append(" <b>").append(backingName).append("</b>")
 
         when (val thisRef = this@AbstractDictionaryComponent) {
             is AppleScriptClass -> {
@@ -121,25 +127,24 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
 
             else -> Unit
         }
-        append(" : ").append(StringUtil.notNullize(getDescription()))
+        append(" : ").append(StringUtil.notNullize(description))
     }
 
-    override fun getDocumentation(): String =
-        getDocHeader() + getTypeDescription() + getDocFooter()
+    override val documentation: String
+        get() = getDocHeader() + getTypeDescription() + getDocFooter()
 
     protected open fun getDocFooter(): String = "</p>"
 
-    override fun getCode(): String = code
+    override val code: String
+        get() = backingCode
 
-    override fun getDescription(): String? = description
-
-    abstract override fun getSuite(): Suite
+    abstract override val suite: Suite
 
     override fun getIcon(open: Boolean): Icon? = AppleScriptComponentType.typeOf(this)?.icon
 
     override fun getPresentation(): ItemPresentation = AppleScriptElementPresentation(this)
 
-    override fun getLocationString(): String? = getQualifiedPath()
+    override fun getLocationString(): String? = qualifiedPath
 
     override fun getIdentifier(): DictionaryIdentifier {
         var myIdentifier: DictionaryIdentifier? = null

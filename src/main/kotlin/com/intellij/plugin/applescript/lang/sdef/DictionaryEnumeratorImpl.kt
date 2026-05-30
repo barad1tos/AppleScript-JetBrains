@@ -21,7 +21,7 @@ class DictionaryEnumeratorImpl :
         xmlTagEnumerator: XmlTag,
     ) : super(myEnumeration, name, code, xmlTagEnumerator)
 
-    override fun getSuite(): Suite = getMyEnumeration().getSuite()
+    override val suite: Suite get() = getMyEnumeration().suite
 
     override fun getMyEnumeration(): DictionaryEnumeration = myParent
 }

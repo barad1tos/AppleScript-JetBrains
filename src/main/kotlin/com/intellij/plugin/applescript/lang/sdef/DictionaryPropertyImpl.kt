@@ -54,7 +54,7 @@ open class DictionaryPropertyImpl :
 
     override fun isObjectProperty(): Boolean = true
 
-    override fun getSuite(): Suite = getDictionaryParentComponent().getSuite()!!
+    override val suite: Suite get() = dictionaryParentComponent!!.suite!!
 
     override val typeSpecifier: String get() = backingTypeSpecifier
 }

@@ -6,5 +6,6 @@ interface DictionaryRecord : DictionaryComponent {
 
     fun setProperties(properties: List<@JvmSuppressWildcards AppleScriptPropertyDefinition>?)
 
-    override fun getSuite(): Suite
+    /** JVM-visible as `getSuite()`; narrows `DictionaryComponent.suite` to non-null (05-04 lockstep). */
+    override val suite: Suite
 }

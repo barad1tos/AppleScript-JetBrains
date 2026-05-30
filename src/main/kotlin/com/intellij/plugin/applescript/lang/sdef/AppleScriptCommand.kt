@@ -16,9 +16,8 @@ package com.intellij.plugin.applescript.lang.sdef
  *  - [parameters] / [directParameter] became `var` because their setters (`setParameters` /
  *    `setDirectParameter`) return `Unit` — Kotlin synthesizes `setParameters(...)` /
  *    `setDirectParameter(...)` for the matching `var`, preserving the existing mutation API.
- *  - `getSuite()` narrows `DictionaryComponent.getSuite()`, which has not yet converted (05-04 owns
- *    the supertype). It stays `override fun getSuite()` this wave — converting it now would break the
- *    override against the still-`fun` supertype.
+ *  - [suite] narrows `DictionaryComponent.suite: Suite?` to non-null `Suite` — converted in lockstep
+ *    with the supertype this wave (05-04). JVM-visible as `getSuite()`.
  */
 interface AppleScriptCommand : DictionaryComponent {
 
@@ -41,5 +40,6 @@ interface AppleScriptCommand : DictionaryComponent {
     /** JVM-visible as `getMandatoryParameters()` — parser hot path. */
     val mandatoryParameters: List<CommandParameter>
 
-    override fun getSuite(): Suite
+    /** JVM-visible as `getSuite()`; narrows `DictionaryComponent.suite` to non-null. */
+    override val suite: Suite
 }

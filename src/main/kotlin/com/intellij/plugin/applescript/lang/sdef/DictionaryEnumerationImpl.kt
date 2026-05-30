@@ -41,5 +41,5 @@ class DictionaryEnumerationImpl :
         this.enumerators = enumerators?.toMutableList() ?: mutableListOf()
     }
 
-    override fun getSuite(): Suite = myParent
+    override val suite: Suite get() = myParent
 }

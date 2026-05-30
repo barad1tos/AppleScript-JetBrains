@@ -32,7 +32,7 @@ abstract class DictionaryComponentBase<P : DictionaryComponent, D : XmlElement> 
 
     override fun getOriginalElement(): PsiElement = myXmlElement.originalElement
 
-    override fun getProject(): Project = getDictionaryParentComponent().getProject()
+    override fun getProject(): Project = dictionaryParentComponent.getProject()
 
     override fun getContainingFile(): PsiFile =
         if (myXmlElement.isValid) myXmlElement.containingFile else parent.containingFile
@@ -41,7 +41,8 @@ abstract class DictionaryComponentBase<P : DictionaryComponent, D : XmlElement> 
 
     override fun getNode(): ASTNode? = myXmlElement.node
 
-    override fun getParent(): PsiElement = getDictionaryParentComponent()
+    override fun getParent(): PsiElement = dictionaryParentComponent
 
-    fun getDictionaryParentComponent(): P = myParent
+    /** JVM-visible as `getDictionaryParentComponent()`; satisfies `DictionaryComponent.dictionaryParentComponent`. */
+    val dictionaryParentComponent: P get() = myParent
 }

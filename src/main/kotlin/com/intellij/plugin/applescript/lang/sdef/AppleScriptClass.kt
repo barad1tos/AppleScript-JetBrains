@@ -10,8 +10,8 @@ package com.intellij.plugin.applescript.lang.sdef
  * Conversion caveats (NON-NEGOTIABLE):
  *  - [setPluralClassName] RETURNS `DictionaryClass` (not Unit) → cannot be a property setter; it stays
  *    `fun` while [pluralClassName] is the read-only `val` getter.
- *  - `getSuite()` narrows `DictionaryComponent.getSuite()` (not yet converted — 05-04 owns the
- *    supertype) and stays `override fun getSuite()` this wave.
+ *  - [suite] narrows `DictionaryComponent.suite: Suite?` to non-null `Suite` — converted in lockstep
+ *    with the supertype this wave (05-04). JVM-visible as `getSuite()`.
  */
 interface AppleScriptClass : DictionaryComponent {
 
@@ -21,7 +21,8 @@ interface AppleScriptClass : DictionaryComponent {
     /** JVM-visible as `getProperties()` / `setProperties(List)`. */
     var properties: List<@JvmSuppressWildcards AppleScriptPropertyDefinition>
 
-    override fun getSuite(): Suite
+    /** JVM-visible as `getSuite()`; narrows `DictionaryComponent.suite` to non-null. */
+    override val suite: Suite
 
     /** JVM-visible as `getParentClassName()`. */
     val parentClassName: String?
