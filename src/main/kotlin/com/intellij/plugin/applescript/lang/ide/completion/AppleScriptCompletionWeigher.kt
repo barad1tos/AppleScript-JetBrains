@@ -10,6 +10,6 @@ class AppleScriptCompletionWeigher : CompletionWeigher() {
     override fun weigh(element: LookupElement, location: CompletionLocation): Int {
         val lookupObject = element.`object`
         val parameter = lookupObject as? CommandParameter
-        return if (parameter != null && parameter.isOptional()) -10 else 0
+        return if (parameter != null && parameter.isOptional) -10 else 0
     }
 }

@@ -68,7 +68,7 @@ class SuiteImpl :
             .build()
     }
 
-    override fun isHidden(): Boolean = data.hidden
+    override val isHidden: Boolean get() = data.hidden
 
     override fun getSuite(): Suite = this
 

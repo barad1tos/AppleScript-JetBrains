@@ -78,11 +78,11 @@ class CommandParameterImpl :
         this.data = data
     }
 
-    override fun getTypeSpecifier(): String = data.type
+    override val typeSpecifier: String get() = data.type
 
-    override fun getMyCommand(): AppleScriptCommand = myParent
+    override val myCommand: AppleScriptCommand get() = myParent
 
-    override fun isOptional(): Boolean = data.optional
+    override val isOptional: Boolean get() = data.optional
 
-    override fun getSuite(): Suite = getMyCommand().getSuite()
+    override fun getSuite(): Suite = myCommand.getSuite()
 }
