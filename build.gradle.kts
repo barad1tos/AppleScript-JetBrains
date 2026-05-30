@@ -256,6 +256,13 @@ tasks {
             // consumed by the generated parser util. No BasePlatformTestCase, no fixture
             // boot — runs in <100ms. Unconditional so contract drift trips on every CI run.
             includeTestsMatching("com.intellij.plugin.applescript.test.parser.*")
+            // Phase 5 PSI-03 (plan 05-01): PsiGetterJvmSignatureTest is the reflection-only
+            // sibling of ParserUtilContractTest — it freezes the Java-visible getter names
+            // (getX/isX/setX) produced by converting GROUP A interface getters to Kotlin
+            // properties. No BasePlatformTestCase, no fixture boot — runs in <100ms.
+            // Unconditional so a property conversion that drops/renames a Java-reachable
+            // accessor trips on every CI run, not after a runtime NoSuchMethodError.
+            includeTestsMatching("com.intellij.plugin.applescript.test.psi.*")
             if (includeHeavy) {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
