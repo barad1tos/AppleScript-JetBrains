@@ -6,8 +6,8 @@ open class DictionaryPropertyImpl :
     AbstractDictionaryComponent<DictionaryComponent>,
     AppleScriptPropertyDefinition {
 
-    private val typeSpecifier: String
-    private var accessType: AccessType? = AccessType.RW
+    private val backingTypeSpecifier: String
+    private var backingAccessType: AccessType? = AccessType.RW
 
     constructor(
         classOrRecord: DictionaryComponent,
@@ -18,8 +18,8 @@ open class DictionaryPropertyImpl :
         xmlTagProperty: XmlTag,
         accessType: AccessType?,
     ) : super(classOrRecord, name, code, xmlTagProperty, description) {
-        this.typeSpecifier = typeSpecifier
-        if (accessType != null) this.accessType = accessType
+        this.backingTypeSpecifier = typeSpecifier
+        if (accessType != null) this.backingAccessType = accessType
         check(myParent is AppleScriptClass || myParent is DictionaryRecord)
     }
 
@@ -31,31 +31,30 @@ open class DictionaryPropertyImpl :
         accessType: AccessType?,
         xmlTagProperty: XmlTag,
     ) : super(classOrRecord, name, code, xmlTagProperty) {
-        this.typeSpecifier = typeSpecifier
-        this.accessType = accessType
+        this.backingTypeSpecifier = typeSpecifier
+        this.backingAccessType = accessType
         check(myParent is AppleScriptClass || myParent is DictionaryRecord)
     }
 
-    @Suppress("UNCHECKED_CAST")
-    override fun getPsiType(): PsiType = PsiType.CLASS
+    override val psiType: PsiType get() = PsiType.CLASS
 
-    override fun isClassProperty(): Boolean = myParent is AppleScriptClass
+    override val isClassProperty: Boolean get() = myParent is AppleScriptClass
 
-    override fun isRecordProperty(): Boolean = myParent is DictionaryRecord
+    override val isRecordProperty: Boolean get() = myParent is DictionaryRecord
 
-    override fun getMyClass(): AppleScriptClass? = myParent as? AppleScriptClass
+    override val myClass: AppleScriptClass? get() = myParent as? AppleScriptClass
 
-    override fun getMyRecord(): DictionaryRecord? = myParent as? DictionaryRecord
+    override val myRecord: DictionaryRecord? get() = myParent as? DictionaryRecord
 
-    override fun setAccessType(accessType: AccessType?) {
-        this.accessType = accessType
-    }
+    override var accessType: AccessType?
+        get() = backingAccessType
+        set(value) {
+            backingAccessType = value
+        }
 
     override fun isObjectProperty(): Boolean = true
 
     override fun getSuite(): Suite = getDictionaryParentComponent().getSuite()!!
 
-    override fun getAccessType(): AccessType? = accessType
-
-    override fun getTypeSpecifier(): String = typeSpecifier
+    override val typeSpecifier: String get() = backingTypeSpecifier
 }

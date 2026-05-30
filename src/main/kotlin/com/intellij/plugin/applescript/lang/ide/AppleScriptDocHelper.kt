@@ -133,9 +133,9 @@ object AppleScriptDocHelper {
     }
 
     private fun appendClassProperty(sb: StringBuilder, prop: AppleScriptPropertyDefinition) {
-        val accessType = if (prop.getAccessType() == AccessType.R) ", r/o" else ""
+        val accessType = if (prop.accessType == AccessType.R) ", r/o" else ""
         sb.append("<b>").append(prop.getName()).append("</b> ")
-            .append("(").append(prop.getTypeSpecifier()).append(accessType)
+            .append("(").append(prop.typeSpecifier).append(accessType)
             .append(") : ").append(StringUtil.notNullize(prop.getDescription())).append("<br>")
     }
 }
