@@ -28,7 +28,7 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
 
     protected abstract fun getMyTargetDirectoryPath(): String
 
-    protected fun getMyTestDataDir(): String = "src/test/resources/testData/parse"
+    protected fun getMyTestDataDir(): String = TEST_DATA_DIR
 
     override fun getTestDataPath(): String = File(getMyTestDataDir()).absolutePath
 
@@ -38,10 +38,8 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
         val targetDir = File(myTargetTestDataDir)
         if (!targetDir.isDirectory) throw Exception("$targetDir is not a directory")
 
-        val files = targetDir.listFiles { pathname -> pathname.name.endsWith("scpt") } ?: emptyArray()
-        for (file in files) {
-            myPsiFiles.add(myFixture.configureByFile(file.canonicalPath))
-        }
+        targetDir.listFiles { pathname -> pathname.name.endsWith("scpt") }
+            ?.forEach { file -> myPsiFiles.add(myFixture.configureByFile(file.canonicalPath)) }
     }
 
     protected fun doParseAllInPackageTest() {
@@ -74,6 +72,7 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
     protected open fun checkAllPsiRoots(): Boolean = true
 
     companion object {
+        private const val TEST_DATA_DIR = "src/test/resources/testData/parse"
         private val LOG = Logger.getInstance("#" + AbstractParsingFixtureTestCase::class.java.name)
     }
 }
