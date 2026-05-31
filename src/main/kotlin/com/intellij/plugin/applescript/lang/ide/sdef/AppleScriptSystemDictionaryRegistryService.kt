@@ -750,12 +750,13 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     }
 
     /**
-     * Phase 4 SERVICE-04 (Wave 4) trampoline: routes through [SdefFileProvider.isXcodeInstalled].
-     * The body, including the `@Volatile`-like lazy detection cache, lives on the service.
-     * External callers ([com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptColorAnnotator])
-     * see the same `() -> Boolean` signature byte-for-byte.
+     * Phase 7 D-05 trampoline: routes through [XcodeDetectionService.isXcodeInstalled] (the
+     * extracted Xcode-detection seam — was [SdefFileProvider] pre-Phase-7). The body,
+     * including the lazy detection cache, lives on that service. External callers
+     * ([com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptColorAnnotator]) see
+     * the same `() -> Boolean` signature byte-for-byte.
      */
-    fun isXcodeInstalled(): Boolean = service<SdefFileProvider>().isXcodeInstalled()
+    fun isXcodeInstalled(): Boolean = service<XcodeDetectionService>().isXcodeInstalled()
 
     /**
      * @return true if `/usr/bin/sdef` invocation previously failed to generate a dictionary

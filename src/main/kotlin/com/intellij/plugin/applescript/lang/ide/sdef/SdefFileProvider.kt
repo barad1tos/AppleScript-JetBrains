@@ -30,13 +30,15 @@ import java.nio.file.StandardCopyOption
 import java.util.Arrays
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
-import javax.script.ScriptEngineManager
-import javax.script.ScriptException
 
 /**
  * Phase 4 SERVICE-04 + SERVICE-09 (plan 04-04, Wave 4): Light Service that owns the
  * dictionary file generation + caching + xi:include resolution + sdef CLI invocation +
- * Xcode detection + scripting-additions merging pipeline.
+ * scripting-additions merging pipeline.
+ *
+ * Phase 7 D-05: Xcode detection moved out to [XcodeDetectionService] (its own seam) — this
+ * provider consults it via `service<XcodeDetectionService>()` on the developer-tools-missing
+ * recovery path in [doGenerateDictionaryFile].
  *
  * Returns [DictionaryLoadResult] from [fetch] — call sites get exhaustive `when` and
  * compile-time variant safety (D-05). The sealed type is service-INTERNAL: it does NOT
@@ -45,10 +47,10 @@ import javax.script.ScriptException
  * PSI-side sealing is deferred to v1.4 Phase 5 PSI-05.
  *
  * RESEARCH Q2 + Q3 resolutions (recorded in 04-RESEARCH.md):
- *  - **Q2**: [isXcodeInstalled] lives here because the file-generation orchestrator
- *    [createDictionaryInfoForApplication] needs it on the error-recovery path. Marked
- *    `TODO(v1.6 CLEANUP)` — the responsibility is orthogonal to SDEF parsing and could
- *    move to a dedicated XcodeDetectionService or to a plugin-startup once-per-IDE check.
+ *  - **Q2**: Xcode detection used to live here (error-recovery path of
+ *    [createDictionaryInfoForApplication]). Phase 7 D-05 closed that v1.6-cleanup marker
+ *    by extracting it to [XcodeDetectionService] — the responsibility (probe for a
+ *    developer-tools install) is orthogonal to SDEF parsing and now has its own owner.
  *  - **Q3**: [mergeScriptingAdditions] lives here — it generates a synthesised SDEF by
  *    merging per-scripting-addition suites via JDOM. The output is a file (file-generation
  *    concern); ingestion is downstream (SdefIndexService in Wave 5).
@@ -86,7 +88,6 @@ import javax.script.ScriptException
  * (on the facade + upstream services) for thread-safety of their backing state.
  *
  * State migrated from the facade (Wave 4):
- *  - [xCodeApplicationFile] — lazy-cached Xcode bundle file (Wave 4).
  *  - [scriptingAdditions] — set of scripting-addition names successfully ingested.
  *    Session-only, populated by [initializeScriptingAdditions], read by
  *    [mergeScriptingAdditions] and the facade's [ParsableScriptHelper.getScriptingAdditions]
@@ -100,13 +101,6 @@ class SdefFileProvider @JvmOverloads constructor(
     @Suppress("unused") private val serviceScope: CoroutineScope,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
-
-    // Migrated from facade (Wave 4): lazy-cached Xcode bundle file. Null means "not yet
-    // detected"; a non-null File with name "null" means "previously detected as absent"
-    // (sentinel preserved byte-for-byte from the pre-Wave-4 facade body — do NOT change
-    // the sentinel encoding without re-running the AppleScriptColorAnnotator path on a
-    // dev machine without Xcode installed).
-    private var xCodeApplicationFile: File? = null
 
     // Migrated from facade (Wave 4): set of scripting-addition application names that
     // have been successfully ingested. Populated by [initializeScriptingAdditions],
@@ -396,56 +390,6 @@ class SdefFileProvider @JvmOverloads constructor(
     fun getScriptingAdditions(): HashSet<String> = HashSet(scriptingAdditions)
 
     /**
-     * RESEARCH Q2 resolution: stays in [SdefFileProvider] because the file-generation
-     * orchestrator [createDictionaryInfoForApplication] needs it on the
-     * [DeveloperToolsNotInstalledException] recovery path.
-     *
-     * TODO(v1.6 CLEANUP): isXcodeInstalled is orthogonal to SDEF parsing — its responsibility
-     * (detect a sibling JetBrains-incompatible developer-tool install) could move to a
-     * dedicated XcodeDetectionService or to a plugin-startup once-per-IDE check. Tracked
-     * under v1.6 CLEANUP-* requirements.
-     *
-     * Dispatcher invariant: non-suspend; safe on any thread. Reads [xCodeApplicationFile]
-     * (`@Volatile` semantics not strictly needed because the only writes are inside this
-     * method and the field is only consulted by [createDictionaryInfoForApplication]; the
-     * pre-Wave-4 facade did not annotate `@Volatile` either, so Wave 4 preserves byte-for-byte).
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade `isXcodeInstalled`.
-     */
-    fun isXcodeInstalled(): Boolean {
-        if (!SystemInfo.isMac) return false
-        val cached = xCodeApplicationFile
-        if (cached != null && cached.exists()) return true
-        // "null" name means that Xcode was not found previously.
-        if (cached != null && "null" == cached.name) return false
-
-        val xCodeApp = File("/Applications/Xcode.app")
-        if (xCodeApp.exists()) {
-            xCodeApplicationFile = xCodeApp
-            return true
-        }
-        try {
-            val engineManager = ScriptEngineManager()
-            val engine = engineManager.getEngineByName("AppleScriptEngine")
-            if (engine != null) {
-                val script = "try\n" +
-                    "tell application \"Finder\" to return POSIX path of (get application file id \"com.apple.dt.Xcode\" " +
-                    "as alias)\n" + "on error\n" + "  return \"null\"\n" + "end try"
-                val scriptResult = engine.eval(script)
-                if (scriptResult != null) {
-                    val result = File(scriptResult.toString())
-                    xCodeApplicationFile = result
-                    return result.exists()
-                }
-            }
-        } catch (e: ScriptException) {
-            LOG.error("Error evaluating applescript: ${e.message}")
-        }
-        xCodeApplicationFile = File("null")
-        return false
-    }
-
-    /**
      * Find a `.sdef` file under [applicationIoFile]`/Contents/Resources/`. Used as the
      * recovery path in [createDictionaryInfoForApplication] when the sdef CLI fails
      * because Developer Tools are not installed.
@@ -644,7 +588,7 @@ class SdefFileProvider @JvmOverloads constructor(
             val exitStatus = Runtime.getRuntime().exec(shellCommand).waitFor(timeout, TimeUnit.SECONDS)
             val execEnd = System.currentTimeMillis()
             if (!exitStatus) {
-                if (isXcodeInstalled()) {
+                if (service<XcodeDetectionService>().isXcodeInstalled()) {
                     throw NotScriptableApplicationException(
                         applicationName,
                         "Waiting time elapsed for command ${Arrays.toString(shellCommand)}. " +

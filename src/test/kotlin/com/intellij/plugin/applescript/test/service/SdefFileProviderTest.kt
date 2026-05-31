@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.ide.sdef.SdefFileProvider
+import com.intellij.plugin.applescript.lang.ide.sdef.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.ide.sdef.results.DictionaryLoadResult
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
@@ -96,29 +97,31 @@ class SdefFileProviderTest : BasePlatformTestCase() {
     }
 
     /**
-     * [SdefFileProvider.isXcodeInstalled] returns a Boolean predicate. Outcome depends
+     * [XcodeDetectionService.isXcodeInstalled] returns a Boolean predicate. Outcome depends
      * on dev machine state — on non-Mac the method returns false unconditionally; on
      * Mac it consults the cache + `/Applications/Xcode.app` + the AppleScriptEngine
-     * fallback. The test only verifies callability + return-type contract.
+     * fallback. The test only verifies callability + return-type contract. (Phase 7 D-05:
+     * the probe moved off SdefFileProvider into its own seam.)
      */
     fun testIsXcodeInstalledReturnsBoolean() {
-        val provider = SdefFileProvider.getInstance()
-        val installed: Boolean = provider.isXcodeInstalled()
+        val detection = XcodeDetectionService.getInstance()
+        val installed: Boolean = detection.isXcodeInstalled()
         // Tautology to assert "returns a Boolean and does not throw".
         assertTrue("Boolean value returned", installed || !installed)
     }
 
     /**
-     * Phase 4 SERVICE-04 routing invariant: the facade's `isXcodeInstalled` trampoline
-     * routes through SdefFileProvider. Compares facade vs service direct call — must
-     * agree (single source of truth on the lazy-cached detection result).
+     * Phase 7 D-05 routing invariant: the facade's `isXcodeInstalled` trampoline routes
+     * through [XcodeDetectionService] (was SdefFileProvider pre-Phase-7). Compares facade
+     * vs the new owner's direct call — must agree (single source of truth on the
+     * lazy-cached detection result).
      */
-    fun testFacadeIsXcodeInstalledRoutesThroughFileProvider() {
-        val provider = SdefFileProvider.getInstance()
+    fun testFacadeIsXcodeInstalledRoutesThroughXcodeDetectionService() {
+        val detection = XcodeDetectionService.getInstance()
         val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
         assertEquals(
-            "Facade.isXcodeInstalled must equal SdefFileProvider.isXcodeInstalled (trampoline)",
-            provider.isXcodeInstalled(),
+            "Facade.isXcodeInstalled must equal XcodeDetectionService.isXcodeInstalled (trampoline)",
+            detection.isXcodeInstalled(),
             facade.isXcodeInstalled(),
         )
     }
