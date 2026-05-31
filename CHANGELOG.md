@@ -2,6 +2,16 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [1.6.0] - TBD
+
+### Changed
+
+- Final maintenance release of the internal-modernization series. No user-facing changes to completion, navigation, documentation, or run-configuration behavior.
+
+### Compatibility
+
+- Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2.)
+
 ## [1.5.0] - TBD
 
 ### Changed
