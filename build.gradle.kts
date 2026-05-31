@@ -695,6 +695,14 @@ tasks {
             verifyNoRunBlocking,
             verifyBundledCoroutinesVersions,
             verifyServiceDependencyGraph,
+            // Phase 7 CLEANUP-04 / D-07: detekt + ktlint JOIN the four verify* drift-gates in
+            // `check` (they do NOT replace them — the verify* tasks inspect the runtime classpath
+            // that detekt's source-only mode cannot see). Both are plugin-provided tasks, wired by
+            // string name. detekt runs source-only against detekt-baseline.xml (grandfathered
+            // findings); ktlintCheck runs the standard ruleset. The frozen generated surface is
+            // excluded via the Detekt-typed configureEach exclude("**/gen/**") above.
+            "detekt",
+            "ktlintCheck",
             // verifyGeneratedSourcesMatch — INSTALLED but NOT wired into check on Wave 1.
             //
             // The drift-detection task is fully wired and functional: it re-runs `generateLexer`

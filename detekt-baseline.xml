@@ -16,15 +16,6 @@
     <ID>CyclomaticComplexMethod:SDEF_Parser.kt$SDEF_Parser$private fun processIncludes(parsedDictionary: ApplicationDictionary, includes: Array&lt;XmlTag>?)</ID>
     <ID>CyclomaticComplexMethod:SdefFileProvider.kt$SdefFileProvider$fun initializeScriptingAdditions()</ID>
     <ID>CyclomaticComplexMethod:SdefFileProvider.kt$SdefFileProvider$private fun createDictionaryInfoForApplication( applicationName: String, applicationIoFile: File, ): DictionaryInfo?</ID>
-    <ID>ForbiddenComment:AppleScriptDocHelper.kt$AppleScriptDocHelper$// TODO: dictionaryName != applicationName — confirm this is safe.</ID>
-    <ID>ForbiddenComment:AppleScriptNamesValidator.kt$AppleScriptNamesValidator$// TODO: remove this hack via rename handler + change-signature refactoring.</ID>
-    <ID>ForbiddenComment:AppleScriptResolveUtil.kt$AppleScriptResolveUtil$// TODO: move to ScriptObject and simplify variables extraction.</ID>
-    <ID>ForbiddenComment:AppleScriptScriptCommandLineState.kt$AppleScriptScriptCommandLineState$// TODO: validate scriptPath at the run-config level; for now mirror the Java behaviour.</ID>
-    <ID>ForbiddenComment:AppleScriptUsageTypeProvider.kt$AppleScriptUsageTypeProvider$// TODO: tighten the PSI so this can be a single type test.</ID>
-    <ID>ForbiddenComment:ApplicationDictionaryImpl.kt$ApplicationDictionaryImpl$// TODO: 25/12/15 verify memory management for the BufferedImage list.</ID>
-    <ID>ForbiddenComment:SDEF_Parser.kt$SDEF_Parser$// TODO: add all subtags to the suite here (legacy of the Java port).</ID>
-    <ID>ForbiddenComment:SDEF_Parser.kt$SDEF_Parser$// TODO: parent class code could be NULL — would need to parse the included dictionary in that case.</ID>
-    <ID>ForbiddenComment:SDEF_Parser.kt$SDEF_Parser$// TODO: remove adding the components directly to dictionary above (legacy of the Java port).</ID>
     <ID>FunctionOnlyReturningConstant:AbstractParsingFixtureTestCase.kt$AbstractParsingFixtureTestCase$private fun printRanges(): Boolean</ID>
     <ID>FunctionOnlyReturningConstant:AbstractParsingFixtureTestCase.kt$AbstractParsingFixtureTestCase$private fun skipSpaces(): Boolean</ID>
     <ID>FunctionOnlyReturningConstant:AppleScriptClassType.kt$AppleScriptClassType$@Suppress("unused") internal fun resolve(): PsiElement?</ID>
@@ -41,6 +32,7 @@
     <ID>MagicNumber:SdefFileProvider.kt$SdefFileProvider$5L</ID>
     <ID>MagicNumber:SdefIndexService.kt$SdefIndexService$2_000</ID>
     <ID>MagicNumber:SuiteImpl.kt$SuiteImpl$11</ID>
+    <ID>MaxLineLength:AbstractDictionaryComponent.kt$AbstractDictionaryComponent$get</ID>
     <ID>MaxLineLength:AbstractDictionaryComponent.kt$AbstractDictionaryComponent$val displayType = if (capitalizedType.lowercase().contains("dictionary")) capitalizedType.substring(10) else capitalizedType</ID>
     <ID>MaxLineLength:AppleScriptBlock.kt$AppleScriptBlock$val childBlock = AppleScriptBlock(childNode, createChildWrap(childNode), Alignment.createAlignment(), mySettings)</ID>
     <ID>MaxLineLength:AppleScriptColorAnnotator.kt$AppleScriptColorAnnotator$!dictionaryRegistryService.isXcodeInstalled() -> "Can not create dictionary: Xcode Developer Tools are not installed"</ID>
@@ -53,6 +45,7 @@
     <ID>MaxLineLength:AppleScriptColorAnnotator.kt$AppleScriptColorAnnotator$is AppleScriptDictionaryPropertyName -> createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR)</ID>
     <ID>MaxLineLength:AppleScriptColorAnnotator.kt$AppleScriptColorAnnotator$val dictionaryProjectService = appRef.project.getService(AppleScriptProjectDictionaryService::class.java)</ID>
     <ID>MaxLineLength:AppleScriptColorsAndFontsPage.kt$AppleScriptColorsAndFontsPage.Companion$AttributesDescriptor("Command parameter name", AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR)</ID>
+    <ID>MaxLineLength:AppleScriptComponentScopeProcessor.kt$AppleScriptComponentScopeProcessor$requireNotNull(myCollectedTargets[name]) { "myCollectedTargets[$name] present: this branch implies containsKey(name)" }.containingFile</ID>
     <ID>MaxLineLength:AppleScriptConfigurationProducer.kt$AppleScriptConfigurationProducer$class</ID>
     <ID>MaxLineLength:AppleScriptDocHelper.kt$AppleScriptDocHelper$internal</ID>
     <ID>MaxLineLength:AppleScriptDocumentationProvider.kt$AppleScriptDocumentationProvider$override</ID>
@@ -70,12 +63,17 @@
     <ID>MaxLineLength:AppleScriptSpacingProcessor.kt$AppleScriptSpacingProcessor$return Spacing.createSpacing(spaces, spaces, lines, mySettings.KEEP_LINE_BREAKS, mySettings.KEEP_BLANK_LINES_IN_CODE)</ID>
     <ID>MaxLineLength:AppleScriptStructureViewFactory.kt$AppleScriptStructureViewFactory$override</ID>
     <ID>MaxLineLength:AppleScriptSyntaxHighlighter.kt$AppleScriptSyntaxHighlighter.Companion$fillMap(ATTRIBUTES, AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR, COMMAND_PARAMETER_SELECTOR)</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$File(requireNotNull(applicationUrl) { "applicationUrl non-null: guarded by !StringUtil.isEmpty above" })</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$File(requireNotNull(dictionaryUrl) { "dictionaryUrl non-null: guarded by !StringUtil.isEmpty above" })</ID>
     <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$val isStd: InputStream? = javaClass.getResourceAsStream(ApplicationDictionary.COCOA_STANDARD_FILE)</ID>
     <ID>MaxLineLength:CreateAppleScriptFileAction.kt$CreateAppleScriptFileAction$CreateFileFromTemplateAction("AppleScript File", "Creates a AppleScript file from the specified template", AppleScriptIcons.FILE)</ID>
+    <ID>MaxLineLength:DictionaryClass.kt$DictionaryClass$requireNotNull(pluralClassName) { "pluralClassName non-null: guarded by !StringUtil.isEmpty (else branch)" }</ID>
     <ID>MaxLineLength:DictionaryComponent.kt$DictionaryComponent$/** Name, starting with suite code name and including component code (not necessarily unique). JVM-visible as `getQualifiedName()`. */</ID>
     <ID>MaxLineLength:IngestResult.kt$IngestResult$*</ID>
+    <ID>MaxLineLength:LoadDictionaryAction.kt$LoadDictionaryAction.Companion$requireNotNull(appName) { "appName non-null: this branch implies chooseMultiple==false, i.e. !StringUtil.isEmpty(appName)" }</ID>
+    <ID>MaxLineLength:LoadDictionaryAction.kt$LoadDictionaryAction.Companion$requireNotNull(applicationName) { "applicationName non-null: guarded by StringUtil.isEmpty continue above" }</ID>
     <ID>MaxLineLength:ParserUtilContractTest.kt$ParserUtilContractTest.Companion$"findApplicationCommands(com.intellij.openapi.project.Project,java.lang.String,java.lang.String):java.util.List"</ID>
-    <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider$"tell application \"Finder\" to return POSIX path of (get application file id \"com.apple.dt.Xcode\" "</ID>
+    <ID>MaxLineLength:SDEF_Parser.kt$SDEF_Parser$parsedDictionary.setName(requireNotNull(dicTitle) { "dicTitle non-null: guarded by !StringUtil.isEmpty above" })</ID>
     <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider$fileGenerated = doGenerateDictionaryFile(applicationName, serializePath, cmdName, applicationIoFile.path)</ID>
     <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider$if (ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(appExtension)) applicationIoFile else null</ID>
     <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseElementsForApplication(classTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)</ID>
@@ -88,6 +86,7 @@
     <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService.Companion$parseSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)</ID>
     <ID>MaxLineLength:SdefPersistenceService.kt$SdefPersistenceService$*</ID>
     <ID>MaxLineLength:SuiteImpl.kt$SuiteImpl$override fun addEnumeration(enumeration: DictionaryEnumeration): Boolean</ID>
+    <ID>MaxLineLength:XcodeDetectionService.kt$XcodeDetectionService$"tell application \"Finder\" to return POSIX path of (get application file id \"com.apple.dt.Xcode\" "</ID>
     <ID>MayBeConst:AppleScriptColorsAndFontsPage.kt$AppleScriptColorsAndFontsPage.Companion$private val DEMO_TEXT: String = """searchFiles for ff of minimumValue(2, 3) for "LeChateau" text from word (copy 5 to c) to word 4 of "We're all in this together" minimumValue(2, maximumValue(x, y)) if file_type comes before "APPL" then copy 5 to c if reportsToPrint > 0 then tell application "ReportWizard" -- Statements to print the reports. end tell end if ## had some reports to print tell application "TextEdit" &lt;command>make&lt;/command> &lt;command parameter>new&lt;/command parameter> &lt;dictionary class>document&lt;/dictionary class> &lt;command parameter>with properties&lt;/command parameter> {name:"Doc Name", text:"Now I can create new documents ¬ using AppleScript."} get &lt;dictionary property>message id&lt;/dictionary property> of it's &lt;dictionary class>mailbox&lt;/dictionary class> &lt;command>close&lt;/command> get &lt;dictionary class>character&lt;/dictionary class> set pathToSpec to &lt;dictionary constant>application support&lt;/dictionary constant> set character to 1234 end tell"""</ID>
     <ID>MayBeConst:ApplicationDictionary.kt$ApplicationDictionary.Companion$@JvmField val COCOA_STANDARD_LIBRARY: String = "Standard Terminology"</ID>
     <ID>MayBeConst:ApplicationDictionary.kt$ApplicationDictionary.Companion$@JvmField val COCOA_STANDARD_LIBRARY_PATH: String = "/System/Library/ScriptingDefinitions/CocoaStandard.sdef"</ID>
