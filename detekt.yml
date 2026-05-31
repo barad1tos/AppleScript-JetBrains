@@ -1,0 +1,39 @@
+# detekt ruleset — Phase 7 CLEANUP-04 / D-07.
+# Ported verbatim from the operator's sibling project ayu-jetbrains (operator-blessed).
+# SOURCE-ONLY config: no type-resolution build classpath is configured — detekt 1.23.8
+# bundles Kotlin compiler 2.0.0 and cannot read this project's Kotlin 2.3.21 metadata, so
+# type-resolution rules are intentionally absent (RESEARCH Pitfall 2). buildUponDefaultConfig=true in
+# build.gradle.kts layers these overrides on top of detekt's bundled defaults.
+
+style:
+  ReturnCount:
+    max: 10
+  LoopWithTooManyJumpStatements:
+    maxJumpCount: 3
+
+complexity:
+  LongParameterList:
+    constructorThreshold: 9
+  LargeClass:
+    excludes:
+      - "**/test/**"
+  LongMethod:
+    threshold: 200
+  TooManyFunctions:
+    thresholdInClasses: 25
+    thresholdInObjects: 20
+  CyclomaticComplexMethod:
+    threshold: 15
+  NestedBlockDepth:
+    threshold: 5
+
+exceptions:
+  TooGenericExceptionCaught:
+    exceptionNames:
+      - ArrayIndexOutOfBoundsException
+      - Error
+      - Exception
+      - IllegalMonitorStateException
+      - IndexOutOfBoundsException
+      - NullPointerException
+      - Throwable

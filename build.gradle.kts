@@ -1,3 +1,4 @@
+import io.gitlab.arturbosch.detekt.Detekt
 import java.time.Duration
 import org.gradle.api.file.ConfigurableFileCollection
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
@@ -12,6 +13,13 @@ plugins {
     java
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.intellij.platform)
+    // Phase 7 CLEANUP-04 / D-07: detekt + ktlint static analysis. Staged here (version-catalog
+    // aliases) but NOT yet wired into `check` — Wave 3 (plan 07-04) flips the gate after the
+    // cleanup edits land so the baseline reflects the cleaned tree. detekt runs SOURCE-ONLY
+    // (no `classpath`) because 1.23.8 bundles Kotlin compiler 2.0.0 and cannot read the
+    // project's Kotlin 2.3.21 metadata (RESEARCH Pitfall 2). Build-time-only; never in the ZIP.
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
     // Phase 4 SERVICE-10: bundled grammarkit plugin from IntelliJ Platform Gradle Plugin 2.16.0.
     // Provides `generateLexer` / `generateParser` tasks that the `verifyGeneratedSourcesMatch`
     // task below configures to write into a tmp dir for drift diffing against committed
@@ -118,6 +126,34 @@ configurations.testCompileClasspath {
 configurations.testRuntimeClasspath {
     exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")
     exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core-jvm")
+}
+
+// Phase 7 CLEANUP-04 / D-07: detekt + ktlint static analysis, staged source-only.
+// SOURCE-ONLY mode — NO `classpath` / type-resolution is set on the detekt task. detekt
+// 1.23.8 bundles Kotlin compiler 2.0.0 which cannot read this project's Kotlin 2.3.21
+// metadata; type-resolution would flood false positives + emit the
+// "was compiled with an incompatible version of Kotlin" warning (RESEARCH Pitfall 2).
+// The baseline (detekt-baseline.xml) grandfathers existing findings so only NEW code gates.
+// NOT wired into `check` here — Wave 3 (plan 07-04) flips the gate after the cleanup edits
+// land so the regenerated baseline reflects the cleaned tree.
+detekt {
+    config.setFrom(files("detekt.yml"))
+    buildUponDefaultConfig = true
+    baseline = file("detekt-baseline.xml")
+}
+
+// Frozen-surface guard: src/main/gen is on the main sourceSet (build.gradle.kts:51), so detekt
+// scans the ~250 generated parser/PSI files without this exclusion. The generated surface is
+// regenerated from BNF/Flex and must never be pressured by a code-smell gate (CLAUDE.md).
+tasks.withType<Detekt>().configureEach {
+    exclude("**/gen/**")
+}
+
+// ktlint formatting (standard ruleset, no custom config). Do NOT run a tree-wide ktlintFormat
+// (RESEARCH Pitfall 5 — would churn 100+ files); existing violations are grandfathered via a
+// ktlint baseline if Wave 3 wires ktlintCheck into `check`.
+ktlint {
+    // Standard ruleset; no custom config surface (mirrors sibling project ayu-jetbrains).
 }
 
 intellijPlatform {
