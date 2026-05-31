@@ -306,6 +306,12 @@ tasks {
             includeTestsMatching("com.intellij.plugin.applescript.test.psi.*")
             if (!skipHeavy) {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
+                // Phase 8 PARSE-01 (plan 08-01): RealWorldCorpusTest is the v2.0
+                // "corpus is the contract" harness — realistic production-shaped
+                // scripts asserting zero PsiErrorElement. BasePlatformTestCase boots
+                // a full fixture (~30s), so it belongs in the heavy-by-default gate
+                // next to ParserRegressionTest (Phase 7 CLEANUP-03 opt-OUT model).
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.RealWorldCorpusTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.HandlersParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellParsingTestCase")
