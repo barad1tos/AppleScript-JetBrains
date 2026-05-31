@@ -8,8 +8,9 @@ package com.intellij.plugin.applescript.lang.sdef
  * `AppleScriptCommandImpl` PSI wrapper as `private val data: CommandData`
  * (D-01 Hybrid). Until then no PSI class references `CommandData`.
  *
- * Equality contract (closes the TODO at `ApplicationDictionaryImpl:177` —
- * D-02): the synthesised `equals` / `hashCode` covers every primary-
+ * Equality contract (D-02, the overload-distinct-commands contract backing
+ * `ApplicationDictionaryImpl.findAllCommandsWithName`): the synthesised
+ * `equals` / `hashCode` covers every primary-
  * constructor field including `parameters`. Two commands with the same
  * name / code but different parameter signatures (overloads) are correctly
  * distinct, which lets `findAllCommandsWithName` return the full N-element

@@ -81,8 +81,10 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     if (!recursion_guard_(b, l, "parseDictionaryCommandNameInner")) return false;
     boolean r;
     parsedName.set("");
-    // TODO: 12/1/2015 could be command with name which does not exist in this target app but in stanradr additions or
-    // CocoaStandard dictionary or in use application dictionary. search all here?? to find the longest dictionary term
+    // KEEP (Phase 8 / v2.0 grammar hardening): a command name absent from the target app
+    // may exist in StandardAdditions / CocoaStandard / a 'use'd application dictionary;
+    // searching all of them to find the longest dictionary term is a parser-surface change,
+    // frozen across the v1.x cycle. Deferred to the grammar-hardening milestone.
 
     //if there are use statements, do not check terms from scripting additions library (they should be explicitly imported in this case)
     boolean checkStdLib = !areThereUseStatements || applicationsToImportFrom == null
@@ -185,13 +187,16 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
       applicationsToImport = b.getUserData(USED_APPLICATION_NAMES);
     }
     PsiBuilder.Marker m2 = enter_section_(b, l, _COLLAPSE_, "<parse Command Handler Call Expression>");
-    // TODO: 19/12/15 need to parse command name together with parameters for each possible application in order to be
-    // able to parse the longest possible application name ('open for access' std lib vs 'open' from application dict)
+    // KEEP (Phase 8 / v2.0 grammar hardening): parsing the command name together with its
+    // parameters per candidate application (to pick the longest match — 'open for access'
+    // std-lib vs 'open' from an app dict) reshapes the parser surface, frozen in v1.x.
+    // Deferred to the grammar-hardening milestone.
     r = parseDictionaryCommandNameInner(b, l + 1, parsedCommandName, toldApplicationName, areThereUseStatements, applicationsToImport);
     exit_section_(b, l, m2, DICTIONARY_COMMAND_NAME, r, false, null);
 
     if (!r) return false;
-    // TODO: 06/12/15 may be try to avoid creating PSI here!..
+    // KEEP (Phase 8 / v2.0 grammar hardening): avoiding PSI creation on this lookup path is a
+    // parser-surface optimisation, frozen in v1.x. Deferred to the grammar-hardening milestone.
     List<AppleScriptCommand> allCommandsWithName = getAllCommandsWithName(b, parsedCommandName.get(), toldApplicationName, areThereUseStatements,
             applicationsToImport);
 
@@ -232,7 +237,8 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     exit_section_(b, l, m2, DICTIONARY_COMMAND_NAME, r, false, null);
 
     if (!r) return false;
-    // TODO: 06/12/15 may be try to avoid creating PSI here!..
+    // KEEP (Phase 8 / v2.0 grammar hardening): avoiding PSI creation on this lookup path is a
+    // parser-surface optimisation, frozen in v1.x. Deferred to the grammar-hardening milestone.
     List<AppleScriptCommand> allCommandsWithName = getAllCommandsWithName(b, parsedCommandName.get(), toldApplicationName, false, null);
 
     for (AppleScriptCommand command : allCommandsWithName) {
@@ -771,8 +777,10 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     return r;
   }
 
-  // TODO: 08/12/15 the correct syntax is: (given paramSelector:paramValue (,paramSelector:paramValue)*) |
-  // (paramSelector paramValue)
+  // KEEP (Phase 8 / v2.0 grammar hardening): the fully-correct 'given' syntax is
+  // (given paramSelector:paramValue (,paramSelector:paramValue)*) | (paramSelector paramValue).
+  // Tightening the grammar to match is a frozen-parser-surface change deferred to the
+  // grammar-hardening milestone.
   //given? commandParameterSelector parameterValue
   private static boolean parseGivenParameter(PsiBuilder b, int l, AppleScriptCommand command,
                                              Ref<String> parsedParameterSelector, boolean givenForm, boolean first) {
@@ -1291,9 +1299,9 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     if (!recursion_guard_(b, l, "parseDictionaryConstant")) return false;
     boolean r, propertyOrClassExists = false;
     String toldApplicationName = getTargetApplicationName(b);
-    //TODO: to think how to better handle such situations?
-    // (if there are too many constants defined -> lead to many incorrect parsing errors like
-    // 'end' tell/repeat etc is not detected
+    // KEEP (Phase 8 / v2.0 grammar hardening): too many defined constants can cause incorrect
+    // parsing errors ('end' of tell/repeat etc. not detected). A better disambiguation
+    // strategy is a frozen-parser-surface change deferred to the grammar-hardening milestone.
     // dictionary constant could appear only if we are inside dictionary command call
     boolean insideExpression = (b.getUserData(PARSING_COMMAND_HANDLER_CALL_PARAMETERS) == Boolean.TRUE
             || b.getUserData(PARSING_COMMAND_ASSIGNMENT_STATEMENT) == Boolean.TRUE)

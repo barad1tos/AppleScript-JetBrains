@@ -12,7 +12,9 @@ class AppleScriptUsageTypeProvider : UsageTypeProvider {
 
     override fun getUsageType(element: PsiElement): UsageType? {
         if (element !is AppleScriptPsiElement) return null
-        // TODO: tighten the PSI so this can be a single type test.
+        // KEEP (Phase 8 / v2.0 backlog): collapsing this three-way check into a single type
+        // test requires tightening the PSI shape (a grammar-tier change), which is frozen
+        // across the v1.x cycle. Deferred to the v2.0 grammar-hardening milestone.
         if (element is AppleScriptLabeledParameterDeclarationPart ||
             element.context is AppleScriptFormalParameterList ||
             element.context is AppleScriptHandlerInterleavedParametersSelectorPart

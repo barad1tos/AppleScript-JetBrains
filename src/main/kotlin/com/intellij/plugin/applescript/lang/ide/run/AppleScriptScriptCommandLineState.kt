@@ -16,7 +16,9 @@ class AppleScriptScriptCommandLineState(
 
     @Throws(ExecutionException::class)
     override fun startProcess(): ProcessHandler {
-        // TODO: validate scriptPath at the run-config level; for now mirror the Java behaviour.
+        // No scriptPath validation here by design: an empty path falls through to osascript,
+        // which surfaces its own error — matching the original Java behaviour. Earlier,
+        // richer validation at the run-config (checkConfiguration) level is a backlog item.
         val scriptPath = runConfiguration.scriptPath.orEmpty()
         val scriptParameters = runConfiguration.scriptParameters
         val scriptOptions = runConfiguration.scriptOptions

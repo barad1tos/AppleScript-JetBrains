@@ -30,7 +30,10 @@ class AppleScriptNamesValidator : NamesValidator {
     }
 
     override fun isIdentifier(name: String, project: Project?): Boolean =
-        // TODO: remove this hack via rename handler + change-signature refactoring.
+        // KEEP (Phase 8 / v2.0 backlog): the rename-handler probe below is a workaround for
+        // multi-part handler names; removing it cleanly needs a dedicated rename handler plus
+        // change-signature support, which alters refactoring behaviour. Out of the v1.x
+        // cleanup scope (behaviour-preserving only).
         isIdentifier(name) || (project != null && isRenamingHandlerWithValidName(name, project))
 
     private fun isRenamingHandlerWithValidName(name: String, project: Project): Boolean {

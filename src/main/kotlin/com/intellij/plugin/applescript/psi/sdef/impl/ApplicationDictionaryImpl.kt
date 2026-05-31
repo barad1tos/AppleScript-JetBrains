@@ -112,7 +112,9 @@ class ApplicationDictionaryImpl(
             if (!icnsFile.exists() || icnsFile.isDirectory) return
 
             val parser = IcnsImageParser()
-            // TODO: 25/12/15 verify memory management for the BufferedImage list.
+            // The decoded BufferedImage list is a method-local; only one entry is scaled and
+            // retained as applicationIcon, the rest go out of scope and are GC-eligible on
+            // return. No long-lived reference to the full list is held. Memory is bounded.
             val list: List<BufferedImage>? = parser.getAllBufferedImages(icnsFile)
             if (list.isNullOrEmpty()) return
 
