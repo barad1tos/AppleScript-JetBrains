@@ -33,7 +33,10 @@ class AppleScriptRunSettingsEditor(
     override fun resetEditorFrom(configuration: AppleScriptRunConfiguration) {
         val scriptPath = configuration.scriptPath
         if (!StringUtil.isEmpty(scriptPath)) {
-            scriptTextField.text = scriptPath!!
+            // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmpty guard above;
+            // requireNotNull asserts (and smart-casts) the non-null invariant.
+            requireNotNull(scriptPath) { "scriptPath non-null: guarded by !StringUtil.isEmpty above" }
+            scriptTextField.text = scriptPath
             val parts = scriptPath.split("/")
             if (parts.isNotEmpty()) runConfiguration.name = parts.last()
         }

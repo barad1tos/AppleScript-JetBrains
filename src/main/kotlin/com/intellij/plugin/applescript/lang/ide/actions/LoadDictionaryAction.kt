@@ -58,9 +58,15 @@ class LoadDictionaryAction : AnAction() {
                                 )
                             }
                         if (StringUtil.isEmpty(applicationName)) continue
-                        projectDictionaryRegistry.createDictionaryFromFile(applicationName!!, file)
+                        // Guarded by the StringUtil.isEmpty(applicationName) continue above; the
+                        // opaque library call hides the non-null invariant from Kotlin flow-analysis.
+                        requireNotNull(applicationName) { "applicationName non-null: guarded by StringUtil.isEmpty continue above" }
+                        projectDictionaryRegistry.createDictionaryFromFile(applicationName, file)
                     } else {
-                        projectDictionaryRegistry.createDictionaryFromFile(appName!!, file)
+                        // This else branch is reached only when chooseMultiple is false, and
+                        // chooseMultiple = StringUtil.isEmpty(appName), so appName is non-empty here.
+                        requireNotNull(appName) { "appName non-null: this branch implies chooseMultiple==false, i.e. !StringUtil.isEmpty(appName)" }
+                        projectDictionaryRegistry.createDictionaryFromFile(appName, file)
                         return@chooseFiles
                     }
                 }
