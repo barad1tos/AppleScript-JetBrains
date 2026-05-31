@@ -18,8 +18,8 @@ import com.intellij.psi.xml.XmlTag
  *  - Why not pure-split (PSI separate from value)? Would require an equivalence
  *    audit on every consumer of `dictionary.getAllCommands().contains(cmd)`-style
  *    code (resolver, completion, annotator) — too broad for v1.1. Hybrid keeps
- *    the PSI surface stable; the structural-equality contract that closes the
- *    TODO at `ApplicationDictionaryImpl:177` lives in `CommandData`.
+ *    the PSI surface stable; the structural-equality contract behind
+ *    `ApplicationDictionaryImpl.findAllCommandsWithName` lives in `CommandData`.
  *  - Why `var` not `val`? The parser's two-pass SDEF walk calls
  *    `setParameters` / `setResult` / `setDirectParameter` AFTER constructing
  *    the impl (D-06 façade). Each setter routes through `AppleScriptCommandBuilder`

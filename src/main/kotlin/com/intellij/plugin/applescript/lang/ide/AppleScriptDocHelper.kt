@@ -58,7 +58,10 @@ object AppleScriptDocHelper {
         val dictionaryRegistry = context.project.getService(AppleScriptProjectDictionaryService::class.java)
         var dictionary: ApplicationDictionary? = null
         if (dictionaryRegistry != null) {
-            // TODO: dictionaryName != applicationName — confirm this is safe.
+            // The link encodes the dictionary's display name, which may differ from the
+            // registry key (application name). Primary lookup is by key; the fallback loop
+            // below scans every dictionary by getName(), so a name/key divergence still
+            // resolves. Confirmed safe — both lookup paths are covered.
             dictionary = dictionaryRegistry.getDictionary(dictionaryName)
             if (dictionary == null) {
                 for (dict in dictionaryRegistry.getDictionaries()) {

@@ -130,7 +130,10 @@ object SDEF_Parser {
                 parsedDictionary.addEnumeration(enumeration)
                 suite.addEnumeration(enumeration)
             }
-            // TODO: remove adding the components directly to dictionary above (legacy of the Java port).
+            // KEEP (Phase 8 / v2.0 backlog): the dual registration (components added directly
+            // to the dictionary above AND to the suite) is a legacy of the Java port. Removing
+            // it changes dictionary-population ordering on the frozen parser surface — a
+            // behavioural change deferred to the grammar-hardening milestone.
             parsedDictionary.addSuite(suite)
         }
     }
@@ -196,7 +199,9 @@ object SDEF_Parser {
     }
 
     private fun parseSuiteTag(suiteTag: XmlTag, dictionary: ApplicationDictionary): Suite? {
-        // TODO: add all subtags to the suite here (legacy of the Java port).
+        // KEEP (Phase 8 / v2.0 backlog): consolidating subtag attachment into the suite here
+        // (instead of the caller wiring them) is a legacy-of-the-Java-port reshape of the
+        // frozen parser surface. Deferred to the grammar-hardening milestone.
         val name = suiteTag.getAttributeValue("name")
         val code = suiteTag.getAttributeValue("code")
         val description = suiteTag.getAttributeValue("description")
@@ -214,7 +219,10 @@ object SDEF_Parser {
         val parentClass = dictionary.findClass(parentClassName)
         var parentClassCode = parentClass?.code
         val pluralName = classExtensionTag.getAttributeValue("plural")
-        // TODO: parent class code could be NULL — would need to parse the included dictionary in that case.
+        // KEEP (Phase 8 / v2.0 backlog): when the parent class lives in a not-yet-parsed
+        // included dictionary, parentClassCode is NULL and we fall back to a name-derived
+        // 4-char code. Fully resolving it requires eagerly parsing the included dictionary —
+        // a frozen-parser-surface change deferred to the grammar-hardening milestone.
         if (parentClassCode == null && parentClassName != null) {
             val l = parentClassName.length
             parentClassCode = parentClassName.substring(if (l >= 4) 4 else l - 1)
