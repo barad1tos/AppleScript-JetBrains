@@ -96,16 +96,23 @@ class AppleScriptColorAnnotator : Annotator {
         val appName = AppleScriptPsiImplUtil.getNameFromApplicationReference(appRef)
         val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
         if (StringUtil.isEmptyOrSpaces(appName)) return
+        // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmptyOrSpaces guard
+        // above on this platform @Nullable String; requireNotNull asserts (and smart-casts) the
+        // non-null invariant so the rest of the method treats appName as non-null.
+        requireNotNull(appName) { "appName non-null: guarded by StringUtil.isEmptyOrSpaces above" }
 
-        if (!dictionaryRegistryService.isDictionaryInitialized(appName!!)) {
+        if (!dictionaryRegistryService.isDictionaryInitialized(appName)) {
             var warningReason = checkWarningReason(appName, dictionaryRegistryService)
             if (warningReason == null && !dictionaryRegistryService.ensureDictionaryInitialized(appName)) {
                 LOG.debug("Re-checking warning reason for {}", appName)
                 warningReason = checkWarningReason(appName, dictionaryRegistryService)
             }
             if (!StringUtil.isEmpty(warningReason)) {
+                // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmpty guard above;
+                // requireNotNull asserts (and smart-casts) the non-null invariant for both branches.
+                requireNotNull(warningReason) { "warningReason non-null: guarded by !StringUtil.isEmpty above" }
                 if (error) {
-                    holder.newAnnotation(HighlightSeverity.ERROR, warningReason!!)
+                    holder.newAnnotation(HighlightSeverity.ERROR, warningReason)
                         .range(appRef)
                         .textAttributes(CodeInsightColors.WARNINGS_ATTRIBUTES)
                         .withFix(AddApplicationDictionaryQuickFix(appName))
@@ -115,7 +122,7 @@ class AppleScriptColorAnnotator : Annotator {
                     // editor gutter while preserving the tooltip and the quick-fix —
                     // a missing third-party .app is not something the user can act on
                     // automatically, so we don't want the noise on every tell block.
-                    holder.newAnnotation(HighlightSeverity.WEAK_WARNING, warningReason!!)
+                    holder.newAnnotation(HighlightSeverity.WEAK_WARNING, warningReason)
                         .range(appRef)
                         .withFix(AddApplicationDictionaryQuickFix(appName))
                         .create()

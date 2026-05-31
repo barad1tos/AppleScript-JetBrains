@@ -21,7 +21,10 @@ class AppleScriptLineMarkerProvider : RelatedItemLineMarkerProvider() {
         val dictionaryService = element.project.getService(AppleScriptProjectDictionaryService::class.java)
         val appName = element.getApplicationName()
         if (dictionaryService == null || StringUtil.isEmpty(appName)) return
-        val dictionary = dictionaryService.getDictionary(appName!!) ?: return
+        // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmpty guard above;
+        // requireNotNull asserts (and smart-casts) the non-null invariant.
+        requireNotNull(appName) { "appName non-null: guarded by !StringUtil.isEmpty above" }
+        val dictionary = dictionaryService.getDictionary(appName) ?: return
 
         val builder = NavigationGutterIconBuilder.create(dictionary.getIcon(0))
             .setTargets(dictionary)

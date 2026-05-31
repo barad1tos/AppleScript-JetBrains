@@ -25,12 +25,16 @@ class AppleScriptScriptCommandLineState(
 
         val commandString = mutableListOf("/usr/bin/osascript")
         if (!StringUtil.isEmpty(scriptOptions)) {
-            commandString.addAll(scriptOptions!!.split(" "))
+            // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmpty guard above.
+            requireNotNull(scriptOptions) { "scriptOptions non-null: guarded by !StringUtil.isEmpty above" }
+            commandString.addAll(scriptOptions.split(" "))
         }
         commandString.add(scriptPath)
         if (!StringUtil.isEmpty(scriptParameters)) {
+            // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmpty guard above.
+            requireNotNull(scriptParameters) { "scriptParameters non-null: guarded by !StringUtil.isEmpty above" }
             val matchedParams = mutableListOf<String>()
-            val matcher = PARAM_PATTERN.matcher(scriptParameters!!)
+            val matcher = PARAM_PATTERN.matcher(scriptParameters)
             while (matcher.find()) {
                 for (i in 1..matcher.groupCount()) {
                     try {

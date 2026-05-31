@@ -73,7 +73,9 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
                         if (!sortedUseStatement.withImporting()) continue
                         val currAppName = sortedUseStatement.getApplicationName()
                         if (!StringUtil.isEmpty(currAppName)) {
-                            val currentDictionary = dictionaryRegistry.getDictionary(currAppName!!)
+                            // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmpty guard above.
+                            requireNotNull(currAppName) { "currAppName non-null: guarded by !StringUtil.isEmpty above" }
+                            val currentDictionary = dictionaryRegistry.getDictionary(currAppName)
                             if (currentDictionary != null) {
                                 // The sorted list ordering means the first match is the closest use statement.
                                 if (setResult(currentDictionary, myElement)) {
