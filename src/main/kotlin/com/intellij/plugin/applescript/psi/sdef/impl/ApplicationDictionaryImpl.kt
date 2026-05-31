@@ -343,8 +343,11 @@ class ApplicationDictionaryImpl(
     }
 
     override fun getIdentifier(): AppleScriptIdentifier {
-        // Mirrors the Java original — NPEs if myRootTag was never set, which would itself indicate a
-        // construction/lifecycle bug (the constructor always assigns rootTag via readDictionaryFromXmlFile).
+        // D-06 audit: KEPT as `!!` (not requireNotNull). Null is unreachable — the constructor always
+        // assigns rootTag via readDictionaryFromXmlFile, so a null here would itself be a
+        // construction/lifecycle bug. The `!!` is deliberate: it mirrors the Java original's NPE-on-bug
+        // semantics, and requireNotNull would swap that for IllegalArgumentException. Since null never
+        // occurs at runtime, the throw-type is unobservable, but we keep the NPE form to preserve intent.
         val rootTag = myRootTag!!
         var myIdentifier: DictionaryIdentifier? = null
         val titleAttr: XmlAttribute? = rootTag.getAttribute("title")

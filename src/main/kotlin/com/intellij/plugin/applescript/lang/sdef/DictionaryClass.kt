@@ -43,7 +43,14 @@ class DictionaryClass :
         respondingCommandNames: List<String>?,
         pluralClassName: String?,
     ) : super(suite, name, code, xmlTagClass, null) {
-        val plural = if (StringUtil.isEmpty(pluralClassName)) "${name}s" else pluralClassName!!
+        // else branch implies !StringUtil.isEmpty(pluralClassName); the opaque library guard hides
+        // the non-null invariant from Kotlin flow-analysis on this platform @Nullable String.
+        val plural =
+            if (StringUtil.isEmpty(pluralClassName)) {
+                "${name}s"
+            } else {
+                requireNotNull(pluralClassName) { "pluralClassName non-null: guarded by !StringUtil.isEmpty (else branch)" }
+            }
         this.data = ClassDefinition(
             name = name,
             code = code,
