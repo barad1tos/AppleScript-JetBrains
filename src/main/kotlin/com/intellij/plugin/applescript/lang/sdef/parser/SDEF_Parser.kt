@@ -61,7 +61,8 @@ object SDEF_Parser {
                 if ("dictionary" == rootTag.name && attr != null) {
                     val dicTitle = attr.value
                     if (!StringUtil.isEmpty(dicTitle)) {
-                        parsedDictionary.setName(dicTitle!!)
+                        // Frozen surface (CLAUDE.md): pure !!->requireNotNull hygiene swap, control flow unchanged.
+                        parsedDictionary.setName(requireNotNull(dicTitle) { "dicTitle non-null: guarded by !StringUtil.isEmpty above" })
                     }
                 }
                 parseRootTag(parsedDictionary, rootTag)
@@ -146,7 +147,11 @@ object SDEF_Parser {
 
         val dictionaryService = AppleScriptSystemDictionaryRegistryService.getInstance()
         var vFile: VirtualFile? = origPsiFile.virtualFile ?: return xmlFile
-        val dInfo = dictionaryService.getDictionaryInfoByApplicationPath(vFile!!.path)
+        // Frozen surface (CLAUDE.md): pure !!->requireNotNull hygiene swap. vFile is non-null here —
+        // the elvis-return above guarantees it; the `var` (reassigned later) defeats smart-cast.
+        val dInfo = dictionaryService.getDictionaryInfoByApplicationPath(
+            requireNotNull(vFile) { "vFile non-null: guaranteed by the ?: return above" }.path,
+        )
         if (dInfo != null) {
             val ioFile = dInfo.getDictionaryFile()
             if (ioFile.exists()) {
@@ -170,7 +175,9 @@ object SDEF_Parser {
         for (include in includes) {
             var hrefIncl = include.getAttributeValue("href")
             if (StringUtil.isEmpty(hrefIncl)) continue
-            hrefIncl = hrefIncl!!.replace("file://localhost", "")
+            // Frozen surface (CLAUDE.md): pure !!->requireNotNull hygiene swap, control flow unchanged.
+            hrefIncl = requireNotNull(hrefIncl) { "hrefIncl non-null: guarded by StringUtil.isEmpty continue above" }
+                .replace("file://localhost", "")
             val includedFile = File(hrefIncl)
 
             // An assertion ("File accessed outside allowed roots") may fire when an included dictionary

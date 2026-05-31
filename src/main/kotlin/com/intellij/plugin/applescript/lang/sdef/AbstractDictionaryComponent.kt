@@ -64,13 +64,17 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
         get() = backingName.split("\\s+".toRegex())
 
     override val qualifiedName: String
-        get() = "${dictionaryParentComponent!!.qualifiedName}/$shortQname"
+        // Structural invariant: a concrete dictionary component (class/command/property/etc.) always
+        // has a parent component — only the root ApplicationDictionaryImpl returns a null parent, and
+        // qualifiedName is never resolved on the root through this path.
+        get() = "${requireNotNull(dictionaryParentComponent) { "$backingName has a parent dictionary component" }.qualifiedName}/$shortQname"
 
     private val shortQname: String
         get() = type.substring(11) + ":" + code
 
     override val qualifiedPath: String
-        get() = "${dictionaryParentComponent!!.qualifiedPath}/$shortQname"
+        // Same structural invariant as qualifiedName: a concrete component always has a parent.
+        get() = "${requireNotNull(dictionaryParentComponent) { "$backingName has a parent dictionary component" }.qualifiedPath}/$shortQname"
 
     override val type: String
         get() {

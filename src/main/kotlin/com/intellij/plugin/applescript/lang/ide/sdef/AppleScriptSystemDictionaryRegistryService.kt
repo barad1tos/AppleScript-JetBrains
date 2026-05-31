@@ -442,9 +442,18 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
         if (state.notScriptableApplications == null) {
             state.notScriptableApplications = ArrayList()
         } else {
-            state.notScriptableApplications!!.clear()
+            // Reached only in the else of the == null check; the mutable BaseState property defeats
+            // smart-cast, so assert the non-null invariant the == null guard establishes.
+            requireNotNull(state.notScriptableApplications) {
+                "notScriptableApplications non-null: this is the else branch of the == null check"
+            }.clear()
         }
-        state.notScriptableApplications!!.addAll(notScriptableApplicationList)
+        // notScriptableApplications is non-null after the if/else above (either freshly assigned
+        // an ArrayList, or already non-null and cleared). It is a mutable BaseState property, so
+        // Kotlin flow-analysis cannot smart-cast across the branch — assert the invariant explicitly.
+        requireNotNull(state.notScriptableApplications) {
+            "notScriptableApplications non-null: assigned-or-cleared in the if/else above"
+        }.addAll(notScriptableApplicationList)
     }
 
     /**
@@ -463,11 +472,25 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
             val dictionaryUrl = dInfoState.dictionaryUrl
             val applicationUrl = dInfoState.applicationUrl
             if (!StringUtil.isEmptyOrSpaces(appName) && !StringUtil.isEmptyOrSpaces(dictionaryUrl)) {
-                val dictionaryFile = if (!StringUtil.isEmpty(dictionaryUrl)) File(dictionaryUrl!!) else null
-                val applicationFile = if (!StringUtil.isEmpty(applicationUrl)) File(applicationUrl!!) else null
+                // The opaque StringUtil guards above defeat Kotlin flow-analysis on these platform
+                // @Nullable Strings; the per-branch isEmpty checks below establish the non-null invariant.
+                val dictionaryFile =
+                    if (!StringUtil.isEmpty(dictionaryUrl)) {
+                        File(requireNotNull(dictionaryUrl) { "dictionaryUrl non-null: guarded by !StringUtil.isEmpty above" })
+                    } else {
+                        null
+                    }
+                val applicationFile =
+                    if (!StringUtil.isEmpty(applicationUrl)) {
+                        File(requireNotNull(applicationUrl) { "applicationUrl non-null: guarded by !StringUtil.isEmpty above" })
+                    } else {
+                        null
+                    }
                 if (dictionaryFile != null && dictionaryFile.exists()) {
                     dictionaryInfoMap.remove(appName)
-                    addDictionaryInfoInternal(DictionaryInfo(appName!!, dictionaryFile, applicationFile))
+                    val nonNullAppName =
+                        requireNotNull(appName) { "appName non-null: guarded by !StringUtil.isEmptyOrSpaces above" }
+                    addDictionaryInfoInternal(DictionaryInfo(nonNullAppName, dictionaryFile, applicationFile))
                 }
             }
         }

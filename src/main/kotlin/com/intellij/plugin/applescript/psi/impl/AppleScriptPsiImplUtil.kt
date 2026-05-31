@@ -156,7 +156,8 @@ object AppleScriptPsiImplUtil {
         for (tellStatement in resolveScope) {
             val appRef = findApplicationNameFromTellStatement(tellStatement)
             if (!StringUtil.isEmpty(appRef)) {
-                result.add(appRef!!)
+                // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmpty guard above.
+                result.add(requireNotNull(appRef) { "appRef non-null: guarded by !StringUtil.isEmpty above" })
             }
         }
         return result

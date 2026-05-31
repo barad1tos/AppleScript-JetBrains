@@ -54,7 +54,13 @@ open class DictionaryPropertyImpl :
 
     override fun isObjectProperty(): Boolean = true
 
-    override val suite: Suite get() = dictionaryParentComponent!!.suite!!
+    override val suite: Suite
+        // Structural invariant: a dictionary property is constructed against a class/record parent
+        // (enforced by the `check(myParent is ...)` in both constructors), and that parent always
+        // belongs to a suite. Neither is ever null for a live property node.
+        get() = requireNotNull(
+            requireNotNull(dictionaryParentComponent) { "property ${getName()} has a parent component" }.suite,
+        ) { "property ${getName()}'s parent component belongs to a suite" }
 
     override val typeSpecifier: String get() = backingTypeSpecifier
 }
