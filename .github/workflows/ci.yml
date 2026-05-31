@@ -41,7 +41,14 @@ jobs:
       - name: Build plugin
         run: ./gradlew build --stacktrace
 
-      - name: Run tests
+      # Phase 7 CLEANUP-03 / D-01: the heavy fixture suite (parsing/concurrency/service/
+      # codeinsight) now runs BY DEFAULT — the build.gradle.kts gate was inverted from a
+      # `-PincludeHeavyTests` opt-IN to a `-PskipHeavyTests` opt-OUT. There is no flag to
+      # pass here: bare `./gradlew test` is now the full heavy suite. CI Linux is the source
+      # of truth for the heavy suite's green state (local macOS BasePlatformTestCase boot
+      # can exceed the Gradle timeout cap; 12 drifted golden fixtures are disabled via the
+      # Platform shouldRunTest() hook as Phase 8 / PARSE-07 territory).
+      - name: Run tests (heavy suite by default)
         run: ./gradlew test --stacktrace
 
       # SDEF-14: headless smoke runs ONLY on Linux to avoid bloating CI matrix.
@@ -97,6 +104,16 @@ jobs:
       # incident playbook is authored at first-incident time, not pre-emptively.
       - name: Verify coroutines wiring (Phase 3 drift gate)
         run: ./gradlew verifyNoBundledCoroutines verifyNoRunBlocking verifyBundledCoroutinesVersions --stacktrace
+
+      # Phase 7 CLEANUP-04 / D-07: detekt + ktlint static-analysis gates. They run
+      # transitively via `./gradlew check` in the build job, but the verify job invokes
+      # only `verifyPlugin*` and the build job runs `./gradlew test` (which does NOT
+      # trigger `check`). Invoking them explicitly here (mirroring the verifyNo* step
+      # above) is defence-in-depth so static-analysis drift surfaces in CI. Both run
+      # source-only against their grandfather baselines (detekt-baseline.xml /
+      # config/ktlint/baseline.xml) — only NEW findings gate.
+      - name: Verify static analysis (detekt + ktlint)
+        run: ./gradlew detekt ktlintCheck --stacktrace
 
       - name: Verify plugin against target IDEs
         run: ./gradlew verifyPlugin --stacktrace
