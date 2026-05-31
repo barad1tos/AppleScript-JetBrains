@@ -262,17 +262,22 @@ tasks {
         useJUnitPlatform()
         systemProperty("idea.test.cyclic.buffer.size", "1048576")
         systemProperty("file.encoding", "UTF-8")
-        // Phase 1 baseline: fixture-heavy tests (parsing/code-insight/dictionary)
-        // time out on 2024.3 because AbstractParsingFixtureTestCase.setUp() loads all
-        // testData files at once and AppleScriptSystemDictionaryRegistryService scans
-        // every installed macOS application (247 on dev box).
-        // Both will be rewritten in Phases 3 (PSI rewrite) and 4 (SDEF rewrite).
-        // For the green baseline we only run lexer tests; CI passes deterministically.
-        // Phase 8: parser regression suite runs only with -PincludeHeavyTests=true.
-        // BasePlatformTestCase boots a full fixture (~30s) + scans /Applications, so
-        // it's gated to avoid bloating CI but available for local fix-loop work.
-        val includeHeavy = providers.gradleProperty("includeHeavyTests").orNull == "true"
-        if (includeHeavy) {
+        // Phase 7 CLEANUP-03 / D-01: the heavy fixture suite now runs by DEFAULT so CI
+        // catches parser/concurrency/service/codeinsight regressions on every PR. Opt OUT
+        // for fast local fix-loops with `-PskipHeavyTests=true` (light suite only: lexer/
+        // persistence/sdef/parser/psi). This inverts the former `-PincludeHeavyTests` opt-IN
+        // gate. BasePlatformTestCase still boots a full fixture (~30s) + scans /Applications;
+        // the 11 baseline-RED drifted parsing methods are disabled in-method (Phase 8 /
+        // PARSE-07) and the 2 host-state tests stay excluded by omission (see end of filter).
+        //
+        // The `includeHeavyTests` SYSTEM property is still set when heavy runs, because the
+        // concurrency.* tests self-gate on `System.getProperty("includeHeavyTests") == "true"`
+        // via an in-setUp `Assume.assumeTrue(...)`. Dropping it would let the filter select
+        // those classes but then skip them internally — heavy-by-default would be a no-op for
+        // the concurrency suite. Keeping the system property keyed to `!skipHeavy` preserves
+        // the in-test gate without touching ~10 test files (out of D-01 scope).
+        val skipHeavy = providers.gradleProperty("skipHeavyTests").orNull == "true"
+        if (!skipHeavy) {
             systemProperty("includeHeavyTests", "true")
         }
         filter {
@@ -299,7 +304,7 @@ tasks {
             // Unconditional so a property conversion that drops/renames a Java-reachable
             // accessor trips on every CI run, not after a runtime NoSuchMethodError.
             includeTestsMatching("com.intellij.plugin.applescript.test.psi.*")
-            if (includeHeavy) {
+            if (!skipHeavy) {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.HandlersParsingTestCase")
