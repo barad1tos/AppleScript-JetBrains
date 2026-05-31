@@ -10,6 +10,15 @@ kotlin = "2.3.21"
 kotlinx-coroutines = "1.8.0"
 intellij-platform = "2.16.0"
 
+# Static analysis (Phase 7 CLEANUP-04 / D-07)
+# detekt 1.23.8 = latest 1.x (Gradle Plugin Portal, verified 2026-05-31). Pinned exact
+# (T-07-01 supply-chain mitigation). Runs SOURCE-ONLY against Kotlin 2.3.21 — detekt 1.23.8
+# bundles Kotlin compiler 2.0.0, cannot read 2.3.0 metadata, so NO `classpath`/type-resolution
+# (RESEARCH Pitfall 2). Build-time-only plugin; never shipped in the plugin ZIP.
+detekt = "1.23.8"
+# ktlint-gradle 14.2.0 — operator-blessed (same pin as sibling project ayu-jetbrains).
+ktlint-plugin = "14.2.0"
+
 # Test
 junit-jupiter = "5.11.4"
 junit4 = "4.13.2"
@@ -43,3 +52,5 @@ proxy-vole = { module = "org.bidib.com.github.markusbernhardt:proxy-vole", versi
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 intellij-platform = { id = "org.jetbrains.intellij.platform", version.ref = "intellij-platform" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint-plugin" }
