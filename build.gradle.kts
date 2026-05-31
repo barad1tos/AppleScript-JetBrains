@@ -14,8 +14,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.intellij.platform)
     // Phase 7 CLEANUP-04 / D-07: detekt + ktlint static analysis. Staged here (version-catalog
-    // aliases) but NOT yet wired into `check` — Wave 3 (plan 07-04) flips the gate after the
-    // cleanup edits land so the baseline reflects the cleaned tree. detekt runs SOURCE-ONLY
+    // aliases) and wired into `check` (see the `named("check")` block below — plan 07-04) so the
+    // grandfather baseline reflects the cleaned tree. detekt runs SOURCE-ONLY
     // (no `classpath`) because 1.23.8 bundles Kotlin compiler 2.0.0 and cannot read the
     // project's Kotlin 2.3.21 metadata (RESEARCH Pitfall 2). Build-time-only; never in the ZIP.
     alias(libs.plugins.detekt)
@@ -134,8 +134,8 @@ configurations.testRuntimeClasspath {
 // metadata; type-resolution would flood false positives + emit the
 // "was compiled with an incompatible version of Kotlin" warning (RESEARCH Pitfall 2).
 // The baseline (detekt-baseline.xml) grandfathers existing findings so only NEW code gates.
-// NOT wired into `check` here — Wave 3 (plan 07-04) flips the gate after the cleanup edits
-// land so the regenerated baseline reflects the cleaned tree.
+// Wired into `check` (plan 07-04, see the `named("check")` block below); the regenerated
+// baseline reflects the cleaned tree.
 detekt {
     config.setFrom(files("detekt.yml"))
     buildUponDefaultConfig = true
@@ -150,8 +150,8 @@ tasks.withType<Detekt>().configureEach {
 }
 
 // ktlint formatting (standard ruleset, no custom config). Do NOT run a tree-wide ktlintFormat
-// (RESEARCH Pitfall 5 — would churn 100+ files); existing violations are grandfathered via a
-// ktlint baseline if Wave 3 wires ktlintCheck into `check`.
+// (RESEARCH Pitfall 5 — would churn 100+ files); existing violations are grandfathered via the
+// ktlint baseline (config/ktlint/baseline.xml); ktlintCheck is wired into `check` (plan 07-04).
 ktlint {
     // Standard ruleset; no custom config surface (mirrors sibling project ayu-jetbrains).
 }
