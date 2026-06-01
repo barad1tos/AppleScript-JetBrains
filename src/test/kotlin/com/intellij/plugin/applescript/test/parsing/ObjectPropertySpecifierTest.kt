@@ -1,0 +1,38 @@
+package com.intellij.plugin.applescript.test.parsing
+
+import com.intellij.psi.PsiErrorElement
+import com.intellij.psi.PsiFile
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.io.File
+
+/**
+ * Phase 09 broad object/property specifier coverage: direct object constructors,
+ * contextual keyword terms, indexed object references, and Standard Additions
+ * path domains must parse cold, without loading application dictionaries.
+ */
+class ObjectPropertySpecifierTest : BasePlatformTestCase() {
+
+    override fun getTestDataPath(): String = File(REGRESSION_DIR).absolutePath
+
+    fun testObjectPropertySpecifiers() = assertNoParserErrors(OBJECT_PROPERTY_SPECIFIERS_FIXTURE)
+
+    private fun assertNoParserErrors(fileName: String) {
+        val psiFile: PsiFile = myFixture.configureByFile(fileName)
+        val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
+        if (errors.isEmpty()) return
+        val text = psiFile.text
+        val report = errors.joinToString("\n") { err ->
+            val offset = err.textRange.startOffset
+            val line = text.substring(0, offset).count { it == '\n' } + 1
+            val snippet = err.text.replace("\n", "\\n").take(40)
+            "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
+        }
+        fail("$fileName has ${errors.size} parser error(s):\n$report")
+    }
+
+    companion object {
+        private const val REGRESSION_DIR = "src/test/resources/testData/parse/regressions"
+        private const val OBJECT_PROPERTY_SPECIFIERS_FIXTURE = "object_property_specifiers.scpt"
+    }
+}
