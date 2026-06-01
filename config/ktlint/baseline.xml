@@ -27,7 +27,7 @@
         <error line="593" column="21" source="standard:function-signature" />
         <error line="593" column="35" source="standard:function-signature" />
         <error line="593" column="60" source="standard:function-signature" />
-        <error line="702" column="22" source="standard:chain-method-continuation" />
+        <error line="718" column="22" source="standard:chain-method-continuation" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/AppleScriptFile.kt">
         <error line="15" column="23" source="standard:class-signature" />
