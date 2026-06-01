@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptReturnStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptReturnStatement {
 
-  public AppleScriptReturnStatementImpl(ASTNode node) {
+  public AppleScriptReturnStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptReturnStatementImpl extends AppleScriptPsiElementImpl im
     visitor.visitReturnStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

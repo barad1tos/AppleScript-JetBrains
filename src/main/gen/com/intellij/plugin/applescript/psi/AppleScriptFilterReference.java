@@ -38,9 +38,6 @@ public interface AppleScriptFilterReference extends AppleScriptPsiElement {
   List<AppleScriptExpression> getExpressionList();
 
   @Nullable
-  AppleScriptFilterReference getFilterReference();
-
-  @Nullable
   AppleScriptHandlerInterleavedParametersCall getHandlerInterleavedParametersCall();
 
   @Nullable

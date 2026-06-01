@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptTargetRecordLiteralImpl extends AppleScriptPsiElementImpl implements AppleScriptTargetRecordLiteral {
 
-  public AppleScriptTargetRecordLiteralImpl(ASTNode node) {
+  public AppleScriptTargetRecordLiteralImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptTargetRecordLiteralImpl extends AppleScriptPsiElementImp
     visitor.visitTargetRecordLiteral(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -31,6 +32,7 @@ public class AppleScriptTargetRecordLiteralImpl extends AppleScriptPsiElementImp
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptObjectTargetPropertyDeclaration.class);
   }
 
+  @Override
   @NotNull
   public List<AppleScriptTargetVariable> getTargets() {
     return AppleScriptPsiImplUtil.getTargets(this);

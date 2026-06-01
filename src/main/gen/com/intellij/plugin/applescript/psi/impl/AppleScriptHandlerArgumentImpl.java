@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptHandlerArgumentImpl extends AppleScriptPsiElementImpl implements AppleScriptHandlerArgument {
 
-  public AppleScriptHandlerArgumentImpl(ASTNode node) {
+  public AppleScriptHandlerArgumentImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptHandlerArgumentImpl extends AppleScriptPsiElementImpl im
     visitor.visitHandlerArgument(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

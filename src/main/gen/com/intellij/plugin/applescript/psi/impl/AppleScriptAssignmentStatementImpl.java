@@ -13,7 +13,7 @@ import com.intellij.openapi.util.Pair;
 
 public class AppleScriptAssignmentStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptAssignmentStatement {
 
-  public AppleScriptAssignmentStatementImpl(ASTNode node) {
+  public AppleScriptAssignmentStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -21,6 +21,7 @@ public class AppleScriptAssignmentStatementImpl extends AppleScriptPsiElementImp
     visitor.visitAssignmentStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -176,16 +177,19 @@ public class AppleScriptAssignmentStatementImpl extends AppleScriptPsiElementImp
     return findChildByType(STRING_LITERAL);
   }
 
+  @Override
   @Nullable
   public AppleScriptPsiElement getAssignmentTarget() {
     return AppleScriptPsiImplUtil.getAssignmentTarget(this);
   }
 
+  @Override
   @NotNull
   public List<AppleScriptTargetVariable> getTargets() {
     return AppleScriptPsiImplUtil.getTargets(this);
   }
 
+  @Override
   @NotNull
   public List<Pair<AppleScriptPsiElement, AppleScriptExpression>> getTargetsToValuesMapping() {
     return AppleScriptPsiImplUtil.getTargetsToValuesMapping(this);

@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptConcatenationExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptConcatenationExpression {
 
-  public AppleScriptConcatenationExpressionImpl(ASTNode node) {
+  public AppleScriptConcatenationExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitConcatenationExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

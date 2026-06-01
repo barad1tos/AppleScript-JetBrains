@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptContinueStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptContinueStatement {
 
-  public AppleScriptContinueStatementImpl(ASTNode node) {
+  public AppleScriptContinueStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptContinueStatementImpl extends AppleScriptPsiElementImpl 
     visitor.visitContinueStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

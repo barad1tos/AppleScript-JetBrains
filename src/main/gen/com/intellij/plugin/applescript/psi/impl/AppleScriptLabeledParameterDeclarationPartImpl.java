@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptLabeledParameterDeclarationPartImpl extends AbstractAppleScriptComponent implements AppleScriptLabeledParameterDeclarationPart {
 
-  public AppleScriptLabeledParameterDeclarationPartImpl(ASTNode node) {
+  public AppleScriptLabeledParameterDeclarationPartImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptLabeledParameterDeclarationPartImpl extends AbstractAppl
     visitor.visitLabeledParameterDeclarationPart(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

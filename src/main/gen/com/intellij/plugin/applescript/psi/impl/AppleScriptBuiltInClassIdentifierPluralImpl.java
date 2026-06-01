@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptBuiltInClassIdentifierPluralImpl extends AppleScriptPsiElementImpl implements AppleScriptBuiltInClassIdentifierPlural {
 
-  public AppleScriptBuiltInClassIdentifierPluralImpl(ASTNode node) {
+  public AppleScriptBuiltInClassIdentifierPluralImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptBuiltInClassIdentifierPluralImpl extends AppleScriptPsiE
     visitor.visitBuiltInClassIdentifierPlural(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

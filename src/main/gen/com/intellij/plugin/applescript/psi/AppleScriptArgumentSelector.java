@@ -10,8 +10,10 @@ public interface AppleScriptArgumentSelector extends AppleScriptPsiElement {
   @NotNull
   AppleScriptIdentifier getIdentifier();
 
+  @Nullable
   AppleScriptIdentifier getSelectorIdentifier();
 
+  @NotNull
   String getSelectorName();
 
 }

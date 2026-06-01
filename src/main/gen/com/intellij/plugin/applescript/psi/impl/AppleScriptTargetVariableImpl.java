@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptTargetVariableImpl extends AbstractAppleScriptComponent implements AppleScriptTargetVariable {
 
-  public AppleScriptTargetVariableImpl(ASTNode node) {
+  public AppleScriptTargetVariableImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptTargetVariableImpl extends AbstractAppleScriptComponent 
     visitor.visitTargetVariable(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

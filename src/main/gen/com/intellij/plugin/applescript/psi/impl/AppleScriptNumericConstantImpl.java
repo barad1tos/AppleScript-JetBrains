@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptNumericConstantImpl extends AppleScriptPsiElementImpl implements AppleScriptNumericConstant {
 
-  public AppleScriptNumericConstantImpl(ASTNode node) {
+  public AppleScriptNumericConstantImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptNumericConstantImpl extends AppleScriptPsiElementImpl im
     visitor.visitNumericConstant(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

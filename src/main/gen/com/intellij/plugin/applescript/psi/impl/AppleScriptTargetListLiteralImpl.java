@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptTargetListLiteralImpl extends AppleScriptPsiElementImpl implements AppleScriptTargetListLiteral {
 
-  public AppleScriptTargetListLiteralImpl(ASTNode node) {
+  public AppleScriptTargetListLiteralImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptTargetListLiteralImpl extends AppleScriptPsiElementImpl 
     visitor.visitTargetListLiteral(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -49,6 +50,7 @@ public class AppleScriptTargetListLiteralImpl extends AppleScriptPsiElementImpl 
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptTargetVariable.class);
   }
 
+  @Override
   @NotNull
   public List<AppleScriptTargetVariable> getTargets() {
     return AppleScriptPsiImplUtil.getTargets(this);

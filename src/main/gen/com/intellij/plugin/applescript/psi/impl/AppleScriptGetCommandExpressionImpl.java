@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptGetCommandExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptGetCommandExpression {
 
-  public AppleScriptGetCommandExpressionImpl(ASTNode node) {
+  public AppleScriptGetCommandExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitGetCommandExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

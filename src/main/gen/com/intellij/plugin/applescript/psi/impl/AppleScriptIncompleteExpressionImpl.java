@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptIncompleteExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptIncompleteExpression {
 
-  public AppleScriptIncompleteExpressionImpl(ASTNode node) {
+  public AppleScriptIncompleteExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitIncompleteExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

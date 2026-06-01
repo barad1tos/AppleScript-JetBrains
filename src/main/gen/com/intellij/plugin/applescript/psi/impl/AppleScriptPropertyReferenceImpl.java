@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptPropertyReferenceImpl extends AppleScriptPsiElementImpl implements AppleScriptPropertyReference {
 
-  public AppleScriptPropertyReferenceImpl(ASTNode node) {
+  public AppleScriptPropertyReferenceImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptPropertyReferenceImpl extends AppleScriptPsiElementImpl 
     visitor.visitPropertyReference(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

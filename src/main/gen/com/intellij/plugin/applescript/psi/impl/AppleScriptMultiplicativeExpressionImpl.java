@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptMultiplicativeExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptMultiplicativeExpression {
 
-  public AppleScriptMultiplicativeExpressionImpl(ASTNode node) {
+  public AppleScriptMultiplicativeExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitMultiplicativeExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

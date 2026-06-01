@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptIfCompoundStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptIfCompoundStatement {
 
-  public AppleScriptIfCompoundStatementImpl(ASTNode node) {
+  public AppleScriptIfCompoundStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptIfCompoundStatementImpl extends AppleScriptPsiElementImp
     visitor.visitIfCompoundStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

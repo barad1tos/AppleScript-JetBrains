@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRepeatUntilStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptRepeatUntilStatement {
 
-  public AppleScriptRepeatUntilStatementImpl(ASTNode node) {
+  public AppleScriptRepeatUntilStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptRepeatUntilStatementImpl extends AppleScriptPsiElementIm
     visitor.visitRepeatUntilStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

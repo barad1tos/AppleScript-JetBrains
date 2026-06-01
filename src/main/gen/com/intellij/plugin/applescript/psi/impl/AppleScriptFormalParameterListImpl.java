@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptFormalParameterListImpl extends AppleScriptPsiElementImpl implements AppleScriptFormalParameterList {
 
-  public AppleScriptFormalParameterListImpl(ASTNode node) {
+  public AppleScriptFormalParameterListImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptFormalParameterListImpl extends AppleScriptPsiElementImp
     visitor.visitFormalParameterList(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -49,6 +50,7 @@ public class AppleScriptFormalParameterListImpl extends AppleScriptPsiElementImp
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptSimpleFormalParameter.class);
   }
 
+  @Override
   @NotNull
   public List<AppleScriptComponent> getFormalParameters() {
     return AppleScriptPsiImplUtil.getFormalParameters(this);

@@ -372,7 +372,7 @@ public interface AppleScriptTypes {
   class Factory {
     public static PsiElement createElement(ASTNode node) {
       IElementType type = node.getElementType();
-       if (type == ACTIVATE_COMMAND_EXPRESSION) {
+      if (type == ACTIVATE_COMMAND_EXPRESSION) {
         return new AppleScriptActivateCommandExpressionImpl(node);
       }
       else if (type == ADDITIVE_EXPRESSION) {

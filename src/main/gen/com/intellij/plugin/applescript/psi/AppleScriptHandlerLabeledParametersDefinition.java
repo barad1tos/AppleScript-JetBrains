@@ -25,6 +25,7 @@ public interface AppleScriptHandlerLabeledParametersDefinition extends AppleScri
   @Nullable
   AppleScriptVarDeclarationList getVarDeclarationList();
 
+  @NotNull
   List<AppleScriptComponent> getParameterComponentList();
 
 }

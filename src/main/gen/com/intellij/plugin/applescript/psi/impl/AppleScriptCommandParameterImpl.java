@@ -13,7 +13,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptCommandParameterImpl extends AbstractAppleScriptCommandParameter implements AppleScriptCommandParameter {
 
-  public AppleScriptCommandParameterImpl(ASTNode node) {
+  public AppleScriptCommandParameterImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -21,6 +21,7 @@ public class AppleScriptCommandParameterImpl extends AbstractAppleScriptCommandP
     visitor.visitCommandParameter(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

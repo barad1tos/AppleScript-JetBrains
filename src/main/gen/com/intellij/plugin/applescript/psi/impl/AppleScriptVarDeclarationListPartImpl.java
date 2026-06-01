@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptVarDeclarationListPartImpl extends AbstractAppleScriptComponent implements AppleScriptVarDeclarationListPart {
 
-  public AppleScriptVarDeclarationListPartImpl(ASTNode node) {
+  public AppleScriptVarDeclarationListPartImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptVarDeclarationListPartImpl extends AbstractAppleScriptCo
     visitor.visitVarDeclarationListPart(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

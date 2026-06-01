@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptTellSimpleStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptTellSimpleStatement {
 
-  public AppleScriptTellSimpleStatementImpl(ASTNode node) {
+  public AppleScriptTellSimpleStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptTellSimpleStatementImpl extends AppleScriptPsiElementImp
     visitor.visitTellSimpleStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -109,6 +110,7 @@ public class AppleScriptTellSimpleStatementImpl extends AppleScriptPsiElementImp
     return findChildByClass(AppleScriptWithTransactionStatement.class);
   }
 
+  @Override
   @Nullable
   public String getApplicationName() {
     return AppleScriptPsiImplUtil.getApplicationName(this);

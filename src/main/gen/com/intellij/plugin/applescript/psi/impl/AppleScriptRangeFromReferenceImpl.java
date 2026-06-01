@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRangeFromReferenceImpl extends AppleScriptPsiElementImpl implements AppleScriptRangeFromReference {
 
-  public AppleScriptRangeFromReferenceImpl(ASTNode node) {
+  public AppleScriptRangeFromReferenceImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptRangeFromReferenceImpl extends AppleScriptPsiElementImpl
     visitor.visitRangeFromReference(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

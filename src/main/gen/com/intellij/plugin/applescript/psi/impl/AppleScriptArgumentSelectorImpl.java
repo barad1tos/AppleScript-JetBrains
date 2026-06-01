@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptArgumentSelectorImpl extends AppleScriptPsiElementImpl implements AppleScriptArgumentSelector {
 
-  public AppleScriptArgumentSelectorImpl(ASTNode node) {
+  public AppleScriptArgumentSelectorImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptArgumentSelectorImpl extends AppleScriptPsiElementImpl i
     visitor.visitArgumentSelector(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -31,10 +32,14 @@ public class AppleScriptArgumentSelectorImpl extends AppleScriptPsiElementImpl i
     return findNotNullChildByClass(AppleScriptIdentifier.class);
   }
 
+  @Override
+  @Nullable
   public AppleScriptIdentifier getSelectorIdentifier() {
     return AppleScriptPsiImplUtil.getSelectorIdentifier(this);
   }
 
+  @Override
+  @NotNull
   public String getSelectorName() {
     return AppleScriptPsiImplUtil.getSelectorName(this);
   }
