@@ -998,9 +998,15 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
    */
   private static boolean parseKeywordAsPropertyFallback(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "parseKeywordAsPropertyFallback")) return false;
-    if (b.getTokenType() != COUNT) return false;
-    IElementType ahead = b.lookAhead(1);
-    if (ahead != OF && ahead != IN) return false;
+    if (!isContextualPropertyTerm(b.getTokenType())) return false;
+    if (isFallbackAnchor(b.lookAhead(1), FALLBACK_PROPERTY)) {
+      b.advanceLexer();
+      return true;
+    }
+    if (b.lookAhead(1) != VAR_IDENTIFIER || !isFallbackAnchor(b.lookAhead(2), FALLBACK_PROPERTY)) {
+      return false;
+    }
+    b.advanceLexer();
     b.advanceLexer();
     return true;
   }
@@ -1065,6 +1071,14 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
   private static boolean parseFallbackBareIdentifier(PsiBuilder b, int l, int mode) {
     if (!recursion_guard_(b, l, "parseFallbackBareIdentifier")) return false;
     if (b.getTokenType() != VAR_IDENTIFIER) return false;
+    if (isFallbackAnchor(b.lookAhead(1), mode)) {
+      b.advanceLexer();
+      return true;
+    }
+    if (mode == FALLBACK_CLASS && b.lookAhead(1) == VAR_IDENTIFIER && isClassRangeAnchor(b.lookAhead(2))) {
+      b.advanceLexer();
+      return true;
+    }
     if (b.lookAhead(1) != VAR_IDENTIFIER) return false;
     if (!isFallbackAnchor(b.lookAhead(2), mode)) return false;
     b.advanceLexer();
@@ -1074,8 +1088,25 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
 
   private static boolean isFallbackAnchor(IElementType t, int mode) {
     if (t == OF || t == IN) return true;
+    if (mode == FALLBACK_PROPERTY) {
+      return isPropertyComparisonAnchor(t);
+    }
     if (mode == FALLBACK_CLASS) return t == DIGITS || t == WHOSE || t == WHERE;
     return false;
+  }
+
+  private static boolean isPropertyComparisonAnchor(IElementType t) {
+    return t == EQ || t == NE || t == LT || t == GT || t == LE || t == GE
+            || t == STARTS_BEGINS_WITH || t == ENDS_WITH || t == DOES_NOT_CONTAIN
+            || t == IS_IN || t == IS_NOT_IN || t == IS_CONTAIN;
+  }
+
+  private static boolean isClassRangeAnchor(IElementType t) {
+    return t == THRU || t == THROUGH || t == FROM || t == TO;
+  }
+
+  private static boolean isContextualPropertyTerm(IElementType t) {
+    return t == COUNT || t == DATE || t == FILE || t == EVENT || t == TAB;
   }
 
   /**

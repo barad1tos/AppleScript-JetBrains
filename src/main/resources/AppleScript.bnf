@@ -556,8 +556,8 @@ rangeFromReference ::= from [THE_KW] (beginning|expression) to [THE_KW](end|expr
 rangeIndexReference ::= startIndex (thru|through) stopIndex
 everyRangeReference ::= every (singularClassName|userClassName) from (beginning|expression) to (end|expression)
 
-private stopIndex::= integerLiteralExpression | expression
-private startIndex ::= integerLiteralExpression | expression
+private stopIndex::= integerLiteralExpression | (referenceExpression &(of|in|RPAREN|NLS)) | expression
+private startIndex ::= integerLiteralExpression | (referenceExpression &(thru|through)) | expression
 
 relativeReference ::=  relativeBeforeReference | relativeAfterReference
 
