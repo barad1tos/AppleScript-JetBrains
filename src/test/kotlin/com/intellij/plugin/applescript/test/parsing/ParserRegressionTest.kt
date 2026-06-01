@@ -34,6 +34,8 @@ class ParserRegressionTest : BasePlatformTestCase() {
 
     fun testDoShellScript() = assertNoParserErrors("do_shell_script.scpt")
 
+    fun testDateProperties() = assertNoParserErrors("date_properties.scpt")
+
     private fun assertNoParserErrors(fileName: String) {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)

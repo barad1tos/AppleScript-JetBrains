@@ -26,6 +26,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.APP
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.APPLICATION_REFERENCE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_CONSTANT_LITERAL_EXPRESSION
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.CLASS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COLON
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMA
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
@@ -47,6 +48,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GT
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.HOURS_CONSTANT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ID
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
@@ -59,6 +61,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.LE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MY
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.MINUTES_CONSTANT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NAMED
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
@@ -66,6 +69,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SCRIPT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SCRIPTING_ADDITIONS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.SECONDS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STARTS_BEGINS_WITH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TAB
@@ -1307,8 +1311,12 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
             tokenType === THRU || tokenType === THROUGH || tokenType === FROM || tokenType === TO
 
         private fun isContextualPropertyTerm(tokenType: IElementType?): Boolean =
-            tokenType === COUNT ||
+            tokenType === CLASS ||
+                tokenType === COUNT ||
+                tokenType === HOURS_CONSTANT ||
                 tokenType === ID ||
+                tokenType === MINUTES_CONSTANT ||
+                tokenType === SECONDS ||
                 tokenType === END ||
                 isContextualSpecifierTermToken(tokenType)
 
