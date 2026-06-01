@@ -24,6 +24,7 @@ import com.intellij.plugin.applescript.lang.sdef.CommandParameter
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.APPLICATION
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.APP
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.APPLICATION_REFERENCE
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_CONSTANT_LITERAL_EXPRESSION
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COLON
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMA
@@ -58,6 +59,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.LE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MY
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.NAMED
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
@@ -116,8 +118,15 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
         private val PARSING_LITERAL_EXPRESSION: Key<Boolean> =
             Key.create("applescript.parsing.literal.expression")
 
-        private const val FALLBACK_PROPERTY = 0
-        private const val FALLBACK_CLASS = 1
+        private enum class FallbackTermKind {
+            Property,
+            Class,
+        }
+
+        private enum class FallbackCommandParameterMode {
+            OptionalDirectParameter,
+            ParametersOnly,
+        }
 
         private fun parseDictionaryCommandNameInner(
             builder: PsiBuilder,
@@ -176,6 +185,12 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
         ): Boolean {
             if (!recursion_guard_(builder, level, "parseWellKnownCommandFallback")) return false
             if (builder.tokenType !== VAR_IDENTIFIER) return false
+
+            if (parseFallbackCommandPhrase(builder, parsedName, "choose", "from", "list")) return true
+            if (parseFallbackCommandPhrase(builder, parsedName, "display", "dialog")) return true
+            if (parseFallbackCommandPhrase(builder, parsedName, "do", "shell", "script")) return true
+            if (parseFallbackCommandPhrase(builder, parsedName, "run", "script")) return true
+
             if (builder.tokenText == "read" && builder.lookAhead(1) !== FILE) {
                 return false
             }
@@ -185,47 +200,34 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
                 builder.advanceLexer()
                 return true
             }
-            if (currentText != "do") return false
+            return false
+        }
 
-            if (builder.lookAhead(1) === VAR_IDENTIFIER && builder.lookAhead(2) === SCRIPT) {
-                val marker = builder.mark()
-                val first = builder.tokenText.orEmpty()
-                builder.advanceLexer()
-                if (builder.tokenText != "shell") {
+        private fun parseFallbackCommandPhrase(
+            builder: PsiBuilder,
+            parsedName: Ref<String>,
+            vararg words: String,
+        ): Boolean {
+            val marker = builder.mark()
+            val commandName = mutableListOf<String>()
+            for (word in words) {
+                val tokenText = builder.tokenText
+                if (tokenText == null || !tokenText.equals(word, ignoreCase = true)) {
                     marker.rollbackTo()
                     return false
                 }
-                val second = builder.tokenText.orEmpty()
+                commandName.add(tokenText)
                 builder.advanceLexer()
-                val third = builder.tokenText.orEmpty()
-                builder.advanceLexer()
-                marker.drop()
-                parsedName.set("$first $second $third")
-                return true
             }
-
-            if (builder.lookAhead(1) === SCRIPT) {
-                val marker = builder.mark()
-                val first = builder.tokenText.orEmpty()
-                builder.advanceLexer()
-                val second = builder.tokenText.orEmpty()
-                builder.advanceLexer()
-                marker.drop()
-                parsedName.set("$first $second")
-                return true
-            }
-
-            return false
+            marker.drop()
+            parsedName.set(commandName.joinToString(" "))
+            return true
         }
 
         @JvmStatic
         fun parseCommandHandlerCallExpression(builder: PsiBuilder, level: Int): Boolean {
             if (!recursion_guard_(builder, level, "parseCommandHandlerCallExpression")) return false
-            if (nextTokenIs(builder, NLS)) return false
-
-            val tokenText = builder.tokenText
-            if (tokenText.isNullOrEmpty() || !AppleScriptNames.isIdentifierStart(tokenText[0])) return false
-            if (builder.tokenType === COUNT) return false
+            if (!isCommandHandlerCallStart(builder)) return false
 
             val parsedCommandName = Ref<String>()
             val toldApplicationName = getTargetApplicationName(builder)
@@ -236,7 +238,12 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
                 null
             }
 
-            val commandNameMarker = enter_section_(builder, level, _COLLAPSE_, "<parse Command Handler Call Expression>")
+            val commandNameMarker = enter_section_(
+                builder,
+                level,
+                _COLLAPSE_,
+                "<parse Command Handler Call Expression>",
+            )
             var result = parseDictionaryCommandNameInner(
                 builder,
                 level + 1,
@@ -258,14 +265,8 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
             )
 
             if (allCommandsWithName.isEmpty() &&
-                parsedCommandName.get() != null &&
-                isFallbackCommandWithDirectParameter(parsedCommandName.get())
+                parseFallbackParametersForCommand(builder, level + 1, parsedCommandName.get())
             ) {
-                consumeToken(builder, OF)
-                val parameterMarker = enter_section_(builder, level, _NONE_, "<fallback direct parameter>")
-                val parameterResult = AppleScriptParser.expression(builder, level + 1)
-                exit_section_(builder, level, parameterMarker, DIRECT_PARAMETER_VAL, parameterResult, false, null)
-                parseFallbackCommandParameters(builder, level + 1)
                 return true
             }
 
@@ -280,30 +281,126 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
             return result || incompleteHandlerCall
         }
 
-        private fun isFallbackCommandWithDirectParameter(commandName: String): Boolean =
-            commandName.contains(" ") || isWellKnownSingleWordCommand(commandName)
+        private fun isCommandHandlerCallStart(builder: PsiBuilder): Boolean {
+            if (nextTokenIs(builder, NLS)) return false
+            if (builder.tokenType === COUNT) return false
+            val tokenText = builder.tokenText
+            return !tokenText.isNullOrEmpty() && AppleScriptNames.isIdentifierStart(tokenText[0])
+        }
 
         private fun isWellKnownSingleWordCommand(commandName: String): Boolean =
-            commandName == "read" || commandName == "move" || commandName == "exists" || commandName == "run"
+            commandName == "read" ||
+                commandName == "move" ||
+                commandName == "exists" ||
+                commandName == "run" ||
+                commandName == "delete" ||
+                commandName == "make"
+
+        private fun fallbackCommandParameterMode(commandName: String): FallbackCommandParameterMode? =
+            when (commandName.lowercase()) {
+                "make" -> FallbackCommandParameterMode.ParametersOnly
+                "choose from list",
+                "display dialog",
+                "do shell script",
+                "run script",
+                "read",
+                "move",
+                "exists",
+                "run",
+                "delete",
+                -> FallbackCommandParameterMode.OptionalDirectParameter
+                else -> {
+                    if (commandName.contains(" ")) FallbackCommandParameterMode.OptionalDirectParameter else null
+                }
+            }
+
+        private fun parseFallbackParametersForCommand(
+            builder: PsiBuilder,
+            level: Int,
+            commandName: String?,
+        ): Boolean {
+            val mode = commandName?.let(::fallbackCommandParameterMode) ?: return false
+            if (mode == FallbackCommandParameterMode.OptionalDirectParameter) {
+                parseOptionalFallbackDirectParameter(builder, level + 1)
+            }
+            parseFallbackCommandParameters(builder, level + 1)
+            return true
+        }
+
+        private fun parseOptionalFallbackDirectParameter(builder: PsiBuilder, level: Int): Boolean {
+            consumeToken(builder, OF)
+            if (!isFallbackDirectParameterStart(builder.tokenType)) return false
+
+            val parameterMarker = enter_section_(builder, level, _NONE_, "<fallback direct parameter>")
+            val parameterResult = AppleScriptParser.expression(builder, level + 1)
+            exit_section_(builder, level, parameterMarker, DIRECT_PARAMETER_VAL, parameterResult, false, null)
+            return parameterResult
+        }
 
         private fun parseFallbackCommandParameters(builder: PsiBuilder, level: Int) {
             while (isFallbackCommandParameterStart(builder.tokenType)) {
                 val marker = enter_section_(builder, level, _NONE_, "<fallback command parameter>")
-                builder.advanceLexer()
-                if (builder.tokenType === VAR_IDENTIFIER &&
-                    builder.lookAhead(1) !== NLS &&
-                    builder.lookAhead(1) !== RPAREN
-                ) {
-                    builder.advanceLexer()
-                }
-                val result = AppleScriptParser.expression(builder, level + 1)
+                val result = parseFallbackCommandParameterSelector(builder, level + 1) &&
+                    AppleScriptParser.expression(builder, level + 1)
                 exit_section_(builder, level, marker, COMMAND_PARAMETER, result, false, null)
                 if (!result) return
             }
         }
 
+        private fun parseFallbackCommandParameterSelector(builder: PsiBuilder, level: Int): Boolean {
+            val marker = enter_section_(builder, level, _NONE_, "<fallback command parameter selector>")
+            val result = when {
+                isFallbackPrepositionParameterStart(builder.tokenType) -> {
+                    val selectorStart = builder.tokenType
+                    builder.advanceLexer()
+                    if (selectorStart === WITH && builder.tokenType === VAR_IDENTIFIER) {
+                        builder.advanceLexer()
+                    }
+                    true
+                }
+                builder.tokenType === VAR_IDENTIFIER -> parseFallbackBareParameterSelector(builder)
+                else -> false
+            }
+            exit_section_(builder, level, marker, COMMAND_PARAMETER_SELECTOR, result, false, null)
+            return result
+        }
+
+        private fun parseFallbackBareParameterSelector(builder: PsiBuilder): Boolean {
+            val firstWord = builder.tokenText.orEmpty()
+            builder.advanceLexer()
+            if (firstWord.equals("default", ignoreCase = true) && builder.tokenType === VAR_IDENTIFIER) {
+                builder.advanceLexer()
+                return true
+            }
+            if (firstWord.equals("giving", ignoreCase = true) &&
+                builder.tokenText.equals("up", ignoreCase = true) &&
+                builder.lookAhead(1).hasText("after")
+            ) {
+                builder.advanceLexer()
+                builder.advanceLexer()
+            }
+            return true
+        }
+
+        private fun isFallbackDirectParameterStart(tokenType: IElementType?): Boolean =
+            tokenType != null &&
+                tokenType !== NLS &&
+                tokenType !== COMMENT &&
+                !isFallbackPrepositionParameterStart(tokenType)
+
         private fun isFallbackCommandParameterStart(tokenType: IElementType?): Boolean =
-            tokenType === TO || tokenType === INTO || tokenType === FROM || tokenType === WITH
+            isFallbackPrepositionParameterStart(tokenType) || tokenType === VAR_IDENTIFIER
+
+        private fun isFallbackPrepositionParameterStart(tokenType: IElementType?): Boolean =
+            tokenType === TO ||
+                tokenType === INTO ||
+                tokenType === FROM ||
+                tokenType === WITH ||
+                tokenType === WITHOUT ||
+                tokenType === GIVEN
+
+        private fun IElementType?.hasText(text: String): Boolean =
+            this != null && toString().equals(text, ignoreCase = true)
 
         @JvmStatic
         fun parseApplicationHandlerDefinitionSignature(builder: PsiBuilder, level: Int): Boolean {
@@ -385,7 +482,9 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
                     }
                 }
             } else {
-                allCommandsWithName.addAll(ParsableScriptSuiteRegistryHelper.findStdCommands(builder.project, parsedCommandName))
+                allCommandsWithName.addAll(
+                    ParsableScriptSuiteRegistryHelper.findStdCommands(builder.project, parsedCommandName),
+                )
             }
             if (allCommandsWithName.isEmpty()) {
                 allCommandsWithName.addAll(
@@ -1024,18 +1123,20 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
             }
 
             if (parseKeywordAsPropertyFallback(builder, level + 1)) return true
-            return parseFallbackBareIdentifier(builder, level + 1, FALLBACK_PROPERTY)
+            return parseFallbackBareIdentifier(builder, level + 1, FallbackTermKind.Property)
         }
 
         private fun parseKeywordAsPropertyFallback(builder: PsiBuilder, level: Int): Boolean {
             if (!recursion_guard_(builder, level, "parseKeywordAsPropertyFallback")) return false
-            if (isContextualPropertyTerm(builder.tokenType) && isFallbackAnchor(builder.lookAhead(1), FALLBACK_PROPERTY)) {
+            if (isContextualPropertyTerm(builder.tokenType) &&
+                isFallbackAnchor(builder.lookAhead(1), FallbackTermKind.Property)
+            ) {
                 builder.advanceLexer()
                 return true
             }
             if (builder.tokenType === VAR_IDENTIFIER &&
                 isContextualPropertyTerm(builder.lookAhead(1)) &&
-                isFallbackAnchor(builder.lookAhead(2), FALLBACK_PROPERTY)
+                isFallbackAnchor(builder.lookAhead(2), FallbackTermKind.Property)
             ) {
                 builder.advanceLexer()
                 builder.advanceLexer()
@@ -1043,7 +1144,7 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
             }
             if (isContextualPropertyTerm(builder.tokenType) &&
                 builder.lookAhead(1) === VAR_IDENTIFIER &&
-                isFallbackAnchor(builder.lookAhead(2), FALLBACK_PROPERTY)
+                isFallbackAnchor(builder.lookAhead(2), FallbackTermKind.Property)
             ) {
                 builder.advanceLexer()
                 builder.advanceLexer()
@@ -1081,7 +1182,7 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
                 applicationsToImportFrom,
             )
             if (result) return true
-            return parseFallbackBareIdentifier(builder, level + 1, FALLBACK_CLASS)
+            return parseFallbackBareIdentifier(builder, level + 1, FallbackTermKind.Class)
         }
 
         @JvmStatic
@@ -1089,62 +1190,101 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
             recursion_guard_(builder, level, "parseCheckForUseStatements") &&
                 builder.getUserData(WAS_USE_STATEMENT_USED) == true
 
-        private fun parseFallbackBareIdentifier(builder: PsiBuilder, level: Int, mode: Int): Boolean {
+        private fun parseFallbackBareIdentifier(
+            builder: PsiBuilder,
+            level: Int,
+            termKind: FallbackTermKind,
+        ): Boolean {
             if (!recursion_guard_(builder, level, "parseFallbackBareIdentifier")) return false
-            if (!isFallbackTermToken(builder.tokenType, mode)) return false
-            if (isFallbackAnchor(builder.lookAhead(1), mode)) {
-                builder.advanceLexer()
-                return true
+            if (!isFallbackTermToken(builder.tokenType, termKind)) return false
+            if (isFallbackAnchor(builder.lookAhead(1), termKind)) {
+                return advanceFallbackTerm(builder)
             }
-            if (mode == FALLBACK_CLASS && isClassDirectSelectorAnchor(builder.lookAhead(1))) {
-                builder.advanceLexer()
-                return true
+            return when (termKind) {
+                FallbackTermKind.Class -> parseFallbackClassIdentifier(builder)
+                FallbackTermKind.Property -> parseFallbackPropertyIdentifier(builder)
             }
-            if (mode == FALLBACK_CLASS &&
-                builder.lookAhead(1) === VAR_IDENTIFIER &&
-                isClassRangeAnchor(builder.lookAhead(2))
-            ) {
-                builder.advanceLexer()
-                return true
+        }
+
+        private fun parseFallbackClassIdentifier(builder: PsiBuilder): Boolean {
+            if (isClassDirectSelectorAnchor(builder.lookAhead(1))) {
+                return advanceFallbackTerm(builder)
             }
-            if (mode == FALLBACK_PROPERTY &&
+            if (builder.lookAhead(1) === VAR_IDENTIFIER && isClassRangeAnchor(builder.lookAhead(2))) {
+                return advanceFallbackTerm(builder)
+            }
+            if (isProcessClassDirectReference(builder)) {
+                return advanceFallbackTerm(builder)
+            }
+            return parseFallbackTwoWordIdentifier(builder, FallbackTermKind.Class)
+        }
+
+        private fun parseFallbackPropertyIdentifier(builder: PsiBuilder): Boolean {
+            if (
                 builder.tokenType === VAR_IDENTIFIER &&
                 isContextualPropertyTerm(builder.lookAhead(1)) &&
-                isFallbackAnchor(builder.lookAhead(2), mode)
+                isFallbackAnchor(builder.lookAhead(2), FallbackTermKind.Property)
             ) {
-                builder.advanceLexer()
-                builder.advanceLexer()
-                return true
+                return advanceFallbackTermPair(builder)
             }
-            if (mode == FALLBACK_PROPERTY &&
-                builder.lookAhead(1) === VAR_IDENTIFIER &&
+            if (
+                isContextualPropertyTerm(builder.lookAhead(1)) &&
                 isPropertyTerminatorAnchor(builder.lookAhead(2))
             ) {
-                builder.advanceLexer()
-                builder.advanceLexer()
-                return true
+                return advanceFallbackTermPair(builder)
             }
+            if (builder.lookAhead(1) === VAR_IDENTIFIER && isPropertyTerminatorAnchor(builder.lookAhead(2))) {
+                return advanceFallbackTermPair(builder)
+            }
+            return parseFallbackTwoWordIdentifier(builder, FallbackTermKind.Property)
+        }
+
+        private fun parseFallbackTwoWordIdentifier(builder: PsiBuilder, termKind: FallbackTermKind): Boolean {
             if (builder.lookAhead(1) !== VAR_IDENTIFIER) return false
-            if (!isFallbackAnchor(builder.lookAhead(2), mode)) return false
+            if (!isFallbackAnchor(builder.lookAhead(2), termKind)) return false
+            return advanceFallbackTermPair(builder)
+        }
+
+        private fun advanceFallbackTerm(builder: PsiBuilder): Boolean {
+            builder.advanceLexer()
+            return true
+        }
+
+        private fun advanceFallbackTermPair(builder: PsiBuilder): Boolean {
             builder.advanceLexer()
             builder.advanceLexer()
             return true
         }
 
-        private fun isFallbackAnchor(tokenType: IElementType?, mode: Int): Boolean {
+        private fun isFallbackAnchor(tokenType: IElementType?, termKind: FallbackTermKind): Boolean {
             if (tokenType === OF || tokenType === IN) return true
-            if (mode == FALLBACK_PROPERTY) {
+            if (termKind == FallbackTermKind.Property) {
                 return isPropertyComparisonAnchor(tokenType)
             }
-            if (mode == FALLBACK_CLASS) return tokenType === DIGITS || tokenType === WHOSE || tokenType === WHERE
+            if (termKind == FallbackTermKind.Class) {
+                return tokenType === DIGITS || tokenType === WHOSE || tokenType === WHERE
+            }
             return false
         }
 
-        private fun isFallbackTermToken(tokenType: IElementType?, mode: Int): Boolean =
-            tokenType === VAR_IDENTIFIER || mode == FALLBACK_CLASS && isContextualClassTerm(tokenType)
+        private fun isFallbackTermToken(tokenType: IElementType?, termKind: FallbackTermKind): Boolean =
+            tokenType === VAR_IDENTIFIER || termKind == FallbackTermKind.Class && isContextualClassTerm(tokenType)
 
         private fun isClassDirectSelectorAnchor(tokenType: IElementType?): Boolean =
-            tokenType === STRING_LITERAL
+            tokenType === STRING_LITERAL || tokenType === NAMED
+
+        private fun isProcessClassDirectReference(builder: PsiBuilder): Boolean =
+            builder.tokenText.equals("process", ignoreCase = true) &&
+                builder.lookAhead(1) === VAR_IDENTIFIER &&
+                isClassDirectReferenceAnchor(builder.lookAhead(2))
+
+        private fun isClassDirectReferenceAnchor(tokenType: IElementType?): Boolean =
+            tokenType === AS ||
+                tokenType === OF ||
+                tokenType === IN ||
+                tokenType === RPAREN ||
+                tokenType === NLS ||
+                tokenType === COMMENT
 
         private fun isPropertyComparisonAnchor(tokenType: IElementType?): Boolean =
             tokenType === EQ ||
@@ -1168,13 +1308,14 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
 
         private fun isContextualPropertyTerm(tokenType: IElementType?): Boolean =
             tokenType === COUNT ||
-                tokenType === DATE ||
-                tokenType === FILE ||
-                tokenType === EVENT ||
-                tokenType === TAB ||
-                tokenType === END
+                tokenType === ID ||
+                tokenType === END ||
+                isContextualSpecifierTermToken(tokenType)
 
         private fun isContextualClassTerm(tokenType: IElementType?): Boolean =
+            isContextualSpecifierTermToken(tokenType)
+
+        private fun isContextualSpecifierTermToken(tokenType: IElementType?): Boolean =
             tokenType === EVENT || tokenType === TAB || tokenType === FILE || tokenType === DATE
 
         private fun tryToParseStdProperty(builder: PsiBuilder, level: Int): Boolean {
