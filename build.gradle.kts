@@ -305,6 +305,8 @@ tasks {
             // accessor trips on every CI run, not after a runtime NoSuchMethodError.
             includeTestsMatching("com.intellij.plugin.applescript.test.psi.*")
             if (!skipHeavy) {
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.DictionariesRandomParsingTestCase")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellApplicationMusicTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
                 // Phase 8 PARSE-01 (plan 08-01): RealWorldCorpusTest is the v2.0
                 // "corpus is the contract" harness — realistic production-shaped
@@ -348,8 +350,6 @@ tasks {
                 // D-03 content-anchor redesign actually execute. Gated under includeHeavy so the
                 // default suite stays fast.
                 includeTestsMatching("com.intellij.plugin.applescript.test.codeinsight.*")
-                // DictionariesRandomParsingTestCase + TellApplicationMusicTest scan installed
-                // /Applications and depend on host-machine state — kept out to avoid flakiness.
             }
         }
     }
