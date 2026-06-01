@@ -4,11 +4,11 @@ package com.intellij.plugin.applescript.psi;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeElement;
-import com.intellij.plugin.applescript.psi.sdef.ApplicationDictionaryDeclarator;
 import com.intellij.plugin.applescript.psi.sdef.AppleScriptCommandHandlerParameter;
+import com.intellij.plugin.applescript.psi.sdef.ApplicationDictionaryDeclarator;
 import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeName;
-import com.intellij.psi.PsiLanguageInjectionHost;
 import com.intellij.plugin.applescript.psi.sdef.AppleScriptCommandHandlerCall;
+import com.intellij.psi.PsiLanguageInjectionHost;
 
 public class AppleScriptVisitor extends PsiElementVisitor {
 
@@ -507,10 +507,6 @@ public class AppleScriptVisitor extends PsiElementVisitor {
     visitPsiElement(o);
   }
 
-  public void visitCommandHandlerParameter(@NotNull AppleScriptCommandHandlerParameter o) {
-    visitPsiElement(o);
-  }
-
   public void visitComponent(@NotNull AppleScriptComponent o) {
     visitPsiElement(o);
   }
@@ -532,6 +528,10 @@ public class AppleScriptVisitor extends PsiElementVisitor {
   }
 
   public void visitScriptObject(@NotNull AppleScriptScriptObject o) {
+    visitPsiElement(o);
+  }
+
+  public void visitCommandHandlerParameter(@NotNull AppleScriptCommandHandlerParameter o) {
     visitPsiElement(o);
   }
 

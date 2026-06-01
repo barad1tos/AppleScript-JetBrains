@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptTextItemDelimitersPropertyImpl extends AppleScriptPsiElementImpl implements AppleScriptTextItemDelimitersProperty {
 
-  public AppleScriptTextItemDelimitersPropertyImpl(ASTNode node) {
+  public AppleScriptTextItemDelimitersPropertyImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptTextItemDelimitersPropertyImpl extends AppleScriptPsiEle
     visitor.visitTextItemDelimitersProperty(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

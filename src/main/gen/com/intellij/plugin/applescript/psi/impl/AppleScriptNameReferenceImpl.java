@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptNameReferenceImpl extends AppleScriptPsiElementImpl implements AppleScriptNameReference {
 
-  public AppleScriptNameReferenceImpl(ASTNode node) {
+  public AppleScriptNameReferenceImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptNameReferenceImpl extends AppleScriptPsiElementImpl impl
     visitor.visitNameReference(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -53,12 +54,6 @@ public class AppleScriptNameReferenceImpl extends AppleScriptPsiElementImpl impl
   @NotNull
   public List<AppleScriptExpression> getExpressionList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptExpression.class);
-  }
-
-  @Override
-  @Nullable
-  public AppleScriptNameReference getNameReference() {
-    return findChildByClass(AppleScriptNameReference.class);
   }
 
 }

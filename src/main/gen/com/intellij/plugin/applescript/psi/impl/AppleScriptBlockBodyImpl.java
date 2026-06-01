@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptBlockBodyImpl extends AppleScriptPsiElementImpl implements AppleScriptBlockBody {
 
-  public AppleScriptBlockBodyImpl(ASTNode node) {
+  public AppleScriptBlockBodyImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptBlockBodyImpl extends AppleScriptPsiElementImpl implemen
     visitor.visitBlockBody(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptExpressionImpl extends AppleScriptPsiElementImpl implements AppleScriptExpression {
 
-  public AppleScriptExpressionImpl(ASTNode node) {
+  public AppleScriptExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptExpressionImpl extends AppleScriptPsiElementImpl impleme
     visitor.visitExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

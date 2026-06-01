@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptObjectNamedPropertyDeclarationImpl extends AbstractAppleScriptComponent implements AppleScriptObjectNamedPropertyDeclaration {
 
-  public AppleScriptObjectNamedPropertyDeclarationImpl(ASTNode node) {
+  public AppleScriptObjectNamedPropertyDeclarationImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptObjectNamedPropertyDeclarationImpl extends AbstractApple
     visitor.visitObjectNamedPropertyDeclaration(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

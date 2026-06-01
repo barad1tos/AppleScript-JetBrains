@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptHandlerInterleavedParametersCallImpl extends AbstractAppleScriptHandlerCall implements AppleScriptHandlerInterleavedParametersCall {
 
-  public AppleScriptHandlerInterleavedParametersCallImpl(ASTNode node) {
+  public AppleScriptHandlerInterleavedParametersCallImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptHandlerInterleavedParametersCallImpl extends AbstractApp
     visitor.visitHandlerInterleavedParametersCall(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

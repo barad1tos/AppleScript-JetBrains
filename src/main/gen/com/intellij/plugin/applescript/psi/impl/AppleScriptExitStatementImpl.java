@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptExitStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptExitStatement {
 
-  public AppleScriptExitStatementImpl(ASTNode node) {
+  public AppleScriptExitStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptExitStatementImpl extends AppleScriptPsiElementImpl impl
     visitor.visitExitStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

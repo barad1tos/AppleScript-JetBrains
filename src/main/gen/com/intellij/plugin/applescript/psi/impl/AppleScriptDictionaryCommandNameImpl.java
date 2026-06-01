@@ -13,7 +13,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptDictionaryCommandNameImpl extends DictionaryCompositeNameImpl implements AppleScriptDictionaryCommandName {
 
-  public AppleScriptDictionaryCommandNameImpl(ASTNode node) {
+  public AppleScriptDictionaryCommandNameImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -21,6 +21,7 @@ public class AppleScriptDictionaryCommandNameImpl extends DictionaryCompositeNam
     visitor.visitDictionaryCommandName(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptDirectParameterValImpl extends AppleScriptPsiElementImpl implements AppleScriptDirectParameterVal {
 
-  public AppleScriptDirectParameterValImpl(ASTNode node) {
+  public AppleScriptDirectParameterValImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptDirectParameterValImpl extends AppleScriptPsiElementImpl
     visitor.visitDirectParameterVal(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

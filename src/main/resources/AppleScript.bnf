@@ -468,8 +468,15 @@ private boolean_constant ::= true|false
 applicationReference ::= applicationName [of THE_KW? machine machineName (of THE_KW? zone appleTalkZoneName)?] | THE_KW? currentApplicationConstant
 {methods=[getApplicationName]}
 
-private applicationName ::= (APPLICATION|APP)? (STRING_LITERAL | identifier)
-                         | <<parseApplicationName tellStatementStartCondition>>
+// NOTE: the literal alternative `(APPLICATION|APP)? (STRING_LITERAL | identifier)` was removed.
+// The old Grammar-Kit generator collapsed this rule to the external call only; GK 2023.3 emits the
+// literal alternative faithfully, where `identifier ::= var_identifier` greedily matches a bare
+// identifier (e.g. `folder`, `album`, `library`). Since applicationReference is the first alternative
+// of primaryReferenceExpression, that greedy match shadowed referenceForm's className/composite/index
+// path and broke object-reference parsing. The external <<parseApplicationName>> already handles
+// APPLICATION/APP + STRING_LITERAL/ID, so the literal alternative was redundant for valid cases and
+// harmful otherwise. Removing it restores the pre-migration parse behavior. (Phase 08-04)
+private applicationName ::= <<parseApplicationName tellStatementStartCondition>>
 
 private machineName ::= STRING_LITERAL
 private appleTalkZoneName ::= STRING_LITERAL

@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptIdentifierImpl extends AppleScriptPsiElementImpl implements AppleScriptIdentifier {
 
-  public AppleScriptIdentifierImpl(ASTNode node) {
+  public AppleScriptIdentifierImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptIdentifierImpl extends AppleScriptPsiElementImpl impleme
     visitor.visitIdentifier(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptGivenRawParameterExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptGivenRawParameterExpression {
 
-  public AppleScriptGivenRawParameterExpressionImpl(ASTNode node) {
+  public AppleScriptGivenRawParameterExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitGivenRawParameterExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

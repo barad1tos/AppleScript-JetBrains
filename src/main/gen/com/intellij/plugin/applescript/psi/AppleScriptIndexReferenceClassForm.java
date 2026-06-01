@@ -22,7 +22,4 @@ public interface AppleScriptIndexReferenceClassForm extends AppleScriptPsiElemen
   @NotNull
   List<AppleScriptExpression> getExpressionList();
 
-  @Nullable
-  AppleScriptIndexReferenceClassForm getIndexReferenceClassForm();
-
 }

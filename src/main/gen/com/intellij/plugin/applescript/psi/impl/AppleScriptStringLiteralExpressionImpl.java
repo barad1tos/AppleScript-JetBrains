@@ -13,14 +13,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptStringLiteralExpressionImpl extends AppleScriptStringLiteralExpressionBase implements AppleScriptStringLiteralExpression {
 
-  public AppleScriptStringLiteralExpressionImpl(ASTNode node) {
+  public AppleScriptStringLiteralExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitStringLiteralExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

@@ -22,7 +22,4 @@ public interface AppleScriptIdReference extends AppleScriptPsiElement {
   @NotNull
   List<AppleScriptExpression> getExpressionList();
 
-  @Nullable
-  AppleScriptIdReference getIdReference();
-
 }

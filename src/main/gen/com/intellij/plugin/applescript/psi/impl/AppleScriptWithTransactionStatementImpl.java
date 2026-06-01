@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptWithTransactionStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptWithTransactionStatement {
 
-  public AppleScriptWithTransactionStatementImpl(ASTNode node) {
+  public AppleScriptWithTransactionStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptWithTransactionStatementImpl extends AppleScriptPsiEleme
     visitor.visitWithTransactionStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

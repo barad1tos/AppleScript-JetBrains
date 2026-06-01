@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptIndexReferenceClassFormImpl extends AppleScriptPsiElementImpl implements AppleScriptIndexReferenceClassForm {
 
-  public AppleScriptIndexReferenceClassFormImpl(ASTNode node) {
+  public AppleScriptIndexReferenceClassFormImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptIndexReferenceClassFormImpl extends AppleScriptPsiElemen
     visitor.visitIndexReferenceClassForm(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -53,12 +54,6 @@ public class AppleScriptIndexReferenceClassFormImpl extends AppleScriptPsiElemen
   @NotNull
   public List<AppleScriptExpression> getExpressionList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptExpression.class);
-  }
-
-  @Override
-  @Nullable
-  public AppleScriptIndexReferenceClassForm getIndexReferenceClassForm() {
-    return findChildByClass(AppleScriptIndexReferenceClassForm.class);
   }
 
 }

@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptTellCompoundStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptTellCompoundStatement {
 
-  public AppleScriptTellCompoundStatementImpl(ASTNode node) {
+  public AppleScriptTellCompoundStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptTellCompoundStatementImpl extends AppleScriptPsiElementI
     visitor.visitTellCompoundStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -163,6 +164,7 @@ public class AppleScriptTellCompoundStatementImpl extends AppleScriptPsiElementI
     return findChildByType(STRING_LITERAL);
   }
 
+  @Override
   @Nullable
   public String getApplicationName() {
     return AppleScriptPsiImplUtil.getApplicationName(this);

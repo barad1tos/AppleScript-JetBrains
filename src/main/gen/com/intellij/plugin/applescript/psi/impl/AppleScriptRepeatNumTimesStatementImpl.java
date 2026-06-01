@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRepeatNumTimesStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptRepeatNumTimesStatement {
 
-  public AppleScriptRepeatNumTimesStatementImpl(ASTNode node) {
+  public AppleScriptRepeatNumTimesStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptRepeatNumTimesStatementImpl extends AppleScriptPsiElemen
     visitor.visitRepeatNumTimesStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

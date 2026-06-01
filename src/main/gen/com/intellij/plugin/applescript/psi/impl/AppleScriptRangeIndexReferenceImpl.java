@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRangeIndexReferenceImpl extends AppleScriptPsiElementImpl implements AppleScriptRangeIndexReference {
 
-  public AppleScriptRangeIndexReferenceImpl(ASTNode node) {
+  public AppleScriptRangeIndexReferenceImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptRangeIndexReferenceImpl extends AppleScriptPsiElementImp
     visitor.visitRangeIndexReference(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
