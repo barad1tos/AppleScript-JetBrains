@@ -660,11 +660,24 @@ tasks {
     // during the bootstrap regen, then restore.
     named<GenerateLexerTask>("generateLexer") {
         sourceFile.set(layout.projectDirectory.file("src/main/resources/_AppleScriptLexer.flex"))
-        targetRootOutputDir.set(layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen"))
+        // SEPARATE tmp dir from generateParser. BOTH the JFlex and Grammar-Kit tasks purge their
+        // targetRootOutputDir at the start of each run, so they cannot share one dir (whichever runs
+        // last wipes the other's output → false MISSING drift). The lexer regen goes to tmp-gen-lexer;
+        // the parser/PSI regen goes to tmp-gen (below). verifyGeneratedSourcesMatch resolves each
+        // committed file against BOTH dirs.
+        targetRootOutputDir.set(layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen-lexer"))
     }
     named<GenerateParserTask>("generateParser") {
         sourceFile.set(layout.projectDirectory.file("src/main/resources/AppleScript.bnf"))
         targetRootOutputDir.set(layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen"))
+        // The classpath(...) append below consumes compileKotlin + compileJava outputs
+        // (build/classes/{kotlin,java}/main), so declare the dependency explicitly — Gradle 9.5
+        // fails the build otherwise (implicit-dependency validation). This also makes the
+        // bootstrap-regen order automatic: compile (over committed gen) runs before generateParser,
+        // so the classpath holds the compiled AppleScriptPsiImplUtil. No cycle: generateParser writes
+        // to tmp-gen, never src/main/gen, so compile (which reads committed src/main/gen) does not
+        // depend back on it.
+        dependsOn("compileKotlin", "compileJava")
         // GenerateParserTask extends JavaExec — APPEND the compiled main classes to the inherited
         // task classpath via the JavaExec classpath(..) method (NOT the FileCollection-property
         // setter form, which fails because that property is a plain FileCollection, not appendable).
@@ -692,18 +705,23 @@ tasks {
 
         val committedGen = layout.projectDirectory.dir("src/main/gen")
         val tmpRegen = layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen")
+        val lexerRegen = layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen-lexer")
         inputs.dir(committedGen)
         inputs.dir(tmpRegen)
+        inputs.dir(lexerRegen)
 
         doLast {
             val committed = committedGen.asFile
             val tmpDir = tmpRegen.get().asFile
+            val lexerDir = lexerRegen.get().asFile
             val differences = mutableListOf<String>()
             committed.walkTopDown()
                 .filter { it.isFile && (it.extension == "java" || it.extension == "flex") }
                 .forEach { file ->
                     val rel = file.relativeTo(committed).path
-                    val regenerated = tmpDir.resolve(rel)
+                    // generateLexer and generateParser write to separate tmp dirs (each purges its
+                    // own root), so resolve each committed file against whichever regen dir holds it.
+                    val regenerated = tmpDir.resolve(rel).takeIf { it.exists() } ?: lexerDir.resolve(rel)
                     when {
                         !regenerated.exists() -> differences += "MISSING in regen: $rel"
                         regenerated.readText() != file.readText() -> differences += "DIFFERS: $rel"
@@ -735,27 +753,15 @@ tasks {
             // excluded via the Detekt-typed configureEach exclude("**/gen/**") above.
             "detekt",
             "ktlintCheck",
-            // verifyGeneratedSourcesMatch — INSTALLED but NOT wired into check on Wave 1.
-            //
-            // The drift-detection task is fully wired and functional: it re-runs `generateLexer`
-            // + `generateParser` (auto-registered by the IPGP-bundled grammarkit plugin
-            // applied above) into build/verifyGeneratedSourcesMatch/tmp-gen and diffs against
-            // committed src/main/gen. Developers can run it ad-hoc:
-            //
-            //     ./gradlew verifyGeneratedSourcesMatch
-            //
-            // Why it does NOT gate `check` on Wave 1:
-            // The committed src/main/gen was produced by JFlex 1.7.0-SNAPSHOT and an older
-            // grammarkit; the IPGP-bundled toolchain (JFlex 1.9.x + Grammar-Kit 2023.3) emits
-            // sources that differ in import ordering, method ordering, and whitespace from
-            // the committed gen. Forcing the gate green on Wave 1 would require regenerating
-            // ~200 generated files in a single commit — that is OUT OF SCOPE for the Wave 1
-            // warm-up extract and demands a dedicated parser-regression-test pass first
-            // (CLAUDE.md "Grammar changes are LARGE tier"). Tracked as deferred follow-up in
-            // 04-01-SUMMARY.md "Deviations" / "Deferred Issues" — a future plan in this phase
-            // (or v1.4) lands the gen regeneration + flips this dependency on. SERVICE-10
-            // gate logic itself is fully delivered and ready to gate future PRs once the
-            // toolchain-drift baseline is resolved.
+            // Phase 8 (plan 08-04): verifyGeneratedSourcesMatch is now LIVE in `check`, closing the
+            // long-deferred SERVICE-10 drift baseline. The committed src/main/gen was regenerated on
+            // the bundled toolchain (JFlex 1.9.2 + Grammar-Kit 2023.3) under 08-04 — the dedicated
+            // parser-regression pass the Wave-1 deferral demanded — so the gate now diffs committed
+            // gen against a fresh bundled-toolchain regen and passes cleanly (no drift). generateLexer
+            // and generateParser write to separate tmp dirs (each purges its own root) and the gate
+            // resolves every committed file against both. Any future BNF/flex edit that is not
+            // accompanied by a matching gen regen now fails `check`.
+            verifyGeneratedSourcesMatch,
         )
     }
 }
