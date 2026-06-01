@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.test.parser
 import com.intellij.lang.PsiBuilder
 import com.intellij.lang.parser.GeneratedParserUtilBase
 import com.intellij.plugin.applescript.lang.parser.AppleScriptGeneratedParserUtil
+import com.intellij.openapi.util.Key
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
@@ -33,6 +34,34 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                 signature.visibility,
                 Visibility.fromModifiers(method.modifiers),
                 "FROZEN CONTRACT VIOLATION: visibility drift for ${signature.render()}"
+            )
+        }
+    }
+
+    @Test
+    fun everyFrozenGeneratedParserUtilFieldIsCallable() {
+        val parserUtil = AppleScriptGeneratedParserUtil::class.java
+        for (field in FROZEN_FIELDS) {
+            val actual = try {
+                parserUtil.getField(field.name)
+            } catch (exception: NoSuchFieldException) {
+                fail(
+                    "FROZEN CONTRACT VIOLATION: AppleScriptGeneratedParserUtil.${field.name} " +
+                        "is no longer callable from Java. Restore the @JvmField static field " +
+                        "or coordinate the generated-parser contract change in the same commit."
+                )
+            }
+
+            assertEquals(
+                field.typeName,
+                actual.type.name,
+                "FROZEN CONTRACT VIOLATION: field type drift for ${field.name}" +
+                    " (expected ${field.typeName}, got ${actual.type.name})"
+            )
+            assertTrue(
+                Modifier.isStatic(actual.modifiers),
+                "FROZEN CONTRACT VIOLATION: ${field.name} is no longer static. " +
+                    "Generated parser state is stored through this static parser-util key."
             )
         }
     }
@@ -148,14 +177,40 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                 PSI_BUILDER,
                 INT
             ),
-            FrozenSignature.packageStatic(
+            // Kotlin cannot emit Java package-private @JvmStatic companion methods.
+            // These same-package generated-parser helpers must stay static and callable by name.
+            FrozenSignature.publicStatic(
                 "typeSpecifier",
                 "boolean",
                 PSI_BUILDER,
                 INT
             ),
-            FrozenSignature.packageStatic(
+            FrozenSignature.publicStatic(
                 "singularClassName",
+                "boolean",
+                PSI_BUILDER,
+                INT
+            ),
+            FrozenSignature.publicStatic(
+                "parseCommandParameterSelector",
+                "boolean",
+                PSI_BUILDER,
+                INT
+            ),
+            FrozenSignature.publicStatic(
+                "isPossessivePpronoun",
+                "boolean",
+                PSI_BUILDER,
+                INT
+            ),
+            FrozenSignature.publicStatic(
+                "parseDictionaryCommandName",
+                "boolean",
+                PSI_BUILDER,
+                INT
+            ),
+            FrozenSignature.publicStatic(
+                "parseIncompleteCommandCall",
                 "boolean",
                 PSI_BUILDER,
                 INT
@@ -194,18 +249,25 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
             )
         )
 
+        private val FROZEN_FIELDS = listOf(
+            FrozenField("TOLD_APPLICATION_NAME_STACK", KEY),
+            FrozenField("TOLD_APPLICATION_ID_STACK", KEY)
+        )
+
         private const val PSI_BUILDER = "com.intellij.lang.PsiBuilder"
         private const val INT = "int"
         private const val BOOLEAN = "boolean"
         private const val STRING = "java.lang.String"
         private const val PARSER = "com.intellij.lang.parser.GeneratedParserUtilBase.Parser"
+        private const val KEY = "com.intellij.openapi.util.Key"
 
         private val PARAM_TYPE_ALLOWLIST: Map<String, Class<*>> = mapOf(
             PSI_BUILDER to PsiBuilder::class.java,
             INT to Integer.TYPE,
             BOOLEAN to java.lang.Boolean.TYPE,
             STRING to String::class.java,
-            PARSER to GeneratedParserUtilBase.Parser::class.java
+            PARSER to GeneratedParserUtilBase.Parser::class.java,
+            KEY to Key::class.java
         )
 
         private fun resolveParamType(typeName: String): Class<*> =
@@ -240,6 +302,11 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                 FrozenSignature(name, returnTypeName, Visibility.PACKAGE, parameterTypeNames.toList())
         }
     }
+
+    private data class FrozenField(
+        val name: String,
+        val typeName: String
+    )
 
     private enum class Visibility {
         PUBLIC,
