@@ -312,6 +312,11 @@ tasks {
                 // a full fixture (~30s), so it belongs in the heavy-by-default gate
                 // next to ParserRegressionTest (Phase 7 CLEANUP-03 opt-OUT model).
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.RealWorldCorpusTest")
+                // Phase 8 PARSE-04 (plan 08-05): StandardAdditionsTokensTest gates the
+                // explicit Standard Additions productions (current date / ASCII character /
+                // ASCII number / path to <constant>) to zero PsiErrorElement. Same
+                // BasePlatformTestCase heavy-by-default model as RealWorldCorpusTest above.
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.StandardAdditionsTokensTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.HandlersParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellParsingTestCase")
