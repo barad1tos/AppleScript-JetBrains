@@ -197,7 +197,7 @@ public interface AppleScriptTypes {
   IElementType EACH = new AppleScriptTokenType("each");
   IElementType EIGHTH = new AppleScriptTokenType("eighth");
   IElementType ELSE = new AppleScriptTokenType("else");
-  IElementType END = new AppleScriptTokenType("end");
+  IElementType END = new AppleScriptTokenType("END");
   IElementType ENDS_WITH = new AppleScriptTokenType("ENDS_WITH");
   IElementType EQ = new AppleScriptTokenType("EQ");
   IElementType ERROR = new AppleScriptTokenType("error");

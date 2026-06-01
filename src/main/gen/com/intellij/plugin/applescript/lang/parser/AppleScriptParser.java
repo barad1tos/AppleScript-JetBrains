@@ -204,7 +204,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
 
   /* ********************************************************** */
   // BUILT_IN_PROPERTY|resultProperty|versionProperty|anythingProperty
-  // |textItemDelimitersProperty|parentProperty
+  // |textItemDelimitersProperty|parentProperty|endDateProperty
   public static boolean appleScriptProperty(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "appleScriptProperty")) return false;
     boolean result_;
@@ -215,6 +215,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     if (!result_) result_ = anythingProperty(builder_, level_ + 1);
     if (!result_) result_ = textItemDelimitersProperty(builder_, level_ + 1);
     if (!result_) result_ = parentProperty(builder_, level_ + 1);
+    if (!result_) result_ = endDateProperty(builder_, level_ + 1);
     exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
@@ -348,6 +349,19 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // var_identifier | EVENT | TAB | FILE | DATE
+  static boolean applicationObjectTerm(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "applicationObjectTerm")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, VAR_IDENTIFIER);
+    if (!result_) result_ = consumeToken(builder_, EVENT);
+    if (!result_) result_ = consumeToken(builder_, TAB);
+    if (!result_) result_ = consumeToken(builder_, FILE);
+    if (!result_) result_ = consumeToken(builder_, DATE);
+    return result_;
+  }
+
+  /* ********************************************************** */
   // applicationName [of THE_KW? machine machineName (of THE_KW? zone appleTalkZoneName)?] | THE_KW? currentApplicationConstant
   public static boolean applicationReference(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "applicationReference")) return false;
@@ -444,24 +458,34 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // CURRENT var_identifier | var_identifier integerLiteralExpression
+  // CURRENT applicationObjectTerm | applicationObjectTerm integerLiteralExpression
   public static boolean application_object_reference(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "application_object_reference")) return false;
-    if (!nextTokenIs(builder_, "<application object reference>", CURRENT, VAR_IDENTIFIER)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_, level_, _NONE_, APPLICATION_OBJECT_REFERENCE, "<application object reference>");
-    result_ = parseTokens(builder_, 0, CURRENT, VAR_IDENTIFIER);
+    result_ = application_object_reference_0(builder_, level_ + 1);
     if (!result_) result_ = application_object_reference_1(builder_, level_ + 1);
     exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
-  // var_identifier integerLiteralExpression
+  // CURRENT applicationObjectTerm
+  private static boolean application_object_reference_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "application_object_reference_0")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, CURRENT);
+    result_ = result_ && applicationObjectTerm(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // applicationObjectTerm integerLiteralExpression
   private static boolean application_object_reference_1(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "application_object_reference_1")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = consumeToken(builder_, VAR_IDENTIFIER);
+    result_ = applicationObjectTerm(builder_, level_ + 1);
     result_ = result_ && integerLiteralExpression(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
@@ -1363,7 +1387,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // (count [[each|every] typeSpecifier (in|of)] composite_value) | (number of [typeSpecifier (in|of)] composite_value)
+  // (count parenthesizedExpression) | (count [[each|every] typeSpecifier (in|of)] composite_value) | (number of [typeSpecifier (in|of)] composite_value)
   public static boolean countCommandExpression(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "countCommandExpression")) return false;
     if (!nextTokenIsFast(builder_, COUNT, NUMBER)) return false;
@@ -1371,51 +1395,63 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     Marker marker_ = enter_section_(builder_, level_, _NONE_, COUNT_COMMAND_EXPRESSION, "<count command expression>");
     result_ = countCommandExpression_0(builder_, level_ + 1);
     if (!result_) result_ = countCommandExpression_1(builder_, level_ + 1);
+    if (!result_) result_ = countCommandExpression_2(builder_, level_ + 1);
     exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
-  // count [[each|every] typeSpecifier (in|of)] composite_value
+  // count parenthesizedExpression
   private static boolean countCommandExpression_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "countCommandExpression_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokenFast(builder_, COUNT);
-    result_ = result_ && countCommandExpression_0_1(builder_, level_ + 1);
+    result_ = result_ && parenthesizedExpression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // count [[each|every] typeSpecifier (in|of)] composite_value
+  private static boolean countCommandExpression_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_1")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeTokenFast(builder_, COUNT);
+    result_ = result_ && countCommandExpression_1_1(builder_, level_ + 1);
     result_ = result_ && composite_value(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // [[each|every] typeSpecifier (in|of)]
-  private static boolean countCommandExpression_0_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_0_1")) return false;
-    countCommandExpression_0_1_0(builder_, level_ + 1);
+  private static boolean countCommandExpression_1_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_1_1")) return false;
+    countCommandExpression_1_1_0(builder_, level_ + 1);
     return true;
   }
 
   // [each|every] typeSpecifier (in|of)
-  private static boolean countCommandExpression_0_1_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_0_1_0")) return false;
+  private static boolean countCommandExpression_1_1_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_1_1_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = countCommandExpression_0_1_0_0(builder_, level_ + 1);
+    result_ = countCommandExpression_1_1_0_0(builder_, level_ + 1);
     result_ = result_ && typeSpecifier(builder_, level_ + 1);
-    result_ = result_ && countCommandExpression_0_1_0_2(builder_, level_ + 1);
+    result_ = result_ && countCommandExpression_1_1_0_2(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // [each|every]
-  private static boolean countCommandExpression_0_1_0_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_0_1_0_0")) return false;
-    countCommandExpression_0_1_0_0_0(builder_, level_ + 1);
+  private static boolean countCommandExpression_1_1_0_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_1_1_0_0")) return false;
+    countCommandExpression_1_1_0_0_0(builder_, level_ + 1);
     return true;
   }
 
   // each|every
-  private static boolean countCommandExpression_0_1_0_0_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_0_1_0_0_0")) return false;
+  private static boolean countCommandExpression_1_1_0_0_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_1_1_0_0_0")) return false;
     boolean result_;
     result_ = consumeTokenFast(builder_, EACH);
     if (!result_) result_ = consumeTokenFast(builder_, EVERY);
@@ -1423,8 +1459,8 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   // in|of
-  private static boolean countCommandExpression_0_1_0_2(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_0_1_0_2")) return false;
+  private static boolean countCommandExpression_1_1_0_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_1_1_0_2")) return false;
     boolean result_;
     result_ = consumeTokenFast(builder_, IN);
     if (!result_) result_ = consumeTokenFast(builder_, OF);
@@ -1432,38 +1468,38 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   // number of [typeSpecifier (in|of)] composite_value
-  private static boolean countCommandExpression_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_1")) return false;
+  private static boolean countCommandExpression_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_2")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokens(builder_, 0, NUMBER, OF);
-    result_ = result_ && countCommandExpression_1_2(builder_, level_ + 1);
+    result_ = result_ && countCommandExpression_2_2(builder_, level_ + 1);
     result_ = result_ && composite_value(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // [typeSpecifier (in|of)]
-  private static boolean countCommandExpression_1_2(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_1_2")) return false;
-    countCommandExpression_1_2_0(builder_, level_ + 1);
+  private static boolean countCommandExpression_2_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_2_2")) return false;
+    countCommandExpression_2_2_0(builder_, level_ + 1);
     return true;
   }
 
   // typeSpecifier (in|of)
-  private static boolean countCommandExpression_1_2_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_1_2_0")) return false;
+  private static boolean countCommandExpression_2_2_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_2_2_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = typeSpecifier(builder_, level_ + 1);
-    result_ = result_ && countCommandExpression_1_2_0_1(builder_, level_ + 1);
+    result_ = result_ && countCommandExpression_2_2_0_1(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // in|of
-  private static boolean countCommandExpression_1_2_0_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "countCommandExpression_1_2_0_1")) return false;
+  private static boolean countCommandExpression_2_2_0_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "countCommandExpression_2_2_0_1")) return false;
     boolean result_;
     result_ = consumeTokenFast(builder_, IN);
     if (!result_) result_ = consumeTokenFast(builder_, OF);
@@ -1737,6 +1773,18 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     result_ = referenceIdBeforeParamLabel(builder_, level_ + 1);
     if (!result_) result_ = expression(builder_, level_ + 1);
     exit_section_(builder_, level_, marker_, result_, false, null);
+    return result_;
+  }
+
+  /* ********************************************************** */
+  // END DATE
+  static boolean endDateProperty(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "endDateProperty")) return false;
+    if (!nextTokenIs(builder_, END)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeTokens(builder_, 0, END, DATE);
+    exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
@@ -4710,65 +4758,55 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // var_identifier to var_identifier+ (from var_identifier+)?
+  // var_identifier to pathToConstantName [from pathToConstantName]
   static boolean pathToConstantExpressionInner(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner")) return false;
     if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokens(builder_, 0, VAR_IDENTIFIER, TO);
-    result_ = result_ && pathToConstantExpressionInner_2(builder_, level_ + 1);
+    result_ = result_ && pathToConstantName(builder_, level_ + 1);
     result_ = result_ && pathToConstantExpressionInner_3(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
-  // var_identifier+
-  private static boolean pathToConstantExpressionInner_2(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner_2")) return false;
-    boolean result_;
-    Marker marker_ = enter_section_(builder_);
-    result_ = consumeToken(builder_, VAR_IDENTIFIER);
-    while (result_) {
-      int pos_ = current_position_(builder_);
-      if (!consumeToken(builder_, VAR_IDENTIFIER)) break;
-      if (!empty_element_parsed_guard_(builder_, "pathToConstantExpressionInner_2", pos_)) break;
-    }
-    exit_section_(builder_, marker_, null, result_);
-    return result_;
-  }
-
-  // (from var_identifier+)?
+  // [from pathToConstantName]
   private static boolean pathToConstantExpressionInner_3(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner_3")) return false;
     pathToConstantExpressionInner_3_0(builder_, level_ + 1);
     return true;
   }
 
-  // from var_identifier+
+  // from pathToConstantName
   private static boolean pathToConstantExpressionInner_3_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner_3_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeToken(builder_, FROM);
-    result_ = result_ && pathToConstantExpressionInner_3_0_1(builder_, level_ + 1);
+    result_ = result_ && pathToConstantName(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
-  // var_identifier+
-  private static boolean pathToConstantExpressionInner_3_0_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner_3_0_1")) return false;
+  /* ********************************************************** */
+  // var_identifier var_identifier?
+  static boolean pathToConstantName(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "pathToConstantName")) return false;
+    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeToken(builder_, VAR_IDENTIFIER);
-    while (result_) {
-      int pos_ = current_position_(builder_);
-      if (!consumeToken(builder_, VAR_IDENTIFIER)) break;
-      if (!empty_element_parsed_guard_(builder_, "pathToConstantExpressionInner_3_0_1", pos_)) break;
-    }
+    result_ = result_ && pathToConstantName_1(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
+  }
+
+  // var_identifier?
+  private static boolean pathToConstantName_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "pathToConstantName_1")) return false;
+    consumeToken(builder_, VAR_IDENTIFIER);
+    return true;
   }
 
   /* ********************************************************** */
@@ -5944,7 +5982,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // ("run" [script] [script_object_variable])|("run" [referenceToApplicationVar])
+  // ("run" [script] [script_object_variable] [runCommandInputParameter])|("run" [referenceToApplicationVar])
   public static boolean runCommandExpression(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "runCommandExpression")) return false;
     boolean result_;
@@ -5955,7 +5993,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // "run" [script] [script_object_variable]
+  // "run" [script] [script_object_variable] [runCommandInputParameter]
   private static boolean runCommandExpression_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "runCommandExpression_0")) return false;
     boolean result_;
@@ -5963,6 +6001,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     result_ = consumeTokenFast(builder_, "run");
     result_ = result_ && runCommandExpression_0_1(builder_, level_ + 1);
     result_ = result_ && runCommandExpression_0_2(builder_, level_ + 1);
+    result_ = result_ && runCommandExpression_0_3(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
@@ -5978,6 +6017,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   private static boolean runCommandExpression_0_2(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "runCommandExpression_0_2")) return false;
     script_object_variable(builder_, level_ + 1);
+    return true;
+  }
+
+  // [runCommandInputParameter]
+  private static boolean runCommandExpression_0_3(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "runCommandExpression_0_3")) return false;
+    runCommandInputParameter(builder_, level_ + 1);
     return true;
   }
 
@@ -5997,6 +6043,20 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     if (!recursion_guard_(builder_, level_, "runCommandExpression_1_1")) return false;
     referenceToApplicationVar(builder_, level_ + 1);
     return true;
+  }
+
+  /* ********************************************************** */
+  // with identifier expression
+  static boolean runCommandInputParameter(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "runCommandInputParameter")) return false;
+    if (!nextTokenIs(builder_, WITH)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, WITH);
+    result_ = result_ && identifier(builder_, level_ + 1);
+    result_ = result_ && expression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
   }
 
   /* ********************************************************** */
@@ -6809,15 +6869,48 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // return|space|tab|linefeed|quote
+  // return|space|(tab !(DIGITS|of|in))|linefeed|quote
   static boolean text_constant(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "text_constant")) return false;
     boolean result_;
+    Marker marker_ = enter_section_(builder_);
     result_ = consumeToken(builder_, RETURN);
     if (!result_) result_ = consumeToken(builder_, SPACE);
-    if (!result_) result_ = consumeToken(builder_, TAB);
+    if (!result_) result_ = text_constant_2(builder_, level_ + 1);
     if (!result_) result_ = consumeToken(builder_, LINEFEED);
     if (!result_) result_ = consumeToken(builder_, QUOTE);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // tab !(DIGITS|of|in)
+  private static boolean text_constant_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "text_constant_2")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, TAB);
+    result_ = result_ && text_constant_2_1(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // !(DIGITS|of|in)
+  private static boolean text_constant_2_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "text_constant_2_1")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_, level_, _NOT_);
+    result_ = !text_constant_2_1_0(builder_, level_ + 1);
+    exit_section_(builder_, level_, marker_, result_, false, null);
+    return result_;
+  }
+
+  // DIGITS|of|in
+  private static boolean text_constant_2_1_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "text_constant_2_1_0")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, DIGITS);
+    if (!result_) result_ = consumeToken(builder_, OF);
+    if (!result_) result_ = consumeToken(builder_, IN);
     return result_;
   }
 

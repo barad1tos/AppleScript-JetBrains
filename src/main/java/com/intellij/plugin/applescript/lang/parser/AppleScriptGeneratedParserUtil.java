@@ -132,6 +132,14 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
   private static boolean parseWellKnownCommandFallback(PsiBuilder b, int l, Ref<String> parsedName) {
     if (!recursion_guard_(b, l, "parseWellKnownCommandFallback")) return false;
     if (b.getTokenType() != VAR_IDENTIFIER) return false;
+    if ("read".equals(b.getTokenText()) && b.lookAhead(1) != FILE) {
+      return false;
+    }
+    if (isWellKnownSingleWordCommand(b.getTokenText())) {
+      parsedName.set(b.getTokenText());
+      b.advanceLexer();
+      return true;
+    }
     if (!"do".equals(b.getTokenText())) return false;
     // do shell script  →  VAR_IDENTIFIER VAR_IDENTIFIER SCRIPT
     if (b.lookAhead(1) == VAR_IDENTIFIER && b.lookAhead(2) == SCRIPT) {
@@ -176,6 +184,7 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     final String s = b.getTokenText();
 
     if (s == null || s.length() == 0 || !AppleScriptNames.isIdentifierStart(s.charAt(0))) return false;
+    if (b.getTokenType() == COUNT) return false;
     Ref<String> parsedCommandName = new Ref<>();
     //get current application name to which messages will be sent in the current block
     String toldApplicationName = getTargetApplicationName(b);
@@ -205,11 +214,13 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     // definition was loaded yet. Consume one expression as the direct parameter so
     // the rest of the line parses; without this the call expression ends at the
     // command name and the upstream rule trips on the unconsumed argument tokens.
-    if (allCommandsWithName.isEmpty() && parsedCommandName.get() != null && parsedCommandName.get().contains(" ")) {
+    if (allCommandsWithName.isEmpty() && parsedCommandName.get() != null
+            && isFallbackCommandWithDirectParameter(parsedCommandName.get())) {
       consumeToken(b, OF);
       PsiBuilder.Marker pm = enter_section_(b, l, _NONE_, "<fallback direct parameter>");
       boolean paramR = com.intellij.plugin.applescript.lang.parser.AppleScriptParser.expression(b, l + 1);
       exit_section_(b, l, pm, DIRECT_PARAMETER_VAL, paramR, false, null);
+      parseFallbackCommandParameters(b, l + 1);
       return true;
     }
 
@@ -221,6 +232,34 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     }
     boolean incompleteHandlerCall = !r && allCommandsWithName.size() > 0 && (b.getTokenType() == NLS || b.eof());
     return r || incompleteHandlerCall;
+  }
+
+  private static boolean isFallbackCommandWithDirectParameter(String commandName) {
+    return commandName.contains(" ") || isWellKnownSingleWordCommand(commandName);
+  }
+
+  private static boolean isWellKnownSingleWordCommand(String commandName) {
+    return "read".equals(commandName)
+            || "move".equals(commandName)
+            || "exists".equals(commandName)
+            || "run".equals(commandName);
+  }
+
+  private static void parseFallbackCommandParameters(PsiBuilder b, int l) {
+    while (isFallbackCommandParameterStart(b.getTokenType())) {
+      PsiBuilder.Marker marker = enter_section_(b, l, _NONE_, "<fallback command parameter>");
+      b.advanceLexer();
+      if (b.getTokenType() == VAR_IDENTIFIER && b.lookAhead(1) != NLS && b.lookAhead(1) != RPAREN) {
+        b.advanceLexer();
+      }
+      boolean r = com.intellij.plugin.applescript.lang.parser.AppleScriptParser.expression(b, l + 1);
+      exit_section_(b, l, marker, COMMAND_PARAMETER, r, false, null);
+      if (!r) return;
+    }
+  }
+
+  private static boolean isFallbackCommandParameterStart(IElementType t) {
+    return t == TO || t == INTO || t == FROM || t == WITH;
   }
 
   // commandName commandParameters?
@@ -998,17 +1037,25 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
    */
   private static boolean parseKeywordAsPropertyFallback(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "parseKeywordAsPropertyFallback")) return false;
-    if (!isContextualPropertyTerm(b.getTokenType())) return false;
-    if (isFallbackAnchor(b.lookAhead(1), FALLBACK_PROPERTY)) {
+    if (isContextualPropertyTerm(b.getTokenType()) && isFallbackAnchor(b.lookAhead(1), FALLBACK_PROPERTY)) {
       b.advanceLexer();
       return true;
     }
-    if (b.lookAhead(1) != VAR_IDENTIFIER || !isFallbackAnchor(b.lookAhead(2), FALLBACK_PROPERTY)) {
-      return false;
+    if (b.getTokenType() == VAR_IDENTIFIER
+            && isContextualPropertyTerm(b.lookAhead(1))
+            && isFallbackAnchor(b.lookAhead(2), FALLBACK_PROPERTY)) {
+      b.advanceLexer();
+      b.advanceLexer();
+      return true;
     }
-    b.advanceLexer();
-    b.advanceLexer();
-    return true;
+    if (isContextualPropertyTerm(b.getTokenType())
+            && b.lookAhead(1) == VAR_IDENTIFIER
+            && isFallbackAnchor(b.lookAhead(2), FALLBACK_PROPERTY)) {
+      b.advanceLexer();
+      b.advanceLexer();
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -1070,12 +1117,31 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
    */
   private static boolean parseFallbackBareIdentifier(PsiBuilder b, int l, int mode) {
     if (!recursion_guard_(b, l, "parseFallbackBareIdentifier")) return false;
-    if (b.getTokenType() != VAR_IDENTIFIER) return false;
+    if (!isFallbackTermToken(b.getTokenType(), mode)) return false;
     if (isFallbackAnchor(b.lookAhead(1), mode)) {
       b.advanceLexer();
       return true;
     }
+    if (mode == FALLBACK_CLASS && isClassDirectSelectorAnchor(b.lookAhead(1))) {
+      b.advanceLexer();
+      return true;
+    }
     if (mode == FALLBACK_CLASS && b.lookAhead(1) == VAR_IDENTIFIER && isClassRangeAnchor(b.lookAhead(2))) {
+      b.advanceLexer();
+      return true;
+    }
+    if (mode == FALLBACK_PROPERTY
+            && b.getTokenType() == VAR_IDENTIFIER
+            && isContextualPropertyTerm(b.lookAhead(1))
+            && isFallbackAnchor(b.lookAhead(2), mode)) {
+      b.advanceLexer();
+      b.advanceLexer();
+      return true;
+    }
+    if (mode == FALLBACK_PROPERTY
+            && b.lookAhead(1) == VAR_IDENTIFIER
+            && isPropertyTerminatorAnchor(b.lookAhead(2))) {
+      b.advanceLexer();
       b.advanceLexer();
       return true;
     }
@@ -1095,10 +1161,22 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
     return false;
   }
 
+  private static boolean isFallbackTermToken(IElementType t, int mode) {
+    return t == VAR_IDENTIFIER || mode == FALLBACK_CLASS && isContextualClassTerm(t);
+  }
+
+  private static boolean isClassDirectSelectorAnchor(IElementType t) {
+    return t == STRING_LITERAL;
+  }
+
   private static boolean isPropertyComparisonAnchor(IElementType t) {
     return t == EQ || t == NE || t == LT || t == GT || t == LE || t == GE
             || t == STARTS_BEGINS_WITH || t == ENDS_WITH || t == DOES_NOT_CONTAIN
             || t == IS_IN || t == IS_NOT_IN || t == IS_CONTAIN;
+  }
+
+  private static boolean isPropertyTerminatorAnchor(IElementType t) {
+    return t == NLS || t == RPAREN;
   }
 
   private static boolean isClassRangeAnchor(IElementType t) {
@@ -1106,7 +1184,11 @@ public class AppleScriptGeneratedParserUtil extends GeneratedParserUtilBase {
   }
 
   private static boolean isContextualPropertyTerm(IElementType t) {
-    return t == COUNT || t == DATE || t == FILE || t == EVENT || t == TAB;
+    return t == COUNT || t == DATE || t == FILE || t == EVENT || t == TAB || t == END;
+  }
+
+  private static boolean isContextualClassTerm(IElementType t) {
+    return t == EVENT || t == TAB || t == FILE || t == DATE;
   }
 
   /**

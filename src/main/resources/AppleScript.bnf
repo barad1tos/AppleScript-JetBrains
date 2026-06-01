@@ -540,8 +540,10 @@ implements="com.intellij.plugin.applescript.psi.AppleScriptReferenceElement"}
 // Placed LAST in primaryReferenceExpression so className/composite/index forms win first
 // (Pitfall 1: do not shadow the D-15 dictionary-class path). Navigation hook only (D-09 —
 // no resolver wiring). Single-bareword whose-context index (`folder 1`) is deferred to 08-07.
-application_object_reference ::= CURRENT var_identifier | var_identifier integerLiteralExpression
+application_object_reference ::= CURRENT applicationObjectTerm | applicationObjectTerm integerLiteralExpression
 {mixin="com.intellij.plugin.applescript.psi.impl.AbstractApplicationObjectReference"}
+
+private applicationObjectTerm ::= var_identifier | EVENT | TAB | FILE | DATE
 
 middleElemReference ::= middle typeSpecifier {pin=1}
 
@@ -614,7 +616,7 @@ private currentApplicationConstant ::= CURRENT_APPLICATION|CURRENT_APP|(CURRENT 
 private currentDateConstant ::= CURRENT DATE
 private missing_value_constant ::= MISSING_VALUE
 //private save_opt_constant ::= yes|no|ask
-private text_constant ::=  return|space|tab|linefeed|quote
+private text_constant ::=  return|space|(tab !(DIGITS|of|in))|linefeed|quote
 private anythingProperty ::= anything
 private resultProperty ::= result
 private parentProperty ::= parent
@@ -622,7 +624,9 @@ private versionProperty ::= version
 
 //todo redefine necessary methods (is property, getName etc.)
 appleScriptProperty ::= BUILT_IN_PROPERTY|resultProperty|versionProperty|anythingProperty
-|textItemDelimitersProperty|parentProperty//|itMeProperty//|text_constant /*?? */
+|textItemDelimitersProperty|parentProperty|endDateProperty//|itMeProperty//|text_constant /*?? */
+
+private endDateProperty ::= END DATE
 
 private itMeProperty ::= it|me|ITS //see https://bitbucket.org/adernov/applescript-internal/issues/16/parsing-its-possessive-form-of-it
 //todo add via regexp (spaces)
@@ -803,7 +807,7 @@ launchCommandExpression ::= launch expression?
 private copyCommandStatement ::= (copy|put) expression (to|into) (targetVariablePattern|objectReferenceWrapper)
 
 //>>count<<
-countCommandExpression ::= (count [[each|every] typeSpecifier (in|of)] composite_value) | (number of [typeSpecifier (in|of)] composite_value)
+countCommandExpression ::= (count parenthesizedExpression) | (count [[each|every] typeSpecifier (in|of)] composite_value) | (number of [typeSpecifier (in|of)] composite_value)
 
 private typeSpecifier ::= pluralClassName | singularClassName
 private pluralClassName ::= builtInClassIdentifierPlural | dictionaryClassIdentifierPlural | rawClassExpression //items?
@@ -823,7 +827,8 @@ rawDataExpression ::= RAW_LBR DATA DIGITS RAW_RBR
 getCommandExpression ::= get <<parseCommandParametersExpression>>
 
 //>>Run<< / Run Script
-runCommandExpression ::= ("run" [script] [script_object_variable])|("run" [referenceToApplicationVar]) // application command syntax
+runCommandExpression ::= ("run" [script] [script_object_variable] [runCommandInputParameter])|("run" [referenceToApplicationVar]) // application command syntax
+private runCommandInputParameter ::= with identifier expression
 private referenceToApplicationVar ::= applicationReference
 private script_object_variable ::= referenceExpression
 // log - is a built into Script Editor command http://stackoverflow.com/a/21341372/2000323
@@ -914,7 +919,8 @@ private primaryExpression ::=
 private asciiObjectExpression ::= <<parseExpression '"ASCII"' asciiObjectExpressionInner>>
 private asciiObjectExpressionInner ::= var_identifier (CHARACTER|NUMBER) expression
 private pathToConstantExpression ::= <<parseExpression '"path"' pathToConstantExpressionInner>>
-private pathToConstantExpressionInner ::= var_identifier to var_identifier+ (from var_identifier+)?
+private pathToConstantExpressionInner ::= var_identifier to pathToConstantName [from pathToConstantName]
+private pathToConstantName ::= var_identifier var_identifier?
 
 incompleteCommandHandlerCall ::= <<parseIncompleteCommandCall>>
 {mixin="com.intellij.plugin.applescript.psi.sdef.impl.DictionaryCompositeNameImpl"
