@@ -322,6 +322,11 @@ tasks {
                 // track N of …) to zero PsiErrorElement, SDEF-independently. Same heavy-by-default
                 // BasePlatformTestCase model as the corpus tests above.
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ApplicationObjectReferenceTest")
+                // Phase 8 PARSE-02/06 (plan 08-07): whose-clause / nested-tell / on-error
+                // hardening harnesses, verify-first against the migrated GK 2023.3 parser.
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.WhoseClauseTest")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellBlockHardeningTest")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.OnErrorBlockTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.HandlersParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellParsingTestCase")
