@@ -2,6 +2,24 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.0] - TBD
+
+### Added
+
+- Standard Additions object tokens — `ASCII character N`, `ASCII number C`, `current date`, and `path to <folder>` — are now understood as valid expressions instead of being flagged as errors.
+- Application-specific object references such as `library playlist N` and `current track` are recognised for any scriptable application, even before its dictionary has loaded.
+- Non-ASCII comparison and math operators (≥, ≤, ≠, ÷) are recognised in expressions.
+
+### Fixed
+
+- `whose` filter clauses, including compound boolean conditions with parentheses, are no longer reported as incomplete.
+- `tell application "Name" … end tell` blocks nested inside script handlers no longer produce spurious errors.
+- `try … on error errMsg number errNum … end try` handlers now parse cleanly.
+
+### Compatibility
+
+- Verified against IntelliJ IDEA Community 2025.1 and 2025.2. Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported.
+
 ## [1.6.0] - TBD
 
 ### Changed

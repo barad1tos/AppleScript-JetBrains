@@ -167,7 +167,7 @@ intellijPlatform {
         // The plugin verifier expects HTML, so the conversion is intentionally minimal — Marketplace
         // accepts the resulting markdown-flavoured HTML, and the CHANGELOG.md remains the source of truth.
         changeNotes = providers.fileContents(layout.projectDirectory.file("CHANGELOG.md")).asText.map { raw ->
-            val startMarker = "## [1.0.0]"
+            val startMarker = "## [2.0.0]"
             val nextSection = "\n## ["
             val startIndex = raw.indexOf(startMarker).takeIf { it >= 0 } ?: 0
             val endIndex = raw.indexOf(nextSection, startIndex + startMarker.length).takeIf { it > 0 } ?: raw.length
