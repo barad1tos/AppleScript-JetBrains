@@ -11,6 +11,9 @@ public interface AppleScriptConcatenationExpression extends AppleScriptExpressio
   List<AppleScriptApplicationReference> getApplicationReferenceList();
 
   @NotNull
+  List<AppleScriptApplicationObjectReference> getApplicationObjectReferenceList();
+
+  @NotNull
   List<AppleScriptArbitraryReference> getArbitraryReferenceList();
 
   @NotNull

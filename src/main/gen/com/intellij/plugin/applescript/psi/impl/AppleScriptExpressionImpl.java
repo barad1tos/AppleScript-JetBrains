@@ -34,6 +34,12 @@ public class AppleScriptExpressionImpl extends AppleScriptPsiElementImpl impleme
 
   @Override
   @Nullable
+  public AppleScriptApplicationObjectReference getApplicationObjectReference() {
+    return findChildByClass(AppleScriptApplicationObjectReference.class);
+  }
+
+  @Override
+  @Nullable
   public AppleScriptArbitraryReference getArbitraryReference() {
     return findChildByClass(AppleScriptArbitraryReference.class);
   }

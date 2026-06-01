@@ -11,6 +11,9 @@ public interface AppleScriptFilterReference extends AppleScriptPsiElement {
   AppleScriptApplicationReference getApplicationReference();
 
   @Nullable
+  AppleScriptApplicationObjectReference getApplicationObjectReference();
+
+  @Nullable
   AppleScriptArbitraryReference getArbitraryReference();
 
   @Nullable

@@ -444,6 +444,30 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // CURRENT var_identifier | var_identifier integerLiteralExpression
+  public static boolean application_object_reference(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "application_object_reference")) return false;
+    if (!nextTokenIs(builder_, "<application object reference>", CURRENT, VAR_IDENTIFIER)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, APPLICATION_OBJECT_REFERENCE, "<application object reference>");
+    result_ = parseTokens(builder_, 0, CURRENT, VAR_IDENTIFIER);
+    if (!result_) result_ = application_object_reference_1(builder_, level_ + 1);
+    exit_section_(builder_, level_, marker_, result_, false, null);
+    return result_;
+  }
+
+  // var_identifier integerLiteralExpression
+  private static boolean application_object_reference_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "application_object_reference_1")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, VAR_IDENTIFIER);
+    result_ = result_ && integerLiteralExpression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  /* ********************************************************** */
   // some typeSpecifier
   public static boolean arbitraryReference(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "arbitraryReference")) return false;
@@ -4943,12 +4967,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // applicationReference | referenceForm | referenceExpression
+  // applicationReference | referenceForm | application_object_reference | referenceExpression
   static boolean primaryReferenceExpression(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "primaryReferenceExpression")) return false;
     boolean result_;
     result_ = applicationReference(builder_, level_ + 1);
     if (!result_) result_ = referenceForm(builder_, level_ + 1);
+    if (!result_) result_ = application_object_reference(builder_, level_ + 1);
     if (!result_) result_ = referenceExpression(builder_, level_ + 1);
     return result_;
   }

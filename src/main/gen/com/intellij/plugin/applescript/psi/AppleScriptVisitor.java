@@ -36,6 +36,10 @@ public class AppleScriptVisitor extends PsiElementVisitor {
     visitPsiElement(o);
   }
 
+  public void visitApplicationObjectReference(@NotNull AppleScriptApplicationObjectReference o) {
+    visitPsiElement(o);
+  }
+
   public void visitArbitraryReference(@NotNull AppleScriptArbitraryReference o) {
     visitPsiElement(o);
   }

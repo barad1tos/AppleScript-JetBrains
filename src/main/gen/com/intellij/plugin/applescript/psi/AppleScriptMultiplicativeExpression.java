@@ -11,6 +11,9 @@ public interface AppleScriptMultiplicativeExpression extends AppleScriptExpressi
   List<AppleScriptApplicationReference> getApplicationReferenceList();
 
   @NotNull
+  List<AppleScriptApplicationObjectReference> getApplicationObjectReferenceList();
+
+  @NotNull
   List<AppleScriptArbitraryReference> getArbitraryReferenceList();
 
   @NotNull

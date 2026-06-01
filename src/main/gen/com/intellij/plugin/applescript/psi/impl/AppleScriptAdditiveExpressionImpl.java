@@ -35,6 +35,12 @@ public class AppleScriptAdditiveExpressionImpl extends AppleScriptExpressionImpl
 
   @Override
   @NotNull
+  public List<AppleScriptApplicationObjectReference> getApplicationObjectReferenceList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptApplicationObjectReference.class);
+  }
+
+  @Override
+  @NotNull
   public List<AppleScriptArbitraryReference> getArbitraryReferenceList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptArbitraryReference.class);
   }
