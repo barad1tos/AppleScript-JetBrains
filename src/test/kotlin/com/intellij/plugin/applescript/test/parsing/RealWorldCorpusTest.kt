@@ -30,6 +30,8 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testMusicLibrary() = assertNoParserErrors("music_library.applescript")
 
+    fun testFetchTracks() = assertNoParserErrors("fetch_tracks_sanitized.applescript")
+
     fun testMailArchive() = assertNoParserErrors("mail_archive.applescript")
 
     fun testFinderSelect() = assertNoParserErrors("finder_select.applescript")
