@@ -29,8 +29,8 @@ public class AppleScriptRunCommandExpressionImpl extends AppleScriptExpressionIm
 
   @Override
   @Nullable
-  public AppleScriptReferenceExpression getReferenceExpression() {
-    return findChildByClass(AppleScriptReferenceExpression.class);
+  public AppleScriptIdentifier getIdentifier() {
+    return findChildByClass(AppleScriptIdentifier.class);
   }
 
 }
