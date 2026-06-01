@@ -12,6 +12,9 @@ public interface AppleScriptTellCompoundStatement extends ApplicationDictionaryD
   AppleScriptApplicationReference getApplicationReference();
 
   @Nullable
+  AppleScriptApplicationObjectReference getApplicationObjectReference();
+
+  @Nullable
   AppleScriptArbitraryReference getArbitraryReference();
 
   @Nullable

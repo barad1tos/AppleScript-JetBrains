@@ -535,6 +535,14 @@ userClassName ::= identifier
 {mixin="com.intellij.plugin.applescript.psi.impl.AppleScriptReferenceElementImpl"
 implements="com.intellij.plugin.applescript.psi.AppleScriptReferenceElement"}
 
+// PARSE-03 (08-06, D-06): generic application-object reference for ANY scriptable app —
+// `current <class>` and `<id> <integer index>` — parser-level (SDEF-independent, D-07).
+// Placed LAST in primaryReferenceExpression so className/composite/index forms win first
+// (Pitfall 1: do not shadow the D-15 dictionary-class path). Navigation hook only (D-09 —
+// no resolver wiring). Single-bareword whose-context index (`folder 1`) is deferred to 08-07.
+application_object_reference ::= CURRENT var_identifier | var_identifier integerLiteralExpression
+{mixin="com.intellij.plugin.applescript.psi.impl.AbstractApplicationObjectReference"}
+
 middleElemReference ::= middle typeSpecifier {pin=1}
 
 left nameReference ::= nameReferenceString //could be any expression (clashed with indexReference)
@@ -913,7 +921,7 @@ incompleteCommandHandlerCall ::= <<parseIncompleteCommandCall>>
 implements="com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeName"}
 
 // todo: left associate to class name (range, name, relative, index) ! checking that this is not a property first.. !
-private primaryReferenceExpression ::= applicationReference | referenceForm | referenceExpression
+private primaryReferenceExpression ::= applicationReference | referenceForm | application_object_reference | referenceExpression
 
 private referenceForm ::=
       (my handlerInterleavedCallOrPropertyReferenceOrReferenceIdentifier )
