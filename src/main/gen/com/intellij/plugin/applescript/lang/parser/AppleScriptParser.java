@@ -558,6 +558,35 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // <<parseExpression '"ASCII"' asciiObjectExpressionInner>>
+  static boolean asciiObjectExpression(PsiBuilder builder_, int level_) {
+    return parseExpression(builder_, level_ + 1, "ASCII", AppleScriptParser::asciiObjectExpressionInner);
+  }
+
+  /* ********************************************************** */
+  // var_identifier (CHARACTER|NUMBER) expression
+  static boolean asciiObjectExpressionInner(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "asciiObjectExpressionInner")) return false;
+    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, VAR_IDENTIFIER);
+    result_ = result_ && asciiObjectExpressionInner_1(builder_, level_ + 1);
+    result_ = result_ && expression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // CHARACTER|NUMBER
+  private static boolean asciiObjectExpressionInner_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "asciiObjectExpressionInner_1")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, CHARACTER);
+    if (!result_) result_ = consumeToken(builder_, NUMBER);
+    return result_;
+  }
+
+  /* ********************************************************** */
   // setCommandAppleScript|copyCommandStatement
   public static boolean assignmentStatement(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "assignmentStatement")) return false;
@@ -775,7 +804,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
 
   /* ********************************************************** */
   // boolean_constant|date_time_constants|text_constant|itMeProperty
-  // |currentApplicationConstant| missing_value_constant | scriptingAdditionsFolderConstant
+  // |currentApplicationConstant| missing_value_constant | scriptingAdditionsFolderConstant | currentDateConstant
   public static boolean builtInConstantLiteralExpression(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "builtInConstantLiteralExpression")) return false;
     boolean result_;
@@ -787,6 +816,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     if (!result_) result_ = currentApplicationConstant(builder_, level_ + 1);
     if (!result_) result_ = missing_value_constant(builder_, level_ + 1);
     if (!result_) result_ = scriptingAdditionsFolderConstant(builder_, level_ + 1);
+    if (!result_) result_ = currentDateConstant(builder_, level_ + 1);
     exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
@@ -1435,6 +1465,18 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokens(builder_, 0, CURRENT, APPLICATION);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  /* ********************************************************** */
+  // CURRENT DATE
+  static boolean currentDateConstant(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "currentDateConstant")) return false;
+    if (!nextTokenIs(builder_, CURRENT)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeTokens(builder_, 0, CURRENT, DATE);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
@@ -4638,6 +4680,74 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // <<parseExpression '"path"' pathToConstantExpressionInner>>
+  static boolean pathToConstantExpression(PsiBuilder builder_, int level_) {
+    return parseExpression(builder_, level_ + 1, "path", AppleScriptParser::pathToConstantExpressionInner);
+  }
+
+  /* ********************************************************** */
+  // var_identifier to var_identifier+ (from var_identifier+)?
+  static boolean pathToConstantExpressionInner(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner")) return false;
+    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeTokens(builder_, 0, VAR_IDENTIFIER, TO);
+    result_ = result_ && pathToConstantExpressionInner_2(builder_, level_ + 1);
+    result_ = result_ && pathToConstantExpressionInner_3(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // var_identifier+
+  private static boolean pathToConstantExpressionInner_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner_2")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, VAR_IDENTIFIER);
+    while (result_) {
+      int pos_ = current_position_(builder_);
+      if (!consumeToken(builder_, VAR_IDENTIFIER)) break;
+      if (!empty_element_parsed_guard_(builder_, "pathToConstantExpressionInner_2", pos_)) break;
+    }
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // (from var_identifier+)?
+  private static boolean pathToConstantExpressionInner_3(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner_3")) return false;
+    pathToConstantExpressionInner_3_0(builder_, level_ + 1);
+    return true;
+  }
+
+  // from var_identifier+
+  private static boolean pathToConstantExpressionInner_3_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner_3_0")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, FROM);
+    result_ = result_ && pathToConstantExpressionInner_3_0_1(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // var_identifier+
+  private static boolean pathToConstantExpressionInner_3_0_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "pathToConstantExpressionInner_3_0_1")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, VAR_IDENTIFIER);
+    while (result_) {
+      int pos_ = current_position_(builder_);
+      if (!consumeToken(builder_, VAR_IDENTIFIER)) break;
+      if (!empty_element_parsed_guard_(builder_, "pathToConstantExpressionInner_3_0_1", pos_)) break;
+    }
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  /* ********************************************************** */
   // builtInClassIdentifierPlural | dictionaryClassIdentifierPlural | rawClassExpression
   static boolean pluralClassName(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "pluralClassName")) return false;
@@ -4744,6 +4854,8 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   /* ********************************************************** */
   // literalExpression
   //  |   dictionaryCommandHandlerCallExpression
+  //  |   asciiObjectExpression
+  //  |   pathToConstantExpression
   //  |   rawDictionaryCommandHandlerCallExpression
   //  |   rawDataExpression
   //  | ( primaryReferenceExpression
@@ -4760,9 +4872,11 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     Marker marker_ = enter_section_(builder_);
     result_ = literalExpression(builder_, level_ + 1);
     if (!result_) result_ = dictionaryCommandHandlerCallExpression(builder_, level_ + 1);
+    if (!result_) result_ = asciiObjectExpression(builder_, level_ + 1);
+    if (!result_) result_ = pathToConstantExpression(builder_, level_ + 1);
     if (!result_) result_ = rawDictionaryCommandHandlerCallExpression(builder_, level_ + 1);
     if (!result_) result_ = rawDataExpression(builder_, level_ + 1);
-    if (!result_) result_ = primaryExpression_4(builder_, level_ + 1);
+    if (!result_) result_ = primaryExpression_6(builder_, level_ + 1);
     if (!result_) result_ = parenthesizedExpression(builder_, level_ + 1);
     if (!result_) result_ = appleScriptCommandExpression(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
@@ -4774,12 +4888,12 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   //      <<isTreePrevSimpleReference>>
   //        (  handlerPositionalParametersCallExpression | <<isHandlerLabeledParametersCallAllowed>>  handlerLabeledParametersCallExpression )
   //      )?
-  private static boolean primaryExpression_4(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "primaryExpression_4")) return false;
+  private static boolean primaryExpression_6(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "primaryExpression_6")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = primaryReferenceExpression(builder_, level_ + 1);
-    result_ = result_ && primaryExpression_4_1(builder_, level_ + 1);
+    result_ = result_ && primaryExpression_6_1(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
@@ -4788,38 +4902,38 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   //      <<isTreePrevSimpleReference>>
   //        (  handlerPositionalParametersCallExpression | <<isHandlerLabeledParametersCallAllowed>>  handlerLabeledParametersCallExpression )
   //      )?
-  private static boolean primaryExpression_4_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "primaryExpression_4_1")) return false;
-    primaryExpression_4_1_0(builder_, level_ + 1);
+  private static boolean primaryExpression_6_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "primaryExpression_6_1")) return false;
+    primaryExpression_6_1_0(builder_, level_ + 1);
     return true;
   }
 
   // <<isTreePrevSimpleReference>>
   //        (  handlerPositionalParametersCallExpression | <<isHandlerLabeledParametersCallAllowed>>  handlerLabeledParametersCallExpression )
-  private static boolean primaryExpression_4_1_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "primaryExpression_4_1_0")) return false;
+  private static boolean primaryExpression_6_1_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "primaryExpression_6_1_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = isTreePrevSimpleReference(builder_, level_ + 1);
-    result_ = result_ && primaryExpression_4_1_0_1(builder_, level_ + 1);
+    result_ = result_ && primaryExpression_6_1_0_1(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // handlerPositionalParametersCallExpression | <<isHandlerLabeledParametersCallAllowed>>  handlerLabeledParametersCallExpression
-  private static boolean primaryExpression_4_1_0_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "primaryExpression_4_1_0_1")) return false;
+  private static boolean primaryExpression_6_1_0_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "primaryExpression_6_1_0_1")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = handlerPositionalParametersCallExpression(builder_, level_ + 1);
-    if (!result_) result_ = primaryExpression_4_1_0_1_1(builder_, level_ + 1);
+    if (!result_) result_ = primaryExpression_6_1_0_1_1(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // <<isHandlerLabeledParametersCallAllowed>>  handlerLabeledParametersCallExpression
-  private static boolean primaryExpression_4_1_0_1_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "primaryExpression_4_1_0_1_1")) return false;
+  private static boolean primaryExpression_6_1_0_1_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "primaryExpression_6_1_0_1_1")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = isHandlerLabeledParametersCallAllowed(builder_, level_ + 1);
