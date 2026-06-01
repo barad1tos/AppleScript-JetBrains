@@ -6376,12 +6376,45 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // integerLiteralExpression | expression
+  // integerLiteralExpression | (referenceExpression &(thru|through)) | expression
   static boolean startIndex(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "startIndex")) return false;
     boolean result_;
+    Marker marker_ = enter_section_(builder_);
     result_ = integerLiteralExpression(builder_, level_ + 1);
+    if (!result_) result_ = startIndex_1(builder_, level_ + 1);
     if (!result_) result_ = expression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // referenceExpression &(thru|through)
+  private static boolean startIndex_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "startIndex_1")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = referenceExpression(builder_, level_ + 1);
+    result_ = result_ && startIndex_1_1(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // &(thru|through)
+  private static boolean startIndex_1_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "startIndex_1_1")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_, level_, _AND_);
+    result_ = startIndex_1_1_0(builder_, level_ + 1);
+    exit_section_(builder_, level_, marker_, result_, false, null);
+    return result_;
+  }
+
+  // thru|through
+  private static boolean startIndex_1_1_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "startIndex_1_1_0")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, THRU);
+    if (!result_) result_ = consumeToken(builder_, THROUGH);
     return result_;
   }
 
@@ -6454,12 +6487,47 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // integerLiteralExpression | expression
+  // integerLiteralExpression | (referenceExpression &(of|in|RPAREN|NLS)) | expression
   static boolean stopIndex(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "stopIndex")) return false;
     boolean result_;
+    Marker marker_ = enter_section_(builder_);
     result_ = integerLiteralExpression(builder_, level_ + 1);
+    if (!result_) result_ = stopIndex_1(builder_, level_ + 1);
     if (!result_) result_ = expression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // referenceExpression &(of|in|RPAREN|NLS)
+  private static boolean stopIndex_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "stopIndex_1")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = referenceExpression(builder_, level_ + 1);
+    result_ = result_ && stopIndex_1_1(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // &(of|in|RPAREN|NLS)
+  private static boolean stopIndex_1_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "stopIndex_1_1")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_, level_, _AND_);
+    result_ = stopIndex_1_1_0(builder_, level_ + 1);
+    exit_section_(builder_, level_, marker_, result_, false, null);
+    return result_;
+  }
+
+  // of|in|RPAREN|NLS
+  private static boolean stopIndex_1_1_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "stopIndex_1_1_0")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, OF);
+    if (!result_) result_ = consumeToken(builder_, IN);
+    if (!result_) result_ = consumeToken(builder_, RPAREN);
+    if (!result_) result_ = consumeToken(builder_, NLS);
     return result_;
   }
 
