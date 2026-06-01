@@ -11,4 +11,6 @@ import com.intellij.lang.ASTNode
  * `PsiErrorElement`. Extends the same base (`AppleScriptPsiElementImpl`) the Grammar-Kit
  * generated `AppleScriptApplicationObjectReferenceImpl` expects via this mixin.
  */
-open class AbstractApplicationObjectReference(node: ASTNode) : AppleScriptPsiElementImpl(node)
+open class AbstractApplicationObjectReference(
+    node: ASTNode,
+) : AppleScriptPsiElementImpl(node)

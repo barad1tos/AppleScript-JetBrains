@@ -5,29 +5,29 @@
         <error line="169" column="23" source="standard:multiline-expression-wrapping" />
         <error line="184" column="30" source="standard:multiline-expression-wrapping" />
         <error line="220" column="20" source="standard:multiline-expression-wrapping" />
-        <error line="368" column="27" source="standard:multiline-expression-wrapping" />
-        <error line="392" column="36" source="standard:chain-method-continuation" />
-        <error line="438" column="49" source="standard:multiline-expression-wrapping" />
-        <error line="438" column="50" source="standard:wrapping" />
-        <error line="438" column="61" source="standard:chain-method-continuation" />
-        <error line="439" column="64" source="standard:wrapping" />
-        <error line="451" column="30" source="standard:multiline-expression-wrapping" />
-        <error line="459" column="49" source="standard:multiline-expression-wrapping" />
-        <error line="459" column="56" source="standard:chain-method-continuation" />
-        <error line="462" column="32" source="standard:multiline-expression-wrapping" />
-        <error line="462" column="38" source="standard:chain-method-continuation" />
-        <error line="472" column="25" source="standard:multiline-expression-wrapping" />
-        <error line="477" column="17" source="standard:chain-method-continuation" />
-        <error line="485" column="106" source="standard:trailing-comma-on-call-site" />
-        <error line="508" column="24" source="standard:multiline-expression-wrapping" />
-        <error line="527" column="32" source="standard:multiline-expression-wrapping" />
-        <error line="569" column="31" source="standard:chain-method-continuation" />
-        <error line="578" column="40" source="standard:multiline-expression-wrapping" />
-        <error line="593" column="13" source="standard:blank-line-before-declaration" />
-        <error line="593" column="21" source="standard:function-signature" />
-        <error line="593" column="35" source="standard:function-signature" />
-        <error line="593" column="60" source="standard:function-signature" />
-        <error line="718" column="22" source="standard:chain-method-continuation" />
+        <error line="383" column="27" source="standard:multiline-expression-wrapping" />
+        <error line="407" column="36" source="standard:chain-method-continuation" />
+        <error line="453" column="49" source="standard:multiline-expression-wrapping" />
+        <error line="453" column="50" source="standard:wrapping" />
+        <error line="453" column="61" source="standard:chain-method-continuation" />
+        <error line="454" column="64" source="standard:wrapping" />
+        <error line="466" column="30" source="standard:multiline-expression-wrapping" />
+        <error line="474" column="49" source="standard:multiline-expression-wrapping" />
+        <error line="474" column="56" source="standard:chain-method-continuation" />
+        <error line="477" column="32" source="standard:multiline-expression-wrapping" />
+        <error line="477" column="38" source="standard:chain-method-continuation" />
+        <error line="487" column="25" source="standard:multiline-expression-wrapping" />
+        <error line="492" column="17" source="standard:chain-method-continuation" />
+        <error line="500" column="106" source="standard:trailing-comma-on-call-site" />
+        <error line="523" column="24" source="standard:multiline-expression-wrapping" />
+        <error line="542" column="32" source="standard:multiline-expression-wrapping" />
+        <error line="584" column="31" source="standard:chain-method-continuation" />
+        <error line="593" column="40" source="standard:multiline-expression-wrapping" />
+        <error line="608" column="13" source="standard:blank-line-before-declaration" />
+        <error line="608" column="21" source="standard:function-signature" />
+        <error line="608" column="35" source="standard:function-signature" />
+        <error line="608" column="60" source="standard:function-signature" />
+        <error line="733" column="22" source="standard:chain-method-continuation" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/AppleScriptFile.kt">
         <error line="15" column="23" source="standard:class-signature" />
@@ -1676,6 +1676,10 @@
         <error line="61" column="81" source="standard:argument-list-wrapping" />
         <error line="62" column="34" source="standard:trailing-comma-on-call-site" />
     </file>
+    <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/ApplicationObjectReferenceTest.kt">
+        <error line="27" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="44" column="22" source="standard:multiline-expression-wrapping" />
+    </file>
     <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/ControlStmtParsingTestCase.kt">
         <error line="4" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
@@ -1690,6 +1694,10 @@
         <error line="4" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="28" column="31" source="standard:multiline-expression-wrapping" />
     </file>
+    <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/OnErrorBlockTest.kt">
+        <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="29" column="22" source="standard:multiline-expression-wrapping" />
+    </file>
     <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/ParserRegressionTest.kt">
         <error line="22" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="42" column="22" source="standard:multiline-expression-wrapping" />
@@ -1701,8 +1709,20 @@
     <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/StandardAdditionsParsingTestCase.kt">
         <error line="4" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
+    <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/StandardAdditionsTokensTest.kt">
+        <error line="26" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="45" column="22" source="standard:multiline-expression-wrapping" />
+    </file>
+    <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/TellBlockHardeningTest.kt">
+        <error line="19" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="29" column="22" source="standard:multiline-expression-wrapping" />
+    </file>
     <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/TellParsingTestCase.kt">
         <error line="4" column="1" source="standard:no-empty-first-line-in-class-body" />
+    </file>
+    <file name="src/test/kotlin/com/intellij/plugin/applescript/test/parsing/WhoseClauseTest.kt">
+        <error line="24" column="1" source="standard:no-empty-first-line-in-class-body" />
+        <error line="34" column="22" source="standard:multiline-expression-wrapping" />
     </file>
     <file name="src/test/kotlin/com/intellij/plugin/applescript/test/persistence/PersistenceGoldenFixtureTest.kt">
         <error line="30" column="1" source="standard:no-empty-first-line-in-class-body" />
