@@ -644,6 +644,20 @@ tasks {
     // The `sourceFile` is set here as the only required configuration; targetRootOutputDir
     // overrides the convention from the task companion's register block. packageName is
     // detected automatically from the flex file's `package com.intellij...` declaration.
+    //
+    // Bootstrap-regen procedure (08-04 toolchain migration). `./gradlew build` does NOT regenerate
+    // the committed `src/main/gen` — it is a static artifact. To regenerate it on the bundled
+    // toolchain (JFlex 1.9.2 + Grammar-Kit 2023.3), resolving the chicken-and-egg where Grammar-Kit
+    // must read the COMPILED Kotlin psiImplUtil before it can emit gen:
+    //   1. With committed gen present, run `compileKotlin compileJava` so `build/classes/kotlin/main`
+    //      + `build/classes/java/main` exist (the classpath the `generateParser` task appends below,
+    //      so Grammar-Kit discovers the @JvmStatic AppleScriptPsiImplUtil methods → 0 skip-warnings).
+    //   2. Run `generateLexer` + `generateParser` to emit the new gen.
+    //   3. Assemble both generated trees into `src/main/gen` (gen is on the main source set, line ~59).
+    // This is a one-time bootstrap: `targetRootOutputDir` below stays pinned at
+    // `build/verifyGeneratedSourcesMatch/tmp-gen` so `verifyGeneratedSourcesMatch` keeps diffing a
+    // fresh regen against committed gen (the drift gate). Retarget to `src/main/gen` only transiently
+    // during the bootstrap regen, then restore.
     named<GenerateLexerTask>("generateLexer") {
         sourceFile.set(layout.projectDirectory.file("src/main/resources/_AppleScriptLexer.flex"))
         targetRootOutputDir.set(layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen"))
@@ -651,6 +665,18 @@ tasks {
     named<GenerateParserTask>("generateParser") {
         sourceFile.set(layout.projectDirectory.file("src/main/resources/AppleScript.bnf"))
         targetRootOutputDir.set(layout.buildDirectory.dir("verifyGeneratedSourcesMatch/tmp-gen"))
+        // GenerateParserTask extends JavaExec — APPEND the compiled main classes to the inherited
+        // task classpath via the JavaExec classpath(..) method (NOT the FileCollection-property
+        // setter form, which fails because that property is a plain FileCollection, not appendable).
+        // This lets Grammar-Kit 2023.3 load
+        // the compiled Kotlin `AppleScriptPsiImplUtil` object and discover its @JvmStatic methods at
+        // generation time, eliminating the "methods are not found in AppleScriptPsiImplUtil" skip-
+        // warnings (and the 20 downstream Unresolved-reference compile errors). Requires step 1 of
+        // the bootstrap-regen procedure above to have produced these dirs first.
+        classpath(
+            layout.buildDirectory.dir("classes/kotlin/main"),
+            layout.buildDirectory.dir("classes/java/main"),
+        )
         // pathToParser/pathToPsiRoot are deprecated and not required; the IPGP task writes
         // all generated files under targetRootOutputDir reflecting BNF-declared psiPackage /
         // parserClass paths. purgeOldFiles defaults to true when both deprecated paths are
