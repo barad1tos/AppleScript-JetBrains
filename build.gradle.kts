@@ -317,6 +317,11 @@ tasks {
                 // ASCII number / path to <constant>) to zero PsiErrorElement. Same
                 // BasePlatformTestCase heavy-by-default model as RealWorldCorpusTest above.
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.StandardAdditionsTokensTest")
+                // Phase 8 PARSE-03 (plan 08-06): ApplicationObjectReferenceTest gates the generic
+                // application_object_reference production (library playlist N / current track /
+                // track N of …) to zero PsiErrorElement, SDEF-independently. Same heavy-by-default
+                // BasePlatformTestCase model as the corpus tests above.
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ApplicationObjectReferenceTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ControlStmtParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.HandlersParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellParsingTestCase")
