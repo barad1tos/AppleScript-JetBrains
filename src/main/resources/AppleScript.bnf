@@ -392,7 +392,7 @@ private literalExpression ::=
 
 /** Numeric, string, regexp, boolean, date, string(space,tab,return) constant*/
 builtInConstantLiteralExpression ::= boolean_constant|date_time_constants|text_constant|itMeProperty
-|currentApplicationConstant| missing_value_constant | scriptingAdditionsFolderConstant
+|currentApplicationConstant| missing_value_constant | scriptingAdditionsFolderConstant | currentDateConstant
 //|appleScriptPropertiesConstant
 private scriptingAdditionsFolderConstant ::= <<parseExpression '"scripting additions"' SCRIPTING_ADDITIONS>>
 
@@ -601,6 +601,9 @@ private month_constant ::= 'January'|'February'|'March'|'April'|'May'|'June'|'Ju
                     |'November'|'December' |'Jan'|'Feb'|'Mar'|'Apr'|'Jun'|'Jul'|'Aug'|'Sep'|'Oct'|'Nov'|'Dec'
 
 private currentApplicationConstant ::= CURRENT_APPLICATION|CURRENT_APP|(CURRENT APPLICATION) //'current application'|'current app'//current applicationClass
+// PARSE-04 (08-05, D-06): 'current date' is two discrete lexer tokens (CURRENT + DATE); the
+// commented-out CURRENT_DATE macro in _AppleScriptLexer.flex stays commented (no lexer regen).
+private currentDateConstant ::= CURRENT DATE
 private missing_value_constant ::= MISSING_VALUE
 //private save_opt_constant ::= yes|no|ask
 private text_constant ::=  return|space|tab|linefeed|quote
@@ -882,6 +885,8 @@ implements="com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeName"}
 private primaryExpression ::=
      literalExpression
  |   dictionaryCommandHandlerCallExpression
+ |   asciiObjectExpression
+ |   pathToConstantExpression
  |   rawDictionaryCommandHandlerCallExpression
  |   rawDataExpression
  | ( primaryReferenceExpression
@@ -892,6 +897,16 @@ private primaryExpression ::=
    )
  |   parenthesizedExpression
  |   appleScriptCommandExpression
+
+// PARSE-04 (08-05, D-06): explicit Standard Additions object tokens — additive, parser-level
+// from existing lexer tokens (no lexer change). Guarded on the VAR_IDENTIFIER text via
+// parseExpression so they fire only on these SA constructs; placed below
+// dictionaryCommandHandlerCallExpression so a loaded-StandardAdditions command path still wins.
+// All private: no PSI surface, no AppleScriptPsiImplUtil methods (test asserts zero errors only).
+private asciiObjectExpression ::= <<parseExpression '"ASCII"' asciiObjectExpressionInner>>
+private asciiObjectExpressionInner ::= var_identifier (CHARACTER|NUMBER) expression
+private pathToConstantExpression ::= <<parseExpression '"path"' pathToConstantExpressionInner>>
+private pathToConstantExpressionInner ::= var_identifier to var_identifier+ (from var_identifier+)?
 
 incompleteCommandHandlerCall ::= <<parseIncompleteCommandCall>>
 {mixin="com.intellij.plugin.applescript.psi.sdef.impl.DictionaryCompositeNameImpl"
