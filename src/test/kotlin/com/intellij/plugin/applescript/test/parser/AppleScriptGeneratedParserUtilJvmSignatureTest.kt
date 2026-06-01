@@ -114,6 +114,7 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                 "boolean",
                 PSI_BUILDER,
                 INT,
+                STRING,
                 PARSER
             ),
             FrozenSignature.publicStatic(
