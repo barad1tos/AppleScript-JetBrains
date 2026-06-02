@@ -521,6 +521,7 @@ class SdefIndexService @JvmOverloads constructor(
          */
         internal fun newSecureSaxBuilder(): SAXBuilder {
             val builder = SAXBuilder()
+            builder.setFeature("http://apache.org/xml/features/disallow-doctype-decl", false)
             builder.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
             builder.setFeature("http://xml.org/sax/features/external-general-entities", false)
             builder.setFeature("http://xml.org/sax/features/external-parameter-entities", false)

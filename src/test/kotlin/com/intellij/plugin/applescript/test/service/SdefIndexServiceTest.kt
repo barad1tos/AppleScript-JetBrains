@@ -107,6 +107,26 @@ class SdefIndexServiceTest {
     }
 
     @Test
+    fun secureSaxBuilderExplicitlyAllowsAppleSdefDoctype() {
+        val builder = SdefIndexService.newSecureSaxBuilder()
+        val featuresField = builder.javaClass.getDeclaredField("features")
+        featuresField.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val features = featuresField.get(builder) as Map<String, Boolean>
+
+        assertEquals(
+            false,
+            features["http://apache.org/xml/features/disallow-doctype-decl"],
+            "Apple SDEF files declare a DOCTYPE, so the builder must override IDE defaults that disallow it",
+        )
+        assertEquals(
+            false,
+            features["http://apache.org/xml/features/nonvalidating/load-external-dtd"],
+            "External DTD loading must stay disabled even when the DOCTYPE declaration is allowed",
+        )
+    }
+
+    @Test
     fun ingestScriptingAdditionsPlacesDoShellScriptInStdCommandIndex() = runTest {
         val service = newService(testScheduler)
         val xml = SyntheticSuiteFixtures.standardAdditionsMinimalXml()
