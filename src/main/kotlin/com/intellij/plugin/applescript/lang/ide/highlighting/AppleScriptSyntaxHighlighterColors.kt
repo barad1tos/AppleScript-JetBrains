@@ -11,6 +11,7 @@ object AppleScriptSyntaxHighlighterColors {
     const val APPLE_SCRIPT_COMPARISON_OPERATOR: String = "APPLE_SCRIPT_COMPARISON_OPERATOR"
     const val APPLE_SCRIPT_LANGUAGE_LITERAL: String = "APPLE_SCRIPT_LANGUAGE_LITERAL"
     const val APPLE_SCRIPT_BUILT_IN_TYPE: String = "APPLE_SCRIPT_BUILT_IN_TYPE"
+    const val APPLE_SCRIPT_HANDLER_CALL: String = "APPLE_SCRIPT_HANDLER_CALL"
     private const val APPLE_SCRIPT_NUMBER = "APPLE_SCRIPT_NUMBER"
     private const val APPLE_SCRIPT_STRING = "APPLE_SCRIPT_STRING"
     private const val APPLE_SCRIPT_OPERATION_SIGN = "APPLE_SCRIPT_OPERATION_SIGN"
@@ -52,6 +53,13 @@ object AppleScriptSyntaxHighlighterColors {
         createTextAttributesKey(
             APPLE_SCRIPT_BUILT_IN_TYPE,
             DefaultLanguageHighlighterColors.CLASS_NAME,
+        )
+
+    @JvmField
+    val HANDLER_CALL: TextAttributesKey =
+        createTextAttributesKey(
+            APPLE_SCRIPT_HANDLER_CALL,
+            DefaultLanguageHighlighterColors.FUNCTION_CALL,
         )
 
     @JvmField

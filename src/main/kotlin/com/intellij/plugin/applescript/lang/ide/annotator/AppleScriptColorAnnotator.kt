@@ -27,11 +27,14 @@ import com.intellij.plugin.applescript.psi.AppleScriptHandlerParameterLabel
 import com.intellij.plugin.applescript.psi.AppleScriptIncompleteExpression
 import com.intellij.plugin.applescript.psi.AppleScriptNumericConstant
 import com.intellij.plugin.applescript.psi.AppleScriptPropertyReference
+import com.intellij.plugin.applescript.psi.AppleScriptReferenceElement
 import com.intellij.plugin.applescript.psi.AppleScriptTokenTypesSets.HANDLER_PARAMETER_LABELS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.HANDLER_LABELED_PARAMETERS_CALL_EXPRESSION
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.HANDLER_LABELED_PARAMETERS_DEFINITION
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.HANDLER_PARAMETER_LABEL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.MY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.impl.AppleScriptPsiImplUtil
 import com.intellij.psi.PsiElement
@@ -48,6 +51,7 @@ private object AppleScriptAnnotationSupport {
 
     fun annotate(element: PsiElement, holder: AnnotationHolder) {
         annotateUnresolvedHandlerCall(element, holder)
+        annotateHandlerCall(element, holder)
         annotateElementColor(element, holder)
         annotateDuplicatedParameterLabels(element, holder)
     }
@@ -63,6 +67,32 @@ private object AppleScriptAnnotationSupport {
                 AppleScriptSyntaxHighlighterColors.UNRESOLVED_REFERENCE,
             )
         }
+    }
+
+    private fun annotateHandlerCall(element: PsiElement, holder: AnnotationHolder) {
+        when (element) {
+            is AppleScriptHandlerCall -> annotateInterleavedHandlerCall(element, holder)
+            is AppleScriptReferenceElement -> annotateMyPositionalHandlerCall(element, holder)
+        }
+    }
+
+    private fun annotateInterleavedHandlerCall(element: AppleScriptHandlerCall, holder: AnnotationHolder) {
+        for (argument in element.getArguments()) {
+            createInfoAnnotation(
+                holder,
+                argument.argumentSelector.selectorIdentifier,
+                AppleScriptSyntaxHighlighterColors.HANDLER_CALL,
+            )
+        }
+    }
+
+    private fun annotateMyPositionalHandlerCall(
+        element: AppleScriptReferenceElement,
+        holder: AnnotationHolder,
+    ) {
+        if (!AppleScriptAnnotationPredicates.isMyPositionalHandlerCallName(element)) return
+
+        createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.HANDLER_CALL)
     }
 
     private fun annotateElementColor(element: PsiElement, holder: AnnotationHolder) {
@@ -343,6 +373,10 @@ private object AppleScriptAnnotationPredicates {
             .substringBefore(" ")
             .lowercase() in DATE_PROPERTY_TERMS &&
             isPropertyReferenceOperator(PsiTreeUtil.nextVisibleLeaf(element))
+
+    fun isMyPositionalHandlerCallName(element: AppleScriptReferenceElement): Boolean =
+        PsiTreeUtil.prevVisibleLeaf(element)?.node?.elementType === MY &&
+            PsiTreeUtil.nextVisibleLeaf(element)?.node?.elementType === LPAREN
 
     private fun isPropertyReferenceOperator(element: PsiElement?): Boolean =
         element?.node?.elementType.let { elementType ->
