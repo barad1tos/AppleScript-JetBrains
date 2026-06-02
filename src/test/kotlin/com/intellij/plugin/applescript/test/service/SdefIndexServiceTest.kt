@@ -91,6 +91,22 @@ class SdefIndexServiceTest {
     }
 
     @Test
+    fun ingestMusicSuiteAllowsAppleDoctypeWithoutLoadingExternalDtd() = runTest {
+        val service = newService(testScheduler)
+        val xml = SyntheticSuiteFixtures.musicAppPlayCommandWithAppleDoctypeXml()
+        val file = SyntheticSuiteFixtures.writeToTempFile("music-doctype", xml)
+
+        val result: IngestResult = service.ingest("Music", file)
+
+        assertTrue(result is IngestResult.Success, "expected Success for Apple SDEF DOCTYPE, got $result")
+        val snapshot: SdefIndexSnapshot = service.snapshot()
+        assertTrue(
+            snapshot.isApplicationCommand("Music", "play"),
+            "Music play command must be indexed when the SDEF declares Apple's DTD",
+        )
+    }
+
+    @Test
     fun ingestScriptingAdditionsPlacesDoShellScriptInStdCommandIndex() = runTest {
         val service = newService(testScheduler)
         val xml = SyntheticSuiteFixtures.standardAdditionsMinimalXml()

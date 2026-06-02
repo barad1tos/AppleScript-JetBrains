@@ -55,6 +55,21 @@ object SyntheticSuiteFixtures {
         </dictionary>
     """.trimIndent()
 
+    /**
+     * Real macOS `sdef` output includes this Apple DTD declaration. The parser must allow the
+     * declaration while still refusing external DTD/entity loading.
+     */
+    fun musicAppPlayCommandWithAppleDoctypeXml(): String = """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+        <dictionary title="Music Terminology">
+            <suite name="Music Suite" code="musc" description="Classes and commands for Music">
+                <command name="play" code="hookplay" description="Play the current track"/>
+                <class name="track" code="cTrk" description="A track in a playlist"/>
+            </suite>
+        </dictionary>
+    """.trimIndent()
+
     /** Suite with no commands — edge case for empty-suite handling. */
     fun emptySuiteXml(): String = """
         <?xml version="1.0" encoding="UTF-8"?>
