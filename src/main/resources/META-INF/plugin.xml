@@ -16,6 +16,10 @@
               extensions="scpt;applescript"/>
     <lang.parserDefinition language="AppleScript"
                             implementationClass="com.intellij.plugin.applescript.lang.parser.AppleScriptParserDefinition"/>
+    <lang.formatter language="AppleScript"
+                    implementationClass="com.intellij.plugin.applescript.lang.formatter.AppleScriptFormattingModelBuilder"/>
+    <codeStyleSettingsProvider implementation="com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptCodeStyleSettingsProvider"/>
+    <langCodeStyleSettingsProvider implementation="com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptLanguageCodeStyleSettingsProvider"/>
     <lang.syntaxHighlighterFactory language="AppleScript"
                                    implementationClass="com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterFactory"/>
     <lang.commenter language="AppleScript"
