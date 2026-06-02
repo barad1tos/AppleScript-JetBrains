@@ -1,8 +1,10 @@
 package com.intellij.plugin.applescript.test.service
 
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryInfo
 import com.intellij.plugin.applescript.lang.ide.sdef.SdefPersistenceService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.io.File
 
 /**
  * Phase 4 SERVICE-02 + SERVICE-08 unit test for [SdefPersistenceService].
@@ -94,6 +96,30 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
                 name in facade.getNotScriptableApplicationList(),
             )
         } finally {
+            service.removeNotScriptable(name)
+        }
+    }
+
+    fun testParseFailureDoesNotMarkApplicationAsNotScriptable() {
+        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val service = SdefPersistenceService.getInstance()
+        val name = "ParseFailureApp_${System.nanoTime()}"
+        val brokenDictionary = SyntheticSuiteFixtures.writeToTempFile("broken-dictionary", "<dictionary>")
+        val applicationFile = File(brokenDictionary.parentFile, "$name.app")
+        val info = DictionaryInfo(name, brokenDictionary, applicationFile)
+        try {
+            service.addDictionaryInfo(info)
+
+            assertFalse(
+                "Broken dictionary file must not initialize",
+                facade.initializeDictionaryFromInfoInternal(info),
+            )
+            assertFalse(
+                "Dictionary parse failure is not proof that the application is not scriptable",
+                service.isNotScriptable(name),
+            )
+        } finally {
+            service.removeDictionaryInfo(applicationFile.path)
             service.removeNotScriptable(name)
         }
     }

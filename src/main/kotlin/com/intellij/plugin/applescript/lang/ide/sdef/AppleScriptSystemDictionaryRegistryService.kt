@@ -246,14 +246,15 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
     // ---------------------------------------------------------------------------------------------
 
     /**
-     * Remove a [DictionaryInfo] from the in-memory registry by application NAME and mark the
-     * application as notScriptable. Internal helper called by [initializeDictionaryFromInfo]
-     * when dictionary parsing fails. NOT the public [removeDictionaryInfo] trampoline (which
-     * takes an application PATH and routes through [SdefPersistenceService]).
+     * Remove a [DictionaryInfo] from the in-memory registry by application NAME after
+     * dictionary parsing fails. A parse failure is not proof that the application is not
+     * scriptable; only dictionary generation failures at the `sdef` boundary mark that state.
+     *
+     * NOT the public [removeDictionaryInfo] trampoline (which takes an application PATH and
+     * routes through [SdefPersistenceService]).
      */
     internal fun removeDictionaryInfoInMemoryInternal(applicationName: String) {
         dictionaryInfoMap.remove(applicationName)
-        notScriptableApplicationList.add(applicationName)
     }
 
     /**
@@ -684,7 +685,7 @@ class AppleScriptSystemDictionaryRegistryService @JvmOverloads constructor(
         if (file.exists() && service<SdefIndexService>().parseDictionaryFile(file, applicationName)) {
             return dictionaryInfo.setInitialized(true)
         }
-        // Parsing failed — remove the broken generated dictionary file from the cache.
+        // Parsing failed — drop the broken generated dictionary from the registry.
         // Routes to the in-memory helper (NOT the typed-API trampoline) because callers here
         // identify the application by NAME, not by path. The public `removeDictionaryInfo`
         // trampoline takes an `applicationPath`. SERVICE-02 invariant.
