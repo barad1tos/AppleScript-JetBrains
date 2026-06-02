@@ -1,9 +1,14 @@
 package com.intellij.plugin.applescript.test.codeinsight
 
 import com.intellij.codeInsight.completion.CompletionType
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInsight.generation.actions.CommentByLineCommentAction
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -44,7 +49,38 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
     fun testAnnotator() {
         myFixture.configureByFile("annotator/not_found_dic.scpt")
-        myFixture.checkHighlighting(true, false, false)
+        myFixture.checkHighlighting(true, false, true)
+    }
+
+    fun testDatePropertyReferencesUsePropertyHighlighting() {
+        val script = """
+            on formatDate(theDate)
+                if class of theDate is date then
+                    set y to year of theDate
+                    set mInt to month of theDate
+                    set dInt to day of theDate
+                    set hhInt to hours of theDate
+                    set mmInt to minutes of theDate
+                    set ssInt to seconds of theDate
+                end if
+            end formatDate
+        """.trimIndent()
+
+        myFixture.configureByText(AppleScriptFileType, script)
+        val highlights = myFixture.doHighlighting()
+
+        val document = myFixture.editor.document
+        for (term in DATE_PROPERTY_TERMS) {
+            val keys = highlightingKeysFor(highlights, textRangeFor(document, term))
+            assertTrue(
+                "$term must use dictionary property highlighting; keys=$keys",
+                keys.contains(AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR),
+            )
+            assertFalse(
+                "$term must not use dictionary constant highlighting; keys=$keys",
+                keys.contains(AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR),
+            )
+        }
     }
 
     fun testFileType() {
@@ -92,6 +128,17 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertEquals("myVar", resolveResult.text)
     }
 
+    private fun highlightingKeysFor(highlights: List<HighlightInfo>, textRange: TextRange): Set<TextAttributesKey> =
+        highlights
+            .filter { highlight -> textRange.intersects(highlight.startOffset, highlight.endOffset) }
+            .mapNotNullTo(mutableSetOf()) { highlight -> highlight.forcedTextAttributesKey }
+
+    private fun textRangeFor(document: Document, text: String): TextRange {
+        val startOffset = document.charsSequence.indexOf(text)
+        assertTrue("expected to find '$text'", startOffset >= 0)
+        return TextRange(startOffset, startOffset + text.length)
+    }
+
     companion object {
         private const val MY_TEST_DATA_DIR = "src/test/resources/testData/"
 
@@ -99,6 +146,22 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         // BASIC completion on the std-lib fixture. assertContains (kotlin.test) is NOT on the
         // classpath — use assertTrue(list.contains(x), msg). The set is confirmed against live
         // completion output on the first heavy run (A2 confirmation).
-        private val STABLE_TERMS = listOf("do shell script", "display dialog", "say", "path to", "current date")
+        private val STABLE_TERMS = listOf(
+            "do shell script",
+            "display dialog",
+            "say",
+            "path to",
+            "current date",
+        )
+
+        private val DATE_PROPERTY_TERMS = listOf(
+            "class",
+            "year",
+            "month",
+            "day",
+            "hours",
+            "minutes",
+            "seconds",
+        )
     }
 }
