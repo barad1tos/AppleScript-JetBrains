@@ -83,6 +83,29 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testMyHandlerCallUsesFunctionHighlighting() {
+        val script = """
+            on run
+                set rawStatus to "matched"
+                set statusText to my normalize_cloud_status(rawStatus)
+            end run
+
+            on normalize_cloud_status(statusValue)
+                return statusValue
+            end normalize_cloud_status
+        """.trimIndent()
+
+        myFixture.configureByText(AppleScriptFileType, script)
+        val highlights = myFixture.doHighlighting()
+
+        val document = myFixture.editor.document
+        val keys = highlightingKeyNamesFor(highlights, textRangeFor(document, "normalize_cloud_status"))
+        assertTrue(
+            "handler call must use function-call highlighting; keys=$keys",
+            keys.contains(HANDLER_CALL_KEY),
+        )
+    }
+
     fun testFileType() {
         val file = myFixture.configureByFile("annotator/not_found_dic.scpt")
         assertTrue(file.fileType === AppleScriptFileType)
@@ -133,6 +156,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             .filter { highlight -> textRange.intersects(highlight.startOffset, highlight.endOffset) }
             .mapNotNullTo(mutableSetOf()) { highlight -> highlight.forcedTextAttributesKey }
 
+    private fun highlightingKeyNamesFor(highlights: List<HighlightInfo>, textRange: TextRange): Set<String> =
+        highlightingKeysFor(highlights, textRange)
+            .mapTo(mutableSetOf()) { key -> key.externalName }
+
     private fun textRangeFor(document: Document, text: String): TextRange {
         val startOffset = document.charsSequence.indexOf(text)
         assertTrue("expected to find '$text'", startOffset >= 0)
@@ -141,6 +168,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
     companion object {
         private const val MY_TEST_DATA_DIR = "src/test/resources/testData/"
+        private const val HANDLER_CALL_KEY = "APPLE_SCRIPT_HANDLER_CALL"
 
         // D-03 content anchors: public Standard Additions command names that must appear in
         // BASIC completion on the std-lib fixture. assertContains (kotlin.test) is NOT on the

@@ -31,6 +31,7 @@ class AppleScriptColorsAndFontsPage : ColorSettingsPage {
             AttributesDescriptor("Comparison operator", AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR),
             AttributesDescriptor("Language literal", AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL),
             AttributesDescriptor("Built-in type", AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE),
+            AttributesDescriptor("Handler call", AppleScriptSyntaxHighlighterColors.HANDLER_CALL),
             AttributesDescriptor("String", AppleScriptSyntaxHighlighterColors.STRING),
             AttributesDescriptor("Operator", AppleScriptSyntaxHighlighterColors.OPERATION_SIGN),
             AttributesDescriptor("Comment", AppleScriptSyntaxHighlighterColors.COMMENT),
@@ -50,6 +51,7 @@ class AppleScriptColorsAndFontsPage : ColorSettingsPage {
             "comparison operator" to AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR,
             "language literal" to AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL,
             "built-in type" to AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE,
+            "handler call" to AppleScriptSyntaxHighlighterColors.HANDLER_CALL,
             "string" to AppleScriptSyntaxHighlighterColors.STRING,
             "operator" to AppleScriptSyntaxHighlighterColors.OPERATION_SIGN,
             "comment" to AppleScriptSyntaxHighlighterColors.COMMENT,
@@ -73,6 +75,8 @@ class AppleScriptColorsAndFontsPage : ColorSettingsPage {
                 "if track_count <comparison operator>></comparison operator> 0 " +
                 "<logical operator>and</logical operator> statusText is not " +
                 "<language literal>missing value</language literal> then\n" +
+                "  set statusText to my " +
+                "<handler call>normalize_cloud_status</handler call>(rawStatus)\n" +
                 "  set raw_year to raw_year as <built-in type>integer</built-in type>\n" +
                 "end if\n" +
                 "tell application \"TextEdit\"\n" +
