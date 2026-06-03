@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="AppleScript" width="160">
+  <img src="assets/logo.svg" alt="AppleScript Toolkit" width="160">
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
 
 <br>
 
-The AppleScript plugin brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a Kotlin rewrite and revival of the original Apache-2.0 AppleScript plugin, maintained by Roman Borodavkin and updated for the modern IntelliJ Platform.
+AppleScript Toolkit brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a Kotlin rewrite and revival of the original Apache-2.0 AppleScript plugin, maintained by Roman Borodavkin and updated for the modern IntelliJ Platform.
 
 The project is not affiliated with Apple, JetBrains, or the original maintainer.
 
