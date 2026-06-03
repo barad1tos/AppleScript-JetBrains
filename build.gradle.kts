@@ -517,7 +517,7 @@ tasks {
             val ideDirs = ideFiles.filter { it.isDirectory }
 
             val slf4jRegex = Regex("""kotlinx-coroutines-slf4j-(\d+\.\d+\.\d+(?:-intellij(?:-\d+)?)?)\.jar""")
-            val ideKeyRegex = Regex("""ideaIC-(\d+\.\d+(?:\.\d+(?:\.\d+)?)?)-""")
+            val ideKeyRegex = Regex("""ideaIC-(\d+\.\d+(?:\.\d+(?:\.\d+)?)?)(?:-|$)""")
             val resolved: Map<String, String> =
                 ideDirs
                     .mapNotNull { ideDir ->
