@@ -1,5 +1,6 @@
 package com.intellij.plugin.applescript.test.parsing
 
+import com.intellij.plugin.applescript.psi.AppleScriptApplicationObjectReference
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
@@ -34,6 +35,32 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
 
     /** D-07: the generic rule parses with no app dictionary loaded (default fixture, cold cache). */
     fun testColdCacheNoDictionary() = assertNoParserErrors(APP_OBJECT_REF_FIXTURE)
+
+    fun testGeneratedAccessorsExposeApplicationObjectReferenceTerms() {
+        val psiFile = myFixture.configureByFile(APP_OBJECT_REF_FIXTURE)
+        val references =
+            PsiTreeUtil.findChildrenOfType(
+                psiFile,
+                AppleScriptApplicationObjectReference::class.java,
+            )
+
+        assertTrue(
+            "fixture must contain application object references",
+            references.isNotEmpty(),
+        )
+
+        val objectTermTexts = references.mapNotNull { it.varIdentifier?.text }
+        val integerLiteralTexts = references.mapNotNull { it.integerLiteralExpression?.text }
+
+        assertTrue(
+            "application object references should expose their object term token",
+            objectTermTexts.isNotEmpty(),
+        )
+        assertTrue(
+            "application object reference integer terms should be valid when present",
+            integerLiteralTexts.all { it.isNotBlank() },
+        )
+    }
 
     private fun assertNoParserErrors(fileName: String) {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)

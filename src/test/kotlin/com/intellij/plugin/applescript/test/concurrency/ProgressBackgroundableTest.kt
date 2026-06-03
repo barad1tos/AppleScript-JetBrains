@@ -12,6 +12,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -25,6 +26,7 @@ import org.junit.Assume
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Codex HIGH 3 — verifies the D-04 hybrid silent->visible progress UX via
@@ -141,7 +143,7 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
                     }
                 }
             // Block completes at virtual t=25ms (BEFORE the 50ms threshold).
-            advanceTimeBy(25)
+            advanceTimeBy(25.milliseconds)
             deferred.complete(Unit)
             runCurrent()
             job.join()
@@ -170,7 +172,7 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
                     }
                 }
             // Threshold elapses at virtual t=50ms; show() fires.
-            advanceTimeBy(100)
+            advanceTimeBy(100.milliseconds)
             runCurrent()
             assertEquals(
                 "Visible path: shownCount must be 1 after threshold elapsed",
@@ -212,7 +214,7 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
                         deferred.await()
                     }
                 }
-            advanceTimeBy(100)
+            advanceTimeBy(100.milliseconds)
             runCurrent()
             assertEquals("Pre-cancel: indicator must be shown", 1, fake.shownCount)
             // Cancel the parent coroutine — `block` throws CancellationException,
@@ -244,9 +246,9 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
 
             fake.awaitShowEntered()
             indexingComplete.complete(Unit)
-            withTimeout(1_000) {
+            withTimeout(1.seconds) {
                 while (fake.dismissCount == 0) {
-                    kotlinx.coroutines.delay(10)
+                    delay(10.milliseconds)
                 }
             }
             fake.releaseShow()
