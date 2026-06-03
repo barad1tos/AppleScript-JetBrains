@@ -777,19 +777,31 @@ tasks {
             val tmpDir = tmpRegen.get().asFile
             val lexerDir = lexerRegen.get().asFile
             val differences = mutableListOf<String>()
-            committed
-                .walkTopDown()
-                .filter { it.isFile && (it.extension == "java" || it.extension == "flex") }
-                .forEach { file ->
-                    val rel = file.relativeTo(committed).path
-                    // generateLexer and generateParser write to separate tmp dirs (each purges its
-                    // own root), so resolve each committed file against whichever regen dir holds it.
-                    val regenerated = tmpDir.resolve(rel).takeIf { it.exists() } ?: lexerDir.resolve(rel)
-                    when {
-                        !regenerated.exists() -> differences += "MISSING in regen: $rel"
-                        regenerated.readText() != file.readText() -> differences += "DIFFERS: $rel"
-                    }
+
+            fun File.generatedFilePaths(): Set<String> =
+                walkTopDown()
+                    .filter { it.isFile && (it.extension == "java" || it.extension == "flex") }
+                    .map { it.relativeTo(this).path }
+                    .toSet()
+
+            val committedFiles = committed.generatedFilePaths()
+            val regeneratedFiles = tmpDir.generatedFilePaths() + lexerDir.generatedFilePaths()
+
+            committedFiles.forEach { rel ->
+                // generateLexer and generateParser write to separate tmp dirs (each purges its
+                // own root), so resolve each committed file against whichever regen dir holds it.
+                val regenerated = tmpDir.resolve(rel).takeIf { it.exists() } ?: lexerDir.resolve(rel)
+                val committedFile = committed.resolve(rel)
+                when {
+                    !regenerated.exists() -> differences += "MISSING in regen: $rel"
+                    regenerated.readText() != committedFile.readText() -> differences += "DIFFERS: $rel"
                 }
+            }
+
+            (regeneratedFiles - committedFiles).forEach { rel ->
+                differences += "MISSING in committed src/main/gen: $rel"
+            }
+
             if (differences.isNotEmpty()) {
                 error(
                     "Generated sources drift detected:\n  " + differences.joinToString("\n  ") +
