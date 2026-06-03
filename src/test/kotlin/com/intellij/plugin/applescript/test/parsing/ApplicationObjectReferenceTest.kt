@@ -27,14 +27,14 @@ import java.io.File
 class ApplicationObjectReferenceTest : BasePlatformTestCase() {
     override fun getTestDataPath(): String = File(CORPUS_DIR).absolutePath
 
-    fun testLibraryPlaylistIndex() = assertNoParserErrors(APP_OBJECT_REF_FIXTURE)
+    fun testLibraryPlaylistIndex() = assertNoParserErrors()
 
-    fun testCurrentTrack() = assertNoParserErrors(APP_OBJECT_REF_FIXTURE)
+    fun testCurrentTrack() = assertNoParserErrors()
 
-    fun testTrackOfPlaylist() = assertNoParserErrors(APP_OBJECT_REF_FIXTURE)
+    fun testTrackOfPlaylist() = assertNoParserErrors()
 
     /** D-07: the generic rule parses with no app dictionary loaded (default fixture, cold cache). */
-    fun testColdCacheNoDictionary() = assertNoParserErrors(APP_OBJECT_REF_FIXTURE)
+    fun testColdCacheNoDictionary() = assertNoParserErrors()
 
     fun testGeneratedAccessorsExposeApplicationObjectReferenceTerms() {
         val psiFile = myFixture.configureByFile(APP_OBJECT_REF_FIXTURE)
@@ -62,8 +62,8 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
         )
     }
 
-    private fun assertNoParserErrors(fileName: String) {
-        val psiFile: PsiFile = myFixture.configureByFile(fileName)
+    private fun assertNoParserErrors() {
+        val psiFile: PsiFile = myFixture.configureByFile(APP_OBJECT_REF_FIXTURE)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
         if (errors.isEmpty()) return
         val text = psiFile.text
@@ -74,7 +74,7 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
                 val snippet = err.text.replace("\n", "\\n").take(40)
                 "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
             }
-        fail("$fileName has ${errors.size} parser error(s):\n$report")
+        fail("$APP_OBJECT_REF_FIXTURE has ${errors.size} parser error(s):\n$report")
     }
 
     companion object {

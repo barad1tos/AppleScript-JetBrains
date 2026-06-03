@@ -82,6 +82,11 @@ dependencies {
 
     implementation(libs.commons.imaging)
     implementation(libs.proxy.vole)
+    constraints {
+        implementation(libs.commons.lang3) {
+            because("CVE-2025-48924 affects commons-lang3 before 3.18.0")
+        }
+    }
 
     intellijPlatform {
         create(
@@ -471,12 +476,14 @@ tasks {
     // ConfigurableFileCollection on the `verifyPlugin` task itself — which we
     // read via reflection here to bypass Kotlin name-shadowing inside the
     // tasks { ... } block scope.
-    val verifyBundledCoroutinesVersions by registering {
+    register("verifyBundledCoroutinesVersions") {
         group = "verification"
         description = "Fails if the bundled kotlinx-coroutines fork version drifts " +
             "between releases. Strategy B (filesystem walk of verifier IDE lib/ dirs): " +
             "infers core version from standalone kotlinx-coroutines-slf4j-<VERSION>.jar " +
             "(core itself is merged into app.jar in 2024.3+/2025.x — verified)."
+        // Run this after `verifyPlugin` in CI/release. Clean `build` runs do not materialise
+        // verifier IDE directories, so wiring this task into `check` reports false MISSING drift.
         val snapshotFile = layout.projectDirectory.file("gradle/coroutinesBundledVersions.json")
         inputs.file(snapshotFile)
         doLast {
@@ -500,7 +507,10 @@ tasks {
             val idesMethod =
                 verifyTask::class.java.methods
                     .firstOrNull { it.name == "getIdes" && it.parameterCount == 0 }
-                    ?: error("verifyPlugin task does not expose getIdes() — IntelliJ Platform Gradle Plugin API changed?")
+                    ?: error(
+                        "verifyPlugin task does not expose getIdes() — " +
+                            "IntelliJ Platform Gradle Plugin API changed?",
+                    )
             val ideFiles = (idesMethod.invoke(verifyTask) as ConfigurableFileCollection).files
             val ideDirs = ideFiles.filter { it.isDirectory }
 
@@ -514,7 +524,10 @@ tasks {
                         val slf4jJar =
                             libDir
                                 .listFiles()
-                                ?.firstOrNull { it.name.startsWith("kotlinx-coroutines-slf4j-") && it.name.endsWith(".jar") }
+                                ?.firstOrNull { file ->
+                                    file.name.startsWith("kotlinx-coroutines-slf4j-") &&
+                                        file.name.endsWith(".jar")
+                                }
                                 ?: return@mapNotNull null
                         val match = slf4jRegex.find(slf4jJar.name) ?: return@mapNotNull null
                         // Strip the build counter (-intellij-NN -> -intellij) so the snapshot
@@ -655,16 +668,26 @@ tasks {
             ): List<String>? {
                 color[node] = gray
                 path.add(node)
+                var cycle: List<String>? = null
                 for (neighbor in adjacency[node]!!) {
                     when (color[neighbor]) {
-                        gray -> return path.dropWhile { it != neighbor } + neighbor
-                        white -> dfs(neighbor, path)?.let { return it }
+                        gray -> {
+                            cycle = path.dropWhile { it != neighbor } + neighbor
+                        }
+
+                        white -> {
+                            cycle = dfs(neighbor, path)
+                        }
+
                         else -> Unit
                     }
+                    if (cycle != null) break
                 }
-                color[node] = black
-                path.removeAt(path.size - 1)
-                return null
+                if (cycle == null) {
+                    color[node] = black
+                    path.removeAt(path.size - 1)
+                }
+                return cycle
             }
             for (start in services) {
                 if (color[start] == white) {
@@ -818,9 +841,8 @@ tasks {
         dependsOn(
             verifyNoBundledCoroutines,
             verifyNoRunBlocking,
-            verifyBundledCoroutinesVersions,
             verifyServiceDependencyGraph,
-            // Phase 7 CLEANUP-04 / D-07: detekt + ktlint JOIN the four verify* drift-gates in
+            // Phase 7 CLEANUP-04 / D-07: detekt + ktlint JOIN the check-safe verify gates in
             // `check` (they do NOT replace them — the verify* tasks inspect the runtime classpath
             // that detekt's source-only mode cannot see). Both are plugin-provided tasks, wired by
             // string name. detekt runs source-only against detekt-baseline.xml (grandfathered

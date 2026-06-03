@@ -11,6 +11,7 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
@@ -63,11 +64,11 @@ class AppleScriptSystemDictionaryRegistryService
         private val dictionaryInfoMap: MutableMap<String, DictionaryInfo> = ConcurrentHashMap()
         private val notScriptableApplications: MutableSet<String> = ConcurrentHashMap.newKeySet()
         private val persistence: SdefPersistenceService
-            get() = service()
+            get() = SdefPersistenceService.getInstance()
         private val discovery: ApplicationDiscoveryService
-            get() = service()
+            get() = ApplicationDiscoveryService.getInstance()
         private val dictionaryFiles: SdefFileProvider
-            get() = service()
+            get() = SdefFileProvider.getInstance()
 
         // Phase 4 SERVICE-03 (plan 04-03, Wave 3): the `notFoundApplicationList` and
         // `discoveredApplicationNames` ConcurrentHashMap-backed sets migrated to
@@ -151,7 +152,9 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * Exception handling (RECURRING_PITFALLS.md Pattern B compliance):
          *   - Catch [CancellationException] FIRST and re-throw — never swallow structured cancellation.
-         *   - Catch [Throwable] (not [Exception]) and `LOG.error` — captures `Error` subclasses too.
+         *   - Catch [ProcessCanceledException] before recoverable startup failures — never swallow
+         *     IntelliJ Platform cancellation.
+         *   - Catch [RuntimeException] and `LOG.error` at the service boundary.
          *   - `finally` block completes any not-yet-completed deferred with `Result.failure(...)` so the
          *     facades see `isCompleted && isFailure` → return `false` (not-ready) rather than a
          *     false-positive "ready" for a failed init (Codex HIGH 1, Pattern G).
@@ -159,6 +162,7 @@ class AppleScriptSystemDictionaryRegistryService
         @Suppress("TooGenericExceptionCaught")
         private suspend fun runInitChain() {
             withContext(ioDispatcher) {
+                var shouldCompleteFailures = true
                 try {
                     // Phase 4 SERVICE-01 (plan 04-01): registerSdefExtension moved to SdefFileTypeRegistrar.
                     // The Light Service owns the `withContext(Dispatchers.EDT)` + runWriteAction internally,
@@ -171,15 +175,21 @@ class AppleScriptSystemDictionaryRegistryService
                     appsReady.complete(Result.success(Unit))
                 } catch (e: CancellationException) {
                     // Pattern B: structured cancellation re-thrown to honour the coroutine contract.
+                    shouldCompleteFailures = false
                     throw e
-                } catch (t: Throwable) {
-                    // Pattern B: Throwable (not Exception) — captures Error subclasses too.
-                    LOG.error("Error while initializing service", t)
+                } catch (e: ProcessCanceledException) {
+                    // Pattern B: IntelliJ Platform cancellation must propagate to platform machinery.
+                    shouldCompleteFailures = false
+                    throw e
+                } catch (e: RuntimeException) {
+                    LOG.error("Error while initializing service", e)
                 } finally {
                     // Codex HIGH 1: complete with Result.failure so facades see isCompleted && isFailure
                     // → return false. NOT `completeExceptionally` (which would make `await()` throw at
                     // callers and lose the success-vs-failure distinction at the facade boundary).
-                    completeDeferredFailures()
+                    if (shouldCompleteFailures) {
+                        completeDeferredFailures()
+                    }
                 }
             }
         }
@@ -298,19 +308,6 @@ class AppleScriptSystemDictionaryRegistryService
          * returned reference.
          */
         internal fun dictionaryInfoSnapshotInternal(): List<DictionaryInfo> = dictionaryInfoMap.values.toList()
-
-        /**
-         * Atomically replace the in-memory [DictionaryInfo] registry with [infos]. Used by
-         * [SdefPersistenceService.persistDictionaryInfoSnapshot] for batch imports. Clears the
-         * existing map then re-adds each entry via [addDictionaryInfoInternal] (which preserves
-         * the discoveredApplicationNames / notScriptable side effects).
-         */
-        internal fun replaceDictionaryInfoCollectionInternal(infos: Collection<DictionaryInfo>) {
-            dictionaryInfoMap.clear()
-            for (info in infos) {
-                addDictionaryInfoInternal(info)
-            }
-        }
 
         /**
          * Remove a [DictionaryInfo] by its application path. Returns `true` if a matching entry
@@ -446,41 +443,28 @@ class AppleScriptSystemDictionaryRegistryService
         internal fun initDictionariesInfoFromCacheInternal(state: PersistedState) {
             notScriptableApplications.clear()
             state.notScriptableApplications?.let { notScriptableApplications.addAll(it) }
-            val infos = state.dictionariesInfo
-            for (dInfoState in infos) {
-                val appName = dInfoState.applicationName
-                val dictionaryUrl = dInfoState.dictionaryUrl
-                val applicationUrl = dInfoState.applicationUrl
-                if (!StringUtil.isEmptyOrSpaces(appName) && !StringUtil.isEmptyOrSpaces(dictionaryUrl)) {
-                    // The opaque StringUtil guards above defeat Kotlin flow-analysis on these platform
-                    // @Nullable Strings; the per-branch isEmpty checks below establish the non-null invariant.
-                    val dictionaryFile =
-                        if (!StringUtil.isEmpty(dictionaryUrl)) {
-                            File(
-                                requireNotNull(dictionaryUrl) {
-                                    "dictionaryUrl non-null: guarded by !StringUtil.isEmpty above"
-                                },
-                            )
-                        } else {
-                            null
-                        }
-                    val applicationFile =
-                        if (!StringUtil.isEmpty(applicationUrl)) {
-                            File(
-                                requireNotNull(applicationUrl) {
-                                    "applicationUrl non-null: guarded by !StringUtil.isEmpty above"
-                                },
-                            )
-                        } else {
-                            null
-                        }
-                    if (dictionaryFile != null && dictionaryFile.exists()) {
-                        dictionaryInfoMap.remove(appName)
-                        val nonNullAppName =
-                            requireNotNull(appName) { "appName non-null: guarded by !StringUtil.isEmptyOrSpaces above" }
-                        addDictionaryInfoInternal(DictionaryInfo(nonNullAppName, dictionaryFile, applicationFile))
-                    }
-                }
+            state.dictionariesInfo.mapNotNull(::dictionaryInfoFromState).forEach { info ->
+                dictionaryInfoMap.remove(info.getApplicationName())
+                addDictionaryInfoInternal(info)
+            }
+        }
+
+        private fun dictionaryInfoFromState(state: DictionaryInfo.State): DictionaryInfo? {
+            val applicationName = state.applicationName?.takeUnless { StringUtil.isEmptyOrSpaces(it) }
+            val dictionaryFile =
+                state.dictionaryUrl
+                    ?.takeUnless { StringUtil.isEmptyOrSpaces(it) }
+                    ?.let(::File)
+                    ?.takeIf { it.exists() }
+            val applicationFile =
+                state.applicationUrl
+                    ?.takeUnless { StringUtil.isEmpty(it) }
+                    ?.let(::File)
+
+            return if (applicationName != null && dictionaryFile != null) {
+                DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+            } else {
+                null
             }
         }
 
@@ -792,22 +776,24 @@ class AppleScriptSystemDictionaryRegistryService
         }
 
         private fun initCocoaStandardTerminology(fileProvider: SdefFileProvider) {
-            val applicationName = ApplicationDictionary.COCOA_STANDARD_LIBRARY
-            val dictionaryInfo = findSavedInitializedInfo(applicationName)
+            val dictionaryInfo = findSavedInitializedInfo(ApplicationDictionary.COCOA_STANDARD_LIBRARY)
             if (dictionaryInfo != null) {
                 initializeDictionaryFromInfo(dictionaryInfo)
                 return
             }
 
-            val standardLibraryFile = cocoaStandardDictionaryFile(applicationName)
+            val standardLibraryFile = cocoaStandardDictionaryFile()
             if (standardLibraryFile.exists() && standardLibraryFile.isFile) {
-                fileProvider.createAndInitializeInfo(standardLibraryFile, applicationName)
+                fileProvider.createAndInitializeInfo(
+                    standardLibraryFile,
+                    ApplicationDictionary.COCOA_STANDARD_LIBRARY,
+                )
             } else {
                 LOG.warn("Can not find standard suite dictionary in the classpath")
             }
         }
 
-        private fun cocoaStandardDictionaryFile(applicationName: String): File {
+        private fun cocoaStandardDictionaryFile(): File {
             val standardLibraryFile = File(ApplicationDictionary.COCOA_STANDARD_LIBRARY_PATH)
             if (standardLibraryFile.exists() && standardLibraryFile.isFile) return standardLibraryFile
 
@@ -815,7 +801,7 @@ class AppleScriptSystemDictionaryRegistryService
                 javaClass.getResourceAsStream(ApplicationDictionary.COCOA_STANDARD_FILE)
             return stream2file(
                 standardDictionaryStream,
-                applicationName.replace(" ", "_"),
+                ApplicationDictionary.COCOA_STANDARD_LIBRARY.replace(" ", "_"),
                 ".sdef",
             )
         }
