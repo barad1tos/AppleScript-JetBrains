@@ -14,8 +14,7 @@ values change.
 
 - Plugin version: `2.0.0`
 - Plugin id: `com.intellij.plugin.applescript`
-- Source plugin name: `AppleScript Support`
-- Gradle plugin name: `AppleScript-IDEA`
+- Plugin name: `AppleScript Toolkit`
 - Minimum supported build: `251` (`pluginSinceBuild=251`)
 - Current verifier targets: IntelliJ IDEA Community 2025.1 and 2025.2
 - License: Apache License 2.0
@@ -42,7 +41,7 @@ values change.
 - [ ] Marketplace screenshots captured and uploaded through the Marketplace media section.
 - [ ] Pricing, trial, refund/support, and paid-vs-free publication decisions made.
 - [ ] Developer EULA and privacy-policy requirements reviewed for paid Marketplace publication.
-- [ ] Plugin id, plugin name, and listing ownership decision made before publication.
+- [ ] Plugin id and listing ownership decision made before publication.
 - [ ] Marketplace listing resources configured in the Marketplace admin panel: source code, issue tracker, documentation, license, tags, and getting-started text.
 
 ## Plugin Identity Decision
@@ -64,7 +63,7 @@ Do not change the id silently. Before a paid Marketplace publication, choose one
 
 Until that decision is made, plugin id/listing ownership remains a publication blocker.
 
-The plugin name should be decided in the same step. The source descriptor currently says `AppleScript Support`, while Gradle config uses `AppleScript-IDEA` for the patched distribution metadata. JetBrains listing guidance discourages generic terms such as "Support" and names that include JetBrains product names. This pass preserves the existing names to avoid silently breaking identity or upgrade continuity, but the final Marketplace listing should choose a policy-compliant display name before paid publication.
+The plugin display name is standardized as `AppleScript Toolkit` in both the source descriptor and Gradle-patched distribution metadata. This avoids the generic Marketplace template term "Support" and avoids JetBrains product-name terms such as "IDEA" while keeping the legacy plugin id unchanged for the listing-ownership decision above.
 
 ## Media and Listing Notes
 
@@ -110,7 +109,7 @@ Verified locally on 2026-06-03:
 - `git diff --check` — passed.
 - `./gradlew build --stacktrace` — passed.
 - `./gradlew test --stacktrace` — passed; test task was up-to-date after the build run.
-- `./gradlew verifyPluginStructure --stacktrace` — passed, but reported descriptor identity warnings for the legacy `com.intellij` id prefix, `intellij` in the id, and `IDEA` in the patched plugin name.
+- `./gradlew verifyPluginStructure --stacktrace` — passed, but reported descriptor identity warnings for the legacy `com.intellij` id prefix and `intellij` in the id.
 - `./gradlew verifyPlugin --stacktrace` — passed against IC 2025.1 and 2025.2; Plugin Verifier reported 12 deprecated API usages and one non-dynamic extension restriction.
 - `python3 scripts/verify-plugin-verifier.py` — passed; internal API usages: 0, experimental usages: 0, deprecated usages: 12.
 
