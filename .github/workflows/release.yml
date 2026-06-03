@@ -41,7 +41,7 @@ jobs:
           cache-disabled: true
 
       - name: Build plugin
-        run: ./gradlew build --stacktrace
+        run: ./gradlew build -PskipHeavyTests=true --stacktrace
 
       - name: Run tests with coverage
         run: ./gradlew test koverXmlReport koverVerify --stacktrace
