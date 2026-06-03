@@ -11,7 +11,7 @@ jobs:
   verify:
     name: Verify plugin
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -29,7 +29,19 @@ jobs:
         with:
           cache-disabled: true
 
-      - name: Verify plugin
+      - name: Build plugin
+        run: ./gradlew build --stacktrace
+
+      - name: Run tests with coverage
+        run: ./gradlew test koverXmlReport koverVerify --stacktrace
+
+      - name: Run runIde headless smoke
+        run: ./gradlew runIdeHeadlessSmoke --stacktrace
+
+      - name: Verify plugin structure
+        run: ./gradlew verifyPluginStructure --stacktrace
+
+      - name: Verify plugin against target IDEs
         run: ./gradlew verifyPlugin --stacktrace
 
       - name: Fail on internal API verifier findings

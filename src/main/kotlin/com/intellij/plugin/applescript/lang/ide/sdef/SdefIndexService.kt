@@ -334,58 +334,79 @@ class SdefIndexService
         // EDT-guarded command lookup with bounded waits.
 
         /**
-         * Bounded-wait resolver for standard-suite commands.
+         * Resolver for standard-suite commands.
          *
-         * Codex MEDIUM 1 + Gemini LOW 1: EDT guard at entry — never blocks the UI thread.
-         * Codex HIGH 5: split-gate — waits on `standardReady` (parser fast path readiness only) via
-         * the [ParsableScriptSuiteRegistryHelper.awaitStandardReady] proxy (added in Wave 5 Task 1).
-         * Codex HIGH 1: timeout returns `null`, failure returns `isFailure` → both yield empty list.
-         * Gemini LOW 2: `LOG.warn` records the 2s timeout site for slow-init diagnostics.
+         * Background callers may use the bounded readiness wait. EDT callers only inspect already-ready
+         * state and return immediately when dictionaries are still cold, preserving the no-freeze guard
+         * without dropping command definitions after indexing has completed.
          */
         fun findStdCommands(
             project: Project,
             commandName: String,
-        ): Collection<AppleScriptCommand> =
-            if (ApplicationManager.getApplication().isDispatchThread) {
-                LOG.warn("findStdCommands called from EDT; returning empty list to avoid 2s freeze")
-                emptyList()
-            } else if (!isStandardReady()) {
-                emptyList()
-            } else {
-                val appNameList = stdCommandNameToApplicationNameSetMap[commandName] ?: emptySet()
-                val result = HashSet<AppleScriptCommand>()
-                for (applicationName in appNameList) {
-                    result.addAll(findApplicationCommands(project, applicationName, commandName))
+        ): Collection<AppleScriptCommand> {
+            val isOnDispatchThread = ApplicationManager.getApplication().isDispatchThread
+            val isReady =
+                if (isOnDispatchThread) {
+                    facadeInitialized()
+                } else {
+                    isStandardReady()
                 }
-                result
+            if (!isReady) {
+                if (isOnDispatchThread) {
+                    LOG.warn(
+                        "findStdCommands called from EDT before standard dictionaries are ready; " +
+                            "returning empty list",
+                    )
+                }
+                return emptyList()
             }
 
+            val appNameList = stdCommandNameToApplicationNameSetMap[commandName] ?: emptySet()
+            val result = HashSet<AppleScriptCommand>()
+            for (applicationName in appNameList) {
+                result.addAll(findApplicationCommands(project, applicationName, commandName))
+            }
+            return result
+        }
+
         /**
-         * Bounded-wait resolver for app-scoped commands.
+         * Resolver for app-scoped commands.
          *
-         * EDT guard + bounded-wait on appsReady (via [ParsableScriptSuiteRegistryHelper.awaitAppsReady]
-         * proxy) — Phase 3 invariants preserved verbatim. AppCommandGatingTest locks this behaviour.
+         * Background callers may use the bounded readiness wait. EDT callers only inspect already-ready
+         * state and return immediately when app dictionaries are still cold, preserving the no-freeze
+         * guard without dropping command definitions after indexing has completed.
          */
         fun findApplicationCommands(
             project: Project,
             applicationName: String,
             commandName: String,
-        ): List<AppleScriptCommand> =
-            if (ApplicationManager.getApplication().isDispatchThread) {
-                LOG.warn("findApplicationCommands called from EDT; returning empty list to avoid 2s freeze")
-                emptyList()
-            } else if (!isAppReady()) {
-                emptyList()
-            } else {
-                val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
-                // Among the loaded dictionaries the standard additions should always be present, but if
-                // the command was not found there a new dictionary may need to be initialised here for
-                // the project — once.
-                val dictionary =
-                    projectDictionaryRegistry.getDictionary(applicationName)
-                        ?: projectDictionaryRegistry.createDictionary(applicationName)
-                dictionary?.findAllCommandsWithName(commandName) ?: emptyList()
+        ): List<AppleScriptCommand> {
+            val isOnDispatchThread = ApplicationManager.getApplication().isDispatchThread
+            val isReady =
+                if (isOnDispatchThread) {
+                    ParsableScriptSuiteRegistryHelper.areAppDictionariesIndexed()
+                } else {
+                    isAppReady()
+                }
+            if (!isReady) {
+                if (isOnDispatchThread) {
+                    LOG.warn(
+                        "findApplicationCommands called from EDT before app dictionaries are ready; " +
+                            "returning empty list",
+                    )
+                }
+                return emptyList()
             }
+
+            val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
+            // Among the loaded dictionaries the standard additions should always be present, but if
+            // the command was not found there a new dictionary may need to be initialised here for
+            // the project — once.
+            val dictionary =
+                projectDictionaryRegistry.getDictionary(applicationName)
+                    ?: projectDictionaryRegistry.createDictionary(applicationName)
+            return dictionary?.findAllCommandsWithName(commandName) ?: emptyList()
+        }
 
         // XML parsing pipeline.
 

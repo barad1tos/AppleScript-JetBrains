@@ -9,16 +9,21 @@ import com.intellij.plugin.applescript.lang.ide.sdef.DiscoveryProgressPolicy
 import com.intellij.plugin.applescript.lang.ide.sdef.ProgressTaskCompat
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 import org.junit.Assume
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -80,6 +85,35 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
 
         override fun dismiss() {
             dismissCount++
+        }
+    }
+
+    private class BlockingShowFake : ProgressTaskCompat {
+        private val showEntered = CountDownLatch(1)
+        private val allowShowReturn = CountDownLatch(1)
+
+        var dismissCount: Int = 0
+            private set
+
+        override fun show(displayName: String) {
+            showEntered.countDown()
+            check(allowShowReturn.await(5, TimeUnit.SECONDS)) {
+                "Timed out waiting for the test to release show()"
+            }
+        }
+
+        override fun dismiss() {
+            dismissCount++
+        }
+
+        fun awaitShowEntered() {
+            check(showEntered.await(5, TimeUnit.SECONDS)) {
+                "Timed out waiting for show() to start"
+            }
+        }
+
+        fun releaseShow() {
+            allowShowReturn.countDown()
         }
     }
 
@@ -189,6 +223,39 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
             assertTrue(
                 "Cancellation must dismiss the indicator (Pattern G — every show has matching dismiss)",
                 fake.dismissedAfterShow,
+            )
+        }
+
+    fun testCompletionWhileShowIsInProgressStillDismissesIndicator() =
+        runBlocking {
+            val fake = BlockingShowFake()
+            val policy =
+                DiscoveryProgressPolicy(
+                    taskCompat = fake,
+                    visibilityThreshold = 1.milliseconds,
+                )
+            val indexingComplete = CompletableDeferred<Unit>()
+            val job =
+                launch(Dispatchers.Default) {
+                    policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
+                        indexingComplete.await()
+                    }
+                }
+
+            fake.awaitShowEntered()
+            indexingComplete.complete(Unit)
+            withTimeout(1_000) {
+                while (fake.dismissCount == 0) {
+                    kotlinx.coroutines.delay(10)
+                }
+            }
+            fake.releaseShow()
+            job.join()
+
+            assertEquals(
+                "Completion racing with show() must still dismiss the visible indicator",
+                1,
+                fake.dismissCount,
             )
         }
 }

@@ -27,8 +27,7 @@ gradle/wrapper/dists/
 .vscode/
 
 # Generated parser/lexer code
-gen/
-src/main/gen/
+/gen/
 
 # macOS
 .DS_Store

@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -62,12 +63,12 @@ internal class DiscoveryProgressPolicy(
         // Inherit the caller's coroutine context so the threshold-watcher is a
         // child of the same Job tree — structured cancellation reaches it.
         val scope = CoroutineScope(currentCoroutineContext())
-        var indicatorShown = false
+        val indicatorNeedsDismiss = AtomicBoolean(false)
         val showJob =
             scope.launch {
                 delay(visibilityThreshold)
+                indicatorNeedsDismiss.set(true)
                 taskCompat.show(displayName)
-                indicatorShown = true
             }
         try {
             block()
@@ -76,7 +77,7 @@ internal class DiscoveryProgressPolicy(
             // watcher cancellation also handles the "block finished before threshold"
             // case — showJob.cancel() preempts the not-yet-fired show().
             showJob.cancel()
-            if (indicatorShown) taskCompat.dismiss()
+            if (indicatorNeedsDismiss.getAndSet(false)) taskCompat.dismiss()
         }
     }
 }

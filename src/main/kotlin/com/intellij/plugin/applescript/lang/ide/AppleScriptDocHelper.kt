@@ -185,15 +185,29 @@ object AppleScriptDocHelper {
     ) {
         companion object {
             fun parse(link: String): DocumentationLinkTarget {
-                val dictionaryEndIndex = link.indexOf(TYPE_SEPARATOR).let { if (it > 0) it else link.length }
+                val dictionaryEndIndex =
+                    link.indexOf(TYPE_SEPARATOR).let { if (it > 0) it else link.length }
                 val typeStartIndex = link.lastIndexOf(TYPE_SEPARATOR)
                 val hashIndex = link.indexOf("#")
-                val suiteStartIndex = link.lastIndexOf(ELEMENT_NAME_SEPARATOR)
+                val typeNameStartIndex =
+                    if (typeStartIndex >= 0) {
+                        typeStartIndex + TYPE_SEPARATOR.length
+                    } else {
+                        0
+                    }
+                val suiteName =
+                    if (typeStartIndex > 0) {
+                        val suiteStartIndex =
+                            link.lastIndexOf(ELEMENT_NAME_SEPARATOR, typeStartIndex)
+                        link.substring(suiteStartIndex + ELEMENT_NAME_SEPARATOR.length, typeStartIndex)
+                    } else {
+                        ""
+                    }
                 return DocumentationLinkTarget(
                     dictionaryName = link.substring("dictionary".length + 1, dictionaryEndIndex),
-                    typeName = link.substring(typeStartIndex + TYPE_SEPARATOR.length, hashIndex),
+                    typeName = link.substring(typeNameStartIndex, hashIndex),
                     targetName = link.substring(hashIndex + 1),
-                    suiteName = link.substring(suiteStartIndex + ELEMENT_NAME_SEPARATOR.length, typeStartIndex),
+                    suiteName = suiteName,
                 )
             }
         }
