@@ -8,6 +8,8 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.util.Disposer
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.ide.sdef.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.ide.sdef.ProgressTaskCompat
 import com.intellij.plugin.applescript.lang.ide.sdef.SdefFileTypeRegistrar
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
@@ -22,7 +24,6 @@ import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
-import kotlinx.coroutines.test.runTest
 import org.junit.Assume
 import kotlin.coroutines.CoroutineContext
 
@@ -56,7 +57,7 @@ import kotlin.coroutines.CoroutineContext
  *   )
  * AND the `Result<Unit>`-typed deferreds + facade success-semantics (Codex HIGH 1).
  * Until 03-03 lands, this file FAILS TO COMPILE because the constructor reference
- * `AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)` does not
+ * `newTestService()` does not
  * yet resolve. THAT is the RED state — compile-time failure, not a silent skip.
  *
  * Codex HIGH 2 — no skip-style assume gates remain in test bodies; the RED is real.
@@ -65,6 +66,14 @@ import kotlin.coroutines.CoroutineContext
 class CoroutineColdStartTest : BasePlatformTestCase() {
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var testScope: TestScope
+    private lateinit var pendingDiscoveryTasks: ArrayDeque<Runnable>
+    private lateinit var discoveryDispatcher: CoroutineDispatcher
+    private val noOpProgressTask =
+        object : ProgressTaskCompat {
+            override fun show(displayName: String) = Unit
+
+            override fun dismiss() = Unit
+        }
 
     override fun setUp() {
         Assume.assumeTrue(
@@ -73,74 +82,104 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         )
         super.setUp()
         testScope = TestScope()
-        // StandardTestDispatcher tied to testScope's scheduler so runCurrent /
-        // advanceUntilIdle control BOTH the parent scope AND the ioDispatcher.
+        // Discovery uses an explicit queue so runCurrent can observe standardReady
+        // before the test releases the application walk.
         testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        pendingDiscoveryTasks = ArrayDeque()
+        discoveryDispatcher =
+            object : CoroutineDispatcher() {
+                override fun dispatch(
+                    context: CoroutineContext,
+                    block: Runnable,
+                ) {
+                    pendingDiscoveryTasks.addLast(block)
+                }
+            }
+        ApplicationManager.getApplication().replaceService(
+            ApplicationDiscoveryService::class.java,
+            ApplicationDiscoveryService(testScope, discoveryDispatcher),
+            testRootDisposable,
+        )
+        ApplicationManager.getApplication().replaceService(
+            SdefFileTypeRegistrar::class.java,
+            SdefFileTypeRegistrar(testScope, testDispatcher),
+            testRootDisposable,
+        )
         Disposer.register(testRootDisposable) { testScope.cancel() }
+    }
+
+    private fun newTestService(): AppleScriptSystemDictionaryRegistryService =
+        AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher, noOpProgressTask)
+
+    private fun advanceThroughFullInitialization() {
+        testScope.runCurrent()
+        runPendingDiscoveryTasks()
+        testScope.advanceUntilIdle()
+    }
+
+    private fun runPendingDiscoveryTasks() {
+        while (pendingDiscoveryTasks.isNotEmpty()) {
+            pendingDiscoveryTasks.removeFirst().run()
+        }
     }
 
     /**
      * Constructor injection sanity — proves the service accepts (testScope, ioDispatcher)
      * shape. If 03-03 has NOT landed yet, this test fails to COMPILE — that's the RED.
      */
-    fun testConstructorAcceptsTestScopeAndIoDispatcher() =
-        testScope.runTest {
-            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-            assertNotNull(service)
-        }
+    fun testConstructorAcceptsTestScopeAndIoDispatcher() {
+        val service = newTestService()
+        assertNotNull(service)
+    }
 
     /**
      * STATE 1 — pending: service constructed, launch scheduled but not yet run.
      * Expected: (isInitialized = false, areAppDictionariesIndexed = false)
      * Parser fast path MUST NOT crash and MUST return false/empty deterministically.
      */
-    fun testColdStart_pendingState_returnsFalseFromSyncFacade() =
-        testScope.runTest {
-            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-            // No runCurrent yet — service launched but init body has not executed
-            assertFalse("standardReady not yet completed", service.isInitialized())
-            assertFalse("appsReady not yet completed", service.areAppDictionariesIndexed())
-        }
+    fun testColdStart_pendingState_returnsFalseFromSyncFacade() {
+        val service = newTestService()
+        // No runCurrent yet — service launched but init body has not executed
+        assertFalse("standardReady not yet completed", service.isInitialized())
+        assertFalse("appsReady not yet completed", service.areAppDictionariesIndexed())
+    }
 
     /**
      * STATE 2 — standard_ready: standard suite parsed, discovery still pending.
      * Expected: (isInitialized = true, areAppDictionariesIndexed = false)
      */
-    fun testAfterStandardSuiteParse_parserFastPathReturnsCorrectResults() =
-        testScope.runTest {
-            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-            runCurrent() // advance past standardReady.complete(Result.success(Unit))
-            assertTrue("standardReady should be completed after runCurrent", service.isInitialized())
-            // discovery still pending — appsReady not yet completed
-            assertFalse("appsReady still pending", service.areAppDictionariesIndexed())
-        }
+    fun testAfterStandardSuiteParse_parserFastPathReturnsCorrectResults() {
+        val service = newTestService()
+        testScope.runCurrent() // advance past standardReady.complete(Result.success(Unit))
+        assertTrue("standardReady should be completed after runCurrent", service.isInitialized())
+        // discovery still pending — appsReady not yet completed
+        assertFalse("appsReady still pending", service.areAppDictionariesIndexed())
+    }
 
     /**
      * STATE 3 — fully_ready: both deferred completed, full app catalog indexed.
      * Expected: (isInitialized = true, areAppDictionariesIndexed = true)
      */
-    fun testAfterFullInit_completionContributorsSeeAppCatalog() =
-        testScope.runTest {
-            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-            advanceUntilIdle() // drains all scheduled work
-            assertTrue("standardReady completed", service.isInitialized())
-            assertTrue("appsReady completed", service.areAppDictionariesIndexed())
-        }
+    fun testAfterFullInit_completionContributorsSeeAppCatalog() {
+        val service = newTestService()
+        advanceThroughFullInitialization()
+        assertTrue("standardReady completed", service.isInitialized())
+        assertTrue("appsReady completed", service.areAppDictionariesIndexed())
+    }
 
     /**
      * INVARIANT — forbidden cell `(false, true)` is unreachable. `RECURRING_PITFALLS.md`
      * Pattern L: defensive lock against pipeline-order bugs (`appsReady` completing before
      * `standardReady` would indicate the `runInitChain` pipeline order was inverted).
      */
-    fun testPipelineOrder_standardReadyCannotCompleteAfterAppsReady() =
-        testScope.runTest {
-            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-            advanceUntilIdle()
-            assertFalse(
-                "Invariant broken: appsReady completed before standardReady",
-                service.areAppDictionariesIndexed() && !service.isInitialized(),
-            )
-        }
+    fun testPipelineOrder_standardReadyCannotCompleteAfterAppsReady() {
+        val service = newTestService()
+        advanceThroughFullInitialization()
+        assertFalse(
+            "Invariant broken: appsReady completed before standardReady",
+            service.areAppDictionariesIndexed() && !service.isInitialized(),
+        )
+    }
 
     fun testPlatformCancellationDoesNotFailReadinessGates() {
         var registrarDispatchCalled = false
@@ -170,7 +209,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                 testRootDisposable,
             )
 
-            val service = AppleScriptSystemDictionaryRegistryService(scope, dispatcher)
+            val service = AppleScriptSystemDictionaryRegistryService(scope, dispatcher, noOpProgressTask)
             repeat(5) {
                 scheduler.runCurrent()
             }
@@ -197,16 +236,15 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
      * At every observation point, result must be deterministic — empty pre-init OR full
      * post-init — never partial.
      */
-    fun testNeverHalfBroken_everyStateIsEitherCorrectOrEmpty() =
-        testScope.runTest {
-            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-            repeat(5) {
-                val result = service.findStdCommands(project, "do shell script")
-                assertTrue(
-                    "result must be empty OR contain 'do shell script' command",
-                    result.isEmpty() || result.any { it.name == "do shell script" },
-                )
-                runCurrent()
-            }
+    fun testNeverHalfBroken_everyStateIsEitherCorrectOrEmpty() {
+        val service = newTestService()
+        repeat(5) {
+            val result = service.findStdCommands(project, "do shell script")
+            assertTrue(
+                "result must be empty OR contain 'do shell script' command",
+                result.isEmpty() || result.any { it.name == "do shell script" },
+            )
+            testScope.runCurrent()
         }
+    }
 }

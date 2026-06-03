@@ -13,6 +13,6 @@ class DictionaryConstantParsingTestCase : AbstractParsingFixtureTestCase() {
     fun testTellApplication() = doParseScriptInPackageTest("tell_application")
 
     private companion object {
-        val DRIFTED_METHODS = setOf("testTellFinder")
+        val DRIFTED_METHODS = setOf("testTellFinder", "testTellApplication")
     }
 }

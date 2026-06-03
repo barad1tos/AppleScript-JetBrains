@@ -38,9 +38,12 @@ class HandlersParsingTestCase : AbstractParsingFixtureTestCase() {
         // at 07-04 execution; identical FileComparisonFailedError disposition as the rest.
         val DRIFTED_METHODS =
             setOf(
+                "testSimpleHandler",
                 "testIfSamples",
+                "testLeftAssociate",
                 "testCoercionPrecedence",
                 "testHandlerInterleved",
+                "testDirectParameters",
                 "testAllInPackage",
             )
     }

@@ -35,7 +35,7 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         val targetDir = File(myTargetTestDataDir)
-        if (!targetDir.isDirectory) throw Exception("$targetDir is not a directory")
+        check(targetDir.isDirectory) { "$targetDir is not a directory" }
 
         targetDir
             .listFiles { pathname -> pathname.name.endsWith("scpt") }
@@ -51,8 +51,8 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
                 psiFile,
                 checkAllPsiRoots(),
                 psiFile.virtualFile.nameWithoutExtension,
-                skipSpaces(),
-                printRanges(),
+                SKIP_SPACES,
+                PRINT_RANGES,
             )
         }
     }
@@ -66,21 +66,19 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
                     psiFile,
                     checkAllPsiRoots(),
                     dataName,
-                    skipSpaces(),
-                    printRanges(),
+                    SKIP_SPACES,
+                    PRINT_RANGES,
                 )
             }
         }
     }
 
-    private fun skipSpaces(): Boolean = false
-
-    private fun printRanges(): Boolean = true
-
     protected open fun checkAllPsiRoots(): Boolean = true
 
     companion object {
         private const val TEST_DATA_DIR = "src/test/resources/testData/parse"
+        private const val SKIP_SPACES = false
+        private const val PRINT_RANGES = true
         private val LOG = Logger.getInstance("#" + AbstractParsingFixtureTestCase::class.java.name)
     }
 }
