@@ -34,7 +34,7 @@ This Code of Conduct applies within all project spaces and also applies when an 
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported through GitHub Issues. Security-sensitive reports should use GitHub Private Vulnerability Reporting as described in [SECURITY.md](SECURITY.md).
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported privately by email at `barad1tos@gmail.com`. Security-sensitive reports should use GitHub Private Vulnerability Reporting as described in [SECURITY.md](SECURITY.md).
 
 All complaints will be reviewed and investigated promptly and fairly. Maintainers will respect the privacy and security of the reporter.
 

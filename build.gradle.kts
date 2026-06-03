@@ -1,6 +1,7 @@
 import io.gitlab.arturbosch.detekt.Detekt
 import java.time.Duration
 import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.language.jvm.tasks.ProcessResources
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
@@ -69,6 +70,15 @@ sourceSets {
     }
     named("test") {
         kotlin.srcDirs("src/test/kotlin")
+    }
+}
+
+tasks.named<ProcessResources>("processResources") {
+    from(rootProject.layout.projectDirectory.file("LICENSE")) {
+        into("META-INF")
+    }
+    from(rootProject.layout.projectDirectory.file("THIRD_PARTY_NOTICES.md")) {
+        into("META-INF")
     }
 }
 
