@@ -7,6 +7,11 @@ This document tracks repository and plugin metadata readiness for a JetBrains Ma
 
 ## Current State
 
+Current version and compatibility values are sourced from `gradle.properties`;
+Plugin Verifier target IDEs are sourced from `build.gradle.kts`. Keep this
+section, `README.md`, and `CHANGELOG.md` synchronized whenever those Gradle
+values change.
+
 - Plugin version: `2.0.0`
 - Plugin id: `com.intellij.plugin.applescript`
 - Source plugin name: `AppleScript Support`

@@ -9,9 +9,24 @@ runs:
     - name: Prune unused toolchains
       shell: bash
       run: |
-        sudo rm -rf /opt/hostedtoolcache/CodeQL
-        sudo rm -rf /usr/share/dotnet
-        sudo rm -rf /usr/local/lib/android
-        sudo rm -rf /opt/ghc
-        sudo rm -rf /usr/local/share/boost
+        if [[ "${RUNNER_OS:-}" != "Linux" ]]; then
+          echo "Skipping disk cleanup on ${RUNNER_OS:-unknown runner}"
+          df -h /
+          exit 0
+        fi
+
+        readonly paths_to_prune=(
+          /opt/hostedtoolcache/CodeQL
+          /usr/share/dotnet
+          /usr/local/lib/android
+          /opt/ghc
+          /usr/local/share/boost
+        )
+
+        for path in "${paths_to_prune[@]}"; do
+          if [[ -e "$path" ]]; then
+            sudo rm -rf -- "$path"
+          fi
+        done
+
         df -h /

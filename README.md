@@ -57,6 +57,12 @@ The project is not affiliated with Apple, JetBrains, or the original maintainer.
 
 The current plugin version is `2.0.0`.
 
+Release coordinates are defined in [gradle.properties](gradle.properties);
+Plugin Verifier target IDEs are configured in [build.gradle.kts](build.gradle.kts).
+Update this section, [CHANGELOG.md](CHANGELOG.md), and
+[MARKETPLACE_READINESS.md](MARKETPLACE_READINESS.md) in the same change when
+those Gradle values move.
+
 - Minimum supported IntelliJ Platform build: `251` (`pluginSinceBuild=251`), corresponding to JetBrains IDEs 2025.1 and newer.
 - Current verifier targets: IntelliJ IDEA Community 2025.1 and 2025.2.
 - JVM target: 17.
