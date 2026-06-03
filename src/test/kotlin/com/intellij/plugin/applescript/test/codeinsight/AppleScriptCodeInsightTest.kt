@@ -10,8 +10,10 @@ import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
+import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
 import com.intellij.psi.codeStyle.CodeStyleManager
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.io.File
 
@@ -28,6 +30,12 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     override fun getTestDataPath(): String = File(MY_TEST_DATA_DIR).absolutePath
 
     fun testCompletion() {
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Standard dictionaries were not initialized",
+            { registryService.isInitialized() },
+            10,
+        )
         myFixture.configureByFile("complete/complete_std_lib_test.scpt")
         myFixture.complete(CompletionType.BASIC, 1)
         val strings = myFixture.lookupElementStrings
