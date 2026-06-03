@@ -4,18 +4,27 @@
 // (DEBUG.md ADDENDUM Layer 5 sweep).
 package com.intellij.plugin.applescript.test.concurrency
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.util.Disposer
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.ide.sdef.SdefFileTypeRegistrar
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.testFramework.replaceService
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assume
+import kotlin.coroutines.CoroutineContext
 
 /**
  * Cold-start regression test for the v1.2 structured-concurrency adoption (Phase 3 D-06).
@@ -107,7 +116,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         }
 
     /**
-     * STATE 3 — fully_ready: both deferreds completed, full app catalog indexed.
+     * STATE 3 — fully_ready: both deferred completed, full app catalog indexed.
      * Expected: (isInitialized = true, areAppDictionariesIndexed = true)
      */
     fun testAfterFullInit_completionContributorsSeeAppCatalog() =
@@ -132,6 +141,56 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                 service.areAppDictionariesIndexed() && !service.isInitialized(),
             )
         }
+
+    fun testPlatformCancellationDoesNotFailReadinessGates() {
+        var registrarDispatchCalled = false
+        val scheduler = TestCoroutineScheduler()
+        val dispatcher = StandardTestDispatcher(scheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val processCanceledDispatcher =
+            object : CoroutineDispatcher() {
+                override fun dispatch(
+                    context: CoroutineContext,
+                    block: Runnable,
+                ) {
+                    registrarDispatchCalled = true
+                    throw ProcessCanceledException()
+                }
+            }
+
+        try {
+            val registrar =
+                SdefFileTypeRegistrar(
+                    serviceScope = scope,
+                    edtDispatcher = processCanceledDispatcher,
+                )
+            ApplicationManager.getApplication().replaceService(
+                SdefFileTypeRegistrar::class.java,
+                registrar,
+                testRootDisposable,
+            )
+
+            val service = AppleScriptSystemDictionaryRegistryService(scope, dispatcher)
+            repeat(5) {
+                scheduler.runCurrent()
+            }
+
+            assertTrue(
+                "startup must reach the .sdef registrar before cancellation",
+                registrarDispatchCalled,
+            )
+            assertFalse(
+                "standardReady must stay pending after platform cancellation",
+                service.standardReady.isCompleted,
+            )
+            assertFalse(
+                "appsReady must stay pending after platform cancellation",
+                service.appsReady.isCompleted,
+            )
+        } finally {
+            scope.cancel()
+        }
+    }
 
     /**
      * NEVER HALF-BROKEN (Success Criterion #4 discriminator):
