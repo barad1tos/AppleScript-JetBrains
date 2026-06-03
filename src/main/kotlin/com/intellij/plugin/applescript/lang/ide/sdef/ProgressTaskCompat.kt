@@ -10,11 +10,11 @@ import java.util.concurrent.atomic.AtomicReference
  * Codex HIGH 3 — test seam interface that abstracts the Platform progress primitive.
  *
  * Production: [ProgressTaskCompatDefault] wraps [Task.Backgroundable] with a `null`
- * project (application-scope) per the Codex MEDIUM 4 spike outcome — the bundled
- * `withBackgroundProgress` signature requires a non-null `Project` and is therefore
- * NOT viable for application-scope discovery progress. See
- * `src/test/kotlin/com/intellij/plugin/applescript/test/spikes/WithBackgroundProgressNullProjectSpike.kt`
- * for the compile-time API-shape proof.
+ * project for application-scope progress.
+ *
+ * Follow-up: re-check this when bumping the IntelliJ Platform SDK. If
+ * `withBackgroundProgress` gains application-scope or nullable-project support,
+ * this compatibility wrapper can move back to the coroutine progress API.
  *
  * Tests: a `RecordingFake` (lives in `ProgressBackgroundableTest`) captures
  * `show()`/`dismiss()` calls for deterministic assertions on call counts and
@@ -41,8 +41,8 @@ interface ProgressTaskCompat {
 }
 
 /**
- * Production implementation. Wraps `Task.Backgroundable(project = null, ...)` per
- * the Codex MEDIUM 4 spike outcome.
+ * Production implementation. Wraps `Task.Backgroundable(project = null, ...)` for
+ * application-scope progress.
  *
  * Mechanism: [show] queues a `Task.Backgroundable` whose `run(indicator)` body
  * spins on `indicator.isCanceled` OR an internal [dismissed] flag — releasing the
@@ -58,7 +58,6 @@ interface ProgressTaskCompat {
  * register).
  */
 class ProgressTaskCompatDefault : ProgressTaskCompat {
-
     private val dismissed = AtomicBoolean(false)
     private val visible = AtomicBoolean(false)
     private val indicatorRef = AtomicReference<ProgressIndicator?>(null)
@@ -69,29 +68,33 @@ class ProgressTaskCompatDefault : ProgressTaskCompat {
         // Reset dismissed flag in case this instance is being reused. The plan uses
         // a fresh instance per init pipeline so this is a defence-in-depth guard.
         dismissed.set(false)
-        val task = object : Task.Backgroundable(
-            /* project = */ null,
-            /* title = */ displayName,
-            /* canBeCancelled = */ true,
-        ) {
-            override fun run(indicator: ProgressIndicator) {
-                indicatorRef.set(indicator)
-                indicator.isIndeterminate = true
-                // Block this background-task thread until either: (a) dismiss() flips
-                // the flag, or (b) the indicator's Cancel button is pressed. Polling
-                // interval is short (100ms) so the indicator dismissal is perceptually
-                // immediate to the user but doesn't burn CPU.
-                while (!dismissed.get() && !indicator.isCanceled) {
-                    try {
-                        Thread.sleep(POLL_INTERVAL_MS)
-                    } catch (_: InterruptedException) {
-                        // Restore interrupt status; exit loop so the task completes.
-                        Thread.currentThread().interrupt()
-                        break
+        val task =
+            object : Task.Backgroundable(
+                // project =
+                null,
+                // title =
+                displayName,
+                // canBeCancelled =
+                true,
+            ) {
+                override fun run(indicator: ProgressIndicator) {
+                    indicatorRef.set(indicator)
+                    indicator.isIndeterminate = true
+                    // Block this background-task thread until either: (a) dismiss() flips
+                    // the flag, or (b) the indicator's Cancel button is pressed. Polling
+                    // interval is short (100ms) so the indicator dismissal is perceptually
+                    // immediate to the user but doesn't burn CPU.
+                    while (!dismissed.get() && !indicator.isCanceled) {
+                        try {
+                            Thread.sleep(POLL_INTERVAL_MS)
+                        } catch (_: InterruptedException) {
+                            // Restore interrupt status; exit loop so the task completes.
+                            Thread.currentThread().interrupt()
+                            break
+                        }
                     }
                 }
             }
-        }
         ProgressManager.getInstance().run(task)
     }
 

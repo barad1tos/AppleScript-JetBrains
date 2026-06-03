@@ -10,8 +10,10 @@ import com.intellij.psi.util.PsiTreeUtil
 
 object AppleScriptComponentScopeResolver :
     ResolveCache.AbstractResolver<AppleScriptReferenceElement, List<PsiElement>> {
-
-    override fun resolve(scopeElement: AppleScriptReferenceElement, incompleteCode: Boolean): List<PsiElement> {
+    override fun resolve(
+        scopeElement: AppleScriptReferenceElement,
+        incompleteCode: Boolean,
+    ): List<PsiElement> {
         val resultSet = HashSet<AppleScriptComponent>()
         // Local scope.
         val maxScope = getMaxScope(scopeElement)

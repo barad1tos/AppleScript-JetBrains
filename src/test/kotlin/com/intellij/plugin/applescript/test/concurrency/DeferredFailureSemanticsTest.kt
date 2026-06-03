@@ -26,7 +26,6 @@ import org.junit.Assume
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class DeferredFailureSemanticsTest : BasePlatformTestCase() {
-
     override fun setUp() {
         Assume.assumeTrue(
             "DeferredFailureSemanticsTest only runs with -PincludeHeavyTests=true",

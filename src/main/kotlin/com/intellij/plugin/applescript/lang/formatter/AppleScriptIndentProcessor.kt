@@ -5,8 +5,9 @@ import com.intellij.lang.ASTNode
 import com.intellij.plugin.applescript.psi.AppleScriptTypes
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings
 
-internal class AppleScriptIndentProcessor(@Suppress("unused") private val settings: CommonCodeStyleSettings) {
-
+internal class AppleScriptIndentProcessor(
+    @Suppress("unused") private val settings: CommonCodeStyleSettings,
+) {
     fun getChildIndent(node: ASTNode): Indent {
         val elementType = node.elementType
         return if (elementType === AppleScriptTypes.BLOCK_BODY ||

@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap
  *    container moved.
  *
  * Race scenario closed (T-02-02): `ApplicationDictionaryImpl.processInclude:148`
- * re-enters `SDEF_Parser.parseRootTag`, which mutates the maps via
+ * re-enters `SdefParser.parseRootTag`, which mutates the maps via
  * [ApplicationDictionaryImpl.addCommand] / `addClass` / `addProperty` /
  * `addEnumeration`. Background threads (resolver, completion, annotator) call
  * `findCommand`, `findClass`, `findAllCommandsWithName`, and `getAllCommands`
@@ -48,7 +48,6 @@ import java.util.concurrent.ConcurrentHashMap
  * @see ApplicationDictionaryImpl
  */
 internal class DictionaryIndexes {
-
     val dictionaryPropertyMap: MutableMap<String, AppleScriptPropertyDefinition> = ConcurrentHashMap()
 
     val dictionaryRecordMap: MutableMap<String, DictionaryRecord> = ConcurrentHashMap()

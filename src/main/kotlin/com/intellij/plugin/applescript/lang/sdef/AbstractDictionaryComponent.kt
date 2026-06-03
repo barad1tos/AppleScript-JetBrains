@@ -4,7 +4,6 @@ import com.intellij.navigation.ItemPresentation
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.AppleScriptComponentType
 import com.intellij.plugin.applescript.lang.ide.AppleScriptDocHelper
-import com.intellij.plugin.applescript.psi.AppleScriptExpression
 import com.intellij.plugin.applescript.psi.impl.AppleScriptElementPresentation
 import com.intellij.plugin.applescript.psi.sdef.DictionaryIdentifier
 import com.intellij.plugin.applescript.psi.sdef.impl.DictionaryComponentBase
@@ -13,15 +12,18 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.xml.XmlTag
 import javax.swing.Icon
 
+private const val DICTIONARY_DISPLAY_TYPE_PREFIX = "Dictionary"
+private const val DICTIONARY_REFERENCE_TYPE = "dictionary reference"
+private const val DICTIONARY_SHORT_TYPE_PREFIX = "dictionary "
+private const val MAX_PARENT_CLASS_DEPTH = 15
+
 abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
     DictionaryComponentBase<P, XmlTag>,
     DictionaryComponent {
-
     private val backingCode: String
     private val backingName: String
     private var backingDescription: String? = null
 
-    @Suppress("PropertyName")
     protected var docField: String? = null
 
     protected constructor(
@@ -46,40 +48,24 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
         this.backingName = name
     }
 
-    override fun isScriptProperty(): Boolean = false
-
-    override fun isHandler(): Boolean = false
-
-    override fun getOriginalDeclaration(): PsiElement = this
-
-    override fun isObjectProperty(): Boolean = false
-
-    override fun isVariable(): Boolean = false
-
-    override fun findAssignedValue(): AppleScriptExpression? = null
-
     override fun getName(): String = backingName
 
     override val nameIdentifiers: List<String>
         get() = backingName.split("\\s+".toRegex())
 
     override val qualifiedName: String
-        // Structural invariant: a concrete dictionary component (class/command/property/etc.) always
-        // has a parent component — only the root ApplicationDictionaryImpl returns a null parent, and
-        // qualifiedName is never resolved on the root through this path.
-        get() = "${requireNotNull(dictionaryParentComponent) { "$backingName has a parent dictionary component" }.qualifiedName}/$shortQname"
+        get() = "${dictionaryParentComponent.qualifiedName}/$shortQname"
 
     private val shortQname: String
-        get() = type.substring(11) + ":" + code
+        get() = type.removePrefix(DICTIONARY_SHORT_TYPE_PREFIX) + ":" + code
 
     override val qualifiedPath: String
-        // Same structural invariant as qualifiedName: a concrete component always has a parent.
-        get() = "${requireNotNull(dictionaryParentComponent) { "$backingName has a parent dictionary component" }.qualifiedPath}/$shortQname"
+        get() = "${dictionaryParentComponent.qualifiedPath}/$shortQname"
 
     override val type: String
         get() {
             val componentType = AppleScriptComponentType.typeOf(this)
-            return componentType?.toString()?.lowercase() ?: "dictionary reference"
+            return componentType?.toString()?.lowercase() ?: DICTIONARY_REFERENCE_TYPE
         }
 
     override var description: String?
@@ -94,45 +80,52 @@ abstract class AbstractDictionaryComponent<P : DictionaryComponent> :
     override val cocoaClassName: String?
         get() = null
 
-    protected open fun getDocHeader(): String = buildString {
-        append("<b>")
-        AppleScriptDocHelper.appendElementLink(this, dictionary, dictionary.getName())
-        append("</b> ").append(" Dictionary").append("<br>")
-    }
-
-    protected open fun getTypeDescription(): String = buildString {
-        append("<p>")
-        val capitalizedType = StringUtil.capitalizeWords(type, true)
-        val displayType = if (capitalizedType.lowercase().contains("dictionary")) capitalizedType.substring(10) else capitalizedType
-        append(displayType).append(" <b>").append(backingName).append("</b>")
-
-        when (val thisRef = this@AbstractDictionaryComponent) {
-            is AppleScriptClass -> {
-                var parent: AppleScriptClass? = thisRef.parentClass
-                if (parent != null) {
-                    append(" [inh. ")
-                    var ext = ""
-                    var guard = 15
-                    while (parent != null && guard > 0) {
-                        guard--
-                        append(ext)
-                        AppleScriptDocHelper.appendElementLink(this, parent, parent.getName())
-                        parent = parent.parentClass
-                        ext = " > "
-                    }
-                    append(" ]")
-                }
-            }
-
-            is CommandParameter -> {
-                val pType = StringUtil.notNullize(thisRef.typeSpecifier)
-                append(" [").append(pType).append("]")
-            }
-
-            else -> Unit
+    protected open fun getDocHeader(): String =
+        buildString {
+            append("<b>")
+            AppleScriptDocHelper.appendElementLink(this, dictionary, dictionary.getName())
+            append("</b> ").append(" Dictionary").append("<br>")
         }
-        append(" : ").append(StringUtil.notNullize(description))
-    }
+
+    protected open fun getTypeDescription(): String =
+        buildString {
+            append("<p>")
+            val capitalizedType = StringUtil.capitalizeWords(type, true)
+            val displayType =
+                if (capitalizedType.startsWith(DICTIONARY_DISPLAY_TYPE_PREFIX)) {
+                    capitalizedType.removePrefix(DICTIONARY_DISPLAY_TYPE_PREFIX)
+                } else {
+                    capitalizedType
+                }
+            append(displayType).append(" <b>").append(backingName).append("</b>")
+
+            when (val thisRef = this@AbstractDictionaryComponent) {
+                is AppleScriptClass -> {
+                    var parent: AppleScriptClass? = thisRef.parentClass
+                    if (parent != null) {
+                        append(" [inh. ")
+                        var ext = ""
+                        var guard = MAX_PARENT_CLASS_DEPTH
+                        while (parent != null && guard > 0) {
+                            guard--
+                            append(ext)
+                            AppleScriptDocHelper.appendElementLink(this, parent, parent.getName())
+                            parent = parent.parentClass
+                            ext = " > "
+                        }
+                        append(" ]")
+                    }
+                }
+
+                is CommandParameter -> {
+                    val pType = StringUtil.notNullize(thisRef.typeSpecifier)
+                    append(" [").append(pType).append("]")
+                }
+
+                else -> Unit
+            }
+            append(" : ").append(StringUtil.notNullize(description))
+        }
 
     override val documentation: String
         get() = getDocHeader() + getTypeDescription() + getDocFooter()

@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.test.sdef
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommandImpl
 import com.intellij.plugin.applescript.lang.sdef.CommandParameter
+import com.intellij.plugin.applescript.lang.sdef.CommandParameterData
 import com.intellij.plugin.applescript.lang.sdef.CommandParameterImpl
 import com.intellij.plugin.applescript.lang.sdef.Suite
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
@@ -11,6 +12,8 @@ import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.lang.reflect.Proxy
+
+private const val PLAY_COMMAND_NAME = "play"
 
 /**
  * SDEF-02 regression fence for the D-02 TODO closure at
@@ -33,28 +36,27 @@ import java.lang.reflect.Proxy
  * Uses `BasePlatformTestCase` (slower than the pure-JUnit pattern in
  * `LeafDataClassTest` / `SuiteAddCommandTest`) because `ApplicationDictionaryImpl`
  * extends `FakePsiElement` and its constructor wants a real `Project` + `XmlFile`
- * to feed `SDEF_Parser.parse`. We supply an empty-`<dictionary/>` XmlFile so the
+ * to feed `SdefParser.parse`. We supply an empty-`<dictionary/>` XmlFile so the
  * parser no-ops and we can then drive `addCommand` directly with stub commands.
  */
 class ApplicationDictionaryOverloadTest : BasePlatformTestCase() {
-
     fun testFirstInsertReturnsTrue() {
         val dict = buildDictionary()
-        val cmd = newCommand(name = "play", parameters = listOf("track"))
+        val cmd = newPlayCommand(parameters = listOf("track"))
         assertTrue("First insert must return true", dict.addCommand(cmd))
     }
 
     fun testDuplicateInsertDedupes() {
         val dict = buildDictionary()
-        val cmd1 = newCommand(name = "play", parameters = listOf("track"))
-        val cmd2 = newCommand(name = "play", parameters = listOf("track"))
+        val cmd1 = newPlayCommand(parameters = listOf("track"))
+        val cmd2 = newPlayCommand(parameters = listOf("track"))
         // Both have structurally-equal CommandData → second insert is a
         // duplicate by name AND by structural equality.
         assertTrue(dict.addCommand(cmd1))
         // Second insert: same name → returns false (duplicate-by-name contract).
         assertFalse("Duplicate name insert must return false", dict.addCommand(cmd2))
         // List-keyed map: structural-equality dedupe collapses to 1 entry.
-        val hits = dict.findAllCommandsWithName("play")
+        val hits = dict.findAllCommandsWithName(PLAY_COMMAND_NAME)
         assertEquals("Structurally-equal commands must dedupe to 1 entry", 1, hits.size)
     }
 
@@ -62,11 +64,11 @@ class ApplicationDictionaryOverloadTest : BasePlatformTestCase() {
         val dict = buildDictionary()
         // Two commands with same name but DIFFERENT parameter signatures —
         // CommandData.equals returns false → list keeps both entries.
-        val cmd1 = newCommand(name = "play", parameters = listOf("track"))
-        val cmd2 = newCommand(name = "play", parameters = listOf("track", "from"))
+        val cmd1 = newPlayCommand(parameters = listOf("track"))
+        val cmd2 = newPlayCommand(parameters = listOf("track", "from"))
         dict.addCommand(cmd1)
         dict.addCommand(cmd2)
-        val hits = dict.findAllCommandsWithName("play")
+        val hits = dict.findAllCommandsWithName(PLAY_COMMAND_NAME)
         assertEquals(
             "Genuinely overloaded commands (different parameter lists) must keep both entries",
             2,
@@ -81,16 +83,18 @@ class ApplicationDictionaryOverloadTest : BasePlatformTestCase() {
 
     /**
      * Build a real `ApplicationDictionaryImpl` over an empty in-memory XmlFile.
-     * `SDEF_Parser.parse` walks the empty document tree without inserting any
+     * `SdefParser.parse` walks the empty document tree without inserting any
      * commands, leaving the dictionary ready for direct `addCommand` calls.
      */
     private fun buildDictionary(): ApplicationDictionaryImpl {
-        val xmlFile = PsiFileFactory.getInstance(project)
-            .createFileFromText(
-                "empty.sdef",
-                com.intellij.lang.xml.XMLLanguage.INSTANCE,
-                "<dictionary title=\"TestApp\"></dictionary>",
-            ) as XmlFile
+        val xmlFile =
+            PsiFileFactory
+                .getInstance(project)
+                .createFileFromText(
+                    "empty.sdef",
+                    com.intellij.lang.xml.XMLLanguage.INSTANCE,
+                    "<dictionary title=\"TestApp\"></dictionary>",
+                ) as XmlFile
         return ApplicationDictionaryImpl(
             project = project,
             dictionaryXmlFile = xmlFile,
@@ -105,15 +109,20 @@ class ApplicationDictionaryOverloadTest : BasePlatformTestCase() {
      * only needs it for `getSuite()` (not exercised by `addCommand` /
      * `findAllCommandsWithName` paths).
      */
-    private fun newCommand(name: String, parameters: List<String>): AppleScriptCommand {
+    private fun newPlayCommand(parameters: List<String>): AppleScriptCommand {
         val suiteStub = stubSuite()
         val xmlTagStub = stubXmlTag()
-        val cmd = AppleScriptCommandImpl(suiteStub, name, name, xmlTagStub)
+        val cmd = AppleScriptCommandImpl(suiteStub, PLAY_COMMAND_NAME, PLAY_COMMAND_NAME, xmlTagStub)
         // setParameters routes through the builder so `data: CommandData` is
         // build-frozen with the right parameter list (and hashCode is stable).
-        val params: List<CommandParameter> = parameters.map { pName ->
-            CommandParameterImpl(cmd, pName, "----", false, "text", null, xmlTagStub)
-        }
+        val params: List<CommandParameter> =
+            parameters.map { pName ->
+                CommandParameterImpl(
+                    cmd,
+                    CommandParameterData(name = pName, code = "----", type = "text"),
+                    xmlTagStub,
+                )
+            }
         cmd.parameters = params
         return cmd
     }

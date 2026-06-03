@@ -3,6 +3,7 @@ import java.time.Duration
 import org.gradle.api.file.ConfigurableFileCollection
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 // Phase 4 SERVICE-10: imports for the bundled grammarkit task types from IPGP 2.16.0.
 // The bundled variant lives under org.jetbrains.intellij.platform.gradle.tasks,
 // NOT under org.jetbrains.grammarkit.tasks (that's the standalone plugin).
@@ -20,6 +21,7 @@ plugins {
     // project's Kotlin 2.3.21 metadata (RESEARCH Pitfall 2). Build-time-only; never in the ZIP.
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
+    alias(libs.plugins.kover)
     // Phase 4 SERVICE-10: bundled grammarkit plugin from IntelliJ Platform Gradle Plugin 2.16.0.
     // Provides `generateLexer` / `generateParser` tasks that the `verifyGeneratedSourcesMatch`
     // task below configures to write into a tmp dir for drift diffing against committed
@@ -40,6 +42,8 @@ java {
 kotlin {
     jvmToolchain(17)
     compilerOptions {
+        languageVersion.set(KotlinVersion.KOTLIN_2_2)
+        apiVersion.set(KotlinVersion.KOTLIN_2_2)
         freeCompilerArgs.addAll(
             "-Xjsr305=strict",
             "-opt-in=kotlin.RequiresOptIn",
@@ -156,6 +160,25 @@ ktlint {
     // Standard ruleset; no custom config surface (mirrors sibling project ayu-jetbrains).
 }
 
+kover {
+    reports {
+        filters {
+            excludes {
+                classes(
+                    "com.intellij.plugin.applescript.lang.parser.AppleScriptParser*",
+                )
+            }
+        }
+
+        total {
+            xml {
+                onCheck = false
+                xmlFile = layout.buildDirectory.file("reports/kover/report.xml")
+            }
+        }
+    }
+}
+
 intellijPlatform {
     pluginConfiguration {
         name = providers.gradleProperty("pluginName")
@@ -166,13 +189,14 @@ intellijPlatform {
         // Pull the 1.0.0 section out of CHANGELOG.md so the Marketplace listing stays in sync.
         // The plugin verifier expects HTML, so the conversion is intentionally minimal — Marketplace
         // accepts the resulting markdown-flavoured HTML, and the CHANGELOG.md remains the source of truth.
-        changeNotes = providers.fileContents(layout.projectDirectory.file("CHANGELOG.md")).asText.map { raw ->
-            val startMarker = "## [2.0.0]"
-            val nextSection = "\n## ["
-            val startIndex = raw.indexOf(startMarker).takeIf { it >= 0 } ?: 0
-            val endIndex = raw.indexOf(nextSection, startIndex + startMarker.length).takeIf { it > 0 } ?: raw.length
-            raw.substring(startIndex, endIndex).trim()
-        }
+        changeNotes =
+            providers.fileContents(layout.projectDirectory.file("CHANGELOG.md")).asText.map { raw ->
+                val startMarker = "## [2.0.0]"
+                val nextSection = "\n## ["
+                val startIndex = raw.indexOf(startMarker).takeIf { it >= 0 } ?: 0
+                val endIndex = raw.indexOf(nextSection, startIndex + startMarker.length).takeIf { it > 0 } ?: raw.length
+                raw.substring(startIndex, endIndex).trim()
+            }
     }
 
     // Signing materialises lazily — only when CERTIFICATE_CHAIN_PATH is set in the env.
@@ -181,9 +205,10 @@ intellijPlatform {
     if (certificatePath.isPresent && certificatePath.get().isNotEmpty()) {
         signing {
             certificateChainFile = layout.projectDirectory.file(certificatePath.get())
-            privateKeyFile = layout.projectDirectory.file(
-                providers.environmentVariable("PRIVATE_KEY_PATH").get(),
-            )
+            privateKeyFile =
+                layout.projectDirectory.file(
+                    providers.environmentVariable("PRIVATE_KEY_PATH").get(),
+                )
             password = providers.environmentVariable("PRIVATE_KEY_PASSWORD")
         }
     }
@@ -217,10 +242,11 @@ intellijPlatform {
         // auto-update path when 1.0.0 ships — renaming would orphan them.
         // Pass mute flags directly to Plugin Verifier CLI per the error
         // message hint; compatibility / API / dependency checks still gate.
-        freeArgs = listOf(
-            "-mute",
-            "ForbiddenPluginIdPrefix,TemplateWordInPluginId,TemplateWordInPluginName",
-        )
+        freeArgs =
+            listOf(
+                "-mute",
+                "ForbiddenPluginIdPrefix,TemplateWordInPluginId,TemplateWordInPluginName",
+            )
     }
 }
 
@@ -237,11 +263,11 @@ val runIdeHeadlessSmoke by intellijPlatformTesting.runIde.registering {
 
         jvmArgs(
             "-Djava.awt.headless=true",
-            "-Didea.ApplicationStarter.command=applescript-smoke",
             "-Didea.suppress.statistics.report=true",
             "-Didea.is.internal=false",
             "-Dapplescript.smoke.fixtureRoot=${file("src/test/resources/testData/runIde").absolutePath}",
         )
+        args("applescript-smoke")
         // 3-minute Gradle-level cap (T-02-S mitigation). CI also enforces its own job
         // timeout. CONTEXT D-13 expected wall-time is ~75s; this leaves headroom for
         // cold IDE boot on the first CI run after a cache miss.
@@ -383,9 +409,10 @@ tasks {
             // kotlinx-coroutines-test (D-05) and kotlinx-coroutines-bom (transitive POM-only) are
             // fine — only the standalone core jar is forbidden on test runtime.
             val testRuntime = configurations.testRuntimeClasspath.get().resolve()
-            val badTest = testRuntime.filter {
-                it.name.startsWith("kotlinx-coroutines-core") && !it.name.contains("intellij")
-            }
+            val badTest =
+                testRuntime.filter {
+                    it.name.startsWith("kotlinx-coroutines-core") && !it.name.contains("intellij")
+                }
             require(badTest.isEmpty()) {
                 "Vanilla kotlinx-coroutines-core leaked onto testRuntimeClasspath (PITFALLS section 3.1 — " +
                     "shadows the Platform-bundled fork's runBlockingWithParallelismCompensation):\n" +
@@ -407,7 +434,8 @@ tasks {
         inputs.dir(productionKotlin)
         doLast {
             val matches = mutableListOf<String>()
-            productionKotlin.asFile.walkTopDown()
+            productionKotlin.asFile
+                .walkTopDown()
                 .filter { it.isFile && it.extension == "kt" }
                 .forEach { file ->
                     file.useLines { lines ->
@@ -453,9 +481,12 @@ tasks {
         inputs.file(snapshotFile)
         doLast {
             @Suppress("UNCHECKED_CAST")
-            val expected: Map<String, String> = (groovy.json.JsonSlurper()
-                .parse(snapshotFile.asFile) as Map<String, Any?>)
-                .let { json ->
+            val expected: Map<String, String> =
+                (
+                    groovy.json
+                        .JsonSlurper()
+                        .parse(snapshotFile.asFile) as Map<String, Any?>
+                ).let { json ->
                     (json["versions"] as Map<*, *>)
                         .mapKeys { it.key.toString() }
                         .mapValues { it.value.toString() }
@@ -466,41 +497,46 @@ tasks {
             // intellijPlatform extension's `PluginVerification.Ides` type
             // inside the tasks { ... } block scope.
             val verifyTask = project.tasks.named("verifyPlugin").get()
-            val idesMethod = verifyTask::class.java.methods
-                .firstOrNull { it.name == "getIdes" && it.parameterCount == 0 }
-                ?: error("verifyPlugin task does not expose getIdes() — IntelliJ Platform Gradle Plugin API changed?")
+            val idesMethod =
+                verifyTask::class.java.methods
+                    .firstOrNull { it.name == "getIdes" && it.parameterCount == 0 }
+                    ?: error("verifyPlugin task does not expose getIdes() — IntelliJ Platform Gradle Plugin API changed?")
             val ideFiles = (idesMethod.invoke(verifyTask) as ConfigurableFileCollection).files
             val ideDirs = ideFiles.filter { it.isDirectory }
 
             val slf4jRegex = Regex("""kotlinx-coroutines-slf4j-(\d+\.\d+\.\d+(?:-intellij(?:-\d+)?)?)\.jar""")
             val ideKeyRegex = Regex("""ideaIC-(\d+\.\d+(?:\.\d+(?:\.\d+)?)?)-""")
-            val resolved: Map<String, String> = ideDirs.mapNotNull { ideDir ->
-                val ideKey = ideKeyRegex.find(ideDir.name)?.groupValues?.get(1) ?: return@mapNotNull null
-                val libDir = ideDir.resolve("lib").takeIf { it.isDirectory } ?: return@mapNotNull null
-                val slf4jJar = libDir.listFiles()
-                    ?.firstOrNull { it.name.startsWith("kotlinx-coroutines-slf4j-") && it.name.endsWith(".jar") }
-                    ?: return@mapNotNull null
-                val match = slf4jRegex.find(slf4jJar.name) ?: return@mapNotNull null
-                // Strip the build counter (-intellij-NN -> -intellij) so the snapshot
-                // pins to the API-stable form rather than the patch counter.
-                val version = match.groupValues[1].replace(Regex("""-intellij-\d+$"""), "-intellij")
-                ideKey to version
-            }.toMap()
+            val resolved: Map<String, String> =
+                ideDirs
+                    .mapNotNull { ideDir ->
+                        val ideKey = ideKeyRegex.find(ideDir.name)?.groupValues?.get(1) ?: return@mapNotNull null
+                        val libDir = ideDir.resolve("lib").takeIf { it.isDirectory } ?: return@mapNotNull null
+                        val slf4jJar =
+                            libDir
+                                .listFiles()
+                                ?.firstOrNull { it.name.startsWith("kotlinx-coroutines-slf4j-") && it.name.endsWith(".jar") }
+                                ?: return@mapNotNull null
+                        val match = slf4jRegex.find(slf4jJar.name) ?: return@mapNotNull null
+                        // Strip the build counter (-intellij-NN -> -intellij) so the snapshot
+                        // pins to the API-stable form rather than the patch counter.
+                        val version = match.groupValues[1].replace(Regex("""-intellij-\d+$"""), "-intellij")
+                        ideKey to version
+                    }.toMap()
 
-            val drift = expected.entries
-                .filter { (ide, expectedVer) ->
-                    val actual = resolved[ide]
-                    actual == null || actual != expectedVer
-                }
-                .joinToString("\n") { (ide, expectedVer) ->
-                    "  $ide expected=$expectedVer actual=${resolved[ide] ?: "MISSING"}"
-                }
+            val drift =
+                expected.entries
+                    .filter { (ide, expectedVer) ->
+                        val actual = resolved[ide]
+                        actual == null || actual != expectedVer
+                    }.joinToString("\n") { (ide, expectedVer) ->
+                        "  $ide expected=$expectedVer actual=${resolved[ide] ?: "MISSING"}"
+                    }
 
             if (drift.isNotEmpty()) {
                 error(
                     "Bundled kotlinx-coroutines version drift detected:\n$drift\n" +
                         "Fix: review the version change against PITFALLS section 3.1 signature " +
-                        "drift catalog, then update gradle/coroutinesBundledVersions.json IF compatible."
+                        "drift catalog, then update gradle/coroutinesBundledVersions.json IF compatible.",
                 )
             }
         }
@@ -523,14 +559,15 @@ tasks {
             "classes (5 new in Phase 4 + the facade). DFS with WHITE/GRAY/BLACK colouring. " +
             "Phase 4 SERVICE-11."
 
-        val services = listOf(
-            "SdefFileTypeRegistrar",
-            "SdefPersistenceService",
-            "ApplicationDiscoveryService",
-            "SdefFileProvider",
-            "SdefIndexService",
-            "AppleScriptSystemDictionaryRegistryService",
-        )
+        val services =
+            listOf(
+                "SdefFileTypeRegistrar",
+                "SdefPersistenceService",
+                "ApplicationDiscoveryService",
+                "SdefFileProvider",
+                "SdefIndexService",
+                "AppleScriptSystemDictionaryRegistryService",
+            )
         // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
         // back-edge from a service to the facade is a DATA dependency (reading state.X), not
         // a service-graph dependency. RESEARCH §5 calls this out explicitly: "the back-edge
@@ -542,41 +579,42 @@ tasks {
         // via the facade. Never add an entry for a service-to-service edge that is a real
         // service<X>() lookup hop — those are real service dependencies and MUST be modelled
         // as graph edges so cycles are caught.
-        val dataHopAllowlist = setOf(
-            "SdefPersistenceService" to "AppleScriptSystemDictionaryRegistryService",
-            // Wave 3 (Phase 4 SERVICE-03, plan 04-03): SdefPersistenceService.isInUnknownList
-            // is a back-compat shim that forwards to ApplicationDiscoveryService — the not-found
-            // list moved to the discovery service (its rightful owner; it's a session-only
-            // discovery artifact, NOT a persistence artifact). The forwarder preserves the
-            // public surface of SdefPersistenceServiceTest (Wave 2) without violating the
-            // single-source-of-truth invariant. This is conceptually a session-data forwarder,
-            // NOT a service-graph dependency. Without this entry the cycle detector flags
-            // `SdefPersistenceService -> ApplicationDiscoveryService -> SdefPersistenceService`
-            // (ApplicationDiscoveryService consults SdefPersistenceService.isNotScriptable
-            // during discovery — that direction IS a real service dependency and remains
-            // tracked in the graph).
-            "SdefPersistenceService" to "ApplicationDiscoveryService",
-            // Wave 4 (Phase 4 SERVICE-04, plan 04-04): SdefFileProvider reaches back into the
-            // facade for two narrow data-hop reads:
-            //   1. AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal(name) —
-            //      O(1) lookup against the persisted @State-tagged dictionaryInfoMap. The facade is
-            //      the persisted-state owner (Pattern A — annotation tied to COMPONENT_NAME by
-            //      class identity; cannot move without breaking existing user caches per
-            //      PITFALLS 4.1). Wave 4 reads through this typed accessor rather than copying
-            //      the snapshot on every fetch.
-            //   2. AppleScriptSystemDictionaryRegistryService.initializeDictionaryFromInfoInternal —
-            //      delegates the parse step (parseDictionaryFile + map population) back to the
-            //      facade because the parser-index map cluster is Wave 5 SdefIndexService
-            //      territory; Wave 4 only owns file-generation.
-            //   3. AppleScriptSystemDictionaryRegistryService.newSecureSaxBuilderInternal —
-            //      XXE-hardened SAXBuilder factory. The other consumer (parseDictionaryFile) still
-            //      lives on the facade; co-location with the file-provider's mergeScriptingAdditions
-            //      moves with the parseDictionaryFile extraction in Wave 5.
-            // All three are DATA reads — the facade does not depend on SdefFileProvider's
-            // session-only file-generation state. Wave 5 may eliminate this allowlist entry once
-            // parseDictionaryFile + the parser map cluster migrate to SdefIndexService.
-            "SdefFileProvider" to "AppleScriptSystemDictionaryRegistryService",
-        )
+        val dataHopAllowlist =
+            setOf(
+                "SdefPersistenceService" to "AppleScriptSystemDictionaryRegistryService",
+                // Wave 3 (Phase 4 SERVICE-03, plan 04-03): SdefPersistenceService.isInUnknownList
+                // is a back-compat shim that forwards to ApplicationDiscoveryService — the not-found
+                // list moved to the discovery service (its rightful owner; it's a session-only
+                // discovery artifact, NOT a persistence artifact). The forwarder preserves the
+                // public surface of SdefPersistenceServiceTest (Wave 2) without violating the
+                // single-source-of-truth invariant. This is conceptually a session-data forwarder,
+                // NOT a service-graph dependency. Without this entry the cycle detector flags
+                // `SdefPersistenceService -> ApplicationDiscoveryService -> SdefPersistenceService`
+                // (ApplicationDiscoveryService consults SdefPersistenceService.isNotScriptable
+                // during discovery — that direction IS a real service dependency and remains
+                // tracked in the graph).
+                "SdefPersistenceService" to "ApplicationDiscoveryService",
+                // Wave 4 (Phase 4 SERVICE-04, plan 04-04): SdefFileProvider reaches back into the
+                // facade for two narrow data-hop reads:
+                //   1. AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal(name) —
+                //      O(1) lookup against the persisted @State-tagged dictionaryInfoMap. The facade is
+                //      the persisted-state owner (Pattern A — annotation tied to COMPONENT_NAME by
+                //      class identity; cannot move without breaking existing user caches per
+                //      PITFALLS 4.1). Wave 4 reads through this typed accessor rather than copying
+                //      the snapshot on every fetch.
+                //   2. AppleScriptSystemDictionaryRegistryService.initializeDictionaryFromInfoInternal —
+                //      delegates the parse step (parseDictionaryFile + map population) back to the
+                //      facade because the parser-index map cluster is Wave 5 SdefIndexService
+                //      territory; Wave 4 only owns file-generation.
+                //   3. AppleScriptSystemDictionaryRegistryService.newSecureSaxBuilderInternal —
+                //      XXE-hardened SAXBuilder factory. The other consumer (parseDictionaryFile) still
+                //      lives on the facade; co-location with the file-provider's mergeScriptingAdditions
+                //      moves with the parseDictionaryFile extraction in Wave 5.
+                // All three are DATA reads — the facade does not depend on SdefFileProvider's
+                // session-only file-generation state. Wave 5 may eliminate this allowlist entry once
+                // parseDictionaryFile + the parser map cluster migrate to SdefIndexService.
+                "SdefFileProvider" to "AppleScriptSystemDictionaryRegistryService",
+            )
         val sdefPackage = layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef")
         inputs.dir(sdefPackage)
 
@@ -584,7 +622,8 @@ tasks {
             val adjacency = mutableMapOf<String, MutableSet<String>>()
             services.forEach { adjacency[it] = mutableSetOf() }
 
-            sdefPackage.asFile.walkTopDown()
+            sdefPackage.asFile
+                .walkTopDown()
                 .filter { it.isFile && it.extension == "kt" }
                 .forEach { file ->
                     val owner = services.firstOrNull { file.nameWithoutExtension == it } ?: return@forEach
@@ -593,11 +632,12 @@ tasks {
                         if (dep == owner) return@forEach
                         // Skip data-hop edges (RESEARCH §5).
                         if (owner to dep in dataHopAllowlist) return@forEach
-                        val patterns = listOf(
-                            "service<$dep>",
-                            "$dep.getInstance",
-                            "service<$dep::class.java>",
-                        )
+                        val patterns =
+                            listOf(
+                                "service<$dep>",
+                                "$dep.getInstance",
+                                "service<$dep::class.java>",
+                            )
                         if (patterns.any { body.contains(it) }) {
                             adjacency[owner]!!.add(dep)
                         }
@@ -608,7 +648,11 @@ tasks {
             val gray = 1
             val black = 2
             val color = services.associateWith { white }.toMutableMap()
-            fun dfs(node: String, path: MutableList<String>): List<String>? {
+
+            fun dfs(
+                node: String,
+                path: MutableList<String>,
+            ): List<String>? {
                 color[node] = gray
                 path.add(node)
                 for (neighbor in adjacency[node]!!) {
@@ -733,7 +777,8 @@ tasks {
             val tmpDir = tmpRegen.get().asFile
             val lexerDir = lexerRegen.get().asFile
             val differences = mutableListOf<String>()
-            committed.walkTopDown()
+            committed
+                .walkTopDown()
                 .filter { it.isFile && (it.extension == "java" || it.extension == "flex") }
                 .forEach { file ->
                     val rel = file.relativeTo(committed).path

@@ -1,25 +1,8 @@
 package com.intellij.plugin.applescript.lang.ide
 
-import com.intellij.lang.CodeDocumentationAwareCommenter
-import com.intellij.psi.PsiComment
-import com.intellij.psi.tree.IElementType
+import com.intellij.lang.Commenter
 
-class AppleScriptCommenter : CodeDocumentationAwareCommenter {
-
-    override fun getLineCommentTokenType(): IElementType? = null
-
-    override fun getBlockCommentTokenType(): IElementType? = null
-
-    override fun getDocumentationCommentTokenType(): IElementType? = null
-
-    override fun getDocumentationCommentPrefix(): String? = null
-
-    override fun getDocumentationCommentLinePrefix(): String? = null
-
-    override fun getDocumentationCommentSuffix(): String? = null
-
-    override fun isDocumentationComment(element: PsiComment?): Boolean = false
-
+class AppleScriptCommenter : Commenter {
     override fun getLineCommentPrefix(): String = "--"
 
     override fun getBlockCommentPrefix(): String = "(*"

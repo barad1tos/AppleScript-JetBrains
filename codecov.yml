@@ -1,0 +1,25 @@
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 5%
+    patch:
+      default:
+        target: auto
+        threshold: 10%
+        informational: true
+
+ignore:
+  - "src/main/gen/**"
+  - "src/test/**"
+  - "lang-doc/**"
+  - "img/**"
+  - "lib/**"
+
+comment:
+  layout: "condensed_header, condensed_files, condensed_footer"
+  require_changes: true

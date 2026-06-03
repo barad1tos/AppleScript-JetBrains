@@ -19,14 +19,13 @@ class AppleScriptBlock(
     private val mySettings: CodeStyleSettings,
 ) : AbstractBlock(node, wrap, alignment),
     BlockWithParent {
-
     private val myIndentProcessor: AppleScriptIndentProcessor =
         AppleScriptIndentProcessor(mySettings.getCommonSettings(AppleScriptLanguage))
     private val myIndent: Indent = myIndentProcessor.getChildIndent(myNode)
     private val mySpacingProcessor: AppleScriptSpacingProcessor =
-        AppleScriptSpacingProcessor(node, mySettings.getCommonSettings(AppleScriptLanguage))
+        AppleScriptSpacingProcessor(mySettings.getCommonSettings(AppleScriptLanguage))
     private val myWrappingProcessor: AppleScriptWrappingProcessor =
-        AppleScriptWrappingProcessor(node, mySettings.getCommonSettings(AppleScriptLanguage))
+        AppleScriptWrappingProcessor()
 
     private var myParent: BlockWithParent? = null
     private val myChildWrap: Wrap? = null
@@ -37,8 +36,14 @@ class AppleScriptBlock(
         var childNode = node.firstChildNode
         while (childNode != null) {
             if (childNode.text.trim().isNotEmpty()) {
-                val childBlock = AppleScriptBlock(childNode, createChildWrap(childNode), Alignment.createAlignment(), mySettings)
-                childBlock.setParent(this)
+                val childBlock =
+                    AppleScriptBlock(
+                        childNode,
+                        createChildWrap(childNode),
+                        Alignment.createAlignment(),
+                        mySettings,
+                    )
+                childBlock.parent = this
                 tlChildren.add(childBlock)
             }
             childNode = childNode.treeNext
@@ -49,8 +54,10 @@ class AppleScriptBlock(
     private fun createChildWrap(childNode: ASTNode): Wrap =
         myWrappingProcessor.createChildWrap(childNode, Wrap.createWrap(WrapType.NONE, false), myChildWrap)
 
-    override fun getSpacing(child1: Block?, child2: Block): Spacing? =
-        mySpacingProcessor.getSpacing(child1 as? AppleScriptBlock, child2 as AppleScriptBlock)
+    override fun getSpacing(
+        child1: Block?,
+        child2: Block,
+    ): Spacing? = mySpacingProcessor.getSpacing(child1 as? AppleScriptBlock, child2 as AppleScriptBlock)
 
     override fun isLeaf(): Boolean = false
 

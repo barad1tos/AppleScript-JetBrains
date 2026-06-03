@@ -22,7 +22,6 @@ import org.junit.Test
  * exercised without touching this test.
  */
 class ExtensionSupportedTest {
-
     @Test
     fun nullExtensionIsNotSupported() {
         assertFalse(extensionSupported(null))

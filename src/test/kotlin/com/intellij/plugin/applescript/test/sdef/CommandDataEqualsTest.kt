@@ -31,37 +31,44 @@ import org.junit.Test
  *   one entry in a `HashSet`, proving stable structural `hashCode`.
  */
 class CommandDataEqualsTest {
+    private fun paramA() = CommandParameterData(name = "a", code = "----", type = "text", optional = false)
 
-    private fun paramA() =
-        CommandParameterData(name = "a", code = "----", type = "text", optional = false)
-
-    private fun paramB() =
-        CommandParameterData(name = "b", code = "----", type = "text", optional = false)
+    private fun paramB() = CommandParameterData(name = "b", code = "----", type = "text", optional = false)
 
     @Test
     fun testCommandDataIncludesParameters() {
-        val cmd1 = CommandData(
-            name = "play", code = "play", description = null,
-            parameters = listOf(paramA()),
-            directParameter = null, result = null,
-        )
-        val cmd2 = CommandData(
-            name = "play", code = "play", description = null,
-            parameters = listOf(paramA(), paramB()),
-            directParameter = null, result = null,
-        )
+        val cmd1 =
+            CommandData(
+                name = "play",
+                code = "play",
+                description = null,
+                parameters = listOf(paramA()),
+                directParameter = null,
+                result = null,
+            )
+        val cmd2 =
+            CommandData(
+                name = "play",
+                code = "play",
+                description = null,
+                parameters = listOf(paramA(), paramB()),
+                directParameter = null,
+                result = null,
+            )
         assertNotEquals(cmd1, cmd2)
         assertNotEquals(cmd1.hashCode(), cmd2.hashCode())
     }
 
     @Test
     fun testBuilderProducesEqualCommandData() {
-        val a = AppleScriptCommandBuilder(name = "play", code = "play")
-            .parameters(listOf(paramA(), paramB()))
-            .build()
-        val b = AppleScriptCommandBuilder(name = "play", code = "play")
-            .parameters(listOf(paramA(), paramB()))
-            .build()
+        val a =
+            AppleScriptCommandBuilder(name = "play", code = "play")
+                .parameters(listOf(paramA(), paramB()))
+                .build()
+        val b =
+            AppleScriptCommandBuilder(name = "play", code = "play")
+                .parameters(listOf(paramA(), paramB()))
+                .build()
         assertEquals(a, b)
         assertEquals(a.hashCode(), b.hashCode())
     }
@@ -73,9 +80,10 @@ class CommandDataEqualsTest {
         // the frozen `CommandData.parameters` (which would in turn destabilise
         // `hashCode` and break the `HashSet`/`HashMap` contract).
         val params = mutableListOf(paramA())
-        val cmd = AppleScriptCommandBuilder(name = "play", code = "play")
-            .parameters(params)
-            .build()
+        val cmd =
+            AppleScriptCommandBuilder(name = "play", code = "play")
+                .parameters(params)
+                .build()
         params.add(paramB())
         assertEquals(
             "Builder did not freeze parameters (defensive .toList() missing)",
@@ -86,12 +94,14 @@ class CommandDataEqualsTest {
 
     @Test
     fun testHashCodeStableInHashSet() {
-        val a = AppleScriptCommandBuilder(name = "play", code = "play")
-            .parameters(listOf(paramA()))
-            .build()
-        val b = AppleScriptCommandBuilder(name = "play", code = "play")
-            .parameters(listOf(paramA()))
-            .build()
+        val a =
+            AppleScriptCommandBuilder(name = "play", code = "play")
+                .parameters(listOf(paramA()))
+                .build()
+        val b =
+            AppleScriptCommandBuilder(name = "play", code = "play")
+                .parameters(listOf(paramA()))
+                .build()
         val set = hashSetOf(a, b)
         assertEquals(1, set.size)
     }

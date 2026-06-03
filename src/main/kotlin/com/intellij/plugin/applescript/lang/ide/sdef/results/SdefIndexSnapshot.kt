@@ -26,7 +26,6 @@ data class SdefIndexSnapshot(
     val applicationNameToPropertySet: Map<String, Set<String>>,
     val applicationNameToEnumerationNameSet: Map<String, Set<String>>,
     val applicationNameToEnumeratorConstantNameSet: Map<String, Set<String>>,
-
     // ── Std-scoped maps (objectName -> set of applicationNames that defined it as std) ──
     val stdClassNameToApplicationNameSet: Map<String, Set<String>>,
     val stdClassNamePluralToApplicationNameSet: Map<String, Set<String>>,
@@ -40,13 +39,17 @@ data class SdefIndexSnapshot(
     fun isStdCommand(name: String): Boolean = name in stdCommandNameToApplicationNameSet
 
     /** Hermetic-test convenience: returns true if `commandName` is present in the application's command set. */
-    fun isApplicationCommand(applicationName: String, commandName: String): Boolean =
-        commandName in (applicationNameToCommandNameSet[applicationName] ?: emptySet())
+    fun isApplicationCommand(
+        applicationName: String,
+        commandName: String,
+    ): Boolean = commandName in (applicationNameToCommandNameSet[applicationName] ?: emptySet())
 
     /** Hermetic-test convenience: returns true if `name` is present in the std class index. */
     fun isStdLibClass(name: String): Boolean = name in stdClassNameToApplicationNameSet
 
     /** Hermetic-test convenience: returns true if `propertyName` is present in the application's property set. */
-    fun isApplicationProperty(applicationName: String, propertyName: String): Boolean =
-        propertyName in (applicationNameToPropertySet[applicationName] ?: emptySet())
+    fun isApplicationProperty(
+        applicationName: String,
+        propertyName: String,
+    ): Boolean = propertyName in (applicationNameToPropertySet[applicationName] ?: emptySet())
 }

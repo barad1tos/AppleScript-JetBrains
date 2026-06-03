@@ -6,10 +6,13 @@ import com.intellij.plugin.applescript.psi.AppleScriptAssignmentStatement
 import com.intellij.plugin.applescript.psi.AppleScriptBlockBody
 import com.intellij.plugin.applescript.psi.AppleScriptComponent
 import com.intellij.plugin.applescript.psi.AppleScriptFormalParameterList
-import com.intellij.plugin.applescript.psi.AppleScriptHandlerLabeledParametersDefinition
 import com.intellij.plugin.applescript.psi.AppleScriptHandler
+import com.intellij.plugin.applescript.psi.AppleScriptHandlerLabeledParametersDefinition
+import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
+import com.intellij.plugin.applescript.psi.AppleScriptHandlerPositionalParametersCallExpression
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerSelectorPart
 import com.intellij.plugin.applescript.psi.AppleScriptLabeledParameterDeclarationList
+import com.intellij.plugin.applescript.psi.AppleScriptObjectPropertyDeclaration
 import com.intellij.plugin.applescript.psi.AppleScriptObjectTargetPropertyDeclaration
 import com.intellij.plugin.applescript.psi.AppleScriptPsiElement
 import com.intellij.plugin.applescript.psi.AppleScriptUseStatement
@@ -19,10 +22,10 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.ResolveState
 import com.intellij.psi.scope.PsiScopeProcessor
 
-open class AppleScriptPsiElementImpl(node: ASTNode) :
-    ASTWrapperPsiElement(node),
+open class AppleScriptPsiElementImpl(
+    node: ASTNode,
+) : ASTWrapperPsiElement(node),
     AppleScriptPsiElement {
-
     override fun processDeclarations(
         processor: PsiScopeProcessor,
         state: ResolveState,
@@ -33,7 +36,6 @@ open class AppleScriptPsiElementImpl(node: ASTNode) :
             super.processDeclarations(processor, state, lastParent, place)
 
     companion object {
-
         @JvmStatic
         fun processDeclarationsImpl(
             context: PsiElement?,
@@ -44,71 +46,103 @@ open class AppleScriptPsiElementImpl(node: ASTNode) :
         ): Boolean {
             if (context == null) return true
 
-            val result: MutableSet<AppleScriptPsiElement> = LinkedHashSet()
+            val declarations = collectDeclarations(context, lastParent, referencingElement)
+            return processDeclarations(declarations, processor, state, referencingElement)
+        }
 
+        private fun collectDeclarations(
+            context: PsiElement,
+            lastParent: PsiElement?,
+            referencingElement: PsiElement?,
+        ): Set<AppleScriptPsiElement> {
+            val result = LinkedHashSet<AppleScriptPsiElement>()
             for (child in context.children) {
                 if (child === lastParent && child is AppleScriptBlockBody) continue
 
-                when (child) {
-                    is AppleScriptVarDeclarationList -> {
-                        result.add(child.varAccessDeclaration)
-                        result.addAll(child.varDeclarationListPartList)
-                    }
-
-                    is AppleScriptFormalParameterList ->
-                        result.addAll(child.formalParameters)
-
-                    is AppleScriptHandlerSelectorPart ->
-                        result.addAll(child.findParameters())
-
-                    is AppleScriptLabeledParameterDeclarationList ->
-                        result.addAll(child.componentList)
-
-                    is AppleScriptObjectTargetPropertyDeclaration -> {
-                        val ctx = child.context
-                        if (ctx is AppleScriptHandlerLabeledParametersDefinition || ctx is AppleScriptHandler) {
-                            child.targetVariable?.let { result.add(it) }
-                        }
-                    }
-
-                    is AppleScriptAssignmentStatement ->
-                        result.addAll(child.targets)
-
-                    is AppleScriptComponent ->
-                        result.add(child)
-
-                    is AppleScriptUseStatement ->
-                        result.add(child)
-                }
+                result.addDeclarationsFrom(child)
             }
 
-            if (referencingElement != null &&
+            dictionaryDeclaratorDeclaration(context, referencingElement)?.let(result::add)
+
+            return result
+        }
+
+        private fun MutableSet<AppleScriptPsiElement>.addDeclarationsFrom(child: PsiElement) {
+            when (child) {
+                is AppleScriptVarDeclarationList -> {
+                    add(child.varAccessDeclaration)
+                    addAll(child.varDeclarationListPartList)
+                }
+
+                is AppleScriptFormalParameterList ->
+                    addAll(child.formalParameters)
+
+                is AppleScriptHandlerSelectorPart ->
+                    addAll(child.findParameters())
+
+                is AppleScriptLabeledParameterDeclarationList ->
+                    addAll(child.componentList)
+
+                is AppleScriptObjectTargetPropertyDeclaration ->
+                    child.targetVariable
+                        ?.takeIf { child.context.isHandlerDefinitionContext() }
+                        ?.let(::add)
+
+                is AppleScriptAssignmentStatement ->
+                    addAll(child.targets)
+
+                is AppleScriptComponent ->
+                    add(child)
+
+                is AppleScriptUseStatement ->
+                    add(child)
+            }
+        }
+
+        private fun PsiElement?.isHandlerDefinitionContext(): Boolean =
+            this is AppleScriptHandlerLabeledParametersDefinition || this is AppleScriptHandler
+
+        private fun dictionaryDeclaratorDeclaration(
+            context: PsiElement,
+            referencingElement: PsiElement?,
+        ): ApplicationDictionaryDeclarator? =
+            if (
+                referencingElement != null &&
                 context is ApplicationDictionaryDeclarator &&
                 context !is AppleScriptUseStatement
             ) {
-                result.add(context)
+                context
+            } else {
+                null
             }
 
-            for (component in result) {
+        private fun processDeclarations(
+            declarations: Set<AppleScriptPsiElement>,
+            processor: PsiScopeProcessor,
+            state: ResolveState,
+            referencingElement: PsiElement?,
+        ): Boolean =
+            declarations.all { component ->
                 if (referencingElement == null || canBeReferenced(referencingElement, component)) {
-                    if (!processor.execute(component, state)) return false
+                    processor.execute(component, state)
+                } else {
+                    true
                 }
             }
-            return true
-        }
 
         private fun canBeReferenced(
             referencingElement: PsiElement,
             component: AppleScriptPsiElement,
         ): Boolean {
-            val dictionaryElementMatches = component is ApplicationDictionaryDeclarator &&
-                referencingElement is AppleScriptPsiElement &&
-                AppleScriptPsiImplUtil.isBefore(component, referencingElement, true)
+            val dictionaryElementMatches =
+                component is ApplicationDictionaryDeclarator &&
+                    referencingElement is AppleScriptPsiElement &&
+                    isBefore(component, referencingElement, true)
 
-            return referencingElement is com.intellij.plugin.applescript.psi.AppleScriptObjectPropertyDeclaration ||
-                referencingElement is com.intellij.plugin.applescript.psi.AppleScriptHandlerCall ||
-                referencingElement.parent is com.intellij.plugin.applescript.psi.AppleScriptHandlerPositionalParametersCallExpression ||
-                AppleScriptPsiImplUtil.isBefore(component, referencingElement, true) ||
+            return referencingElement is AppleScriptObjectPropertyDeclaration ||
+                referencingElement is AppleScriptHandlerCall ||
+                referencingElement.parent is AppleScriptHandlerPositionalParametersCallExpression ||
+                isBefore(component, referencingElement, true) ||
                 dictionaryElementMatches
         }
     }

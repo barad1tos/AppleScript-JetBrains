@@ -1,6 +1,8 @@
 package com.intellij.plugin.applescript.lang.sdef
 
 import com.intellij.plugin.applescript.psi.AppleScriptComponent
+import com.intellij.plugin.applescript.psi.AppleScriptExpression
+import com.intellij.psi.PsiElement
 
 /**
  * GROUP A (0 gen-implementer) SDEF supertype — Phase 5 (v1.4) property conversion (PSI-03). Every
@@ -22,7 +24,6 @@ import com.intellij.plugin.applescript.psi.AppleScriptComponent
  *  - [setDictionaryDoc] stays `fun` — no matching getter, so it is not a property.
  */
 sealed interface DictionaryComponent : AppleScriptComponent {
-
     /** JVM-visible as `getDocumentation()`. */
     val documentation: String
 
@@ -35,13 +36,28 @@ sealed interface DictionaryComponent : AppleScriptComponent {
     /** JVM-visible as `getName()` — overrides `PsiNamedElement.getName()`; kept `fun` (see KDoc). */
     override fun getName(): String
 
+    override fun isScriptProperty(): Boolean = false
+
+    override fun isHandler(): Boolean = false
+
+    override fun getOriginalDeclaration(): PsiElement? = this
+
+    override fun isObjectProperty(): Boolean = false
+
+    override fun isVariable(): Boolean = false
+
+    override fun findAssignedValue(): AppleScriptExpression? = null
+
     /** List of psi-element identifiers for components with multi-word names. JVM-visible as `getNameIdentifiers()`. */
     val nameIdentifiers: List<String>
 
     /** JVM-visible as `getQualifiedPath()`. */
     val qualifiedPath: String
 
-    /** Name, starting with suite code name and including component code (not necessarily unique). JVM-visible as `getQualifiedName()`. */
+    /**
+     * Name, starting with suite code name and including component code (not necessarily unique).
+     * JVM-visible as `getQualifiedName()`.
+     */
     val qualifiedName: String
 
     /** JVM-visible as `getDescription()` / `setDescription(String)`. */

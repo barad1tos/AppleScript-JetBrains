@@ -21,11 +21,10 @@ import java.lang.reflect.Proxy
  * The `testCommandResultDescriptionAffectsEquality` test in particular catches
  * the latent bug in the pre-Phase 2 `CommandResult` shape, where
  * `getDescription()` returned a hard-coded `null` regardless of the constructor
- * argument; converting to `data class` synthesises a real property getter and
+ * argument; converting to `data class` syntheses a real property getter and
  * the equality contract immediately exercises both fields.
  */
 class LeafDataClassTest {
-
     @Test
     fun testCommandResultEquality() {
         val a = CommandResult(type = "text", description = "d")
@@ -57,24 +56,26 @@ class LeafDataClassTest {
     @Test
     fun testCommandDirectParameterEquality() {
         // Use a JDK dynamic proxy as a zero-behaviour `AppleScriptCommand` stub:
-        // `data class CommandDirectParameter` synthesises `equals` from all
+        // `data class CommandDirectParameter` syntheses `equals` from all
         // primary-constructor properties including `myCommand`. Passing the
         // SAME proxy reference to both instances keeps equality grounded in
         // reference identity for that field, while every other field exercises
         // structural equality.
         val command = stubCommand()
-        val a = CommandDirectParameter(
-            myCommand = command,
-            typeSpecifier = "text",
-            description = "d",
-            optional = false,
-        )
-        val b = CommandDirectParameter(
-            myCommand = command,
-            typeSpecifier = "text",
-            description = "d",
-            optional = false,
-        )
+        val a =
+            CommandDirectParameter(
+                myCommand = command,
+                typeSpecifier = "text",
+                description = "d",
+                optional = false,
+            )
+        val b =
+            CommandDirectParameter(
+                myCommand = command,
+                typeSpecifier = "text",
+                description = "d",
+                optional = false,
+            )
         assertEquals(a, b)
         assertEquals(a.hashCode(), b.hashCode())
     }
@@ -82,18 +83,20 @@ class LeafDataClassTest {
     @Test
     fun testCommandDirectParameterOptionalAffectsEquality() {
         val command = stubCommand()
-        val a = CommandDirectParameter(
-            myCommand = command,
-            typeSpecifier = "text",
-            description = "d",
-            optional = false,
-        )
-        val b = CommandDirectParameter(
-            myCommand = command,
-            typeSpecifier = "text",
-            description = "d",
-            optional = true,
-        )
+        val a =
+            CommandDirectParameter(
+                myCommand = command,
+                typeSpecifier = "text",
+                description = "d",
+                optional = false,
+            )
+        val b =
+            CommandDirectParameter(
+                myCommand = command,
+                typeSpecifier = "text",
+                description = "d",
+                optional = true,
+            )
         assertNotEquals(a, b)
         assertFalse(a.isOptional())
         assertTrue(b.isOptional())

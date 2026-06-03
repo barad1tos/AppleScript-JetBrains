@@ -8,7 +8,6 @@ import com.intellij.plugin.applescript.lang.ide.sdef.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.ide.sdef.results.DictionaryLoadResult
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
-import java.io.File
 import java.nio.file.Files
 
 /**
@@ -31,7 +30,6 @@ import java.nio.file.Files
  * [ApplicationDiscoveryServiceTest]).
  */
 class SdefFileProviderTest : BasePlatformTestCase() {
-
     /**
      * [SdefFileProvider.getDictionaryFile] returns the cached `.sdef` file when the
      * registry has no entry for the given name — `null` per the pre-Wave-4 facade
@@ -56,9 +54,7 @@ class SdefFileProviderTest : BasePlatformTestCase() {
             src.writeText("<dictionary><suite name=\"Test\"/></dictionary>")
             tgt.writeText("PREVIOUS CONTENT") // pre-fill target
 
-            val ok = runBlocking {
-                provider.copyDictionaryFileToCacheDir("TestApp", src, tgt, true)
-            }
+            val ok = provider.copyDictionaryFileToCacheDir("TestApp", src, tgt, true)
             assertTrue("Copy must succeed", ok)
             assertEquals("Target must equal source after copy", src.readText(), tgt.readText())
         } finally {
@@ -87,12 +83,13 @@ class SdefFileProviderTest : BasePlatformTestCase() {
      * refuse to compile (no else branch).
      */
     fun testDictionaryLoadResultExhaustiveWhenCompiles() {
-        val r: DictionaryLoadResult = DictionaryLoadResult.Empty
-        val label: String = when (r) {
-            DictionaryLoadResult.Empty -> "empty"
-            is DictionaryLoadResult.Loaded -> "loaded: ${r.info.getApplicationName()}"
-            is DictionaryLoadResult.Failed -> "failed: ${r.reason}"
-        }
+        val provider = SdefFileProvider.getInstance()
+        val label: String =
+            when (val result = runBlocking { provider.fetch("DefinitelyDoesNotExist_${System.nanoTime()}") }) {
+                DictionaryLoadResult.Empty -> "empty"
+                is DictionaryLoadResult.Loaded -> "loaded: ${result.info.getApplicationName()}"
+                is DictionaryLoadResult.Failed -> "failed: ${result.reason}"
+            }
         assertEquals("Sentinel branch resolved", "empty", label)
     }
 
@@ -106,8 +103,11 @@ class SdefFileProviderTest : BasePlatformTestCase() {
     fun testIsXcodeInstalledReturnsBoolean() {
         val detection = XcodeDetectionService.getInstance()
         val installed: Boolean = detection.isXcodeInstalled()
-        // Tautology to assert "returns a Boolean and does not throw".
-        assertTrue("Boolean value returned", installed || !installed)
+        assertEquals(
+            "Xcode detection result must be stable within one test run",
+            installed,
+            detection.isXcodeInstalled(),
+        )
     }
 
     /**
@@ -155,9 +155,12 @@ class SdefFileProviderTest : BasePlatformTestCase() {
         // ApplicationDiscoveryService.findApplicationBundleFile. That sync VFS walk
         // returns null if called on EDT; BasePlatformTestCase test methods run on EDT,
         // so dispatch to a pooled thread for the production path.
-        val result = ApplicationManager.getApplication().executeOnPooledThread<DictionaryLoadResult> {
-            runBlocking { provider.fetch("Finder") }
-        }.get()
+        val result =
+            ApplicationManager
+                .getApplication()
+                .executeOnPooledThread<DictionaryLoadResult> {
+                    runBlocking { provider.fetch("Finder") }
+                }.get()
         assertFalse(
             "Finder must be discoverable on macOS (Phase 8 D-15 invariant); got $result",
             result is DictionaryLoadResult.Empty,

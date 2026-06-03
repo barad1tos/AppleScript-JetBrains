@@ -16,7 +16,6 @@ package com.intellij.plugin.applescript.lang.sdef
  * "convert getter to property" drop the prefix.
  */
 sealed interface AppleScriptPropertyDefinition : DictionaryComponent {
-
     /** JVM-visible as `getPsiType()`. */
     val psiType: PsiType
 

@@ -1,7 +1,6 @@
 package com.intellij.plugin.applescript.test.parsing
 
 class HandlersParsingTestCase : AbstractParsingFixtureTestCase() {
-
     override fun getMyTargetDirectoryPath(): String = "handlers"
 
     // Phase 8 / PARSE-07: these golden fixtures drifted while the grammar is frozen in v1.x.
@@ -15,7 +14,7 @@ class HandlersParsingTestCase : AbstractParsingFixtureTestCase() {
     //     translate the assumption into an `aborted`/skipped result (verified 07-04).
     // Trade-off: skipped methods report as `passed` (not `skipped`) in the JUnit38 path — the
     // honest-reporting cost of the only green mechanism. See 07-04-SUMMARY for the full analysis.
-    override fun shouldRunTest(): Boolean = getName() !in DRIFTED_METHODS && super.shouldRunTest()
+    override fun shouldRunTest(): Boolean = name !in DRIFTED_METHODS && super.shouldRunTest()
 
     fun testSimpleHandler() = doParseScriptInPackageTest("simple_handler")
 
@@ -37,11 +36,12 @@ class HandlersParsingTestCase : AbstractParsingFixtureTestCase() {
         // Drifted-fixture set for this class. testHandlerInterleved is the 12th baseline-RED
         // method (NOT in the plan's stale 11-set @ 20ab2a2) — re-measured on the current tree
         // at 07-04 execution; identical FileComparisonFailedError disposition as the rest.
-        val DRIFTED_METHODS = setOf(
-            "testIfSamples",
-            "testCoercionPrecedence",
-            "testHandlerInterleved",
-            "testAllInPackage",
-        )
+        val DRIFTED_METHODS =
+            setOf(
+                "testIfSamples",
+                "testCoercionPrecedence",
+                "testHandlerInterleved",
+                "testAllInPackage",
+            )
     }
 }

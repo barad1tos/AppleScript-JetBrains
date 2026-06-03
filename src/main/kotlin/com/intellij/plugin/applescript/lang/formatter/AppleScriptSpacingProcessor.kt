@@ -1,7 +1,6 @@
 package com.intellij.plugin.applescript.lang.formatter
 
 import com.intellij.formatting.Spacing
-import com.intellij.lang.ASTNode
 import com.intellij.plugin.applescript.psi.AppleScriptTokenTypesSets.KEYWORDS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BAND
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COLON
@@ -16,15 +15,16 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RCURLY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
-import com.intellij.plugin.applescript.psi.impl.AppleScriptPsiImplUtil
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings
+import com.intellij.psi.tree.IElementType
 
 class AppleScriptSpacingProcessor(
-    @Suppress("unused") private val myNode: ASTNode,
     private val mySettings: CommonCodeStyleSettings,
 ) {
-
-    fun getSpacing(child1: AppleScriptBlock?, child2: AppleScriptBlock): Spacing? {
+    fun getSpacing(
+        child1: AppleScriptBlock?,
+        child2: AppleScriptBlock,
+    ): Spacing? {
         if (child1 == null) return null
 
         val node1 = child1.node
@@ -33,46 +33,100 @@ class AppleScriptSpacingProcessor(
         val parent2 = node2.treeParent.elementType
         val type2 = node2.elementType
 
-        if (LCURLY === type1 || RCURLY === type2) return Spacing.createSpacing(0, 0, 0, true, 0)
+        return braceSpacing(type1, type2)
+            ?: handlerParenthesisSpacing(type2, parent2)
+            ?: ifParenthesisSpacing(type1, type2)
+            ?: parenthesisSpacing(type1, type2)
+            ?: punctuationSpacing(type1, type2)
+            ?: keywordSpacing(type1, type2)
+            ?: operatorSpacing(type1, type2)
+    }
 
-        // handlerCall(params)
-        if (LPAREN === type2 && HANDLER_POSITIONAL_PARAMETERS_CALL_EXPRESSION === parent2) {
-            return addSingleSpaceIf(mySettings.SPACE_BEFORE_METHOD_CALL_PARENTHESES, false)
+    private fun braceSpacing(
+        type1: IElementType,
+        type2: IElementType,
+    ): Spacing? =
+        if (LCURLY === type1 || RCURLY === type2) {
+            fixedSpacing(0)
+        } else {
+            null
         }
-        if (LPAREN === type2 && HANDLER_POSITIONAL_PARAMETERS_DEFINITION === parent2) {
-            return addSingleSpaceIf(mySettings.SPACE_BEFORE_METHOD_PARENTHESES, false)
+
+    // handlerCall(params)
+    private fun handlerParenthesisSpacing(
+        type2: IElementType,
+        parent2: IElementType,
+    ): Spacing? =
+        when {
+            LPAREN !== type2 -> null
+            HANDLER_POSITIONAL_PARAMETERS_CALL_EXPRESSION === parent2 ->
+                configurableSingleLineSpacing(mySettings.SPACE_BEFORE_METHOD_CALL_PARENTHESES)
+            HANDLER_POSITIONAL_PARAMETERS_DEFINITION === parent2 ->
+                configurableSingleLineSpacing(mySettings.SPACE_BEFORE_METHOD_PARENTHESES)
+            else -> null
         }
+
+    private fun ifParenthesisSpacing(
+        type1: IElementType,
+        type2: IElementType,
+    ): Spacing? =
         if (IF === type1 && LPAREN === type2) {
-            return addSingleSpaceIf(mySettings.SPACE_BEFORE_IF_PARENTHESES, false)
+            configurableSingleLineSpacing(mySettings.SPACE_BEFORE_IF_PARENTHESES)
+        } else {
+            null
         }
-        if (LPAREN === type1 || RPAREN === type2) return Spacing.createSpacing(0, 0, 0, true, 0)
-        if (COMMA === type2) return Spacing.createSpacing(0, 0, 0, true, 0)
-        if (type1 === IDENTIFIER && type2 === HANDLER_PARAMETER_LABEL) {
-            return Spacing.createSpacing(1, 1, 0, true, 0)
+
+    private fun parenthesisSpacing(
+        type1: IElementType,
+        type2: IElementType,
+    ): Spacing? =
+        if (LPAREN === type1 || RPAREN === type2) {
+            fixedSpacing(0)
+        } else {
+            null
         }
-        if (type2 === COLON) return Spacing.createSpacing(0, 0, 0, true, 0)
+
+    private fun punctuationSpacing(
+        type1: IElementType,
+        type2: IElementType,
+    ): Spacing? =
+        when {
+            COMMA === type2 -> fixedSpacing(0)
+            type1 === IDENTIFIER && type2 === HANDLER_PARAMETER_LABEL -> fixedSpacing(1)
+            type2 === COLON -> fixedSpacing(0)
+            else -> null
+        }
+
+    private fun keywordSpacing(
+        type1: IElementType,
+        type2: IElementType,
+    ): Spacing? =
         if ((KEYWORDS.contains(type1) || HANDLER_PARAMETER_LABEL === type1) && NLS !== type2) {
-            return Spacing.createSpacing(1, 1, 0, true, 0)
+            fixedSpacing(1)
+        } else {
+            null
         }
+
+    private fun operatorSpacing(
+        type1: IElementType,
+        type2: IElementType,
+    ): Spacing? =
         if (BAND === type1 || BAND === type2) {
-            return Spacing.createSpacing(1, 1, 0, true, 0)
+            fixedSpacing(1)
+        } else {
+            null
         }
-        return null
-    }
 
-    @Suppress("unused")
-    private fun addLineBreak(): Spacing =
-        Spacing.createSpacing(0, 0, 1, false, mySettings.KEEP_BLANK_LINES_IN_CODE)
-
-    private fun addSingleSpaceIf(condition: Boolean, linesFeed: Boolean): Spacing {
+    private fun configurableSingleLineSpacing(condition: Boolean): Spacing {
         val spaces = if (condition) 1 else 0
-        val lines = if (linesFeed) 1 else 0
-        return Spacing.createSpacing(spaces, spaces, lines, mySettings.KEEP_LINE_BREAKS, mySettings.KEEP_BLANK_LINES_IN_CODE)
+        return Spacing.createSpacing(
+            spaces,
+            spaces,
+            0,
+            mySettings.KEEP_LINE_BREAKS,
+            mySettings.KEEP_BLANK_LINES_IN_CODE,
+        )
     }
 
-    private companion object {
-        @JvmStatic
-        private fun isWhiteSpace(node: ASTNode?): Boolean =
-            node != null && (AppleScriptPsiImplUtil.isWhiteSpaceOrNls(node) || node.textLength == 0)
-    }
+    private fun fixedSpacing(spaces: Int): Spacing = Spacing.createSpacing(spaces, spaces, 0, true, 0)
 }

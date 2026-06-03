@@ -36,27 +36,37 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
-import com.intellij.plugin.applescript.psi.impl.AppleScriptPsiImplUtil
+import com.intellij.plugin.applescript.psi.impl.getNameFromApplicationReference
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
 class AppleScriptColorAnnotator : Annotator {
-
-    override fun annotate(element: PsiElement, holder: AnnotationHolder) {
+    override fun annotate(
+        element: PsiElement,
+        holder: AnnotationHolder,
+    ) {
         AppleScriptAnnotationSupport.annotate(element, holder)
     }
 }
 
 private object AppleScriptAnnotationSupport {
-
-    fun annotate(element: PsiElement, holder: AnnotationHolder) {
+    fun annotate(
+        element: PsiElement,
+        holder: AnnotationHolder,
+    ) {
         annotateUnresolvedHandlerCall(element, holder)
-        annotateHandlerCall(element, holder)
+        when (element) {
+            is AppleScriptHandlerCall -> annotateInterleavedHandlerCall(element, holder)
+            is AppleScriptReferenceElement -> annotateMyPositionalHandlerCall(element, holder)
+        }
         annotateElementColor(element, holder)
         annotateDuplicatedParameterLabels(element, holder)
     }
 
-    private fun annotateUnresolvedHandlerCall(element: PsiElement, holder: AnnotationHolder) {
+    private fun annotateUnresolvedHandlerCall(
+        element: PsiElement,
+        holder: AnnotationHolder,
+    ) {
         if (element !is AppleScriptHandlerCall) return
         if (element.reference.resolve() != null) return
 
@@ -69,14 +79,10 @@ private object AppleScriptAnnotationSupport {
         }
     }
 
-    private fun annotateHandlerCall(element: PsiElement, holder: AnnotationHolder) {
-        when (element) {
-            is AppleScriptHandlerCall -> annotateInterleavedHandlerCall(element, holder)
-            is AppleScriptReferenceElement -> annotateMyPositionalHandlerCall(element, holder)
-        }
-    }
-
-    private fun annotateInterleavedHandlerCall(element: AppleScriptHandlerCall, holder: AnnotationHolder) {
+    private fun annotateInterleavedHandlerCall(
+        element: AppleScriptHandlerCall,
+        holder: AnnotationHolder,
+    ) {
         for (argument in element.getArguments()) {
             createInfoAnnotation(
                 holder,
@@ -95,7 +101,10 @@ private object AppleScriptAnnotationSupport {
         createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.HANDLER_CALL)
     }
 
-    private fun annotateElementColor(element: PsiElement, holder: AnnotationHolder) {
+    private fun annotateElementColor(
+        element: PsiElement,
+        holder: AnnotationHolder,
+    ) {
         when (element) {
             is AppleScriptNumericConstant,
             is AppleScriptPropertyReference,
@@ -108,33 +117,37 @@ private object AppleScriptAnnotationSupport {
                     )
                 }
             }
-            is AppleScriptDictionaryCommandName -> createInfoAnnotation(
-                holder,
-                element,
-                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
-            )
-            is AppleScriptCommandParameterSelector -> createInfoAnnotation(
-                holder,
-                element,
-                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
-            )
+            is AppleScriptDictionaryCommandName ->
+                createInfoAnnotation(
+                    holder,
+                    element,
+                    AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+                )
+            is AppleScriptCommandParameterSelector ->
+                createInfoAnnotation(
+                    holder,
+                    element,
+                    AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+                )
             is AppleScriptDictionaryClassName,
             is AppleScriptDictionaryClassIdentifierPlural,
             is AppleScriptBuiltInClassIdentifier,
             -> annotateClassTerm(holder, element)
             is AppleScriptAppleScriptProperty,
             is AppleScriptDictionaryPropertyName,
-            -> createInfoAnnotation(
-                holder,
-                element,
-                AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
-            )
+            ->
+                createInfoAnnotation(
+                    holder,
+                    element,
+                    AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
+                )
             is AppleScriptDictionaryConstant -> annotateDictionaryConstant(holder, element)
-            is AppleScriptApplicationReference -> AppleScriptApplicationReferenceAnnotator.annotate(
-                holder,
-                element,
-                false,
-            )
+            is AppleScriptApplicationReference ->
+                AppleScriptApplicationReferenceAnnotator.annotate(
+                    holder,
+                    element,
+                    false,
+                )
             is AppleScriptIncompleteExpression -> annotateIncompleteExpression(holder, element)
         }
     }
@@ -148,12 +161,16 @@ private object AppleScriptAnnotationSupport {
         if (appRef != null) {
             AppleScriptApplicationReferenceAnnotator.annotate(holder, appRef, true)
         }
-        holder.newAnnotation(HighlightSeverity.ERROR, "Incomplete expression")
+        holder
+            .newAnnotation(HighlightSeverity.ERROR, "Incomplete expression")
             .range(element)
             .create()
     }
 
-    private fun annotateDuplicatedParameterLabels(element: PsiElement, holder: AnnotationHolder) {
+    private fun annotateDuplicatedParameterLabels(
+        element: PsiElement,
+        holder: AnnotationHolder,
+    ) {
         val elementType = element.node.elementType
         if (elementType !== HANDLER_LABELED_PARAMETERS_DEFINITION &&
             elementType !== HANDLER_LABELED_PARAMETERS_CALL_EXPRESSION
@@ -178,36 +195,30 @@ private object AppleScriptAnnotationSupport {
         labelNames: Set<String>,
     ) {
         val newLabelName = firstAvailableParameterLabel(labelNames)
-        holder.newAnnotation(HighlightSeverity.ERROR, "Duplicated parameter label '$labelName'")
+        holder
+            .newAnnotation(HighlightSeverity.ERROR, "Duplicated parameter label '$labelName'")
             .range(childElement)
             .withFix(
                 RenameParameterLabelQuickFix(
                     childElement as AppleScriptHandlerParameterLabel,
                     newLabelName,
                 ),
-            )
-            .create()
+            ).create()
     }
-
-    private fun firstAvailableParameterLabel(labelNames: Set<String>): String =
-        HANDLER_PARAMETER_LABELS.types
-            .asSequence()
-            .map { it.toString().lowercase().replace("_", " ") }
-            .firstOrNull { it !in labelNames }
-            ?: ""
 
     private fun annotateClassTerm(
         holder: AnnotationHolder,
         element: PsiElement,
     ) {
-        val attributeKey = if (
-            AppleScriptAnnotationPredicates.hasPropertyReferenceParent(element) ||
-            AppleScriptAnnotationPredicates.isClassPropertyReferenceTerm(element)
-        ) {
-            AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR
-        } else {
-            AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR
-        }
+        val attributeKey =
+            if (
+                AppleScriptAnnotationPredicates.hasPropertyReferenceParent(element) ||
+                AppleScriptAnnotationPredicates.isClassPropertyReferenceTerm(element)
+            ) {
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR
+            } else {
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR
+            }
         createInfoAnnotation(holder, element, attributeKey)
     }
 
@@ -215,30 +226,38 @@ private object AppleScriptAnnotationSupport {
         holder: AnnotationHolder,
         element: AppleScriptDictionaryConstant,
     ) {
-        val attributeKey = if (AppleScriptAnnotationPredicates.hasPropertyReferenceParent(element)) {
-            AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR
-        } else {
-            AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR
-        }
+        val attributeKey =
+            if (AppleScriptAnnotationPredicates.hasPropertyReferenceParent(element)) {
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR
+            } else {
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR
+            }
         createInfoAnnotation(holder, element, attributeKey)
-    }
-
-    private fun createInfoAnnotation(
-        holder: AnnotationHolder,
-        element: PsiElement?,
-        attributeKey: TextAttributesKey?,
-    ) {
-        if (element == null || attributeKey == null) return
-
-        holder.newAnnotation(HighlightSeverity.INFORMATION, "")
-            .range(element)
-            .textAttributes(attributeKey)
-            .create()
     }
 }
 
-private object AppleScriptApplicationReferenceAnnotator {
+private fun firstAvailableParameterLabel(labelNames: Set<String>): String =
+    HANDLER_PARAMETER_LABELS.types
+        .asSequence()
+        .map { it.toString().lowercase().replace("_", " ") }
+        .firstOrNull { it !in labelNames }
+        ?: ""
 
+private fun createInfoAnnotation(
+    holder: AnnotationHolder,
+    element: PsiElement?,
+    attributeKey: TextAttributesKey?,
+) {
+    if (element == null || attributeKey == null) return
+
+    holder
+        .newAnnotation(HighlightSeverity.INFORMATION, "")
+        .range(element)
+        .textAttributes(attributeKey)
+        .create()
+}
+
+private object AppleScriptApplicationReferenceAnnotator {
     fun annotate(
         holder: AnnotationHolder,
         appRef: AppleScriptApplicationReference,
@@ -250,10 +269,11 @@ private object AppleScriptApplicationReferenceAnnotator {
             if (dictionaryRegistryService.isDictionaryInitialized(appName)) {
                 ensureProjectDictionaryExists(appRef, appName)
             } else {
-                val warningReason = checkWarningReasonAfterInitialization(
-                    appName,
-                    dictionaryRegistryService,
-                )
+                val warningReason =
+                    checkWarningReasonAfterInitialization(
+                        appName,
+                        dictionaryRegistryService,
+                    )
                 when {
                     !warningReason.isNullOrEmpty() -> {
                         annotateApplicationWarning(holder, appRef, appName, warningReason, error)
@@ -267,7 +287,7 @@ private object AppleScriptApplicationReferenceAnnotator {
     }
 
     private fun getApplicationName(appRef: AppleScriptApplicationReference): String? {
-        val appName = AppleScriptPsiImplUtil.getNameFromApplicationReference(appRef)
+        val appName = getNameFromApplicationReference(appRef)
         return appName?.takeUnless { StringUtil.isEmptyOrSpaces(it) }
     }
 
@@ -279,7 +299,8 @@ private object AppleScriptApplicationReferenceAnnotator {
         error: Boolean,
     ) {
         if (error) {
-            holder.newAnnotation(HighlightSeverity.ERROR, warningReason)
+            holder
+                .newAnnotation(HighlightSeverity.ERROR, warningReason)
                 .range(appRef)
                 .textAttributes(CodeInsightColors.WARNINGS_ATTRIBUTES)
                 .withFix(AddApplicationDictionaryQuickFix(appName))
@@ -287,7 +308,8 @@ private object AppleScriptApplicationReferenceAnnotator {
             return
         }
 
-        holder.newAnnotation(HighlightSeverity.WEAK_WARNING, warningReason)
+        holder
+            .newAnnotation(HighlightSeverity.WEAK_WARNING, warningReason)
             .range(appRef)
             .withFix(AddApplicationDictionaryQuickFix(appName))
             .create()
@@ -309,7 +331,8 @@ private object AppleScriptApplicationReferenceAnnotator {
         error: Boolean,
     ) {
         if (error) {
-            holder.newAnnotation(HighlightSeverity.ERROR, "Unknown app \"$appName\"?")
+            holder
+                .newAnnotation(HighlightSeverity.ERROR, "Unknown app \"$appName\"?")
                 .range(appRef)
                 .textAttributes(CodeInsightColors.WARNINGS_ATTRIBUTES)
                 .withFix(AddApplicationDictionaryQuickFix(appName))
@@ -317,7 +340,8 @@ private object AppleScriptApplicationReferenceAnnotator {
             return
         }
 
-        holder.newAnnotation(HighlightSeverity.WEAK_WARNING, "Unknown app \"$appName\"?")
+        holder
+            .newAnnotation(HighlightSeverity.WEAK_WARNING, "Unknown app \"$appName\"?")
             .range(appRef)
             .create()
     }
@@ -325,13 +349,14 @@ private object AppleScriptApplicationReferenceAnnotator {
     private fun checkWarningReason(
         appName: String,
         dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService,
-    ): String? = when {
-        dictionaryRegistryService.isNotScriptable(appName) && dictionaryRegistryService.isXcodeInstalled() ->
-            "Application \"$appName\" is not scriptable"
-        dictionaryRegistryService.isInUnknownList(appName) -> "Application \"$appName\" not found"
-        !dictionaryRegistryService.isXcodeInstalled() -> MISSING_XCODE_WARNING
-        else -> null
-    }
+    ): String? =
+        when {
+            dictionaryRegistryService.isNotScriptable(appName) && dictionaryRegistryService.isXcodeInstalled() ->
+                "Application \"$appName\" is not scriptable"
+            dictionaryRegistryService.isInUnknownList(appName) -> "Application \"$appName\" not found"
+            !dictionaryRegistryService.isXcodeInstalled() -> MISSING_XCODE_WARNING
+            else -> null
+        }
 
     private fun checkWarningReasonAfterInitialization(
         appName: String,
@@ -353,7 +378,6 @@ private object AppleScriptApplicationReferenceAnnotator {
 }
 
 private object AppleScriptAnnotationPredicates {
-
     fun hasPropertyReferenceParent(element: PsiElement): Boolean {
         var parent = element.parent
         while (parent != null) {
@@ -385,13 +409,14 @@ private object AppleScriptAnnotationPredicates {
 
     private const val CLASS_PROPERTY_TERM = "class"
 
-    private val DATE_PROPERTY_TERMS = setOf(
-        "class",
-        "year",
-        "month",
-        "day",
-        "hours",
-        "minutes",
-        "seconds",
-    )
+    private val DATE_PROPERTY_TERMS =
+        setOf(
+            "class",
+            "year",
+            "month",
+            "day",
+            "hours",
+            "minutes",
+            "seconds",
+        )
 }

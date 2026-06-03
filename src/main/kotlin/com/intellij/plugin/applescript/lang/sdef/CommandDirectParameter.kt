@@ -13,8 +13,7 @@ package com.intellij.plugin.applescript.lang.sdef
  * different commands are correctly distinct in caches. The pre-existing
  * positional constructor signature
  * `(AppleScriptCommand, String, String?, Boolean)` is preserved verbatim so
- * the sole call site at `SDEF_Parser.parseCommandTag` continues to compile
- * without modification.
+ * the SDEF command parser construction path continues to compile without modification.
  */
 @ConsistentCopyVisibility
 data class CommandDirectParameter internal constructor(

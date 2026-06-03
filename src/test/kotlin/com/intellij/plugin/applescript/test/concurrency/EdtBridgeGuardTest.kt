@@ -25,7 +25,6 @@ import org.junit.Assume
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EdtBridgeGuardTest : BasePlatformTestCase() {
-
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var testScope: TestScope
 

@@ -13,7 +13,6 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.containers.SortedList
 
 object AppleScriptResolveUtil {
-
     @JvmStatic
     fun toCandidateInfoArray(elements: List<PsiElement?>?): Array<ResolveResult> {
         if (elements == null) return ResolveResult.EMPTY_ARRAY
@@ -56,17 +55,5 @@ object AppleScriptResolveUtil {
             }
         }
         return resultList
-    }
-
-    @JvmStatic
-    fun getTellStatementScope(myElement: PsiElement): PsiElement? {
-        var tellStatement: PsiElement? = myElement
-        while (tellStatement != null) {
-            tellStatement = tellStatement.parent
-            if (tellStatement is AppleScriptTellSimpleStatement || tellStatement is AppleScriptTellCompoundStatement) {
-                return tellStatement
-            }
-        }
-        return null
     }
 }

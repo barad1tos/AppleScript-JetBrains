@@ -21,16 +21,16 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_PROPERTY_
 import com.intellij.psi.tree.IElementType
 
 class AppleScriptSyntaxHighlighter : SyntaxHighlighterBase() {
-
     override fun getHighlightingLexer(): Lexer = FlexAdapter(_AppleScriptLexer(null))
 
-    override fun getTokenHighlights(tokenType: IElementType?): Array<TextAttributesKey> = when {
-        LOGICAL_OPERATORS.contains(tokenType) -> pack(AppleScriptSyntaxHighlighterColors.LOGICAL_OPERATOR)
-        COMPARISON_OPERATORS.contains(tokenType) -> pack(AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR)
-        LANGUAGE_LITERALS.contains(tokenType) -> pack(AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL)
-        BUILT_IN_TYPES.contains(tokenType) -> pack(AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE)
-        else -> pack(ATTRIBUTES[tokenType])
-    }
+    override fun getTokenHighlights(tokenType: IElementType?): Array<TextAttributesKey> =
+        when {
+            LOGICAL_OPERATORS.contains(tokenType) -> pack(AppleScriptSyntaxHighlighterColors.LOGICAL_OPERATOR)
+            COMPARISON_OPERATORS.contains(tokenType) -> pack(AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR)
+            LANGUAGE_LITERALS.contains(tokenType) -> pack(AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL)
+            BUILT_IN_TYPES.contains(tokenType) -> pack(AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE)
+            else -> pack(ATTRIBUTES[tokenType])
+        }
 
     companion object {
         private val ATTRIBUTES: MutableMap<IElementType, TextAttributesKey> = HashMap()

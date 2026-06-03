@@ -8,6 +8,7 @@ import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
+import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
 import com.intellij.plugin.applescript.lang.sdef.Suite
 import com.intellij.plugin.applescript.psi.AppleScriptPsiElement
 import com.intellij.psi.PsiElement
@@ -22,28 +23,36 @@ import com.intellij.psi.PsiManager
  *  - suite:      psi_element://dictionary:Finder.xml/suite#Finder Basics
  */
 object AppleScriptDocHelper {
-
     private const val URL_PREFIX_DICTIONARY = "dictionary#"
     private const val URL_PREFIX_SUITE = "suite#"
     private const val URL_PREFIX_CLASS = "class#"
     private const val URL_PREFIX_COMMAND = "command#"
     private const val TYPE_SEPARATOR = "/"
     private const val ELEMENT_NAME_SEPARATOR = ":"
+    private const val ATTRIBUTE_INDENT_SIZE = 8
 
     @JvmStatic
-    fun appendElementLink(sb: StringBuilder, psiElement: AppleScriptPsiElement, label: String?): String? {
-        val elementRef = when (psiElement) {
-            is AppleScriptClass -> "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
-                "suite$ELEMENT_NAME_SEPARATOR${psiElement.suite.getName()}$TYPE_SEPARATOR" +
-                "$URL_PREFIX_CLASS${psiElement.getName()}"
-            is ApplicationDictionary -> "$URL_PREFIX_DICTIONARY${psiElement.getName()}"
-            is Suite -> "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
-                "$URL_PREFIX_SUITE${psiElement.getName()}"
-            is AppleScriptCommand -> "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
-                "suite$ELEMENT_NAME_SEPARATOR${psiElement.suite.getName()}$TYPE_SEPARATOR" +
-                "$URL_PREFIX_COMMAND${psiElement.getName()}"
-            else -> ""
-        }
+    fun appendElementLink(
+        sb: StringBuilder,
+        psiElement: AppleScriptPsiElement,
+        label: String?,
+    ): String? {
+        val elementRef =
+            when (psiElement) {
+                is AppleScriptClass ->
+                    "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
+                        "suite$ELEMENT_NAME_SEPARATOR${psiElement.suite.getName()}$TYPE_SEPARATOR" +
+                        "$URL_PREFIX_CLASS${psiElement.getName()}"
+                is ApplicationDictionary -> "$URL_PREFIX_DICTIONARY${psiElement.getName()}"
+                is Suite ->
+                    "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
+                        "$URL_PREFIX_SUITE${psiElement.getName()}"
+                is AppleScriptCommand ->
+                    "dictionary:${psiElement.dictionary.getName()}$TYPE_SEPARATOR" +
+                        "suite$ELEMENT_NAME_SEPARATOR${psiElement.suite.getName()}$TYPE_SEPARATOR" +
+                        "$URL_PREFIX_COMMAND${psiElement.getName()}"
+                else -> ""
+            }
         if (StringUtil.isEmpty(elementRef)) return null
 
         val result = "<a href=\"${DocumentationManagerProtocol.PSI_ELEMENT_PROTOCOL}$elementRef\">$label</a>"
@@ -52,65 +61,39 @@ object AppleScriptDocHelper {
     }
 
     @JvmStatic
-    internal fun getDocumentationElementForLink(psiManager: PsiManager, link: String, context: PsiElement): PsiElement? {
-        val dicNameIdxEnd = link.indexOf(TYPE_SEPARATOR).let { if (it > 0) it else link.length }
-        val dictionaryName = link.substring("dictionary".length + 1, dicNameIdxEnd)
-        val dictionaryRegistry = context.project.getService(AppleScriptProjectDictionaryService::class.java)
-        var dictionary: ApplicationDictionary? = null
-        if (dictionaryRegistry != null) {
-            // The link encodes the dictionary's display name, which may differ from the
-            // registry key (application name). Primary lookup is by key; the fallback loop
-            // below scans every dictionary by getName(), so a name/key divergence still
-            // resolves. Confirmed safe — both lookup paths are covered.
-            dictionary = dictionaryRegistry.getDictionary(dictionaryName)
-            if (dictionary == null) {
-                for (dict in dictionaryRegistry.getDictionaries()) {
-                    if (dict.getName() == dictionaryName) {
-                        dictionary = dict
-                        break
-                    }
-                }
-            }
-        }
-        val typeIndexStart = link.lastIndexOf(TYPE_SEPARATOR)
-        val hashIndex = link.indexOf("#")
-        val typeName = link.substring(typeIndexStart + TYPE_SEPARATOR.length, hashIndex)
-        val targetName = link.substring(hashIndex + 1)
-        val suiteIdxStart = link.lastIndexOf(ELEMENT_NAME_SEPARATOR)
+    internal fun getDocumentationElementForLink(
+        psiManager: PsiManager,
+        link: String,
+    ): PsiElement? {
+        val target = DocumentationLinkTarget.parse(link)
+        val dictionary = findDictionary(psiManager, target.dictionaryName)
 
-        return when (typeName) {
-            "class" -> {
-                val suiteName = link.substring(suiteIdxStart + ELEMENT_NAME_SEPARATOR.length, typeIndexStart)
-                val suite = dictionary?.findSuiteByName(suiteName)
-                suite?.findClassByCode(targetName) ?: dictionary?.findClass(targetName)
-            }
-            "command" -> {
-                val suiteName = link.substring(suiteIdxStart + ELEMENT_NAME_SEPARATOR.length, typeIndexStart)
-                val suite = dictionary?.findSuiteByName(suiteName)
-                suite?.findCommandByCode(targetName) ?: dictionary?.findCommand(targetName)
-            }
+        return when (target.typeName) {
+            "class" -> findClass(dictionary, target)
+            "command" -> findCommand(dictionary, target)
             "dictionary" -> dictionary
-            "suite" -> dictionary?.findSuiteByName(targetName)
+            "suite" -> dictionary?.findSuiteByName(target.targetName)
             else -> null
         }
     }
 
     @JvmStatic
-    fun appendClassAttributes(sb: StringBuilder, dictionaryClass: AppleScriptClass) {
+    fun appendClassAttributes(
+        sb: StringBuilder,
+        dictionaryClass: AppleScriptClass,
+    ) {
         val classElements: List<AppleScriptClass> = dictionaryClass.elements
         val classProperties: List<AppleScriptPropertyDefinition> = dictionaryClass.properties
-        val indent = "&nbsp;".repeat(8)
+        val indent = "&nbsp;".repeat(ATTRIBUTE_INDENT_SIZE)
 
         if (classElements.isNotEmpty()) {
-            sb.append("<p>").append(indent).append("ELEMENTS <br>").append(indent).append("contains ")
-            val it = classElements.iterator()
-            var aClass = it.next()
-            appendElementLink(sb, aClass, aClass.getName())
-            while (it.hasNext()) {
-                aClass = it.next()
-                sb.append(", ")
-                appendElementLink(sb, aClass, aClass.getName())
-            }
+            sb
+                .append("<p>")
+                .append(indent)
+                .append("ELEMENTS <br>")
+                .append(indent)
+                .append("contains ")
+            appendElementLinks(sb, classElements)
             sb.append(".</p>")
         }
         if (classProperties.isNotEmpty()) {
@@ -123,22 +106,96 @@ object AppleScriptDocHelper {
         }
         val commandsToRespond: List<AppleScriptCommand> = dictionaryClass.respondingCommands
         if (commandsToRespond.isNotEmpty()) {
-            sb.append("<p>").append(indent).append("RESPONDS TO: <br>").append(indent)
-            val it = commandsToRespond.iterator()
-            var cmd = it.next()
-            appendElementLink(sb, cmd, cmd.getName())
-            while (it.hasNext()) {
-                cmd = it.next()
-                sb.append(", ")
-                appendElementLink(sb, cmd, cmd.getName())
-            }
+            sb
+                .append("<p>")
+                .append(indent)
+                .append("RESPONDS TO: <br>")
+                .append(indent)
+            appendElementLinks(sb, commandsToRespond)
         }
     }
 
-    private fun appendClassProperty(sb: StringBuilder, prop: AppleScriptPropertyDefinition) {
-        val accessType = if (prop.accessType == AccessType.R) ", r/o" else ""
-        sb.append("<b>").append(prop.getName()).append("</b> ")
-            .append("(").append(prop.typeSpecifier).append(accessType)
-            .append(") : ").append(StringUtil.notNullize(prop.description)).append("<br>")
+    private fun findDictionary(
+        psiManager: PsiManager,
+        dictionaryName: String,
+    ): ApplicationDictionary? {
+        val dictionaryRegistry = psiManager.project.getService(AppleScriptProjectDictionaryService::class.java)
+        // The link encodes the dictionary's display name, which may differ from the
+        // registry key (application name). Primary lookup is by key; the fallback scans
+        // dictionaries by getName(), so a name/key divergence still resolves.
+        return dictionaryRegistry?.getDictionary(dictionaryName)
+            ?: dictionaryRegistry?.getDictionaries()?.firstOrNull { it.getName() == dictionaryName }
+    }
+
+    private fun findClass(
+        dictionary: ApplicationDictionary?,
+        target: DocumentationLinkTarget,
+    ): PsiElement? {
+        val suite = dictionary?.findSuiteByName(target.suiteName)
+        return suite?.findClassByCode(target.targetName) ?: dictionary?.findClass(target.targetName)
+    }
+
+    private fun findCommand(
+        dictionary: ApplicationDictionary?,
+        target: DocumentationLinkTarget,
+    ): PsiElement? {
+        val suite = dictionary?.findSuiteByName(target.suiteName)
+        return suite?.findCommandByCode(target.targetName) ?: dictionary?.findCommand(target.targetName)
+    }
+
+    private fun appendElementLinks(
+        sb: StringBuilder,
+        elements: List<DictionaryComponent>,
+    ) {
+        elements.forEachIndexed { index, element ->
+            if (index > 0) {
+                sb.append(", ")
+            }
+            appendElementLink(sb, element, element.getName())
+        }
+    }
+
+    private fun appendClassProperty(
+        sb: StringBuilder,
+        prop: AppleScriptPropertyDefinition,
+    ) {
+        val accessType =
+            when (prop.accessType) {
+                AccessType.R -> ", r/o"
+                AccessType.W -> ", w/o"
+                else -> ""
+            }
+        sb
+            .append("<b>")
+            .append(prop.getName())
+            .append("</b> ")
+            .append("(")
+            .append(prop.typeSpecifier)
+            .append(accessType)
+            .append(") : ")
+            .append(StringUtil.notNullize(prop.description))
+            .append("<br>")
+    }
+
+    private data class DocumentationLinkTarget(
+        val dictionaryName: String,
+        val typeName: String,
+        val targetName: String,
+        val suiteName: String,
+    ) {
+        companion object {
+            fun parse(link: String): DocumentationLinkTarget {
+                val dictionaryEndIndex = link.indexOf(TYPE_SEPARATOR).let { if (it > 0) it else link.length }
+                val typeStartIndex = link.lastIndexOf(TYPE_SEPARATOR)
+                val hashIndex = link.indexOf("#")
+                val suiteStartIndex = link.lastIndexOf(ELEMENT_NAME_SEPARATOR)
+                return DocumentationLinkTarget(
+                    dictionaryName = link.substring("dictionary".length + 1, dictionaryEndIndex),
+                    typeName = link.substring(typeStartIndex + TYPE_SEPARATOR.length, hashIndex),
+                    targetName = link.substring(hashIndex + 1),
+                    suiteName = link.substring(suiteStartIndex + ELEMENT_NAME_SEPARATOR.length, typeStartIndex),
+                )
+            }
+        }
     }
 }

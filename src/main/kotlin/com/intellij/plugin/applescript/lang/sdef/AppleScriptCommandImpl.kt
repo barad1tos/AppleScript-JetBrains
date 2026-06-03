@@ -12,7 +12,7 @@ import com.intellij.psi.xml.XmlTag
  *  - The class holds `private var data: CommandData` (immutable value type).
  *    Every public accessor reads from `data`.
  *  - Why not `data class : FakePsiElement`? PITFALLS §1.1 BLOCKER: Kotlin
- *    synthesises `equals`/`hashCode` from primary-constructor properties,
+ *    synthesizes `equals`/`hashCode` from primary-constructor properties,
  *    overriding the platform's PSI identity contract and breaking caches /
  *    `PsiManager.areElementsEquivalent` / completion deduplication.
  *  - Why not pure-split (PSI separate from value)? Would require an equivalence
@@ -27,17 +27,16 @@ import com.intellij.psi.xml.XmlTag
  *    The impl is never observable in a half-built state from outside the parser,
  *    and the field becomes effectively-final once the parser hands off to the
  *    dictionary registry. v1.3 service split makes this a `val` by routing the
- *    builder publicly from `SDEF_Parser`.
+ *    builder publicly from `SdefParser`.
  *  - v1.4 converts the public getters to `val` properties + `@get:JvmName` —
  *    NOT touched in v1.1 (D-03 strict v1.1/v1.4 boundary).
  *
- * Public constructor surface is preserved verbatim — `SDEF_Parser.parseCommandTag`
- * (line 356) continues to compile unchanged.
+ * The SDEF command parser constructs a command shell, then fills mutable
+ * command facets during its two-pass walk.
  */
 open class AppleScriptCommandImpl :
     AbstractDictionaryComponent<Suite>,
     AppleScriptCommand {
-
     private var data: CommandData
 
     /**
@@ -52,24 +51,6 @@ open class AppleScriptCommandImpl :
 
     @Suppress("MemberVisibilityCanBePrivate")
     var cocoaClass: String? = null
-
-    constructor(
-        suite: Suite,
-        name: String,
-        code: String,
-        parameters: List<CommandParameter>?,
-        directParameter: CommandDirectParameter?,
-        result: CommandResult?,
-        description: String?,
-        xmlTagCommand: XmlTag,
-    ) : super(suite, name, code, xmlTagCommand, description) {
-        this.data = AppleScriptCommandBuilder(name = name, code = code)
-            .description(description)
-            .parameters(parameters.orEmpty().map { toParameterData(it) })
-            .directParameter(directParameter)
-            .result(result)
-            .build()
-    }
 
     constructor(
         suite: Suite,
@@ -96,12 +77,13 @@ open class AppleScriptCommandImpl :
     override var parameters: List<CommandParameter>
         get() = data.parameters.map { CommandParameterImpl(this, it, myXmlElement) }
         set(value) {
-            data = AppleScriptCommandBuilder(name = data.name, code = data.code)
-                .description(data.description)
-                .parameters(value.map { toParameterData(it) })
-                .directParameter(data.directParameter)
-                .result(data.result)
-                .build()
+            data =
+                AppleScriptCommandBuilder(name = data.name, code = data.code)
+                    .description(data.description)
+                    .parameters(value.map { toParameterData(it) })
+                    .directParameter(data.directParameter)
+                    .result(data.result)
+                    .build()
         }
 
     override var directParameter: CommandDirectParameter?
@@ -119,9 +101,10 @@ open class AppleScriptCommandImpl :
 
     override val mandatoryParameters: List<CommandParameter>
         // Workaround for "in" / "of" being detected as object references rather than parameters.
-        get() = data.parameters
-            .filter { !it.optional && it.name != "in" && it.name != "of" }
-            .map { CommandParameterImpl(this, it, myXmlElement) }
+        get() =
+            data.parameters
+                .filter { !it.optional && it.name != "in" && it.name != "of" }
+                .map { CommandParameterImpl(this, it, myXmlElement) }
 
     override val cocoaClassName: String? get() = cocoaClass
 
@@ -137,22 +120,43 @@ open class AppleScriptCommandImpl :
             // CommandDirectParameter is a `data class` (02-03) — read via property
             // syntax to avoid the Kotlin platform-declaration clash that explicit
             // `fun getX()` forwarders would create (the data class already
-            // synthesises the JVM accessors for Java callers).
-            sb.append(indent).append(indent).append(p.typeSpecifier).append(" : ")
-                .append(StringUtil.notNullize(p.description)).append("<br>")
+            // synthesizes the JVM accessors for Java callers).
+            sb
+                .append(indent)
+                .append(indent)
+                .append(p.typeSpecifier)
+                .append(" : ")
+                .append(StringUtil.notNullize(p.description))
+                .append("<br>")
         }
         for (par in params) {
             val (op, cl) = if (par.isOptional) "[" to "]" else "" to ""
             val pType = StringUtil.notNullize(par.typeSpecifier)
-            sb.append(indent).append(indent).append(op).append("<b>").append(par.getName()).append("</b> ")
-                .append(pType).append(cl).append(" : ").append(par.description).append("<br>")
+            sb
+                .append(indent)
+                .append(indent)
+                .append(op)
+                .append("<b>")
+                .append(par.getName())
+                .append("</b> ")
+                .append(pType)
+                .append(cl)
+                .append(" : ")
+                .append(par.description)
+                .append("<br>")
         }
         val res = result
         if (res != null) {
             // CommandResult is a `data class` (02-03) — same reasoning as
             // CommandDirectParameter above: property syntax for Kotlin readers.
-            sb.append("<p>").append("<b>Returns:</b></p>").append(indent).append(indent)
-                .append(res.type).append(" : ").append(StringUtil.notNullize(res.description))
+            sb
+                .append("<p>")
+                .append("<b>Returns:</b></p>")
+                .append(indent)
+                .append(indent)
+                .append(res.type)
+                .append(" : ")
+                .append(StringUtil.notNullize(res.description))
         }
         return sb.toString()
     }
@@ -161,19 +165,12 @@ open class AppleScriptCommandImpl :
 
     /**
      * Map any `CommandParameter` PSI element to its `CommandParameterData`
-     * backing. The parser produces `CommandParameterImpl` instances exclusively,
-     * so the cast is safe; if some future caller passes a stub / mock impl,
-     * we fall back to a reconstructed `CommandParameterData` from the public
-     * interface accessors (lossy on extra fields but correct for the four
-     * declared interface methods).
+     * backing. `CommandParameter` is sealed and currently represented only by
+     * `CommandParameterImpl`; adding another implementation must define its
+     * data mapping here.
      */
-    private fun toParameterData(p: CommandParameter): CommandParameterData =
-        if (p is CommandParameterImpl) p.data
-        else CommandParameterData(
-            name = p.getName(),
-            code = p.code ?: "",
-            type = p.typeSpecifier,
-            optional = p.isOptional,
-            description = p.description,
-        )
+    private fun toParameterData(parameter: CommandParameter): CommandParameterData =
+        when (parameter) {
+            is CommandParameterImpl -> parameter.data
+        }
 }

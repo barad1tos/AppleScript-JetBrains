@@ -16,6 +16,8 @@
               extensions="scpt;applescript"/>
     <lang.parserDefinition language="AppleScript"
                             implementationClass="com.intellij.plugin.applescript.lang.parser.AppleScriptParserDefinition"/>
+    <lang.namesValidator language="AppleScript"
+                         implementationClass="com.intellij.plugin.applescript.lang.util.AppleScriptNamesValidator"/>
     <lang.formatter language="AppleScript"
                     implementationClass="com.intellij.plugin.applescript.lang.formatter.AppleScriptFormattingModelBuilder"/>
     <codeStyleSettingsProvider implementation="com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptCodeStyleSettingsProvider"/>
@@ -45,6 +47,9 @@
                                   implementationClass="com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewExtension"/>
     <annotator language="AppleScript"
                implementationClass="com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptColorAnnotator"/>
+    <multiHostInjector implementation="com.intellij.plugin.applescript.lang.AppleScriptJSInjector"/>
+    <lang.elementManipulator forClass="com.intellij.plugin.applescript.psi.AppleScriptStringLiteralExpression"
+                             implementationClass="com.intellij.plugin.applescript.psi.manipulators.AppleScriptStringManipulator"/>
     <lineMarkerProvider language="AppleScript"
                         implementationClass="com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptLineMarkerProvider"/>
     <completion.contributor language="AppleScript"
@@ -53,17 +58,25 @@
                             implementationClass="com.intellij.plugin.applescript.lang.ide.completion.CommandCompletionContributor"/>
     <completion.contributor language="AppleScript"
                             implementationClass="com.intellij.plugin.applescript.lang.ide.completion.ApplicationNameCompletionContributor"/>
+    <weigher key="completion"
+             id="AppleScriptCommandParameterCompletionWeigher"
+             order="after prefix"
+             implementationClass="com.intellij.plugin.applescript.lang.ide.completion.AppleScriptCompletionWeigher"/>
     <defaultLiveTemplatesProvider implementation="com.intellij.plugin.applescript.lang.ide.AppleScriptLiveTemplatesProvider"/>
-    <liveTemplateContext implementation="com.intellij.plugin.applescript.lang.ide.AppleScriptTemplateContextType"/>
+    <liveTemplateContext contextId="AppleScript"
+                         implementation="com.intellij.plugin.applescript.lang.ide.AppleScriptTemplateContextType"/>
     <referencesSearch implementation="com.intellij.plugin.applescript.lang.ide.search.AppleScriptHandlerReferencesSearch"/>
     <referencesSearch implementation="com.intellij.plugin.applescript.lang.ide.search.AppleScriptDictionaryComponentReferencesSearch"/>
     <pom.declarationSearcher implementation="com.intellij.plugin.applescript.lang.ide.search.AppleScriptHandlerDeclarationSearcher"/>
+    <targetElementEvaluator language="AppleScript"
+                            implementationClass="com.intellij.plugin.applescript.lang.resolve.AppleScriptTargetElementEvaluator"/>
     <colorSettingsPage implementationClass="com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptColorsAndFontsPage"/>
     <configurationType implementation="com.intellij.plugin.applescript.lang.ide.run.AppleScriptConfigurationType"/>
     <runConfigurationProducer implementation="com.intellij.plugin.applescript.lang.ide.run.AppleScriptConfigurationProducer"/>
     <!-- SDEF-14: headless smoke entry point. Activates only when
-         -Didea.ApplicationStarter.command=applescript-smoke is set; dormant otherwise. -->
-    <applicationStarter implementation="com.intellij.plugin.applescript.smoke.AppleScriptSmokeStarter"/>
+         the IDE is started with the applescript-smoke command. -->
+    <appStarter id="applescript-smoke"
+                implementation="com.intellij.plugin.applescript.smoke.AppleScriptSmokeStarter"/>
   </extensions>
 
   <actions>

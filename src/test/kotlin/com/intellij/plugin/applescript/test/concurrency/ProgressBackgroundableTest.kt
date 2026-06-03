@@ -47,7 +47,6 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ProgressBackgroundableTest : BasePlatformTestCase() {
-
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var testScope: TestScope
 
@@ -92,95 +91,104 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
      * fast under virtual time while the RELATIVE ordering matches production
      * (block completes < threshold).
      */
-    fun testSilentPath_indicatorDoesNotShowWhenBlockCompletesBeforeThreshold() = testScope.runTest {
-        val fake = RecordingFake()
-        val policy = DiscoveryProgressPolicy(
-            taskCompat = fake,
-            visibilityThreshold = 50.milliseconds,
-        )
-        val deferred = CompletableDeferred<Unit>()
-        val job = launch {
-            policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
-                deferred.await()
-            }
+    fun testSilentPath_indicatorDoesNotShowWhenBlockCompletesBeforeThreshold() =
+        testScope.runTest {
+            val fake = RecordingFake()
+            val policy =
+                DiscoveryProgressPolicy(
+                    taskCompat = fake,
+                    visibilityThreshold = 50.milliseconds,
+                )
+            val deferred = CompletableDeferred<Unit>()
+            val job =
+                launch {
+                    policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
+                        deferred.await()
+                    }
+                }
+            // Block completes at virtual t=25ms (BEFORE the 50ms threshold).
+            advanceTimeBy(25)
+            deferred.complete(Unit)
+            runCurrent()
+            job.join()
+            assertEquals("Silent path: shownCount must be 0", 0, fake.shownCount)
+            assertEquals("Silent path: dismissCount must be 0 (no show -> no dismiss)", 0, fake.dismissCount)
         }
-        // Block completes at virtual t=25ms (BEFORE the 50ms threshold).
-        advanceTimeBy(25)
-        deferred.complete(Unit)
-        runCurrent()
-        job.join()
-        assertEquals("Silent path: shownCount must be 0", 0, fake.shownCount)
-        assertEquals("Silent path: dismissCount must be 0 (no show -> no dismiss)", 0, fake.dismissCount)
-    }
 
     /**
      * (b) Visible path — block exceeds the visibility threshold.
      * Expected: `shownCount == 1` (indicator surfaced exactly once) AND
      * `dismissedAfterShow == true` once the block completes.
      */
-    fun testVisiblePath_indicatorShowsExactlyOnceWhenBlockExceedsThreshold() = testScope.runTest {
-        val fake = RecordingFake()
-        val policy = DiscoveryProgressPolicy(
-            taskCompat = fake,
-            visibilityThreshold = 50.milliseconds,
-        )
-        val deferred = CompletableDeferred<Unit>()
-        val job = launch {
-            policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
-                deferred.await()
-            }
+    fun testVisiblePath_indicatorShowsExactlyOnceWhenBlockExceedsThreshold() =
+        testScope.runTest {
+            val fake = RecordingFake()
+            val policy =
+                DiscoveryProgressPolicy(
+                    taskCompat = fake,
+                    visibilityThreshold = 50.milliseconds,
+                )
+            val deferred = CompletableDeferred<Unit>()
+            val job =
+                launch {
+                    policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
+                        deferred.await()
+                    }
+                }
+            // Threshold elapses at virtual t=50ms; show() fires.
+            advanceTimeBy(100)
+            runCurrent()
+            assertEquals(
+                "Visible path: shownCount must be 1 after threshold elapsed",
+                1,
+                fake.shownCount,
+            )
+            // Block completes after the indicator has been shown; dismiss() fires.
+            deferred.complete(Unit)
+            runCurrent()
+            job.join()
+            assertEquals(
+                "Visible path: shownCount stays 1 (no double-fire after completion)",
+                1,
+                fake.shownCount,
+            )
+            assertTrue(
+                "Visible path: dismissedAfterShow must be true after block completes",
+                fake.dismissedAfterShow,
+            )
         }
-        // Threshold elapses at virtual t=50ms; show() fires.
-        advanceTimeBy(100)
-        runCurrent()
-        assertEquals(
-            "Visible path: shownCount must be 1 after threshold elapsed",
-            1,
-            fake.shownCount,
-        )
-        // Block completes after the indicator has been shown; dismiss() fires.
-        deferred.complete(Unit)
-        runCurrent()
-        job.join()
-        assertEquals(
-            "Visible path: shownCount stays 1 (no double-fire after completion)",
-            1,
-            fake.shownCount,
-        )
-        assertTrue(
-            "Visible path: dismissedAfterShow must be true after block completes",
-            fake.dismissedAfterShow,
-        )
-    }
 
     /**
      * (c) Cancellation propagation — cancelling the parent coroutine dismisses
      * a visible indicator. Codex HIGH 3 — assertion on RecordingFake state
      * (`dismissCount` increments), NOT on Job-tree introspection.
      */
-    fun testCancellation_dismissesIndicatorWhenParentCancels() = testScope.runTest {
-        val fake = RecordingFake()
-        val policy = DiscoveryProgressPolicy(
-            taskCompat = fake,
-            visibilityThreshold = 50.milliseconds,
-        )
-        val deferred = CompletableDeferred<Unit>()
-        val job = launch {
-            policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
-                deferred.await()
-            }
+    fun testCancellation_dismissesIndicatorWhenParentCancels() =
+        testScope.runTest {
+            val fake = RecordingFake()
+            val policy =
+                DiscoveryProgressPolicy(
+                    taskCompat = fake,
+                    visibilityThreshold = 50.milliseconds,
+                )
+            val deferred = CompletableDeferred<Unit>()
+            val job =
+                launch {
+                    policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
+                        deferred.await()
+                    }
+                }
+            advanceTimeBy(100)
+            runCurrent()
+            assertEquals("Pre-cancel: indicator must be shown", 1, fake.shownCount)
+            // Cancel the parent coroutine — `block` throws CancellationException,
+            // the `finally` in DiscoveryProgressPolicy.runOrTrackProgress runs the
+            // dismiss path.
+            job.cancel()
+            runCurrent()
+            assertTrue(
+                "Cancellation must dismiss the indicator (Pattern G — every show has matching dismiss)",
+                fake.dismissedAfterShow,
+            )
         }
-        advanceTimeBy(100)
-        runCurrent()
-        assertEquals("Pre-cancel: indicator must be shown", 1, fake.shownCount)
-        // Cancel the parent coroutine — `block` throws CancellationException,
-        // the `finally` in DiscoveryProgressPolicy.runOrTrackProgress runs the
-        // dismiss path.
-        job.cancel()
-        runCurrent()
-        assertTrue(
-            "Cancellation must dismiss the indicator (Pattern G — every show has matching dismiss)",
-            fake.dismissedAfterShow,
-        )
-    }
 }

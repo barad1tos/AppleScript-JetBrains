@@ -21,8 +21,7 @@ import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumeration
 import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumerator
 import com.intellij.plugin.applescript.lang.sdef.DictionaryRecord
 import com.intellij.plugin.applescript.lang.sdef.Suite
-import com.intellij.plugin.applescript.lang.sdef.parser.SDEF_Parser
-import com.intellij.plugin.applescript.psi.AppleScriptExpression
+import com.intellij.plugin.applescript.lang.sdef.parser.SdefParser
 import com.intellij.plugin.applescript.psi.AppleScriptIdentifier
 import com.intellij.plugin.applescript.psi.impl.AppleScriptElementPresentation
 import com.intellij.plugin.applescript.psi.sdef.DictionaryIdentifier
@@ -43,14 +42,27 @@ import java.awt.Image
 import java.awt.image.BufferedImage
 import java.io.File
 import java.io.IOException
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.swing.Icon
+
+@Suppress("SpellCheckingInspection")
+private const val ICON_FILE_EXTENSION = "icns"
+
+private const val DICTIONARY_ICON_SIZE = 13
+private const val INFO_PLIST_PATH = "Contents/Info.plist"
+private const val ICON_RESOURCES_PATH = "Contents/Resources"
 
 /**
  * PSI representation of one SDEF dictionary. Owns the suite registry plus per-name lookup maps for
  * commands / classes / records / properties / enumerations, eagerly initialised at construction by
- * parsing the bundled XmlFile via [SDEF_Parser]. Bundle metadata (application name, icon) is read
+ * parsing the bundled XmlFile via [SdefParser]. Bundle metadata (application name, icon) is read
  * from the .app's Info.plist + ICNS resource when available.
+ *
+ * The method count is intentionally high because this class is the concrete PSI implementation of
+ * the broad [ApplicationDictionary] surface. Splitting those overrides into delegate shells would
+ * add indirection without reducing domain complexity.
  */
+@Suppress("TooManyFunctions")
 class ApplicationDictionaryImpl(
     private val project: Project,
     dictionaryXmlFile: XmlFile,
@@ -58,7 +70,6 @@ class ApplicationDictionaryImpl(
     private val applicationBundleFile: File?,
 ) : FakePsiElement(),
     ApplicationDictionary {
-
     override val dictionaryFile: VirtualFile = dictionaryXmlFile.virtualFile
     private var applicationIcon: Icon? = null
     private val includedFiles: MutableList<PsiFile> = ArrayList()
@@ -76,7 +87,7 @@ class ApplicationDictionaryImpl(
 
     init {
         readDictionaryFromXmlFile(dictionaryXmlFile)
-        applicationBundleFile?.let { setIconFromBundle(it) }
+        applicationIcon = applicationBundleFile?.let { loadIconFromBundle(it, applicationName) }
         if (StringUtil.isEmpty(dictionaryName)) {
             dictionaryName = applicationName
         }
@@ -87,60 +98,13 @@ class ApplicationDictionaryImpl(
         )
     }
 
-    /** Resolve the dictionary icon from the application bundle's Info.plist + ICNS resource. */
-    private fun setIconFromBundle(applicationBundleFile: File) {
-        try {
-            val appUrl = applicationBundleFile.path
-            val infoPlist = File("$appUrl/Contents/Info.plist")
-            if (!infoPlist.exists() || infoPlist.isDirectory) return
-            var dict: PListParser.Dict? = null
-            try {
-                dict = PListParser.load(infoPlist)
-            } catch (e: PListParser.XmlParseException) {
-                LOG.warn("Can not parse Info.plist for $applicationName: ${e.message}")
-            } catch (e: IOException) {
-                LOG.warn("Can not parse Info.plist for $applicationName: ${e.message}")
-            }
-            var imgFilename: Any? = dict?.get("CFBundleIconFile")
-            if (imgFilename == null) {
-                imgFilename = applicationName // best-effort guess
-            }
-            var fileName = imgFilename.toString()
-            fileName = if (fileName.endsWith(".icns")) fileName else "$fileName.icns"
-
-            val icnsFile = File("$appUrl/Contents/Resources/$fileName")
-            if (!icnsFile.exists() || icnsFile.isDirectory) return
-
-            val parser = IcnsImageParser()
-            // The decoded BufferedImage list is a method-local; only one entry is scaled and
-            // retained as applicationIcon, the rest go out of scope and are GC-eligible on
-            // return. No long-lived reference to the full list is held. Memory is bounded.
-            val list: List<BufferedImage>? = parser.getAllBufferedImages(icnsFile)
-            if (list.isNullOrEmpty()) return
-
-            val index = if (list.size > 1) list.size - 1 else 0
-            val size = JBUI.scale(13)
-            val img: Image = list[index].getScaledInstance(size, size, Image.SCALE_SMOOTH)
-            applicationIcon = JBImageIcon(img)
-        } catch (e: ImageReadException) {
-            e.printStackTrace()
-        } catch (e: IOException) {
-            e.printStackTrace()
+    override fun processInclude(includedFile: XmlFile): PsiFile {
+        if (!includedFile.isValid) {
+            return includedFile
         }
-    }
-
-    override fun processInclude(includedFile: XmlFile): PsiFile? {
-        if (includedFile.isValid) {
-            val document = includedFile.document
-            if (document != null) {
-                val rootTag = document.rootTag
-                if (rootTag != null) {
-                    SDEF_Parser.parseRootTag(this, rootTag)
-                }
-            }
-            includedFiles.add(includedFile)
-            LOG.debug("Processed included file:: $includedFile")
-        }
+        includedFile.document?.rootTag?.let { SdefParser.parseRootTag(this, it) }
+        includedFiles.add(includedFile)
+        LOG.debug("Processed included file: $includedFile")
         return includedFile
     }
 
@@ -164,11 +128,9 @@ class ApplicationDictionaryImpl(
     // the pre-fix `HashMap` returned null silently. The interface accepts
     // `String?` so legitimate null inputs flow in (e.g. unresolved handler-call
     // identifiers from the resolver path). Preserve original semantics.
-    override fun findClass(name: String?): AppleScriptClass? =
-        name?.let { indexes.dictionaryClassMap[it] }
+    override fun findClass(name: String?): AppleScriptClass? = name?.let { indexes.dictionaryClassMap[it] }
 
-    override fun getParameterNamesForCommand(name: String): List<String>? =
-        indexes.dictionaryCommandMap[name]?.parameterNames
+    override fun getParameterNamesForCommand(name: String): List<String>? = indexes.parameterNames(name)
 
     override fun findDirectParameterForCommand(commandName: String): CommandDirectParameter? =
         indexes.dictionaryCommandMap[commandName]?.directParameter
@@ -183,8 +145,7 @@ class ApplicationDictionaryImpl(
 
     override fun findEnumerator(name: String): DictionaryEnumerator? = indexes.dictionaryEnumeratorMap[name]
 
-    override fun findClassByPluralName(pluralForm: String): AppleScriptClass? =
-        indexes.dictionaryClassToPluralNameMap[pluralForm]
+    override fun findClassByPluralName(pluralForm: String): AppleScriptClass? = indexes.dictionaryClassToPluralNameMap[pluralForm]
 
     override fun findEnumeration(name: String): DictionaryEnumeration? = indexes.dictionaryEnumerationMap[name]
 
@@ -214,31 +175,31 @@ class ApplicationDictionaryImpl(
     override fun addCommand(command: AppleScriptCommand): Boolean {
         val name = command.getName()
         val wasNew = indexes.dictionaryCommandMap.put(name, command) == null
-        val list = indexes.dictionaryCommandListMap.computeIfAbsent(name) {
-            java.util.concurrent.CopyOnWriteArrayList<AppleScriptCommand>()
-        }
+        val list =
+            indexes.dictionaryCommandListMap.computeIfAbsent(name) {
+                CopyOnWriteArrayList()
+            }
         // Structural-equality dedupe via `CommandData` (D-02 closure). The
         // cast is safe because the parser only ever instantiates
         // [AppleScriptCommandImpl]; for unexpected impl types we fall back
         // to reference equality, which is strictly more permissive (no
         // overload-by-content collapse) but never corrupts the list.
-        val alreadyPresent = if (command is AppleScriptCommandImpl) {
-            list.any { existing -> existing is AppleScriptCommandImpl && existing.commandData == command.commandData }
-        } else {
-            list.any { it === command }
-        }
+        val alreadyPresent =
+            if (command is AppleScriptCommandImpl) {
+                list.any { existing ->
+                    existing is AppleScriptCommandImpl &&
+                        existing.commandData == command.commandData
+                }
+            } else {
+                list.any { it === command }
+            }
         if (!alreadyPresent) list.add(command)
         return wasNew
     }
 
-    /** Test-helper accessor for the secondary list-keyed index. */
-    @org.jetbrains.annotations.TestOnly
-    internal fun getDictionaryCommandListMap(): Map<String, List<AppleScriptCommand>> =
-        indexes.dictionaryCommandListMap.mapValues { it.value.toList() }
-
     override fun addClass(appleScriptClass: AppleScriptClass): Boolean {
         val previous = indexes.dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)
-        appleScriptClass.code?.let { indexes.dictionaryClassByCodeMap[it] = appleScriptClass }
+        indexes.dictionaryClassByCodeMap[appleScriptClass.code] = appleScriptClass
         indexes.dictionaryClassToPluralNameMap[appleScriptClass.pluralClassName] = appleScriptClass
         for (property in appleScriptClass.properties) {
             addProperty(property)
@@ -264,32 +225,23 @@ class ApplicationDictionaryImpl(
     }
 
     override val documentation: String
-        get() = buildString {
-            append(type).append(" <b>").append(getName()).append("</b>")
-            append("<p>")
-            for (suite in mySuites) {
-                append("<br>    <b>")
-                AppleScriptDocHelper.appendElementLink(this, suite, suite.getName())
-                append("</b><br>")
+        get() =
+            buildString {
+                append(type).append(" <b>").append(getName()).append("</b>")
+                append("<p>")
+                for (suite in mySuites) {
+                    append("<br>    <b>")
+                    AppleScriptDocHelper.appendElementLink(this, suite, suite.getName())
+                    append("</b><br>")
+                }
+                append("</p>")
             }
-            append("</p>")
-        }
 
     override val code: String? get() = null
 
     override val cocoaClassName: String? get() = null
 
-    override fun isScriptProperty(): Boolean = false
-
-    override fun isHandler(): Boolean = false
-
     override fun getOriginalDeclaration(): PsiElement? = null
-
-    override fun isObjectProperty(): Boolean = false
-
-    override fun isVariable(): Boolean = false
-
-    override fun findAssignedValue(): AppleScriptExpression? = null
 
     override fun getName(): String = dictionaryName
 
@@ -337,7 +289,7 @@ class ApplicationDictionaryImpl(
     private fun readDictionaryFromXmlFile(xmlFile1: XmlFile) {
         if (xmlFile1.isValid) {
             xmlFile1.rootTag?.let { setRootTag(it) }
-            SDEF_Parser.parse(xmlFile1, this)
+            SdefParser.parse(xmlFile1, this)
             LOG.debug("Dictionary loaded. Virtual file: $xmlFile1")
         }
     }
@@ -387,8 +339,7 @@ class ApplicationDictionaryImpl(
     // the pre-fix `HashMap` returned null silently. Preserve original semantics
     // for callers like `AppleScriptDictionaryResolveProcessor` that pass
     // unresolved identifiers (which may be null).
-    override fun findCommand(name: String?): AppleScriptCommand? =
-        name?.let { indexes.dictionaryCommandMap[it] }
+    override fun findCommand(name: String?): AppleScriptCommand? = name?.let { indexes.dictionaryCommandMap[it] }
 
     override val allCommands: Collection<AppleScriptCommand> get() = indexes.dictionaryCommandMap.values
 
@@ -398,4 +349,85 @@ class ApplicationDictionaryImpl(
         @JvmField
         val LOG: Logger = Logger.getInstance("#${ApplicationDictionaryImpl::class.java.name}")
     }
+}
+
+private fun loadIconFromBundle(
+    applicationBundleFile: File,
+    applicationName: String,
+): Icon? {
+    val infoPlist = File(applicationBundleFile, INFO_PLIST_PATH)
+    val iconFileName = loadIconFileName(infoPlist, applicationName) ?: applicationName
+    val iconFile = File(applicationBundleFile, "$ICON_RESOURCES_PATH/${iconFileName.withIconExtension()}")
+    return if (iconFile.exists() && !iconFile.isDirectory) {
+        loadIconFromFile(iconFile, applicationName)
+    } else {
+        null
+    }
+}
+
+private fun loadIconFileName(
+    infoPlist: File,
+    applicationName: String,
+): String? {
+    if (!infoPlist.exists() || infoPlist.isDirectory) {
+        return null
+    }
+    val dictionary =
+        try {
+            PListParser.load(infoPlist)
+        } catch (e: PListParser.XmlParseException) {
+            logInfoPlistParseFailure(applicationName, e)
+            null
+        } catch (e: IOException) {
+            logInfoPlistParseFailure(applicationName, e)
+            null
+        }
+    return dictionary?.get("CFBundleIconFile")?.toString()
+}
+
+private fun DictionaryIndexes.parameterNames(name: String): List<String>? = dictionaryCommandMap[name]?.parameterNames
+
+private fun String.withIconExtension(): String = if (hasIconExtension()) this else "$this.$ICON_FILE_EXTENSION"
+
+private fun String.hasIconExtension(): Boolean = endsWith(".$ICON_FILE_EXTENSION")
+
+private fun loadIconFromFile(
+    iconFile: File,
+    applicationName: String,
+): Icon? =
+    try {
+        createScaledIcon(IcnsImageParser().getAllBufferedImages(iconFile))
+    } catch (e: ImageReadException) {
+        logIconLoadFailure(applicationName, iconFile, e)
+        null
+    } catch (e: IOException) {
+        logIconLoadFailure(applicationName, iconFile, e)
+        null
+    }
+
+private fun createScaledIcon(images: List<BufferedImage>?): Icon? {
+    if (images.isNullOrEmpty()) {
+        return null
+    }
+    val iconSize = JBUI.scale(DICTIONARY_ICON_SIZE)
+    val image: Image = images.last().getScaledInstance(iconSize, iconSize, Image.SCALE_SMOOTH)
+    return JBImageIcon(image)
+}
+
+private fun logInfoPlistParseFailure(
+    applicationName: String,
+    throwable: Throwable,
+) {
+    ApplicationDictionaryImpl.LOG.warn("Cannot parse Info.plist for $applicationName", throwable)
+}
+
+private fun logIconLoadFailure(
+    applicationName: String,
+    iconFile: File,
+    throwable: Throwable,
+) {
+    ApplicationDictionaryImpl.LOG.warn(
+        "Cannot load dictionary icon for $applicationName from ${iconFile.path}",
+        throwable,
+    )
 }

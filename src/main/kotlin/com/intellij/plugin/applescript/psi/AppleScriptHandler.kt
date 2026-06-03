@@ -4,7 +4,6 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
 
 interface AppleScriptHandler : AppleScriptComponent {
-
     override fun isHandler(): Boolean
 
     override fun getName(): String?

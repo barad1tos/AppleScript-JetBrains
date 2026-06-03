@@ -5,10 +5,9 @@ import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.runBlockingCancellable
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.ide.sdef.results.DictionaryLoadResult
+import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.extensionSupported
 import kotlinx.coroutines.CancellationException
@@ -19,17 +18,240 @@ import kotlinx.coroutines.withContext
 import org.jdom.Document
 import org.jdom.Element
 import org.jdom.JDOMException
-import org.jdom.input.SAXBuilder
-import org.jdom.output.XMLOutputter
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.util.Arrays
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+
+private val LOG: Logger = Logger.getInstance("#${SdefFileProvider::class.java.name}")
+
+private const val DICTIONARY_GENERATION_TIMEOUT_SECONDS: Long = 5L
+
+private val DICTIONARY_FILE_EXTENSIONS: Set<String> = setOf("xml", "sdef")
+
+private fun scriptingAdditionFiles(): Sequence<File> =
+    ApplicationDictionary.SCRIPTING_ADDITIONS_FOLDERS
+        .asSequence()
+        .map(::File)
+        .filter { directory -> directory.isDirectory }
+        .flatMap { directory -> directory.listFiles()?.asSequence() ?: emptySequence() }
+
+private fun scriptingAdditionLibraryName(scriptingAdditionFile: File): String? {
+    val fullName = scriptingAdditionFile.name
+    val dotIndex = fullName.lastIndexOf('.')
+    val endIndex = if (dotIndex > 0) dotIndex else fullName.length
+    return fullName.substring(0, endIndex).takeUnless { libraryName -> libraryName.isEmpty() }
+}
+
+internal fun stream2file(
+    input: InputStream?,
+    prefix: String,
+    suffix: String,
+): File {
+    val tempFile = File.createTempFile(prefix, suffix)
+    tempFile.deleteOnExit()
+    FileOutputStream(tempFile).use { out ->
+        requireNotNull(input) { "InputStream for $prefix$suffix is null" }
+            .use { inputStream ->
+                inputStream.copyTo(out)
+            }
+    }
+    tempFile.deleteOnExit()
+    return tempFile
+}
+
+private fun findSdefForApplication(applicationIoFile: File): File? {
+    val appResources = File(applicationIoFile, "/Contents/Resources")
+    val files = appResources.listFiles { _, fileName -> fileName.endsWith("sdef") }
+    return if (!files.isNullOrEmpty()) files[0] else null
+}
+
+/**
+ * Invoke the `sdef` CLI (macOS-only) or `cat` (cross-platform .xml/.sdef passthrough)
+ * to generate the dictionary file at [serializePath].
+ */
+@Throws(NotScriptableApplicationException::class, DeveloperToolsNotInstalledException::class)
+private fun doGenerateDictionaryFile(
+    applicationName: String,
+    serializePath: String,
+    cmdName: String,
+    appFilePath: String,
+): Boolean {
+    fun logFailure(cause: Throwable) {
+        LOG.error(
+            "Failed to create dictionary file for application [$applicationName] Command:$cmdName " +
+                "target path: $appFilePath Reason: ${cause.cause}",
+            cause,
+        )
+    }
+
+    var isGenerated = false
+    try {
+        val shellCommand = arrayOf("/bin/bash", "-c", " $cmdName \"$appFilePath\" > $serializePath")
+        LOG.debug("executing command: ${shellCommand.contentToString()}")
+        val execStart = System.currentTimeMillis()
+        val exitStatus =
+            Runtime
+                .getRuntime()
+                .exec(shellCommand)
+                .waitFor(DICTIONARY_GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        val execEnd = System.currentTimeMillis()
+        if (!exitStatus) {
+            if (service<XcodeDetectionService>().isXcodeInstalled()) {
+                throw NotScriptableApplicationException(
+                    applicationName,
+                    "Waiting time elapsed for command ${shellCommand.contentToString()}. " +
+                        "Seems that application \"$applicationName\" is not scriptable.",
+                )
+            } else {
+                throw DeveloperToolsNotInstalledException()
+            }
+        }
+        LOG.debug("Waiting time elapsed. Execution time: ${execEnd - execStart} ms.")
+        isGenerated = true
+    } catch (e: InterruptedException) {
+        Thread.currentThread().interrupt()
+        logFailure(e)
+    } catch (e: IOException) {
+        logFailure(e)
+    }
+    return isGenerated
+}
+
+private fun generateDictionaryFileForApplication(request: DictionaryGenerationRequest): Boolean =
+    if (SystemInfo.isMac) {
+        val cmdName = if (request.isDictionaryFile) "cat" else "sdef"
+        doGenerateDictionaryFile(
+            request.applicationName,
+            request.serializePath,
+            cmdName,
+            request.applicationIoFile.path,
+        )
+    } else {
+        request.provider.copyDictionaryFileToCacheDir(
+            request.applicationName,
+            request.applicationIoFile,
+            request.targetFile,
+            true,
+        )
+    }
+
+private data class DictionaryGenerationRequest(
+    val provider: SdefFileProvider,
+    val applicationName: String,
+    val applicationIoFile: File,
+    val targetFile: File,
+    val serializePath: String,
+    val isDictionaryFile: Boolean,
+)
+
+private fun recoverDictionaryFileFromBundledSdef(
+    provider: SdefFileProvider,
+    applicationName: String,
+    applicationIoFile: File,
+    targetFile: File,
+): Boolean {
+    // Codex MEDIUM 3 / Plan 03-04: the legacy dispatch-thread guard here is REMOVED.
+    // copyDictionaryFileToCacheDir routes through `withContext(ioDispatcher)`, so the
+    // recovery path is always available regardless of caller thread.
+    LOG.warn("Will try to find application scripting definition file...")
+    val sdefFile = findSdefForApplication(applicationIoFile)
+    return if (sdefFile != null && sdefFile.exists()) {
+        provider.copyDictionaryFileToCacheDir(applicationName, sdefFile, targetFile, true)
+    } else {
+        LOG.warn(
+            "Scripting definition was not found for application " +
+                applicationIoFile.absolutePath,
+        )
+        service<SdefPersistenceService>().addNotScriptable(applicationName)
+        false
+    }
+}
+
+private fun registerGeneratedDictionaryInfo(
+    applicationName: String,
+    targetFile: File,
+    applicationIoFile: File,
+    appExtension: String,
+): DictionaryInfo {
+    val applicationBundle =
+        applicationIoFile.takeIf {
+            ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(appExtension)
+        }
+    val dictionaryInfo = DictionaryInfo(applicationName, targetFile, applicationBundle)
+    service<SdefPersistenceService>().addDictionaryInfo(dictionaryInfo)
+    LOG.debug("Dictionary file generated for application [$applicationName]$targetFile")
+    return dictionaryInfo
+}
+
+private fun createDictionaryInfoForApplication(
+    provider: SdefFileProvider,
+    applicationName: String,
+    applicationIoFile: File,
+): DictionaryInfo? {
+    fun finishGeneration(
+        targetFile: File,
+        fileGenerated: Boolean,
+    ) {
+        if (!fileGenerated) {
+            LOG.warn("Error occurred while generating file.")
+            if (targetFile.delete()) LOG.warn("Created file was deleted")
+        } else if (ApplicationDiscoveryService.getInstance().removeFromNotFoundList(applicationName)) {
+            LOG.debug("Application was removed from ignored list")
+        }
+    }
+
+    // Kotlin stdlib File.extension: suffix after the last '.' WITHOUT the dot.
+    val appExtension = applicationIoFile.extension
+    val isDictionaryFile = appExtension in DICTIONARY_FILE_EXTENSIONS
+    val serializePath = provider.serializeDictionaryPathForApplication(applicationName)
+    val targetFile = File(serializePath)
+    val parentDirectoryReady = targetFile.parentFile.exists() || targetFile.parentFile.mkdirs()
+    if ((!SystemInfo.isMac && !isDictionaryFile) || !parentDirectoryReady) return null
+
+    LOG.debug("=== Caching Dictionary for application [$applicationName] ===")
+    var fileGenerated = false
+    try {
+        fileGenerated =
+            generateDictionaryFileForApplication(
+                DictionaryGenerationRequest(
+                    provider,
+                    applicationName,
+                    applicationIoFile,
+                    targetFile,
+                    serializePath,
+                    isDictionaryFile,
+                ),
+            )
+    } catch (e: NotScriptableApplicationException) {
+        LOG.warn("Generation failed: ${e.message}. Adding to ignore list")
+        service<SdefPersistenceService>().addNotScriptable(e.applicationName)
+    } catch (e: DeveloperToolsNotInstalledException) {
+        LOG.warn("Generation failed: ${e.message}")
+        fileGenerated =
+            recoverDictionaryFileFromBundledSdef(
+                provider,
+                applicationName,
+                applicationIoFile,
+                targetFile,
+            )
+    } finally {
+        finishGeneration(targetFile, fileGenerated)
+    }
+
+    return targetFile
+        .takeIf { fileGenerated && it.exists() }
+        ?.let {
+            // Wave 4 (SERVICE-04): route the registry write through the typed
+            // persistence API (which itself forwards to the facade's
+            // `addDictionaryInfoInternal` — Pattern A).
+            registerGeneratedDictionaryInfo(applicationName, it, applicationIoFile, appExtension)
+        }
+}
 
 /**
  * Phase 4 SERVICE-04 + SERVICE-09 (plan 04-04, Wave 4): Light Service that owns the
@@ -57,8 +279,8 @@ import java.util.concurrent.TimeUnit
  *
  * Cross-service dependencies (verified by `verifyServiceDependencyGraph`):
  *  - `service<SdefPersistenceService>()` — reads the in-memory dictionary registry via
- *    [SdefPersistenceService.getDictionaryInfo], writes [DictionaryInfo] entries on
- *    successful generation via [SdefPersistenceService.addDictionaryInfo], marks
+ *    [SdefPersistenceService.readDictionaryInfoSnapshot], writes [DictionaryInfo] entries
+ *    on successful generation via [SdefPersistenceService.addDictionaryInfo], marks
  *    applications as not-scriptable on parse failure via
  *    [SdefPersistenceService.addNotScriptable].
  *  - `service<ApplicationDiscoveryService>()` — resolves `applicationName -> bundle
@@ -74,13 +296,9 @@ import java.util.concurrent.TimeUnit
  * the bounded-wait facades (`findStdCommands` / `findApplicationCommands` per Codex
  * MEDIUM 1) make EDT entry into this code path impossible.
  *
- * Phase 3 `runBlockingCancellable` bridges (former facade lines 459/497/878/900 in the
- * pre-Wave-3 file) are preserved verbatim where they appear in migrated bodies:
- * [createDictionaryInfoForApplication] uses them to bridge from the non-suspend
- * `@Synchronized` chain into [copyDictionaryFileToCacheDir] (a `suspend` function).
- * `runBlockingCancellable` is NOT a naked-blocking bridge (different word; `verifyNoRunBlocking`
- * regex `\brunBlocking\b` does not match) — it is the Platform-blessed bridge for
- * background-thread blocking-on-suspend.
+ * Phase 3 coroutine bridges (former facade lines 459/497/878/900 in the pre-Wave-3
+ * file) are no longer needed here: [copyDictionaryFileToCacheDir] is synchronous and
+ * callers reach this provider from background dictionary-loading paths.
  *
  * Phase 6 `@Synchronized`: [createAndInitializeInfo] keeps `@Synchronized` — the
  * composite (generate-file → put-info → init-dictionary) is naturally serial per app;
@@ -97,119 +315,129 @@ import java.util.concurrent.TimeUnit
  * no `<applicationService>` entry needed in plugin.xml.
  */
 @Service(Service.Level.APP)
-class SdefFileProvider @JvmOverloads constructor(
-    @Suppress("unused") private val serviceScope: CoroutineScope,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-) {
+class SdefFileProvider
+    @JvmOverloads
+    constructor(
+        @Suppress("unused") private val serviceScope: CoroutineScope,
+        private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ) {
+        // Migrated from facade (Wave 4): set of scripting-addition application names that
+        // have been successfully ingested. Populated by [initializeScriptingAdditions],
+        // consumed by [mergeScriptingAdditions] and by the facade's
+        // [com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper.getScriptingAdditions]
+        // trampoline. Backed by `ConcurrentHashMap.newKeySet` per HOTFIX-01 (Phase 1).
+        private val scriptingAdditions: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
-    // Migrated from facade (Wave 4): set of scripting-addition application names that
-    // have been successfully ingested. Populated by [initializeScriptingAdditions],
-    // consumed by [mergeScriptingAdditions] and by the facade's
-    // [com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper.getScriptingAdditions]
-    // trampoline. Backed by `ConcurrentHashMap.newKeySet` per HOTFIX-01 (Phase 1).
-    private val scriptingAdditions: MutableSet<String> = ConcurrentHashMap.newKeySet()
-
-    /**
-     * Top-level fetch entry — returns [DictionaryLoadResult] for an `applicationName`.
-     * Resolves the bundle file via [ApplicationDiscoveryService.findApplicationBundleFile]
-     * then delegates to [createAndInitializeInfo] for the full load chain.
-     *
-     * Dispatcher invariant: `suspend` with explicit `withContext(ioDispatcher)` switch —
-     * defence-in-depth even when the caller is already off-EDT.
-     *
-     * Result variants:
-     *  - [DictionaryLoadResult.Empty] — bundle file not found OR createAndInitializeInfo
-     *    returned null (unsupported extension, file does not exist, generation failed).
-     *  - [DictionaryLoadResult.Loaded] — dictionary file generated/cached and persisted.
-     *  - [DictionaryLoadResult.Failed] — recoverable error (sdef CLI missing,
-     *    NotScriptableApplicationException, unexpected throwable). Carries the original
-     *    cause when available.
-     */
-    suspend fun fetch(applicationName: String): DictionaryLoadResult = withContext(ioDispatcher) {
-        val discoveryService = service<ApplicationDiscoveryService>()
-        val applicationFile = discoveryService.findApplicationBundleFile(applicationName)
-            ?: return@withContext DictionaryLoadResult.Empty
-        try {
-            val info = createAndInitializeInfo(applicationFile, applicationName)
-                ?: return@withContext DictionaryLoadResult.Empty
-            DictionaryLoadResult.Loaded(info)
-        } catch (e: CancellationException) {
-            // Pattern B compliance (RECURRING_PITFALLS.md): re-throw structured cancellation.
-            throw e
-        } catch (e: NotScriptableApplicationException) {
-            service<SdefPersistenceService>().addNotScriptable(applicationName)
-            DictionaryLoadResult.Failed(applicationName, "Application is not scriptable", e)
-        } catch (e: DeveloperToolsNotInstalledException) {
-            DictionaryLoadResult.Failed(
-                applicationName,
-                "Developer Tools not installed (sdef CLI unavailable)",
-                e,
-            )
-        } catch (t: Throwable) {
-            LOG.error("Failed to fetch dictionary for $applicationName", t)
-            DictionaryLoadResult.Failed(applicationName, "Unexpected error: ${t.message}", t)
-        }
-    }
-
-    /**
-     * Composite per-app load: generate dictionary file → register [DictionaryInfo] →
-     * return. `@Synchronized` serialises file-generation per app to avoid interleaved
-     * races on the cache directory (PITFALLS reduction §6).
-     *
-     * Dispatcher invariant: non-suspend (`@Synchronized` is incompatible with `suspend`).
-     * Reaches into `suspend` helpers via [runBlockingCancellable] bridges — production
-     * call sites are off-EDT by construction (EDT guards on `findStdCommands` /
-     * `findApplicationCommands` per Codex MEDIUM 1; parser-util via
-     * [AppleScriptSystemDictionaryRegistryService.getInitializedInfo] is off-EDT).
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade
-     * `createAndInitializeInfo(File, String)` — same extension check, same exists check,
-     * same warning on duplicate, same delegation to [createDictionaryInfoForApplication]
-     * + the parse step (deferred to the facade's `initializeDictionaryFromInfo`, which
-     * stays on the facade because it touches the parser map cluster — Wave 5 territory).
-     */
-    @Synchronized
-    fun createAndInitializeInfo(applicationIoFile: File, applicationName: String): DictionaryInfo? {
-        val appExtension: String = applicationIoFile.extension
-        if (!extensionSupported(appExtension)) return null
-        if (!applicationIoFile.exists()) return null
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        if (facade.getDictionaryInfoByNameInternal(applicationName) != null) {
-            LOG.warn(
-                "Dictionary for application $applicationName was already initialized. " +
-                    "Generating new dictionary file any way.",
-            )
-        }
-        val createdDictionaryInfo = createDictionaryInfoForApplication(applicationName, applicationIoFile)
-        if (createdDictionaryInfo != null) {
-            if (facade.initializeDictionaryFromInfoInternal(createdDictionaryInfo)) return createdDictionaryInfo
-        }
-        return null
-    }
-
-    /**
-     * Copy [applicationDictionaryFile] into the IDE's cache directory at [targetFile].
-     *
-     * Dispatcher invariant: `suspend` with explicit `withContext(ioDispatcher)` around the
-     * file I/O. Plan 03-04 / D-02 (Codex MEDIUM 3) — legacy dispatch-thread early-exit
-     * guard was already removed in Phase 3; structured-concurrency dispatch supersedes
-     * the manual guard. Body migrated byte-for-byte from the pre-Wave-4 facade.
-     *
-     * Phase 3 Pattern A error handling preserved: `LOG.error("...", e)` (not
-     * `e.printStackTrace()`) so the exception chain is captured in IDE log routing.
-     */
-    suspend fun copyDictionaryFileToCacheDir(
-        applicationName: String,
-        applicationDictionaryFile: File,
-        targetFile: File,
-        rewrite: Boolean,
-    ): Boolean {
-        if (!targetFile.parentFile.exists()) return false
-
-        val needsCopy = !targetFile.exists() || rewrite
-        if (needsCopy) {
-            // File I/O on ioDispatcher — Pattern C: NEVER the Main dispatcher.
+        /**
+         * Top-level fetch entry — returns [DictionaryLoadResult] for an `applicationName`.
+         * Resolves the bundle file via [ApplicationDiscoveryService.findApplicationBundleFile]
+         * then delegates to [createAndInitializeInfo] for the full load chain.
+         *
+         * Dispatcher invariant: `suspend` with explicit `withContext(ioDispatcher)` switch —
+         * defence-in-depth even when the caller is already off-EDT.
+         *
+         * Result variants:
+         *  - [DictionaryLoadResult.Empty] — bundle file not found OR createAndInitializeInfo
+         *    returned null (unsupported extension, file does not exist, generation failed).
+         *  - [DictionaryLoadResult.Loaded] — dictionary file generated/cached and persisted.
+         *  - [DictionaryLoadResult.Failed] — recoverable error (sdef CLI missing,
+         *    NotScriptableApplicationException, unexpected throwable). Carries the original
+         *    cause when available.
+         */
+        suspend fun fetch(applicationName: String): DictionaryLoadResult =
             withContext(ioDispatcher) {
+                val discoveryService = ApplicationDiscoveryService.getInstance()
+                val applicationFile =
+                    discoveryService.findApplicationBundleFile(applicationName)
+                        ?: return@withContext DictionaryLoadResult.Empty
+                try {
+                    val info =
+                        createAndInitializeInfo(applicationFile, applicationName)
+                            ?: return@withContext DictionaryLoadResult.Empty
+                    DictionaryLoadResult.Loaded(info)
+                } catch (e: CancellationException) {
+                    // Pattern B compliance (RECURRING_PITFALLS.md): re-throw structured cancellation.
+                    throw e
+                } catch (e: NotScriptableApplicationException) {
+                    service<SdefPersistenceService>().addNotScriptable(applicationName)
+                    DictionaryLoadResult.Failed(applicationName, "Application is not scriptable", e)
+                } catch (e: DeveloperToolsNotInstalledException) {
+                    DictionaryLoadResult.Failed(
+                        applicationName,
+                        "Developer Tools not installed (sdef CLI unavailable)",
+                        e,
+                    )
+                } catch (e: IllegalStateException) {
+                    LOG.error("Failed to fetch dictionary for $applicationName", e)
+                    DictionaryLoadResult.Failed(applicationName, "Unexpected error: ${e.message}", e)
+                } catch (e: IllegalArgumentException) {
+                    LOG.error("Failed to fetch dictionary for $applicationName", e)
+                    DictionaryLoadResult.Failed(applicationName, "Unexpected error: ${e.message}", e)
+                }
+            }
+
+        /**
+         * Composite per-app load: generate dictionary file → register [DictionaryInfo] →
+         * return. `@Synchronized` serialises file-generation per app to avoid interleaved
+         * races on the cache directory (PITFALLS reduction §6).
+         *
+         * Dispatcher invariant: non-suspend (`@Synchronized` is incompatible with `suspend`).
+         * Production call sites are off-EDT by construction (EDT guards on `findStdCommands` /
+         * `findApplicationCommands` per Codex MEDIUM 1; parser-util via
+         * [AppleScriptSystemDictionaryRegistryService.getInitializedInfo] is off-EDT).
+         *
+         * Body migrated byte-for-byte from the pre-Wave-4 facade
+         * `createAndInitializeInfo(File, String)` — same extension check, same exists check,
+         * same warning on duplicate, same delegation to [createDictionaryInfoForApplication]
+         * + the parse step (deferred to the facade's `initializeDictionaryFromInfo`, which
+         * stays on the facade because it touches the parser map cluster — Wave 5 territory).
+         */
+        @Synchronized
+        fun createAndInitializeInfo(
+            applicationIoFile: File,
+            applicationName: String,
+        ): DictionaryInfo? {
+            val createdDictionaryInfo =
+                if (!extensionSupported(applicationIoFile.extension) || !applicationIoFile.exists()) {
+                    null
+                } else {
+                    val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
+                    if (facade.getDictionaryInfoByNameInternal(applicationName) != null) {
+                        LOG.warn(
+                            "Dictionary for application $applicationName was already initialized. " +
+                                "Generating new dictionary file any way.",
+                        )
+                    }
+                    createDictionaryInfoForApplication(this, applicationName, applicationIoFile)
+                        ?.takeIf { dictionaryInfo ->
+                            facade.initializeDictionaryFromInfoInternal(dictionaryInfo)
+                        }
+                }
+            return createdDictionaryInfo
+        }
+
+        /**
+         * Copy [applicationDictionaryFile] into the IDE's cache directory at [targetFile].
+         *
+         * Dispatcher invariant: synchronous file I/O; callers reach this provider from
+         * background dictionary-loading paths. Plan 03-04 / D-02 (Codex MEDIUM 3) —
+         * legacy dispatch-thread early-exit
+         * guard was already removed in Phase 3; structured-concurrency dispatch supersedes
+         * the manual guard. Body migrated byte-for-byte from the pre-Wave-4 facade.
+         *
+         * Phase 3 Pattern A error handling preserved: `LOG.error("...", e)` (not
+         * `e.printStackTrace()`) so the exception chain is captured in IDE log routing.
+         */
+        fun copyDictionaryFileToCacheDir(
+            applicationName: String,
+            applicationDictionaryFile: File,
+            targetFile: File,
+            rewrite: Boolean,
+        ): Boolean {
+            if (!targetFile.parentFile.exists()) return false
+
+            val needsCopy = !targetFile.exists() || rewrite
+            if (needsCopy) {
                 try {
                     if (targetFile.exists() && targetFile.delete()) {
                         LOG.debug("Existing target file deleted: $targetFile")
@@ -223,435 +451,250 @@ class SdefFileProvider @JvmOverloads constructor(
                         StandardCopyOption.REPLACE_EXISTING,
                     )
                 } catch (e: IOException) {
-                    LOG.error("Failed to move file $applicationDictionaryFile to cache directory: $targetFile", e)
+                    LOG.error(
+                        "Failed to move file $applicationDictionaryFile to cache directory: $targetFile",
+                        e,
+                    )
+                }
+            } else {
+                LOG.debug("Generated file already exists for application $applicationName")
+            }
+
+            val fileMoved = targetFile.exists()
+            if (fileMoved) {
+                LOG.debug("Dictionary file moved to ${targetFile.parent} directory")
+            }
+            return fileMoved
+        }
+
+        /**
+         * Initialise scripting-additions libraries from
+         * [ApplicationDictionary.SCRIPTING_ADDITIONS_FOLDERS]. For each `.sdef` file found,
+         * tries the registry first (already cached), then [createAndInitializeInfo] (extract
+         * + generate), with a final fallback to [initStdTerms] (bundled-resource extraction).
+         *
+         * Dispatcher invariant: non-suspend; safe on any background thread. Internal calls
+         * reach [createAndInitializeInfo] which carries `@Synchronized` per-app serialisation.
+         *
+         * Body migrated byte-for-byte from the pre-Wave-4 facade `initializeScriptingAdditions`.
+         */
+        fun initializeScriptingAdditions() {
+            val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+            fun initializeBundledScriptingAddition(stdLib: File): DictionaryInfo? {
+                LOG.warn(
+                    "Can not initialize scripting addition library from file: $stdLib. Will copy bundled lib.",
+                )
+                return try {
+                    initStdTerms(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY)
+                } catch (e: IOException) {
+                    LOG.warn("Can not initialize scripting addition library from bundle", e)
+                    null
                 }
             }
-        } else {
-            LOG.debug("Generated file already exists for application $applicationName")
-        }
-        if (targetFile.exists()) {
-            LOG.debug("Dictionary file moved to ${targetFile.parent} directory")
-            return true
-        }
-        return false
-    }
 
-    /**
-     * Initialise scripting-additions libraries from
-     * [ApplicationDictionary.SCRIPTING_ADDITIONS_FOLDERS]. For each `.sdef` file found,
-     * tries the registry first (already cached), then [createAndInitializeInfo] (extract
-     * + generate), with a final fallback to [initStdTerms] (bundled-resource extraction).
-     *
-     * Dispatcher invariant: non-suspend; safe on any background thread. Internal calls
-     * reach [createAndInitializeInfo] which carries `@Synchronized` per-app serialisation.
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade `initializeScriptingAdditions`.
-     */
-    fun initializeScriptingAdditions() {
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        for (stdLibFolder in ApplicationDictionary.SCRIPTING_ADDITIONS_FOLDERS) {
-            val dir = File(stdLibFolder)
-            if (!dir.isDirectory) continue
-            val stdLibs = dir.listFiles() ?: continue
-            if (stdLibs.isEmpty()) continue
-            for (stdLib in stdLibs) {
-                var libraryName = stdLib.name
-                val last = libraryName.lastIndexOf(".")
-                libraryName = libraryName.substring(0, if (last > 0) last else libraryName.length - 1)
-                if (StringUtil.isEmpty(libraryName)) continue
-                var dInfo = facade.getDictionaryInfoByNameInternal(libraryName)
-                if (dInfo != null) {
-                    facade.initializeDictionaryFromInfoInternal(dInfo)
-                } else if (stdLib.exists()) {
-                    dInfo = createAndInitializeInfo(stdLib, libraryName)
-                }
-                if (dInfo != null) {
-                    scriptingAdditions.add(dInfo.getApplicationName())
-                } else {
-                    LOG.warn(
-                        "Can not initialize scripting addition library from file: $stdLib. Will copy bundled lib.",
-                    )
-                    try {
-                        dInfo = initStdTerms(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY)
-                        if (dInfo != null) scriptingAdditions.add(dInfo.getApplicationName())
-                    } catch (e: IOException) {
-                        LOG.warn("Can not initialize scripting addition library from bundle: ${e.message}")
+            scriptingAdditionFiles()
+                .mapNotNull { stdLib ->
+                    scriptingAdditionLibraryName(stdLib)?.let { libraryName -> libraryName to stdLib }
+                }.forEach { (libraryName, stdLib) ->
+                    val dictionaryInfo =
+                        facade
+                            .getDictionaryInfoByNameInternal(libraryName)
+                            ?.also { facade.initializeDictionaryFromInfoInternal(it) }
+                            ?: stdLib
+                                .takeIf { it.exists() }
+                                ?.let { createAndInitializeInfo(it, libraryName) }
+                            ?: initializeBundledScriptingAddition(stdLib)
+
+                    if (dictionaryInfo != null) {
+                        scriptingAdditions.add(dictionaryInfo.getApplicationName())
                     }
                 }
-            }
         }
-    }
 
-    /**
-     * Bootstrap a standard-library suite ([ApplicationDictionary.COCOA_STANDARD_LIBRARY]
-     * or [ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY]) from the bundled
-     * plugin resource. Falls back to a tmp-file extraction via [stream2file] when the
-     * library is not yet cached.
-     *
-     * Dispatcher invariant: non-suspend; throws [IOException] on bundle-resource extraction
-     * failure (preserved from the pre-Wave-4 facade signature for call sites that catch
-     * it explicitly — e.g. [initStandardSuite]).
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade `initStdTerms`.
-     */
-    @Throws(IOException::class)
-    fun initStdTerms(stdLibName: String): DictionaryInfo? {
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        var stdDInfo = facade.getDictionaryInfoByNameInternal(stdLibName)
-        if (stdDInfo != null) {
-            facade.initializeDictionaryFromInfoInternal(stdDInfo)
-        } else {
-            val libPathResource: String? = when (stdLibName) {
-                ApplicationDictionary.COCOA_STANDARD_LIBRARY -> ApplicationDictionary.COCOA_STANDARD_FILE
-                ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY -> ApplicationDictionary.STANDARD_ADDITIONS_FILE
-                else -> null
-            } ?: return null
-
-            val isStd: InputStream? = javaClass.getResourceAsStream(libPathResource)
-            val tmpFile = stream2file(isStd, stdLibName.replace(" ", "_"), ".sdef")
-            if (tmpFile.exists() && tmpFile.isFile) {
-                stdDInfo = createAndInitializeInfo(tmpFile, stdLibName)
+        /**
+         * Bootstrap a standard-library suite ([ApplicationDictionary.COCOA_STANDARD_LIBRARY]
+         * or [ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY]) from the bundled
+         * plugin resource. Falls back to a tmp-file extraction via [stream2file] when the
+         * library is not yet cached.
+         *
+         * Dispatcher invariant: non-suspend; throws [IOException] on bundle-resource extraction
+         * failure (preserved from the pre-Wave-4 facade signature for call sites that catch
+         * it explicitly — e.g. the facade's standard-suite initialization path).
+         *
+         * Body migrated byte-for-byte from the pre-Wave-4 facade `initStdTerms`.
+         */
+        @Throws(IOException::class)
+        fun initStdTerms(stdLibName: String): DictionaryInfo? {
+            val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
+            var stdDInfo = facade.getDictionaryInfoByNameInternal(stdLibName)
+            if (stdDInfo != null) {
+                facade.initializeDictionaryFromInfoInternal(stdDInfo)
             } else {
-                LOG.warn("Can not find standard suite dictionary in the classpath")
-            }
-        }
-        return stdDInfo
-    }
+                val libPathResource: String =
+                    when (stdLibName) {
+                        ApplicationDictionary.COCOA_STANDARD_LIBRARY -> ApplicationDictionary.COCOA_STANDARD_FILE
+                        ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY ->
+                            ApplicationDictionary.STANDARD_ADDITIONS_FILE
+                        else -> null
+                    } ?: return null
 
-    /**
-     * Merge every scripting-additions suite into a single synthesised `.sdef` and register
-     * it under [ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY].
-     *
-     * RESEARCH Q3 resolution: this stays in [SdefFileProvider] — it generates a synthesised
-     * SDEF file (file-generation concern); ingestion (parser pass to populate index maps) is
-     * downstream in SdefIndexService (Wave 5).
-     *
-     * Dispatcher invariant: non-suspend; safe on any background thread. JDOM I/O is
-     * synchronous file-based; the resulting `.sdef` is registered via [createAndInitializeInfo]
-     * which itself runs synchronously.
-     *
-     * XXE hardening: uses [SdefIndexService.newSecureSaxBuilderForFileProvider] — Wave 5
-     * co-located the factory with its primary consumer ([SdefIndexService.parseDictionaryFile])
-     * and exposes a typed cross-service accessor for this caller.
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade `mergeScriptingAdditions`.
-     */
-    fun mergeScriptingAdditions(): DictionaryInfo? {
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        try {
-            val dictionaryFiles = ArrayList<File>()
-            val libName = ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY
-            val mergedFile = File.createTempFile(libName, ".sdef")
-            for (scriptingAddition in scriptingAdditions) {
-                val di = facade.getDictionaryInfoByNameInternal(scriptingAddition) ?: continue
-                dictionaryFiles.add(File(di.getDictionaryFile().path))
+                val standardLibraryStream: InputStream? = javaClass.getResourceAsStream(libPathResource)
+                val tmpFile = stream2file(standardLibraryStream, stdLibName.replace(" ", "_"), ".sdef")
+                if (tmpFile.exists() && tmpFile.isFile) {
+                    stdDInfo = createAndInitializeInfo(tmpFile, stdLibName)
+                } else {
+                    LOG.warn("Can not find standard suite dictionary in the classpath")
+                }
             }
-            val iterator = dictionaryFiles.iterator()
-            if (!iterator.hasNext()) return null
-            val first = iterator.next()
-            val builder = SdefIndexService.newSecureSaxBuilderForFileProvider()
-            val firstDocument: Document = builder.build(first)
-            val firstRoot: Element = firstDocument.rootElement
-            while (iterator.hasNext()) {
-                val second = iterator.next()
-                val secondDocument: Document = builder.build(second)
-                val secondRoot: Element = secondDocument.rootElement
-                val suiteElements: List<Element> = secondRoot.getChildren("suite")
-                for (originalSuite in suiteElements) {
+            return stdDInfo
+        }
+
+        /**
+         * Merge every scripting-additions suite into a single synthesised `.sdef` and register
+         * it under [ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY].
+         *
+         * RESEARCH Q3 resolution: this stays in [SdefFileProvider] — it generates a synthesised
+         * SDEF file (file-generation concern); ingestion (parser pass to populate index maps) is
+         * downstream in SdefIndexService (Wave 5).
+         *
+         * Dispatcher invariant: non-suspend; safe on any background thread. JDOM I/O is
+         * synchronous file-based; the resulting `.sdef` is registered via [createAndInitializeInfo]
+         * which itself runs synchronously.
+         *
+         * XXE hardening: uses the same legacy JDOM parser bridge as
+         * [SdefIndexService.parseDictionaryFile].
+         *
+         * Body migrated byte-for-byte from the pre-Wave-4 facade `mergeScriptingAdditions`.
+         */
+        fun mergeScriptingAdditions(): DictionaryInfo? {
+            fun appendSuites(
+                firstRoot: Element,
+                secondRoot: Element,
+            ) {
+                secondRoot.getChildren("suite").forEach { originalSuite ->
                     val suite = originalSuite.clone()
                     suite.detach()
                     firstRoot.addContent(suite)
                 }
             }
-            val outputter = XMLOutputter()
-            FileOutputStream(mergedFile).use { out ->
-                outputter.output(firstDocument, out)
-                out.flush()
-            }
-            return createAndInitializeInfo(mergedFile, libName)
-        } catch (e: JDOMException) {
-            LOG.warn("Can not parse scripting additions file: ${e.message}")
-            e.printStackTrace()
-        } catch (e: IOException) {
-            LOG.warn("Can not merge scripting additions: ${e.message}")
-            e.printStackTrace()
-        } catch (e: Exception) {
-            LOG.warn("Can not merge scripting additions: ${e.message}")
-            e.printStackTrace()
-        }
-        return null
-    }
 
-    /**
-     * Defensive snapshot of the scripting-additions name set. Returns a [HashSet]
-     * (NOT the live backing `ConcurrentHashMap.KeySet`). Backs the facade's
-     * [ParsableScriptHelper.getScriptingAdditions] trampoline.
-     */
-    fun getScriptingAdditions(): HashSet<String> = HashSet(scriptingAdditions)
+            return try {
+                val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
+                val libName = ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY
+                val dictionaryFiles =
+                    scriptingAdditions.mapNotNull { scriptingAddition ->
+                        facade
+                            .getDictionaryInfoByNameInternal(scriptingAddition)
+                            ?.getDictionaryFile()
+                            ?.let { dictionaryFile -> File(dictionaryFile.path) }
+                    }
 
-    /**
-     * Find a `.sdef` file under [applicationIoFile]`/Contents/Resources/`. Used as the
-     * recovery path in [createDictionaryInfoForApplication] when the sdef CLI fails
-     * because Developer Tools are not installed.
-     *
-     * Dispatcher invariant: non-suspend; safe on any background thread (NOT EDT —
-     * `File.listFiles` is blocking I/O).
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade `findSdefForApplication`.
-     */
-    fun findSdefForApplication(applicationIoFile: File): File? {
-        val appResources = File(applicationIoFile, "/Contents/Resources")
-        val files = appResources.listFiles { _, s -> s.endsWith("sdef") }
-        if (files != null && files.isNotEmpty()) {
-            return files[0]
-        }
-        return null
-    }
+                if (dictionaryFiles.isEmpty()) return null
 
-    /**
-     * Resolve the path where the cached `.sdef` for [applicationName] would live (or
-     * does live) under `${PathManager.getSystemPath()}/sdef/`. The path-escape
-     * (`name.replace(" ", "_")`) preserves the v1.0 cache layout byte-for-byte —
-     * existing user caches use the underscored filenames.
-     *
-     * Dispatcher invariant: non-suspend; pure computation (no I/O).
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade
-     * `serializeDictionaryPathForApplication`.
-     */
-    fun serializeDictionaryPathForApplication(applicationName: String): String {
-        val unescaped = "$GENERATED_DICTIONARIES_SYSTEM_FOLDER/${applicationName}_generated.sdef"
-        return unescaped.replace(" ", "_")
-    }
-
-    /**
-     * Lookup the cached `.sdef` [File] for [applicationName] via the in-memory
-     * [DictionaryInfo] registry (owned by the facade through [SdefPersistenceService]).
-     * Returns `null` if no entry exists for the name (e.g. discovery sweep has not yet
-     * registered the app).
-     *
-     * Dispatcher invariant: non-suspend; O(1) HashMap lookup via
-     * [AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal].
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade `getDictionaryFile(String?)`.
-     */
-    fun getDictionaryFile(applicationName: String?): File? =
-        AppleScriptSystemDictionaryRegistryService.getInstance()
-            .getDictionaryInfoByNameInternal(applicationName)?.getDictionaryFile()
-
-    /**
-     * Reverse lookup: given an application-bundle path (e.g.
-     * `/System/Applications/Finder.app`), find the [DictionaryInfo] entry whose
-     * `applicationFile.path` matches. Standard libraries (no `applicationFile`) are
-     * matched by the well-known `CocoaStandard.sdef` suffix.
-     *
-     * Dispatcher invariant: non-suspend; iterates the in-memory registry snapshot via
-     * [SdefPersistenceService.readDictionaryInfoSnapshot].
-     *
-     * Body migrated from the pre-Wave-4 facade `getDictionaryInfoByApplicationPath`
-     * — iteration shape preserved verbatim (linear scan); reads through the typed
-     * persistence API rather than reaching into the facade's private map directly.
-     */
-    fun getDictionaryInfoByApplicationPath(applicationPath: String): DictionaryInfo? {
-        val infos = service<SdefPersistenceService>().readDictionaryInfoSnapshot()
-        for (dInfo in infos) {
-            val appFile = dInfo.getApplicationFile()
-            if (appFile != null && appFile.path == applicationPath) return dInfo
-        }
-        // Standard libraries do not have an application path.
-        if (applicationPath.endsWith("CocoaStandard.sdef")) {
-            return AppleScriptSystemDictionaryRegistryService.getInstance()
-                .getDictionaryInfoByNameInternal(ApplicationDictionary.COCOA_STANDARD_LIBRARY)
-        }
-        return null
-    }
-
-    /**
-     * Generates the dictionary file and creates a [DictionaryInfo] for the application.
-     * Either invokes the `sdef` CLI (macOS) or copies an existing `.xml`/`.sdef` directly
-     * (cross-platform). On [DeveloperToolsNotInstalledException], falls back to searching
-     * `<app>/Contents/Resources` for a bundled `.sdef`.
-     *
-     * Dispatcher invariant: non-suspend; bridges to `suspend` helpers
-     * ([copyDictionaryFileToCacheDir]) via [runBlockingCancellable] (Phase 3 Codex MEDIUM 3
-     * — the bridge is the documented pattern for non-EDT background threads, NOT a naked
-     * blocking call; the `verifyNoRunBlocking` regex on the matching unqualified word
-     * does not match the qualified `runBlockingCancellable` identifier).
-     *
-     * Cross-service writes:
-     *  - On [NotScriptableApplicationException]: marks the app via
-     *    [SdefPersistenceService.addNotScriptable].
-     *  - On [DeveloperToolsNotInstalledException] with no bundled `.sdef`: same.
-     *  - On successful generation: registers the [DictionaryInfo] via
-     *    [SdefPersistenceService.addDictionaryInfo] (which itself idempotently adds the
-     *    app to the discovered set via [ApplicationDiscoveryService] inside the facade's
-     *    `addDictionaryInfoInternal`).
-     *  - Always (success path): clears the name from the discovery service's not-found
-     *    memo via [ApplicationDiscoveryService.removeFromNotFoundList].
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade
-     * `createDictionaryInfoForApplication`, with cross-service writes routed through the
-     * typed APIs (was direct facade-private set mutation pre-Wave-4).
-     */
-    private fun createDictionaryInfoForApplication(
-        applicationName: String,
-        applicationIoFile: File,
-    ): DictionaryInfo? {
-        // Kotlin stdlib File.extension: suffix after the last '.' WITHOUT the dot.
-        val appExtension = applicationIoFile.extension
-        if (!SystemInfo.isMac && !("xml" == appExtension || "sdef" == appExtension)) return null
-        LOG.debug("=== Caching Dictionary for application [$applicationName] ===")
-        val serializePath = serializeDictionaryPathForApplication(applicationName)
-        var fileGenerated = false
-        val targetFile = File(serializePath)
-        if (!targetFile.parentFile.exists() && !targetFile.parentFile.mkdirs()) return null
-        try {
-            if (!SystemInfo.isMac && ("xml" == appExtension || "sdef" == appExtension)) {
-                // Plan 03-04 / D-02: copyDictionaryFileToCacheDir is `suspend` and dispatches
-                // its I/O onto ioDispatcher. Bridge via runBlockingCancellable since this caller is
-                // a non-suspend, @Synchronized chain reachable from non-EDT background threads.
-                // The EDT guards on findStdCommands / findApplicationCommands (Codex MEDIUM 1)
-                // prevent EDT entry to the synchronous facade surface; non-EDT entry paths are
-                // safe for runBlockingCancellable.
-                fileGenerated = runBlockingCancellable {
-                    copyDictionaryFileToCacheDir(applicationName, applicationIoFile, targetFile, true)
+                val mergedFile = File.createTempFile(libName, ".sdef")
+                val firstDocument: Document = LegacyJdomParser.build(dictionaryFiles.first())
+                val firstRoot: Element = firstDocument.rootElement
+                dictionaryFiles.drop(1).forEach { second ->
+                    appendSuites(firstRoot, LegacyJdomParser.build(second).rootElement)
                 }
-            } else if (SystemInfo.isMac) {
-                val cmdName = if ("xml" == appExtension || "sdef" == appExtension) "cat" else "sdef"
-                fileGenerated = doGenerateDictionaryFile(applicationName, serializePath, cmdName, applicationIoFile.path)
-            }
-        } catch (e: NotScriptableApplicationException) {
-            LOG.warn("Generation failed: ${e.message}. Adding to ignore list")
-            service<SdefPersistenceService>().addNotScriptable(e.getApplicationName())
-        } catch (e: DeveloperToolsNotInstalledException) {
-            LOG.warn("Generation failed: ${e.message}")
-            // Codex MEDIUM 3 / Plan 03-04: the legacy dispatch-thread guard here is REMOVED.
-            // copyDictionaryFileToCacheDir routes through `withContext(ioDispatcher)`, so the
-            // recovery path is always available regardless of caller thread.
-            LOG.warn("Will try to find application scripting definition file...")
-            val sdefFile = findSdefForApplication(applicationIoFile)
-            if (sdefFile != null && sdefFile.exists()) {
-                fileGenerated = runBlockingCancellable {
-                    copyDictionaryFileToCacheDir(applicationName, sdefFile, targetFile, true)
+                FileOutputStream(mergedFile).use { out ->
+                    LegacyJdomWriter.write(firstDocument, out)
+                    out.flush()
                 }
-            } else {
-                LOG.warn("Scripting definition was not found for application ${applicationIoFile.absolutePath}")
-                service<SdefPersistenceService>().addNotScriptable(applicationName)
-            }
-        } finally {
-            if (!fileGenerated) {
-                LOG.warn("Error occurred while generating file.")
-                if (targetFile.delete()) LOG.warn("Created file was deleted")
-            } else if (service<ApplicationDiscoveryService>().removeFromNotFoundList(applicationName)) {
-                // Wave 3 (SERVICE-03): notFoundApplicationList is owned by ApplicationDiscoveryService.
-                LOG.debug("Application was removed from ignored list")
+                createAndInitializeInfo(mergedFile, libName)
+            } catch (e: JDOMException) {
+                LOG.warn("Can not parse scripting additions file", e)
+                null
+            } catch (e: IOException) {
+                LOG.warn("Can not merge scripting additions", e)
+                null
             }
         }
-        if (fileGenerated && targetFile.exists()) {
-            val applicationBundle =
-                if (ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(appExtension)) applicationIoFile else null
-            val dInfo = DictionaryInfo(applicationName, targetFile, applicationBundle)
-            // Wave 4 (SERVICE-04): route the registry write through the typed persistence API
-            // (which itself forwards to the facade's `addDictionaryInfoInternal` — Pattern A).
-            service<SdefPersistenceService>().addDictionaryInfo(dInfo)
-            LOG.debug("Dictionary file generated for application [$applicationName]$targetFile")
-            return dInfo
-        }
-        return null
-    }
-
-    /**
-     * Invoke the `sdef` CLI (macOS-only) or `cat` (cross-platform .xml/.sdef passthrough)
-     * to generate the dictionary file at [serializePath]. Throws
-     * [NotScriptableApplicationException] when the CLI invocation times out AND Xcode is
-     * present (signal: app is genuinely non-scriptable); throws
-     * [DeveloperToolsNotInstalledException] when Xcode is absent (signal: CLI unavailable).
-     *
-     * Dispatcher invariant: non-suspend; safe on any background thread. Uses
-     * [Runtime.exec] + [Process.waitFor] with a 5-second timeout (preserved byte-for-byte
-     * from the pre-Wave-4 facade — Phase 8 invariant).
-     *
-     * Body migrated byte-for-byte from the pre-Wave-4 facade `doGenerateDictionaryFile`.
-     */
-    @Throws(NotScriptableApplicationException::class, DeveloperToolsNotInstalledException::class)
-    private fun doGenerateDictionaryFile(
-        applicationName: String,
-        serializePath: String,
-        cmdName: String,
-        appFilePath: String,
-    ): Boolean {
-        try {
-            val shellCommand = arrayOf("/bin/bash", "-c", " $cmdName \"$appFilePath\" > $serializePath")
-            LOG.debug("executing command: ${Arrays.toString(shellCommand)}")
-            val timeout = 5L
-            val execStart = System.currentTimeMillis()
-            val exitStatus = Runtime.getRuntime().exec(shellCommand).waitFor(timeout, TimeUnit.SECONDS)
-            val execEnd = System.currentTimeMillis()
-            if (!exitStatus) {
-                if (service<XcodeDetectionService>().isXcodeInstalled()) {
-                    throw NotScriptableApplicationException(
-                        applicationName,
-                        "Waiting time elapsed for command ${Arrays.toString(shellCommand)}. " +
-                            "Seems that application \"$applicationName\" is not scriptable.",
-                    )
-                } else {
-                    throw DeveloperToolsNotInstalledException()
-                }
-            }
-            LOG.debug("Waiting time elapsed. Execution time: ${execEnd - execStart} ms.")
-            return true
-        } catch (e: InterruptedException) {
-            LOG.error(
-                "Failed to create dictionary file for application [$applicationName] Command:$cmdName " +
-                    "target path: $appFilePath Reason: ${e.cause}",
-            )
-            e.printStackTrace()
-        } catch (e: IOException) {
-            LOG.error(
-                "Failed to create dictionary file for application [$applicationName] Command:$cmdName " +
-                    "target path: $appFilePath Reason: ${e.cause}",
-            )
-            e.printStackTrace()
-        }
-        return false
-    }
-
-    companion object {
-        private val LOG: Logger = Logger.getInstance("#${SdefFileProvider::class.java.name}")
 
         /**
-         * Cache directory for generated `.sdef` files: `${PathManager.getSystemPath()}/sdef`.
-         * Migrated from the pre-Wave-4 facade companion. Path layout preserved byte-for-byte
-         * (`<systemPath>/sdef/<App_Name>_generated.sdef` after underscore-escaping).
+         * Defensive snapshot of the scripting-additions name set. Returns a [HashSet]
+         * (NOT the live backing `ConcurrentHashMap.KeySet`). Backs the facade's
+         * [ParsableScriptHelper.getScriptingAdditions] trampoline.
          */
-        private val GENERATED_DICTIONARIES_SYSTEM_FOLDER: String = "${PathManager.getSystemPath()}/sdef"
-
-        @JvmStatic
-        fun getInstance(): SdefFileProvider =
-            ApplicationManager.getApplication().getService(SdefFileProvider::class.java)
+        fun getScriptingAdditions(): HashSet<String> = HashSet(scriptingAdditions)
 
         /**
-         * Extract an [InputStream] into a temp file. Used by [initStdTerms] (bundled-resource
-         * extraction). `deleteOnExit` flagged twice in the pre-Wave-4 facade — preserved
-         * verbatim (defensive double-registration of the JVM shutdown hook).
+         * Resolve the path where the cached `.sdef` for [applicationName] would live (or
+         * does live) under `${PathManager.getSystemPath()}/sdef/`. The path-escape
+         * (`name.replace(" ", "_")`) preserves the v1.0 cache layout byte-for-byte —
+         * existing user caches use the underscored filenames.
          *
-         * Migrated from the pre-Wave-4 facade `stream2file` companion helper.
+         * Dispatcher invariant: non-suspend; pure computation (no I/O).
+         *
+         * Body migrated byte-for-byte from the pre-Wave-4 facade
+         * `serializeDictionaryPathForApplication`.
          */
-        @Throws(IOException::class)
-        internal fun stream2file(input: InputStream?, prefix: String, suffix: String): File {
-            val tempFile = File.createTempFile(prefix, suffix)
-            tempFile.deleteOnExit()
-            FileOutputStream(tempFile).use { out ->
-                requireNotNull(input) { "InputStream for $prefix$suffix is null" }
-                var c = input.read()
-                while (c != -1) {
-                    out.write(c)
-                    c = input.read()
+        fun serializeDictionaryPathForApplication(applicationName: String): String {
+            val unescaped = "$GENERATED_DICTIONARIES_SYSTEM_FOLDER/${applicationName}_generated.sdef"
+            return unescaped.replace(" ", "_")
+        }
+
+        /**
+         * Lookup the cached `.sdef` [File] for [applicationName] via the in-memory
+         * [DictionaryInfo] registry (owned by the facade through [SdefPersistenceService]).
+         * Returns `null` if no entry exists for the name (e.g. discovery sweep has not yet
+         * registered the app).
+         *
+         * Dispatcher invariant: non-suspend; O(1) HashMap lookup via
+         * [AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal].
+         *
+         * Body migrated byte-for-byte from the pre-Wave-4 facade `getDictionaryFile(String?)`.
+         */
+        fun getDictionaryFile(applicationName: String?): File? =
+            AppleScriptSystemDictionaryRegistryService
+                .getInstance()
+                .getDictionaryInfoByNameInternal(applicationName)
+                ?.getDictionaryFile()
+
+        /**
+         * Reverse lookup: given an application-bundle path (e.g.
+         * `/System/Applications/Finder.app`), find the [DictionaryInfo] entry whose
+         * `applicationFile.path` matches. Standard libraries (no `applicationFile`) are
+         * matched by the well-known `CocoaStandard.sdef` suffix.
+         *
+         * Dispatcher invariant: non-suspend; iterates the in-memory registry snapshot via
+         * [SdefPersistenceService.readDictionaryInfoSnapshot].
+         *
+         * Body migrated from the pre-Wave-4 facade `getDictionaryInfoByApplicationPath`
+         * — iteration shape preserved verbatim (linear scan); reads through the typed
+         * persistence API rather than reaching into the facade's private map directly.
+         */
+        fun getDictionaryInfoByApplicationPath(applicationPath: String): DictionaryInfo? {
+            val cachedInfo =
+                service<SdefPersistenceService>()
+                    .readDictionaryInfoSnapshot()
+                    .firstOrNull { dInfo ->
+                        dInfo.getApplicationFile()?.path == applicationPath
+                    }
+            val standardInfo =
+                if (applicationPath.endsWith("CocoaStandard.sdef")) {
+                    AppleScriptSystemDictionaryRegistryService
+                        .getInstance()
+                        .getDictionaryInfoByNameInternal(ApplicationDictionary.COCOA_STANDARD_LIBRARY)
+                } else {
+                    null
                 }
-                input.close()
-            }
-            tempFile.deleteOnExit()
-            return tempFile
+            return cachedInfo ?: standardInfo
+        }
+
+        companion object {
+            /**
+             * Cache directory for generated `.sdef` files: `${PathManager.getSystemPath()}/sdef`.
+             * Migrated from the pre-Wave-4 facade companion. Path layout preserved byte-for-byte
+             * (`<systemPath>/sdef/<App_Name>_generated.sdef` after underscore-escaping).
+             */
+            private val GENERATED_DICTIONARIES_SYSTEM_FOLDER: String = "${PathManager.getSystemPath()}/sdef"
+
+            @JvmStatic
+            fun getInstance(): SdefFileProvider =
+                ApplicationManager
+                    .getApplication()
+                    .getService(SdefFileProvider::class.java)
         }
     }
-}

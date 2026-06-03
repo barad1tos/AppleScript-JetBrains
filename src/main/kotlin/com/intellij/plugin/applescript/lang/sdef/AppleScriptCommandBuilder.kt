@@ -20,7 +20,7 @@ package com.intellij.plugin.applescript.lang.sdef
  *   named arguments (the test suite does — see
  *   `CommandDataEqualsTest.testBuilderProducesEqualCommandData`) to keep
  *   the value-class swap hole sealed even though the constructor itself
- *   is intentionally public for the SDEF_Parser façade.
+ *   is intentionally public for the SdefParser facade.
  */
 class AppleScriptCommandBuilder(
     private val name: String,
@@ -40,20 +40,19 @@ class AppleScriptCommandBuilder(
      * silently break the `HashSet` / `HashMap` contract for the resulting
      * `CommandData` instance.
      */
-    fun parameters(p: List<CommandParameterData>): AppleScriptCommandBuilder =
-        apply { this.parameters = p.toList() }
+    fun parameters(p: List<CommandParameterData>): AppleScriptCommandBuilder = apply { this.parameters = p.toList() }
 
-    fun directParameter(d: CommandDirectParameter?): AppleScriptCommandBuilder =
-        apply { this.directParameter = d }
+    fun directParameter(d: CommandDirectParameter?): AppleScriptCommandBuilder = apply { this.directParameter = d }
 
     fun result(r: CommandResult?): AppleScriptCommandBuilder = apply { this.result = r }
 
-    fun build(): CommandData = CommandData(
-        name = name,
-        code = code,
-        description = description,
-        parameters = parameters,
-        directParameter = directParameter,
-        result = result,
-    )
+    fun build(): CommandData =
+        CommandData(
+            name = name,
+            code = code,
+            description = description,
+            parameters = parameters,
+            directParameter = directParameter,
+            result = result,
+        )
 }

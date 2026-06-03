@@ -30,7 +30,6 @@ import org.junit.Assume
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ServiceScopeLifecycleIntegrationTest : BasePlatformTestCase() {
-
     override fun setUp() {
         Assume.assumeTrue(
             "ServiceScopeLifecycleIntegrationTest only runs with -PincludeHeavyTests=true",
@@ -41,11 +40,13 @@ class ServiceScopeLifecycleIntegrationTest : BasePlatformTestCase() {
 
     fun testPlatformInjectedScopeExposesActiveJob() {
         val service: AppleScriptSystemDictionaryRegistryService =
-            ApplicationManager.getApplication()
+            ApplicationManager
+                .getApplication()
                 .getService(AppleScriptSystemDictionaryRegistryService::class.java)
         // serviceScope is exposed as `internal val` for same-module test access.
-        val scopeJob: Job = service.serviceScope.coroutineContext[Job]
-            ?: error("Platform-injected serviceScope must expose a Job")
+        val scopeJob: Job =
+            service.serviceScope.coroutineContext[Job]
+                ?: error("Platform-injected serviceScope must expose a Job")
         assertFalse(
             "serviceScope should be active when service is acquired",
             scopeJob.isCancelled,

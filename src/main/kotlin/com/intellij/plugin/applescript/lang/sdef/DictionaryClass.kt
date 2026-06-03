@@ -21,67 +21,23 @@ import com.intellij.psi.xml.XmlTag
  *    `SYNCHRONIZED` is the safe default; CD-03 allows `PUBLICATION` if profile
  *    shows monitor contention.
  *  - Why not `data class : FakePsiElement`? PITFALLS §1.1 BLOCKER: Kotlin
- *    synthesises `equals`/`hashCode` from primary-constructor properties,
+ *    synthesizes `equals`/`hashCode` from primary-constructor properties,
  *    overriding the platform's PSI identity contract and breaking caches.
  *
- * Public constructor surface is preserved verbatim so SDEF_Parser.parseClassTag
- * (line 307) + parseClassExtensionTag (line 229) continue to compile unchanged.
+ * The SDEF parser constructs the immutable `ClassDefinition` value and wraps
+ * it here as a PSI element.
  */
 class DictionaryClass :
     AbstractDictionaryComponent<Suite>,
     AppleScriptClass {
-
     private var data: ClassDefinition
 
     constructor(
         suite: Suite,
-        name: String,
-        code: String,
+        data: ClassDefinition,
         xmlTagClass: XmlTag,
-        parentClassName: String?,
-        elementNames: List<String>?,
-        respondingCommandNames: List<String>?,
-        pluralClassName: String?,
-    ) : super(suite, name, code, xmlTagClass, null) {
-        // else branch implies !StringUtil.isEmpty(pluralClassName); the opaque library guard hides
-        // the non-null invariant from Kotlin flow-analysis on this platform @Nullable String.
-        val plural =
-            if (StringUtil.isEmpty(pluralClassName)) {
-                "${name}s"
-            } else {
-                requireNotNull(pluralClassName) { "pluralClassName non-null: guarded by !StringUtil.isEmpty (else branch)" }
-            }
-        this.data = ClassDefinition(
-            name = name,
-            code = code,
-            description = null,
-            parentClassName = parentClassName,
-            pluralClassName = plural,
-            elementNames = elementNames.orEmpty(),
-            respondingCommandNames = respondingCommandNames.orEmpty(),
-            properties = emptyList(),
-        )
-    }
-
-    constructor(
-        suite: Suite,
-        name: String,
-        code: String,
-        properties: List<AppleScriptPropertyDefinition>,
-        xmlTagClass: XmlTag,
-        description: String?,
-        parentClassName: String?,
-    ) : super(suite, name, code, xmlTagClass, description) {
-        this.data = ClassDefinition(
-            name = name,
-            code = code,
-            description = description,
-            parentClassName = parentClassName,
-            pluralClassName = "${name}s",
-            elementNames = emptyList(),
-            respondingCommandNames = emptyList(),
-            properties = properties,
-        )
+    ) : super(suite, data.name, data.code, xmlTagClass, data.description) {
+        this.data = data
     }
 
     // D-04: resolve-once lookups via lazy(SYNCHRONIZED). The old mutable
@@ -97,16 +53,21 @@ class DictionaryClass :
         data.respondingCommandNames.mapNotNull { dictionary.findCommand(it) }
     }
 
-    override fun getDocFooter(): String = buildString {
-        AppleScriptDocHelper.appendClassAttributes(this, this@DictionaryClass)
-        val parent = parentClass
-        if (parent != null) {
-            val indent = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
-            append("<p>").append(indent).append("INHERITED FROM ").append(parent.getName().uppercase()).append("</p>")
-            AppleScriptDocHelper.appendClassAttributes(this, parent)
+    override fun getDocFooter(): String =
+        buildString {
+            AppleScriptDocHelper.appendClassAttributes(this, this@DictionaryClass)
+            val parent = parentClass
+            if (parent != null) {
+                val indent = "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"
+                append("<p>")
+                    .append(indent)
+                    .append("INHERITED FROM ")
+                    .append(parent.getName().uppercase())
+                    .append("</p>")
+                AppleScriptDocHelper.appendClassAttributes(this, parent)
+            }
+            append("</HTML>")
         }
-        append("</HTML>")
-    }
 
     override val contents: List<AppleScriptClass> get() = emptyList()
 

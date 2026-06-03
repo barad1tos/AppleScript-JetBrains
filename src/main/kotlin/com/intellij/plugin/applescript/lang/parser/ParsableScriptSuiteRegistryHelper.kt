@@ -8,137 +8,162 @@ import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
  * Static facade over [ParsableScriptHelper] consumed by the generated parser
  * (see `AppleScriptGeneratedParserUtil`). All methods proxy to the application-level
  * [AppleScriptSystemDictionaryRegistryService].
+ *
+ * This object intentionally stays flat: the generated parser calls Java-visible static methods,
+ * and the parser-util ABI guard freezes that facade shape.
  */
+@Suppress("TooManyFunctions")
 object ParsableScriptSuiteRegistryHelper {
-
-    private val scriptHelper: ParsableScriptHelper
+    private val registry: AppleScriptSystemDictionaryRegistryService
         get() = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+    private val helper: ParsableScriptHelper
+        get() = registry
 
     @JvmStatic
     fun ensureKnownApplicationInitialized(applicationName: String): Boolean =
-        scriptHelper.ensureKnownApplicationDictionaryInitialized(applicationName)
+        helper.ensureKnownApplicationDictionaryInitialized(applicationName)
 
     @JvmStatic
-    fun isStdLibClass(name: String): Boolean = scriptHelper.isStdLibClass(name)
+    fun isStdLibClass(name: String): Boolean = helper.isStdLibClass(name)
 
     @JvmStatic
-    fun isApplicationClass(applicationName: String, className: String): Boolean =
-        scriptHelper.isApplicationClass(applicationName, className)
+    fun isApplicationClass(
+        applicationName: String,
+        className: String,
+    ): Boolean = helper.isApplicationClass(applicationName, className)
 
     @JvmStatic
-    fun isStdLibClassPluralName(pluralName: String): Boolean = scriptHelper.isStdLibClassPluralName(pluralName)
+    fun isStdLibClassPluralName(pluralName: String): Boolean = helper.isStdLibClassPluralName(pluralName)
 
     @JvmStatic
-    fun isApplicationClassPluralName(applicationName: String, pluralClassName: String): Boolean =
-        scriptHelper.isApplicationClassPluralName(applicationName, pluralClassName)
+    fun isApplicationClassPluralName(
+        applicationName: String,
+        pluralClassName: String,
+    ): Boolean = helper.isApplicationClassPluralName(applicationName, pluralClassName)
 
     @JvmStatic
-    fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean =
-        scriptHelper.isStdClassWithPrefixExist(classNamePrefix)
+    fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean = helper.isStdClassWithPrefixExist(classNamePrefix)
 
     @JvmStatic
-    fun isClassWithPrefixExist(applicationName: String, classNamePrefix: String): Boolean =
-        scriptHelper.isClassWithPrefixExist(applicationName, classNamePrefix)
+    fun isClassWithPrefixExist(
+        applicationName: String,
+        classNamePrefix: String,
+    ): Boolean = helper.isClassWithPrefixExist(applicationName, classNamePrefix)
 
     @JvmStatic
-    fun isStdClassPluralWithPrefixExist(namePrefix: String): Boolean =
-        scriptHelper.isStdClassPluralWithPrefixExist(namePrefix)
+    fun isStdClassPluralWithPrefixExist(prefix: String): Boolean = helper.isStdClassPluralWithPrefixExist(prefix)
 
     @JvmStatic
-    fun isClassPluralWithPrefixExist(applicationName: String, pluralClassNamePrefix: String): Boolean =
-        scriptHelper.isClassPluralWithPrefixExist(applicationName, pluralClassNamePrefix)
+    fun isClassPluralWithPrefixExist(
+        applicationName: String,
+        pluralClassNamePrefix: String,
+    ): Boolean = helper.isClassPluralWithPrefixExist(applicationName, pluralClassNamePrefix)
 
     @JvmStatic
-    fun isStdCommand(name: String): Boolean = scriptHelper.isStdCommand(name)
+    fun isStdCommand(name: String): Boolean = helper.isStdCommand(name)
 
     @JvmStatic
-    fun isApplicationCommand(applicationName: String, commandName: String): Boolean =
-        scriptHelper.isApplicationCommand(applicationName, commandName)
+    fun isApplicationCommand(
+        applicationName: String,
+        commandName: String,
+    ): Boolean = helper.isApplicationCommand(applicationName, commandName)
 
     @JvmStatic
-    fun isCommandWithPrefixExist(applicationName: String, commandNamePrefix: String): Boolean =
-        scriptHelper.isCommandWithPrefixExist(applicationName, commandNamePrefix)
+    fun isCommandWithPrefixExist(
+        applicationName: String,
+        commandNamePrefix: String,
+    ): Boolean = helper.isCommandWithPrefixExist(applicationName, commandNamePrefix)
 
     @JvmStatic
-    fun isStdCommandWithPrefixExist(namePrefix: String): Boolean =
-        scriptHelper.isStdCommandWithPrefixExist(namePrefix)
+    fun isStdCommandWithPrefixExist(namePrefix: String): Boolean = helper.isStdCommandWithPrefixExist(namePrefix)
 
     @JvmStatic
-    fun findStdCommands(project: Project, commandName: String): Collection<AppleScriptCommand> =
-        scriptHelper.findStdCommands(project, commandName)
+    fun findStdCommands(
+        project: Project,
+        commandName: String,
+    ): Collection<AppleScriptCommand> = helper.findStdCommands(project, commandName)
 
     @JvmStatic
     fun findApplicationCommands(
         project: Project,
         applicationName: String,
         commandName: String,
-    ): List<AppleScriptCommand> = scriptHelper.findApplicationCommands(project, applicationName, commandName)
+    ): List<AppleScriptCommand> =
+        helper.findApplicationCommands(
+            project,
+            applicationName,
+            commandName,
+        )
 
     @JvmStatic
-    fun isStdProperty(name: String): Boolean = scriptHelper.isStdProperty(name)
+    fun isStdProperty(name: String): Boolean = helper.isStdProperty(name)
 
     @JvmStatic
-    fun isApplicationProperty(applicationName: String, propertyName: String): Boolean =
-        scriptHelper.isApplicationProperty(applicationName, propertyName)
+    fun isApplicationProperty(
+        applicationName: String,
+        propertyName: String,
+    ): Boolean = helper.isApplicationProperty(applicationName, propertyName)
 
     @JvmStatic
-    fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean =
-        scriptHelper.isStdPropertyWithPrefixExist(namePrefix)
+    fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean = helper.isStdPropertyWithPrefixExist(namePrefix)
 
     @JvmStatic
-    fun isPropertyWithPrefixExist(applicationName: String, propertyNamePrefix: String): Boolean =
-        scriptHelper.isPropertyWithPrefixExist(applicationName, propertyNamePrefix)
+    fun isPropertyWithPrefixExist(
+        applicationName: String,
+        propertyNamePrefix: String,
+    ): Boolean = helper.isPropertyWithPrefixExist(applicationName, propertyNamePrefix)
 
     @JvmStatic
-    fun isStdConstant(name: String): Boolean = scriptHelper.isStdConstant(name)
+    fun isStdConstant(name: String): Boolean = helper.isStdConstant(name)
 
     @JvmStatic
-    fun isApplicationConstant(applicationName: String, constantName: String): Boolean =
-        scriptHelper.isApplicationConstant(applicationName, constantName)
+    fun isApplicationConstant(
+        applicationName: String,
+        constantName: String,
+    ): Boolean = helper.isApplicationConstant(applicationName, constantName)
 
     @JvmStatic
-    fun isStdConstantWithPrefixExist(namePrefix: String): Boolean =
-        scriptHelper.isStdConstantWithPrefixExist(namePrefix)
+    fun isStdConstantWithPrefixExist(namePrefix: String): Boolean = helper.isStdConstantWithPrefixExist(namePrefix)
 
     @JvmStatic
-    fun isConstantWithPrefixExist(applicationName: String, constantNamePrefix: String): Boolean =
-        scriptHelper.isConstantWithPrefixExist(applicationName, constantNamePrefix)
+    fun isConstantWithPrefixExist(
+        applicationName: String,
+        constantNamePrefix: String,
+    ): Boolean = helper.isConstantWithPrefixExist(applicationName, constantNamePrefix)
 
+    @Suppress("unused")
     @JvmStatic
-    fun getScriptingAdditions(): HashSet<String> = scriptHelper.getScriptingAdditions()
+    fun getScriptingAdditions(): HashSet<String> = helper.getScriptingAdditions()
 
     // D-01 / D-04 facade dispatchers — additive, no existing method touched (D-08 parser-util
     // contract preserved). The two new booleans live on the registry-service class (NOT the
     // ParsableScriptHelper interface), so these proxies go via getInstance() directly.
 
     @JvmStatic
-    fun isInitialized(): Boolean =
-        AppleScriptSystemDictionaryRegistryService.getInstance().isInitialized()
+    fun isInitialized(): Boolean = registry.isInitialized()
 
     @JvmStatic
-    fun areAppDictionariesIndexed(): Boolean =
-        AppleScriptSystemDictionaryRegistryService.getInstance().areAppDictionariesIndexed()
+    fun areAppDictionariesIndexed(): Boolean = registry.areAppDictionariesIndexed()
 
     /**
-     * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: lets [SdefIndexService] bound-wait
-     * on the facade-owned `standardReady` Deferred WITHOUT importing the facade directly. Routing
+     * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: lets the dictionary index service
+     * bound-wait on the facade-owned `standardReady` Deferred WITHOUT importing the facade directly. Routing
      * through this static-utility class (NOT in the `verifyServiceDependencyGraph` services list)
-     * avoids the SdefIndexService -> facade back-edge that DFS would detect as a cycle.
+     * avoids the index-service -> facade back-edge that DFS would detect as a cycle.
      *
      * NOT marked `@JvmStatic` (unlike the 26 frozen-contract methods above) because (a) the only
-     * caller is Kotlin code in `SdefIndexService` — no Java parser-util call site exists — and (b)
+     * caller is Kotlin code in the dictionary index service — no Java parser-util call site exists — and (b)
      * `@JvmStatic suspend fun` emits a name-mangled JVM signature (the `-IoAF18A` suffix from
-     * `Result<Unit>`'s inline-class boxing) that would force [ParserUtilContractTest] to enumerate
-     * those mangled names. Keeping these proxies as plain object members preserves the contract
-     * count at the original 26.
+     * `Result<Unit>`'s inline-class boxing) that would force the ABI guard to enumerate those
+     * mangled names. Keeping these proxies as plain object members preserves the contract count at
+     * the original 26.
      */
-    suspend fun awaitStandardReady(): Result<Unit> =
-        AppleScriptSystemDictionaryRegistryService.getInstance().awaitStandardReadyInternal()
+    suspend fun awaitStandardReady(): Result<Unit> = registry.awaitStandardReadyInternal()
 
     /**
      * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: same as [awaitStandardReady] but
      * for the `appsReady` Deferred. See [awaitStandardReady] for cycle-prevention rationale.
      */
-    suspend fun awaitAppsReady(): Result<Unit> =
-        AppleScriptSystemDictionaryRegistryService.getInstance().awaitAppsReadyInternal()
+    suspend fun awaitAppsReady(): Result<Unit> = registry.awaitAppsReadyInternal()
 }

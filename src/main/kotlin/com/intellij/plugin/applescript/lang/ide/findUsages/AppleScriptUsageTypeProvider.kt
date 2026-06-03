@@ -9,7 +9,6 @@ import com.intellij.usages.impl.rules.UsageType
 import com.intellij.usages.impl.rules.UsageTypeProvider
 
 class AppleScriptUsageTypeProvider : UsageTypeProvider {
-
     override fun getUsageType(element: PsiElement): UsageType? {
         if (element !is AppleScriptPsiElement) return null
         // KEEP (Phase 8 / v2.0 backlog): collapsing this three-way check into a single type

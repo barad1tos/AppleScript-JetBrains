@@ -54,7 +54,6 @@ import org.junit.Assume
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CoroutineColdStartTest : BasePlatformTestCase() {
-
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var testScope: TestScope
 
@@ -75,74 +74,80 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
      * Constructor injection sanity — proves the service accepts (testScope, ioDispatcher)
      * shape. If 03-03 has NOT landed yet, this test fails to COMPILE — that's the RED.
      */
-    fun testConstructorAcceptsTestScopeAndIoDispatcher() = testScope.runTest {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-        assertNotNull(service)
-    }
+    fun testConstructorAcceptsTestScopeAndIoDispatcher() =
+        testScope.runTest {
+            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+            assertNotNull(service)
+        }
 
     /**
      * STATE 1 — pending: service constructed, launch scheduled but not yet run.
      * Expected: (isInitialized = false, areAppDictionariesIndexed = false)
      * Parser fast path MUST NOT crash and MUST return false/empty deterministically.
      */
-    fun testColdStart_pendingState_returnsFalseFromSyncFacade() = testScope.runTest {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-        // No runCurrent yet — service launched but init body has not executed
-        assertFalse("standardReady not yet completed", service.isInitialized())
-        assertFalse("appsReady not yet completed", service.areAppDictionariesIndexed())
-    }
+    fun testColdStart_pendingState_returnsFalseFromSyncFacade() =
+        testScope.runTest {
+            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+            // No runCurrent yet — service launched but init body has not executed
+            assertFalse("standardReady not yet completed", service.isInitialized())
+            assertFalse("appsReady not yet completed", service.areAppDictionariesIndexed())
+        }
 
     /**
      * STATE 2 — standard_ready: standard suite parsed, discovery still pending.
      * Expected: (isInitialized = true, areAppDictionariesIndexed = false)
      */
-    fun testAfterStandardSuiteParse_parserFastPathReturnsCorrectResults() = testScope.runTest {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-        runCurrent()  // advance past standardReady.complete(Result.success(Unit))
-        assertTrue("standardReady should be completed after runCurrent", service.isInitialized())
-        // discovery still pending — appsReady not yet completed
-        assertFalse("appsReady still pending", service.areAppDictionariesIndexed())
-    }
+    fun testAfterStandardSuiteParse_parserFastPathReturnsCorrectResults() =
+        testScope.runTest {
+            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+            runCurrent() // advance past standardReady.complete(Result.success(Unit))
+            assertTrue("standardReady should be completed after runCurrent", service.isInitialized())
+            // discovery still pending — appsReady not yet completed
+            assertFalse("appsReady still pending", service.areAppDictionariesIndexed())
+        }
 
     /**
      * STATE 3 — fully_ready: both deferreds completed, full app catalog indexed.
      * Expected: (isInitialized = true, areAppDictionariesIndexed = true)
      */
-    fun testAfterFullInit_completionContributorsSeeAppCatalog() = testScope.runTest {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-        advanceUntilIdle()  // drains all scheduled work
-        assertTrue("standardReady completed", service.isInitialized())
-        assertTrue("appsReady completed", service.areAppDictionariesIndexed())
-    }
+    fun testAfterFullInit_completionContributorsSeeAppCatalog() =
+        testScope.runTest {
+            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+            advanceUntilIdle() // drains all scheduled work
+            assertTrue("standardReady completed", service.isInitialized())
+            assertTrue("appsReady completed", service.areAppDictionariesIndexed())
+        }
 
     /**
      * INVARIANT — forbidden cell `(false, true)` is unreachable. `RECURRING_PITFALLS.md`
      * Pattern L: defensive lock against pipeline-order bugs (`appsReady` completing before
      * `standardReady` would indicate the `runInitChain` pipeline order was inverted).
      */
-    fun testPipelineOrder_standardReadyCannotCompleteAfterAppsReady() = testScope.runTest {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-        advanceUntilIdle()
-        assertFalse(
-            "Invariant broken: appsReady completed before standardReady",
-            service.areAppDictionariesIndexed() && !service.isInitialized(),
-        )
-    }
+    fun testPipelineOrder_standardReadyCannotCompleteAfterAppsReady() =
+        testScope.runTest {
+            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+            advanceUntilIdle()
+            assertFalse(
+                "Invariant broken: appsReady completed before standardReady",
+                service.areAppDictionariesIndexed() && !service.isInitialized(),
+            )
+        }
 
     /**
      * NEVER HALF-BROKEN (Success Criterion #4 discriminator):
      * At every observation point, result must be deterministic — empty pre-init OR full
      * post-init — never partial.
      */
-    fun testNeverHalfBroken_everyStateIsEitherCorrectOrEmpty() = testScope.runTest {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-        repeat(5) {
-            val result = service.findStdCommands(project, "do shell script")
-            assertTrue(
-                "result must be empty OR contain 'do shell script' command",
-                result.isEmpty() || result.any { it.name == "do shell script" }
-            )
-            runCurrent()
+    fun testNeverHalfBroken_everyStateIsEitherCorrectOrEmpty() =
+        testScope.runTest {
+            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+            repeat(5) {
+                val result = service.findStdCommands(project, "do shell script")
+                assertTrue(
+                    "result must be empty OR contain 'do shell script' command",
+                    result.isEmpty() || result.any { it.name == "do shell script" },
+                )
+                runCurrent()
+            }
         }
-    }
 }

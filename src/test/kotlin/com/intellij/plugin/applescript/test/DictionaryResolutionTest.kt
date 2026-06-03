@@ -11,11 +11,11 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
  * matcher. Run on demand with -PincludeHeavyTests=true --tests "*DictionaryResolutionTest".
  */
 class DictionaryResolutionTest : BasePlatformTestCase() {
-
     fun testPropertyEffectResolution() {
-        val script = "tell application \"Microsoft PowerPoint\"\n" +
-            "  property effect\n" +
-            "end tell"
+        val script =
+            "tell application \"Microsoft PowerPoint\"\n" +
+                "  property effect\n" +
+                "end tell"
 
         myFixture.configureByText("test.applescript", script)
         // Should not show errors for 'property effect'

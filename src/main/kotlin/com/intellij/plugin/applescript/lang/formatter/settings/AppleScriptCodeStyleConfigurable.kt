@@ -4,11 +4,17 @@ import com.intellij.application.options.CodeStyleAbstractConfigurable
 import com.intellij.application.options.CodeStyleAbstractPanel
 import com.intellij.psi.codeStyle.CodeStyleSettings
 
-class AppleScriptCodeStyleConfigurable(settings: CodeStyleSettings, cloneSettings: CodeStyleSettings) :
-    CodeStyleAbstractConfigurable(settings, cloneSettings, "Apple Script") {
+class AppleScriptCodeStyleConfigurable(
+    settings: CodeStyleSettings,
+    cloneSettings: CodeStyleSettings,
+) : CodeStyleAbstractConfigurable(settings, cloneSettings, "Apple Script") {
+    override fun createPanel(settings: CodeStyleSettings): CodeStyleAbstractPanel = createMainPanel(settings)
 
-    override fun createPanel(settings: CodeStyleSettings): CodeStyleAbstractPanel =
-        AppleScriptCodeStyleMainPanel(currentSettings, settings)
+    private fun createMainPanel(settings: CodeStyleSettings): CodeStyleAbstractPanel =
+        AppleScriptCodeStyleMainPanel(
+            currentSettings,
+            settings,
+        )
 
     override fun getHelpTopic(): String? = null
 }

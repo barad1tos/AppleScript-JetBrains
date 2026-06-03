@@ -27,10 +27,9 @@ import java.nio.charset.StandardCharsets
  * baseline ([com.intellij.plugin.applescript.test.parsing.ParserRegressionTest]).
  */
 class PersistenceGoldenFixtureTest : BasePlatformTestCase() {
-
     override fun getTestDataPath(): String = File(PERSISTENCE_DIR).absolutePath
 
-    fun testV1_0_StateLoadsCleanly() {
+    fun testV10StateLoadsCleanly() {
         val fixtureFile = File(testDataPath, "v1.0.xml")
         assertTrue("Fixture missing: ${fixtureFile.absolutePath}", fixtureFile.exists())
         val fixtureBytes = fixtureFile.readBytes()
@@ -38,12 +37,13 @@ class PersistenceGoldenFixtureTest : BasePlatformTestCase() {
 
         // Load root <application>, find <component name="AppleScriptSystemDictionaryRegistryComponent">.
         val rootElement = JDOMUtil.load(String(fixtureBytes, StandardCharsets.UTF_8))
-        val componentElement = rootElement.children
-            .firstOrNull { child ->
-                child.name == "component" &&
-                    child.getAttributeValue("name") == "AppleScriptSystemDictionaryRegistryComponent"
-            }
-            ?: error("Component element not found in fixture: ${fixtureFile.absolutePath}")
+        val componentElement =
+            rootElement.children
+                .firstOrNull { child ->
+                    child.name == "component" &&
+                        child.getAttributeValue("name") == "AppleScriptSystemDictionaryRegistryComponent"
+                }
+                ?: error("Component element not found in fixture: ${fixtureFile.absolutePath}")
 
         // Deserialise `PersistedState` in-place.
         val state = PersistedState()
@@ -57,10 +57,11 @@ class PersistenceGoldenFixtureTest : BasePlatformTestCase() {
         assertEquals(mutableListOf("Calculator", "Stickies"), state.notScriptableApplications)
 
         // Re-serialise the in-memory state and byte-compare against the fixture.
-        val emittedComponent = XmlSerializer.serialize(state).apply {
-            setAttribute("name", "AppleScriptSystemDictionaryRegistryComponent")
-            name = "component"
-        }
+        val emittedComponent =
+            XmlSerializer.serialize(state).apply {
+                setAttribute("name", "AppleScriptSystemDictionaryRegistryComponent")
+                name = "component"
+            }
         val emittedRoot = Element("application").apply { addContent(emittedComponent) }
         val serializedBytes = JDOMUtil.write(emittedRoot).toByteArray(StandardCharsets.UTF_8)
 

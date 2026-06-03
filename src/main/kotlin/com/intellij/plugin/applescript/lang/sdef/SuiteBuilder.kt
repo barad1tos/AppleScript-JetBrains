@@ -5,10 +5,9 @@ package com.intellij.plugin.applescript.lang.sdef
  *
  * Plan 02-04 ships this as a standalone top-level class (D-05) in the same
  * package as `SuiteImpl.kt` — no nested-class form, no `builder/` sub-package.
- * The parser route is: `SuiteImpl(dictionary, code, name, hidden, description,
- * xmlTagSuite)` continues to be the constructor call shape used by
- * `SDEF_Parser.parseSuiteTag` (D-06 façade). Internally that constructor uses
- * this builder to produce the initial `data: SuiteDefinition`.
+ * The SDEF parser still constructs suites through `SuiteImpl(dictionary, code, name, hidden,
+ * description, xmlTagSuite)`. Internally that constructor uses this builder to produce the initial
+ * `data: SuiteDefinition`.
  *
  * Setter methods returning `this` keep the fluent style consistent with
  * `AppleScriptCommandBuilder` from plan 02-03.
@@ -31,10 +30,11 @@ class SuiteBuilder(
 
     fun description(d: String?): SuiteBuilder = apply { this.description = d }
 
-    fun build(): SuiteDefinition = SuiteDefinition(
-        name = name,
-        code = code,
-        hidden = hidden,
-        description = description,
-    )
+    fun build(): SuiteDefinition =
+        SuiteDefinition(
+            name = name,
+            code = code,
+            hidden = hidden,
+            description = description,
+        )
 }

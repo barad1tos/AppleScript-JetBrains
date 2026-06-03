@@ -11,10 +11,10 @@ import com.intellij.plugin.applescript.psi.sdef.DictionaryReference
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
-open class AbstractAppleScriptCommandHandlerCall(node: ASTNode) :
-    AppleScriptExpressionImpl(node),
+open class AbstractAppleScriptCommandHandlerCall(
+    node: ASTNode,
+) : AppleScriptExpressionImpl(node),
     AppleScriptCommandHandlerCall {
-
     override fun getReference(): DictionaryReference = CommandHandlerReference()
 
     override fun getCompositeNameElement(): DictionaryCompositeName =
@@ -31,7 +31,6 @@ open class AbstractAppleScriptCommandHandlerCall(node: ASTNode) :
     private inner class CommandHandlerReference :
         AbstractDictionaryReferenceElement(),
         DictionaryReference {
-
         override fun isReferenceTo(element: PsiElement): Boolean {
             val target = resolve()
             if (element is AppleScriptCommandHandlerCall && target != null) {

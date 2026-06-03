@@ -4,10 +4,22 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
-import kotlinx.coroutines.CoroutineScope
 import java.io.File
 import javax.script.ScriptEngineManager
 import javax.script.ScriptException
+
+private const val APPLE_SCRIPT_ENGINE = "AppleScriptEngine"
+private const val XCODE_APPLICATION_PATH = "/Applications/Xcode.app"
+private const val XCODE_ABSENT_SENTINEL = "null"
+private const val XCODE_BUNDLE_ID = "com.apple.dt.Xcode"
+private val FIND_XCODE_SCRIPT: String =
+    """
+    try
+      tell application "Finder" to return POSIX path of (get application file id "$XCODE_BUNDLE_ID" as alias)
+    on error
+      return "$XCODE_ABSENT_SENTINEL"
+    end try
+    """.trimIndent()
 
 /**
  * Phase 7 CLEANUP-01 / D-05: Xcode-detection seam, extracted out of [SdefFileProvider].
@@ -26,10 +38,7 @@ import javax.script.ScriptException
  * annotation, mirroring [SdefFileProvider] and [SdefFileTypeRegistrar]).
  */
 @Service(Service.Level.APP)
-class XcodeDetectionService @JvmOverloads constructor(
-    @Suppress("unused") private val serviceScope: CoroutineScope,
-) {
-
+class XcodeDetectionService {
     // Migrated from SdefFileProvider (Phase 7 D-05): lazy-cached Xcode bundle file. Null means
     // "not yet detected"; a non-null File with name "null" means "previously detected as absent"
     // (sentinel preserved byte-for-byte from the SdefFileProvider body — do NOT change the
@@ -46,43 +55,58 @@ class XcodeDetectionService @JvmOverloads constructor(
      * byte-for-byte from the pre-extraction SdefFileProvider body.
      */
     fun isXcodeInstalled(): Boolean {
-        if (!SystemInfo.isMac) return false
-        val cached = xCodeApplicationFile
-        if (cached != null && cached.exists()) return true
-        // "null" name means that Xcode was not found previously.
-        if (cached != null && "null" == cached.name) return false
-
-        val xCodeApp = File("/Applications/Xcode.app")
-        if (xCodeApp.exists()) {
-            xCodeApplicationFile = xCodeApp
-            return true
-        }
-        try {
-            val engineManager = ScriptEngineManager()
-            val engine = engineManager.getEngineByName("AppleScriptEngine")
-            if (engine != null) {
-                val script = "try\n" +
-                    "tell application \"Finder\" to return POSIX path of (get application file id \"com.apple.dt.Xcode\" " +
-                    "as alias)\n" + "on error\n" + "  return \"null\"\n" + "end try"
-                val scriptResult = engine.eval(script)
-                if (scriptResult != null) {
-                    val result = File(scriptResult.toString())
-                    xCodeApplicationFile = result
-                    return result.exists()
-                }
+        val isInstalled =
+            if (!SystemInfo.isMac) {
+                false
+            } else {
+                readCachedInstallState()
+                    ?: detectXcodeApplicationFile().exists()
             }
-        } catch (e: ScriptException) {
-            LOG.error("Error evaluating applescript: ${e.message}")
+        return isInstalled
+    }
+
+    private fun readCachedInstallState(): Boolean? {
+        val cached = xCodeApplicationFile
+        return when {
+            cached == null -> null
+            cached.exists() -> true
+            cached.name == XCODE_ABSENT_SENTINEL -> false
+            else -> null
         }
-        xCodeApplicationFile = File("null")
-        return false
+    }
+
+    private fun detectXcodeApplicationFile(): File {
+        val xCodeApplication = File(XCODE_APPLICATION_PATH)
+        val detected =
+            if (xCodeApplication.exists()) {
+                xCodeApplication
+            } else {
+                findXcodeWithAppleScript() ?: File(XCODE_ABSENT_SENTINEL)
+            }
+        xCodeApplicationFile = detected
+        return detected
+    }
+
+    private fun findXcodeWithAppleScript(): File? {
+        val engine = ScriptEngineManager().getEngineByName(APPLE_SCRIPT_ENGINE)
+        return if (engine == null) {
+            null
+        } else {
+            try {
+                engine.eval(FIND_XCODE_SCRIPT)?.toString()?.let(::File)
+            } catch (e: ScriptException) {
+                LOG.error("Error evaluating applescript: ${e.message}")
+                null
+            }
+        }
     }
 
     companion object {
         private val LOG: Logger = Logger.getInstance("#${XcodeDetectionService::class.java.name}")
+        private val application
+            get() = ApplicationManager.getApplication()
 
         @JvmStatic
-        fun getInstance(): XcodeDetectionService =
-            ApplicationManager.getApplication().getService(XcodeDetectionService::class.java)
+        fun getInstance(): XcodeDetectionService = application.getService(XcodeDetectionService::class.java)
     }
 }

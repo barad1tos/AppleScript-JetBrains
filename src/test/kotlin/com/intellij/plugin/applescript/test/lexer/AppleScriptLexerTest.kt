@@ -14,7 +14,6 @@ import junit.framework.TestCase
  * so it runs unconditionally in the light suite under the `lexer.*` matcher.
  */
 class AppleScriptLexerTest : TestCase() {
-
     fun testLexerTest() {
         val lexer = AppleScriptLexerAdapter()
         val ch: CharSequence = "the \"My string\""

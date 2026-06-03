@@ -12,10 +12,10 @@ import com.intellij.psi.ResolveState
 import com.intellij.psi.scope.PsiScopeProcessor
 import javax.swing.Icon
 
-class AppleScriptFile(viewProvider: FileViewProvider) :
-    PsiFileBase(viewProvider, AppleScriptLanguage),
+class AppleScriptFile(
+    viewProvider: FileViewProvider,
+) : PsiFileBase(viewProvider, AppleScriptLanguage),
     AppleScriptPsiElement {
-
     override fun processDeclarations(
         processor: PsiScopeProcessor,
         state: ResolveState,

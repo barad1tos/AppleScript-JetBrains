@@ -12,9 +12,10 @@ package com.intellij.plugin.applescript.lang.sdef
  *    `fun` while [pluralClassName] is the read-only `val` getter.
  *  - [suite] narrows `DictionaryComponent.suite: Suite?` to non-null `Suite` — converted in lockstep
  *    with the supertype this wave (05-04). JVM-visible as `getSuite()`.
+ *  - [code] narrows `DictionaryComponent.code: String?` to non-null `String`; SDEF classes always have
+ *    a dictionary code, while top-level application dictionaries may still report `null`.
  */
 sealed interface AppleScriptClass : DictionaryComponent {
-
     /** JVM-visible as `getContents()`. */
     val contents: List<AppleScriptClass>
 
@@ -23,6 +24,9 @@ sealed interface AppleScriptClass : DictionaryComponent {
 
     /** JVM-visible as `getSuite()`; narrows `DictionaryComponent.suite` to non-null. */
     override val suite: Suite
+
+    /** JVM-visible as `getCode()`; narrows `DictionaryComponent.code` to non-null. */
+    override val code: String
 
     /** JVM-visible as `getParentClassName()`. */
     val parentClassName: String?

@@ -53,13 +53,6 @@
         <error line="17" column="61" source="standard:parameter-list-wrapping" />
         <error line="17" column="61" source="standard:class-signature" />
     </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/AppleScriptJSInjector.kt">
-        <error line="15" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="16" column="39" source="standard:function-signature" />
-        <error line="16" column="70" source="standard:function-signature" />
-        <error line="16" column="89" source="standard:function-signature" />
-        <error line="24" column="18" source="standard:chain-method-continuation" />
-    </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/formatter/AppleScriptBlock.kt">
         <error line="22" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="52" column="29" source="standard:function-signature" />
@@ -251,12 +244,6 @@
         <error line="160" column="18" source="standard:multiline-expression-wrapping" />
         <error line="160" column="18" source="standard:function-signature" />
         <error line="177" column="23" source="standard:chain-method-continuation" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/ide/completion/AppleScriptCompletionWeigher.kt">
-        <error line="9" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="10" column="24" source="standard:function-signature" />
-        <error line="10" column="48" source="standard:function-signature" />
-        <error line="10" column="76" source="standard:function-signature" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/ide/completion/ApplicationNameCompletionContributor.kt">
         <error line="17" column="1" source="standard:no-empty-first-line-in-class-body" />
@@ -950,9 +937,6 @@
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/AppleScriptClass.kt">
         <error line="17" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/AppleScriptClassType.kt">
-        <error line="6" column="1" source="standard:no-empty-first-line-in-class-body" />
-    </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/AppleScriptCommand.kt">
         <error line="23" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
@@ -1032,20 +1016,12 @@
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/DictionaryEnumerator.kt">
         <error line="4" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/DictionaryEnumeratorImpl.kt">
-        <error line="8" column="1" source="standard:no-empty-first-line-in-class-body" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/DictionaryPropertyImpl.kt">
-        <error line="8" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="61" column="17" source="standard:multiline-expression-wrapping" />
-    </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/DictionaryRecord.kt">
         <error line="4" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/DictionaryRecordDefinition.kt">
         <error line="5" column="36" source="standard:class-signature" />
         <error line="5" column="72" source="standard:class-signature" />
-        <error line="6" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/DictionarySuite.kt">
         <error line="4" column="1" source="standard:no-empty-first-line-in-class-body" />
@@ -1065,7 +1041,6 @@
         <error line="34" column="36" source="standard:function-signature" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/sdef/SuiteImpl.kt">
-        <error line="36" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="65" column="21" source="standard:multiline-expression-wrapping" />
         <error line="80" column="17" source="standard:multiline-expression-wrapping" />
     </file>
@@ -1125,32 +1100,6 @@
         <error line="399" column="24" source="standard:if-else-bracing" />
         <error line="399" column="24" source="standard:if-else-wrapping" />
         <error line="399" column="24" source="standard:multiline-if-else" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/util/AppleScriptNamesValidator.kt">
-        <error line="16" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="17" column="28" source="standard:function-signature" />
-        <error line="17" column="42" source="standard:function-signature" />
-        <error line="17" column="59" source="standard:function-signature" />
-        <error line="32" column="31" source="standard:function-signature" />
-        <error line="32" column="45" source="standard:function-signature" />
-        <error line="32" column="62" source="standard:function-signature" />
-        <error line="39" column="48" source="standard:function-signature" />
-        <error line="39" column="62" source="standard:function-signature" />
-        <error line="39" column="78" source="standard:function-signature" />
-        <error line="40" column="22" source="standard:multiline-expression-wrapping" />
-        <error line="61" column="54" source="standard:function-signature" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/util/MyStopVisitingException.kt">
-        <error line="6" column="1" source="standard:no-empty-first-line-in-class-body" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/lang/util/ScopeUtil.kt">
-        <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="21" column="1" source="standard:spacing-between-declarations-with-annotations" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/AppleScriptComponent.kt">
-        <error line="10" column="34" source="standard:class-signature" />
-        <error line="10" column="59" source="standard:class-signature" />
-        <error line="11" column="1" source="standard:no-empty-first-line-in-class-body" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/AppleScriptHandler.kt">
         <error line="7" column="1" source="standard:no-empty-first-line-in-class-body" />
@@ -1345,55 +1294,12 @@
         <error line="155" column="38" source="standard:argument-list-wrapping" />
         <error line="159" column="41" source="standard:multiline-expression-wrapping" />
     </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/impl/AbstractAppleScriptComponent.kt">
-        <error line="16" column="1" source="standard:no-unused-imports" />
-        <error line="34" column="45" source="standard:class-signature" />
-        <error line="34" column="58" source="standard:class-signature" />
-        <error line="37" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="40" column="47" source="standard:function-signature" />
-        <error line="45" column="41" source="standard:multiline-expression-wrapping" />
-        <error line="45" column="41" source="standard:function-signature" />
-        <error line="58" column="1" source="standard:indent" />
-        <error line="83" column="50" source="standard:multiline-expression-wrapping" />
-        <error line="83" column="50" source="standard:function-signature" />
-        <error line="96" column="40" source="standard:function-signature" />
-        <error line="103" column="45" source="standard:function-signature" />
-        <error line="106" column="56" source="standard:multiline-expression-wrapping" />
-        <error line="106" column="56" source="standard:function-signature" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/impl/AbstractAppleScriptHandlerCall.kt">
-        <error line="25" column="47" source="standard:class-signature" />
-        <error line="25" column="60" source="standard:class-signature" />
-        <error line="28" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="31" column="49" source="standard:multiline-expression-wrapping" />
-        <error line="31" column="49" source="standard:function-signature" />
-        <error line="39" column="68" source="standard:function-signature" />
-        <error line="46" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="60" column="35" source="standard:function-signature" />
-        <error line="60" column="60" source="standard:function-signature" />
-        <error line="60" column="83" source="standard:function-signature" />
-    </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/impl/AbstractAppleScriptScriptObject.kt">
         <error line="11" column="48" source="standard:class-signature" />
         <error line="11" column="61" source="standard:class-signature" />
         <error line="14" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="21" column="56" source="standard:multiline-expression-wrapping" />
         <error line="21" column="56" source="standard:function-signature" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/impl/AppleScriptElementPresentation.kt">
-        <error line="12" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="23" column="49" source="standard:function-signature" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/impl/AppleScriptHandlerInterleavedParameters.kt">
-        <error line="19" column="52" source="standard:class-signature" />
-        <error line="19" column="65" source="standard:class-signature" />
-        <error line="25" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="50" column="24" source="standard:multiline-expression-wrapping" />
-        <error line="57" column="24" source="standard:multiline-expression-wrapping" />
-        <error line="70" column="25" source="standard:multiline-expression-wrapping" />
-        <error line="76" column="42" source="standard:multiline-expression-wrapping" />
-        <error line="76" column="42" source="standard:function-signature" />
-        <error line="82" column="63" source="standard:function-signature" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/impl/AppleScriptHandlerSelectorPartImpl.kt">
         <error line="18" column="51" source="standard:class-signature" />
@@ -1416,25 +1322,6 @@
         <error line="25" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="36" column="1" source="standard:no-empty-first-line-in-class-body" />
         <error line="104" column="44" source="standard:multiline-expression-wrapping" />
-    </file>
-    <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/impl/AppleScriptPsiImplUtil.kt">
-        <error line="44" column="1" source="standard:no-empty-first-line-in-class-body" />
-        <error line="46" column="96" source="standard:function-signature" />
-        <error line="145" column="53" source="standard:function-signature" />
-        <error line="149" column="18" source="standard:function-signature" />
-        <error line="149" column="34" source="standard:function-signature" />
-        <error line="149" column="50" source="standard:function-signature" />
-        <error line="149" column="65" source="standard:function-signature" />
-        <error line="149" column="77" source="standard:function-signature" />
-        <error line="168" column="56" source="standard:multiline-expression-wrapping" />
-        <error line="169" column="28" source="standard:argument-list-wrapping" />
-        <error line="188" column="78" source="standard:multiline-expression-wrapping" />
-        <error line="188" column="78" source="standard:function-signature" />
-        <error line="191" column="19" source="standard:chain-method-continuation" />
-        <error line="191" column="25" source="standard:chain-method-continuation" />
-        <error line="191" column="75" source="standard:chain-method-continuation" />
-        <error line="191" column="81" source="standard:chain-method-continuation" />
-        <error line="246" column="86" source="standard:function-signature" />
     </file>
     <file name="src/main/kotlin/com/intellij/plugin/applescript/psi/impl/AppleScriptReferenceElementImpl.kt">
         <error line="32" column="48" source="standard:class-signature" />
@@ -1869,9 +1756,5 @@
         <error line="67" column="39" source="standard:function-signature" />
         <error line="67" column="50" source="standard:function-signature" />
         <error line="68" column="43" source="standard:string-template" />
-    </file>
-    <file name="src/test/kotlin/com/intellij/plugin/applescript/test/spikes/WithBackgroundProgressNullProjectSpike.kt">
-        <error line="32" column="63" source="standard:multiline-expression-wrapping" />
-        <error line="32" column="63" source="standard:function-signature" />
     </file>
 </baseline>

@@ -13,13 +13,13 @@ import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.tree.TokenSet
 
 class AppleScriptFindUsagesProvider : FindUsagesProvider {
-
-    override fun getWordsScanner(): WordsScanner = DefaultWordsScanner(
-        AppleScriptLexerAdapter(),
-        TokenSet.create(AppleScriptTypes.IDENTIFIER),
-        TokenSet.create(AppleScriptTypes.COMMENT),
-        TokenSet.create(AppleScriptTypes.STRING_LITERAL),
-    )
+    override fun getWordsScanner(): WordsScanner =
+        DefaultWordsScanner(
+            AppleScriptLexerAdapter(),
+            TokenSet.create(AppleScriptTypes.IDENTIFIER),
+            TokenSet.create(AppleScriptTypes.COMMENT),
+            TokenSet.create(AppleScriptTypes.STRING_LITERAL),
+        )
 
     override fun canFindUsagesFor(psiElement: PsiElement): Boolean =
         psiElement is PsiNamedElement || psiElement is AppleScriptReferenceElement
@@ -38,7 +38,10 @@ class AppleScriptFindUsagesProvider : FindUsagesProvider {
         return ""
     }
 
-    override fun getNodeText(element: PsiElement, useFullName: Boolean): String {
+    override fun getNodeText(
+        element: PsiElement,
+        useFullName: Boolean,
+    ): String {
         val name = (element as? PsiNamedElement)?.name
         return name ?: element.text
     }

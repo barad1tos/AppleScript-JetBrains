@@ -9,7 +9,6 @@ import com.intellij.psi.tree.IElementType
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptSyntaxHighlighterTest : BasePlatformTestCase() {
-
     fun testLanguagePrimitiveTokensUseDedicatedHighlighting() {
         val highlighter = AppleScriptSyntaxHighlighter()
 
@@ -24,9 +23,10 @@ class AppleScriptSyntaxHighlighterTest : BasePlatformTestCase() {
         tokenType: IElementType,
         expectedExternalName: String,
     ) {
-        val actualNames = highlighter
-            .getTokenHighlights(tokenType)
-            .mapTo(mutableSetOf()) { key -> key.externalName }
+        val actualNames =
+            highlighter
+                .getTokenHighlights(tokenType)
+                .mapTo(mutableSetOf()) { key -> key.externalName }
 
         assertTrue(
             "$tokenType should include $expectedExternalName; actual keys=$actualNames",
