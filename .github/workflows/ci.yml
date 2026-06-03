@@ -58,7 +58,7 @@ jobs:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Build plugin
-        run: ./gradlew build --stacktrace
+        run: ./gradlew build -PskipHeavyTests=true --stacktrace
 
       - name: Run tests with coverage
         run: ./gradlew test koverXmlReport koverVerify --stacktrace
