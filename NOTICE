@@ -1,0 +1,26 @@
+AppleScript Support
+Copyright 2025-2026 Roman Borodavkin and contributors
+
+Current maintained fork:
+This product is maintained by Roman Borodavkin and contributors as a Kotlin
+rewrite and revival of the AppleScript language support plugin for current
+IntelliJ Platform releases.
+
+Original AppleScript-IDEA plugin:
+This product includes software derived from the original AppleScript-IDEA
+plugin for JetBrains IDEs:
+
+  https://github.com/ant-druha/AppleScript-IDEA
+
+Copyright 2017 Andrey Dernov
+Licensed under the Apache License, Version 2.0.
+
+This maintained fork preserves the original Apache-2.0 attribution. The
+current-fork notice above covers this repository's maintained derivative work
+and modifications; it does not replace or narrow the original project
+attribution.
+
+Apple, AppleScript, macOS, JetBrains, IntelliJ IDEA, and related names or
+marks are trademarks of their respective owners. This project is not
+affiliated with, endorsed by, or sponsored by Apple, JetBrains, or the
+original maintainer.

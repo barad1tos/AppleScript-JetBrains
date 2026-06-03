@@ -77,6 +77,9 @@ tasks.named<ProcessResources>("processResources") {
     from(rootProject.layout.projectDirectory.file("LICENSE")) {
         into("META-INF")
     }
+    from(rootProject.layout.projectDirectory.file("NOTICE")) {
+        into("META-INF")
+    }
     from(rootProject.layout.projectDirectory.file("THIRD_PARTY_NOTICES.md")) {
         into("META-INF")
     }

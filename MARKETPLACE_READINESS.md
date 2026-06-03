@@ -19,7 +19,7 @@ values change.
 - Minimum supported build: `251` (`pluginSinceBuild=251`)
 - Current verifier targets: IntelliJ IDEA Community 2025.1 and 2025.2
 - License: Apache License 2.0
-- Vendor metadata: `barad1tos`
+- Vendor metadata: `Roman Borodavkin`
 
 ## Checklist
 
@@ -29,6 +29,7 @@ values change.
 - [x] Neutral file type icon replaces the previous Apple-like file icon.
 - [x] Legacy upstream screenshots, bundled language PDFs, old PsiViewer JAR, and unused SDEF media assets removed.
 - [x] `plugin.xml` vendor and description updated for Marketplace display.
+- [x] `NOTICE` added with current maintainer and original-project attribution.
 - [x] `THIRD_PARTY_NOTICES.md` added with original-project attribution.
 - [x] Apache 2.0 license retained.
 - [x] CI, CodeQL, Dependabot, pre-commit, zizmor, ktlint, detekt, and plugin-verifier wiring are present.
