@@ -29,7 +29,7 @@
 
 <br>
 
-AppleScript Support brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a maintained Kotlin rewrite and revival of the original Apache-2.0 AppleScript plugin, updated for the modern IntelliJ Platform.
+AppleScript Support brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a Kotlin rewrite and revival of the original Apache-2.0 AppleScript plugin, maintained by Roman Borodavkin and updated for the modern IntelliJ Platform.
 
 The project is not affiliated with Apple, JetBrains, or the original maintainer.
 
@@ -43,15 +43,15 @@ The project is not affiliated with Apple, JetBrains, or the original maintainer.
 
 ## Language Support
 
-| Area | Support |
-|------|---------|
-| File types | `.applescript`, `.scpt` |
-| Syntax | Highlighting for AppleScript keywords, literals, operators, handlers, tell blocks, and dictionary terms where available |
-| Parser | Common AppleScript statements and expressions, Standard Additions object tokens, object references, handlers, `tell`, `try`, `whose`, and application-specific terms |
-| Completion | Keywords, command names, command parameters, application names, and dictionary-backed terms |
-| Navigation | Structure view, documentation lookup, references, find usages, and rename where supported |
-| Runtime | Run configurations using the macOS AppleScript runtime |
-| Templates | Live templates for common AppleScript constructs |
+| Area       | Support                                                                                                                                                              |
+|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| File types | `.applescript`, `.scpt`                                                                                                                                              |
+| Syntax     | Highlighting for AppleScript keywords, literals, operators, handlers, tell blocks, and dictionary terms where available                                              |
+| Parser     | Common AppleScript statements and expressions, Standard Additions object tokens, object references, handlers, `tell`, `try`, `whose`, and application-specific terms |
+| Completion | Keywords, command names, command parameters, application names, and dictionary-backed terms                                                                          |
+| Navigation | Structure view, documentation lookup, references, find usages, and rename where supported                                                                            |
+| Runtime    | Run configurations using the macOS AppleScript runtime                                                                                                               |
+| Templates  | Live templates for common AppleScript constructs                                                                                                                     |
 
 ## Compatibility
 
@@ -148,6 +148,8 @@ This project is derived from the original AppleScript plugin for JetBrains IDEs 
 
 This maintained fork keeps the Apache-2.0 attribution while updating the implementation for current JetBrains IDEs, including a Kotlin rewrite, modern IntelliJ Platform Gradle Plugin migration, dictionary loading hardening, parser compatibility work, and current CI/plugin-verifier coverage.
 
+The current maintained fork and modifications are Copyright 2025-2026 Roman Borodavkin and contributors. That notice covers this repository's maintained derivative work and does not replace the original author attribution.
+
 The legacy plugin identity is currently preserved for upgrade-continuity analysis. A paid Marketplace publication may require a separate plugin id, display name, and vendor namespace if the existing listing cannot be controlled or transferred. See `MARKETPLACE_READINESS.md`.
 
 ## Links
@@ -158,9 +160,10 @@ The legacy plugin identity is currently preserved for upgrade-continuity analysi
 
 ## Credits
 
+- Maintained fork and Kotlin rewrite by Roman Borodavkin and contributors.
 - Original AppleScript plugin by Andrey Dernov, distributed under the Apache License 2.0.
 - IntelliJ Platform SDK by JetBrains.
 
 ## License
 
-This project is distributed under the Apache License 2.0. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.
+This project is distributed under the Apache License 2.0. See `LICENSE`, `NOTICE`, and `THIRD_PARTY_NOTICES.md`.

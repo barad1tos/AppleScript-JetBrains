@@ -1,7 +1,7 @@
 <idea-plugin>
   <id>com.intellij.plugin.applescript</id>
   <name>AppleScript Support</name>
-  <vendor url="https://github.com/barad1tos/AppleScript-JetBrains">barad1tos</vendor>
+  <vendor url="https://github.com/barad1tos/AppleScript-JetBrains">Roman Borodavkin</vendor>
   <description><![CDATA[
     <p>AppleScript support for modern JetBrains IDEs.</p>
     <p>
