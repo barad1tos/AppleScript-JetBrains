@@ -10,7 +10,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assume
 
 /**
- * Codex HIGH 1 — proves the success-semantic facade predicate correctly distinguishes
+ * Review HIGH 1 — proves the success-semantic facade predicate correctly distinguishes
  * `Result.success(Unit)` (ready) from `Result.failure(throwable)` (NOT ready).
  *
  * Without this distinction a failed init would make readers see "ready" because

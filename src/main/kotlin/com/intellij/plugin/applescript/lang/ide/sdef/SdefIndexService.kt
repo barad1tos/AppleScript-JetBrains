@@ -67,7 +67,7 @@ private fun parsedSuiteElements(suiteElement: Element): ParsedSuiteElements =
  * - 14 ConcurrentHashMap indexes (migrated byte-for-byte from facade lines 79-92).
  * - 21 sync lookup methods (migrated 1:1 from facade `isXxx` bodies).
  * - [findStdCommands] + [findApplicationCommands] (EDT-guarded + bounded-wait readiness
- *   bridges preserved per Phase 3 Codex MEDIUM 1 + HIGH 5 / HIGH 1).
+ *   bridges preserved per Phase 3 Review MEDIUM 1 + HIGH 5 / HIGH 1).
  * - XML parsing pipeline (`parseDictionaryFile` + 3 element handlers + 7 companion helpers).
  *
  * Cycle-prevention (plan-checker iteration-1 BLOCKER 1 + iteration-2 BLOCKER mitigation):

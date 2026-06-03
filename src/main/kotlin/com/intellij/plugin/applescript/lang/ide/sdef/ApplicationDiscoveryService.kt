@@ -56,7 +56,7 @@ import java.util.concurrent.ConcurrentHashMap
  *   synchronous and indirectly invoked from the parser-util hot path (which cannot
  *   suspend, per Phase 4 D-03). The EDT guard at entry returns `null` immediately on
  *   the UI thread to avoid a multi-second freeze on the recursive VFS walk
- *   (RESEARCH Open Question 1 + Phase 3 Codex MEDIUM 1).
+ *   (RESEARCH Open Question 1 + Phase 3 Review MEDIUM 1).
  *
  * Backing collections are [ConcurrentHashMap.newKeySet] per HOTFIX-01 (Phase 1) so
  * concurrent reads from completion contributors / annotator paths and writes from
@@ -163,7 +163,7 @@ class ApplicationDiscoveryService
          * facade's [AppleScriptSystemDictionaryRegistryService.getInitializedInfo], which
          * cannot suspend (RESEARCH Open Question 1).
          *
-         * EDT guard (Phase 3 Codex MEDIUM 1 + RESEARCH Q1): if called on the EDT this
+         * EDT guard (Phase 3 Review MEDIUM 1 + RESEARCH Q1): if called on the EDT this
          * method returns `null` immediately instead of attempting the multi-second
          * recursive walk. Callers must invoke from a background thread; production
          * call sites are already off-EDT by construction.

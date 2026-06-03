@@ -51,7 +51,6 @@ reports/
 # Agent / tool state
 .serena/
 .trunk/
-.claude/
 
 # Kotlin / Gradle convenience
 kotlin-js-store/

@@ -14,7 +14,7 @@ import kotlinx.coroutines.Job
 import org.junit.Assume
 
 /**
- * Codex MEDIUM 2 — validates the actual `@Service(Service.Level.APP)` Platform-injected
+ * Review MEDIUM 2 — validates the actual `@Service(Service.Level.APP)` Platform-injected
  * scope path. Distinct from [ManualServiceScopeCancellationTest] which only validates the
  * manual cleanup pattern with an arbitrary parent disposable.
  *

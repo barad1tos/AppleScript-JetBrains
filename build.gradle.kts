@@ -153,7 +153,7 @@ detekt {
 
 // Frozen-surface guard: src/main/gen is on the main sourceSet (build.gradle.kts:51), so detekt
 // scans the ~250 generated parser/PSI files without this exclusion. The generated surface is
-// regenerated from BNF/Flex and must never be pressured by a code-smell gate (CLAUDE.md).
+// regenerated from BNF/Flex and must never be pressured by a code-smell gate (project rules).
 tasks.withType<Detekt>().configureEach {
     exclude("**/gen/**")
 }

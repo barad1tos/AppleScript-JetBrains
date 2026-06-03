@@ -16,7 +16,7 @@ import kotlinx.coroutines.test.TestScope
 import org.junit.Assume
 
 /**
- * Codex HIGH 5 — proves that completing `standardReady` alone does NOT unblock
+ * Review HIGH 5 — proves that completing `standardReady` alone does NOT unblock
  * `findApplicationCommands`. The app-scoped facade MUST wait on `appsReady`, NOT on
  * `standardReady`. Otherwise app completion/resolution would read an empty/partial
  * app catalog before discovery completes.

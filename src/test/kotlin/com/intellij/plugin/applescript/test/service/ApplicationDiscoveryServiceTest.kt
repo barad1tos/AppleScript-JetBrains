@@ -86,7 +86,7 @@ class ApplicationDiscoveryServiceTest : BasePlatformTestCase() {
     }
 
     /**
-     * EDT guard verification (RESEARCH Open Question 1 + Phase 3 Codex MEDIUM 1):
+     * EDT guard verification (RESEARCH Open Question 1 + Phase 3 Review MEDIUM 1):
      * `findApplicationBundleFile` on the EDT must return `null` immediately rather than
      * attempt the multi-second recursive VFS walk that would freeze the UI thread.
      *

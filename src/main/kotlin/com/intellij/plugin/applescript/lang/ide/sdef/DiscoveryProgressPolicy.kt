@@ -9,7 +9,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Codex HIGH 3 — extracted testable helper that owns the D-04 hybrid silent->visible
+ * Review HIGH 3 — extracted testable helper that owns the D-04 hybrid silent->visible
  * progress UX timing decision.
  *
  * Runs a suspend `block`. If the block has NOT completed by [visibilityThreshold]
@@ -23,7 +23,7 @@ import kotlin.time.Duration.Companion.seconds
  * application-scope progress); tests pass a `RecordingFake` for deterministic
  * assertions on `show()`/`dismiss()` call counts and ordering. NO Job-tree
  * `toString().contains()` reflection-by-string (Pattern I compliance per
- * `~/.claude/agents/RECURRING_PITFALLS.md`).
+ * `RECURRING_PITFALLS.md`).
  *
  * Structured concurrency: the internal "show after threshold" coroutine is
  * launched via `CoroutineScope(currentCoroutineContext()).launch { ... }`, so it inherits

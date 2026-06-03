@@ -16,7 +16,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assume
 
 /**
- * Codex MEDIUM 2 rename of the original `ServiceScopeLifecycleTest`. Validates that the manual
+ * Review MEDIUM 2 rename of the original `ServiceScopeLifecycleTest`. Validates that the manual
  * cleanup pattern (parent-disposable cancels a manually-constructed TestScope) works for arbitrary
  * parent-disposable wiring. Distinct from the new [ServiceScopeLifecycleIntegrationTest] which
  * validates the actual `@Service(Service.Level.APP)` Platform-injected scope path.

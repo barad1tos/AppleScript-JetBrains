@@ -38,7 +38,7 @@ import kotlin.coroutines.CoroutineContext
  *   (isInitialized = false, areAppDictionariesIndexed = true)   // INVARIANT VIOLATION
  *
  * Per RESEARCH section 6 + PITFALLS section 7.3 (tests don't catch the race in production):
- *  - Uses kotlinx-coroutines-test TestDispatcher INJECTED VIA CONSTRUCTOR (Codex HIGH 2):
+ *  - Uses kotlinx-coroutines-test TestDispatcher INJECTED VIA CONSTRUCTOR (Review HIGH 2):
  *    the [StandardTestDispatcher] is passed as the `ioDispatcher` constructor parameter
  *    that 03-03 adds. Without that injection, the service would use hardcoded
  *    `Dispatchers.IO` and `runCurrent()` / `advanceUntilIdle()` would not control
@@ -55,12 +55,12 @@ import kotlin.coroutines.CoroutineContext
  *       private val serviceScope: CoroutineScope,
  *       private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
  *   )
- * AND the `Result<Unit>`-typed deferreds + facade success-semantics (Codex HIGH 1).
+ * AND the `Result<Unit>`-typed deferreds + facade success-semantics (Review HIGH 1).
  * Until 03-03 lands, this file FAILS TO COMPILE because the constructor reference
  * `newTestService()` does not
  * yet resolve. THAT is the RED state — compile-time failure, not a silent skip.
  *
- * Codex HIGH 2 — no skip-style assume gates remain in test bodies; the RED is real.
+ * Review HIGH 2 — no skip-style assume gates remain in test bodies; the RED is real.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CoroutineColdStartTest : BasePlatformTestCase() {

@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Codex HIGH 3 — test seam interface that abstracts the Platform progress primitive.
+ * Review HIGH 3 — test seam interface that abstracts the Platform progress primitive.
  *
  * Production: [ProgressTaskCompatDefault] wraps [Task.Backgroundable] with a `null`
  * project for application-scope progress.

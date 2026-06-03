@@ -155,7 +155,7 @@ private fun recoverDictionaryFileFromBundledSdef(
     applicationIoFile: File,
     targetFile: File,
 ): Boolean {
-    // Codex MEDIUM 3 / Plan 03-04: the legacy dispatch-thread guard here is REMOVED.
+    // Review MEDIUM 3 / Plan 03-04: the legacy dispatch-thread guard here is REMOVED.
     // copyDictionaryFileToCacheDir routes through `withContext(ioDispatcher)`, so the
     // recovery path is always available regardless of caller thread.
     LOG.warn("Will try to find application scripting definition file...")
@@ -290,10 +290,10 @@ private fun createDictionaryInfoForApplication(
  *
  * Phase 3 D-02 dispatch-context audit (closed in Wave 4 per 03-CONTEXT.md): each method
  * carries an explicit dispatcher invariant in its KDoc. The pre-Wave-4 facade had a
- * legacy `isDispatchThread` guard at former line 631 (already removed in Phase 3 Codex
+ * legacy `isDispatchThread` guard at former line 631 (already removed in Phase 3 Review
  * MEDIUM 3 on `copyDictionaryFileToCacheDir`) — no remaining EDT guards needed on the
  * migrated bodies because the `@Synchronized` composite chain plus the EDT guards on
- * the bounded-wait facades (`findStdCommands` / `findApplicationCommands` per Codex
+ * the bounded-wait facades (`findStdCommands` / `findApplicationCommands` per Review
  * MEDIUM 1) make EDT entry into this code path impossible.
  *
  * Phase 3 coroutine bridges (former facade lines 459/497/878/900 in the pre-Wave-3
@@ -383,7 +383,7 @@ class SdefFileProvider
          *
          * Dispatcher invariant: non-suspend (`@Synchronized` is incompatible with `suspend`).
          * Production call sites are off-EDT by construction (EDT guards on `findStdCommands` /
-         * `findApplicationCommands` per Codex MEDIUM 1; parser-util via
+         * `findApplicationCommands` per Review MEDIUM 1; parser-util via
          * [AppleScriptSystemDictionaryRegistryService.getInitializedInfo] is off-EDT).
          *
          * Body migrated byte-for-byte from the pre-Wave-4 facade
@@ -420,7 +420,7 @@ class SdefFileProvider
          * Copy [applicationDictionaryFile] into the IDE's cache directory at [targetFile].
          *
          * Dispatcher invariant: synchronous file I/O; callers reach this provider from
-         * background dictionary-loading paths. Plan 03-04 / D-02 (Codex MEDIUM 3) —
+         * background dictionary-loading paths. Plan 03-04 / D-02 (Review MEDIUM 3) —
          * legacy dispatch-thread early-exit
          * guard was already removed in Phase 3; structured-concurrency dispatch supersedes
          * the manual guard. Body migrated byte-for-byte from the pre-Wave-4 facade.

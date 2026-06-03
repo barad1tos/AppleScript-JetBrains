@@ -56,7 +56,7 @@ class AppleScriptSystemDictionaryRegistryService
         // Without @JvmOverloads, Platform-instantiated `getInstance()` calls fail with
         // InstantiationException; tests that construct the service manually with a
         // `StandardTestDispatcher` still get the 2-arg overload for runCurrent / advanceUntilIdle
-        // determinism (Codex HIGH 2). Discovered during Phase 03 gap closure (DEBUG.md REVISION).
+        // determinism (Review HIGH 2). Discovered during Phase 03 gap closure (DEBUG.md REVISION).
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         private val progressTaskCompat: ProgressTaskCompat = ProgressTaskCompatDefault(),
     ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()),
@@ -95,7 +95,7 @@ class AppleScriptSystemDictionaryRegistryService
         /**
          * Two-stage gating primitives replacing the Phase 1 [java.util.concurrent.CountDownLatch] (D-01, D-04).
          *
-         * Typed as `CompletableDeferred<Result<Unit>>` per Codex HIGH 1 so failed init is communicated via
+         * Typed as `CompletableDeferred<Result<Unit>>` per Review HIGH 1 so failed init is communicated via
          * `complete(Result.failure(...))` (NOT `completeExceptionally(...)`). `isCompleted` alone is NOT
          * a success signal — readers must additionally check `getCompleted().isSuccess`. The two facades
          * [isInitialized] and [areAppDictionariesIndexed] encapsulate this success-semantic predicate.
@@ -113,7 +113,7 @@ class AppleScriptSystemDictionaryRegistryService
             // Constructor returns immediately (COROUTINE-05 non-blocking-init invariant). The launch is
             // fire-and-forget; structured concurrency guarantees cancellation on plugin unload / app
             // shutdown via the injected [serviceScope] (RESEARCH §3 verified). `ioDispatcher` is injected
-            // (Codex HIGH 2) so tests pass `StandardTestDispatcher` for deterministic runCurrent /
+            // (Review HIGH 2) so tests pass `StandardTestDispatcher` for deterministic runCurrent /
             // advanceUntilIdle control of init progression.
             serviceScope.launch {
                 runInitChain()
@@ -127,7 +127,7 @@ class AppleScriptSystemDictionaryRegistryService
             // cancel button. User cancel on the indicator does NOT cancel runInitChain — they are
             // sibling children (T-03-cancel-leak mitigation per the plan's STRIDE register).
             //
-            // Codex HIGH 3 — the timing decision + indicator surfacing lives in DiscoveryProgressPolicy,
+            // Review HIGH 3 — the timing decision + indicator surfacing lives in DiscoveryProgressPolicy,
             // testable via a RecordingFake ProgressTaskCompat. Production uses
             // `Task.Backgroundable(null, ...)` for application-scope progress.
             serviceScope.launch {
@@ -158,7 +158,7 @@ class AppleScriptSystemDictionaryRegistryService
          *   - Catch [RuntimeException] and `LOG.error` at the service boundary.
          *   - `finally` block completes any not-yet-completed deferred with `Result.failure(...)` so the
          *     facades see `isCompleted && isFailure` → return `false` (not-ready) rather than a
-         *     false-positive "ready" for a failed init (Codex HIGH 1, Pattern G).
+         *     false-positive "ready" for a failed init (Review HIGH 1, Pattern G).
          */
         @Suppress("TooGenericExceptionCaught")
         private suspend fun runInitChain() {
@@ -185,7 +185,7 @@ class AppleScriptSystemDictionaryRegistryService
                 } catch (e: RuntimeException) {
                     LOG.error("Error while initializing service", e)
                 } finally {
-                    // Codex HIGH 1: complete with Result.failure so facades see isCompleted && isFailure
+                    // Review HIGH 1: complete with Result.failure so facades see isCompleted && isFailure
                     // → return false. NOT `completeExceptionally` (which would make `await()` throw at
                     // callers and lose the success-vs-failure distinction at the facade boundary).
                     if (shouldCompleteFailures) {
@@ -212,7 +212,7 @@ class AppleScriptSystemDictionaryRegistryService
          * Returns `true` only when the standard SDEF suite (StandardAdditions + CocoaStandard) has been
          * parsed AND indexed successfully. A completed-but-failed [standardReady] (init threw before the
          * `Result.success(Unit)` line) returns `false` — readers see "not ready" rather than a
-         * false-positive "ready" for a failed init (Codex HIGH 1, RECURRING_PITFALLS.md Pattern G).
+         * false-positive "ready" for a failed init (Review HIGH 1, RECURRING_PITFALLS.md Pattern G).
          *
          * Distinct from [areAppDictionariesIndexed]: this facade reflects the parser fast path readiness
          * (standard-library suite only), while [areAppDictionariesIndexed] reflects the full
@@ -226,7 +226,7 @@ class AppleScriptSystemDictionaryRegistryService
          * Returns `true` only when the full application catalog discovery has completed successfully.
          * Completion contributors and the annotator gate on this facade. A failed [appsReady] returns
          * `false` — readers see "not ready" rather than a false-positive "ready" for a failed
-         * app-discovery sweep (Codex HIGH 1, RECURRING_PITFALLS.md Pattern G).
+         * app-discovery sweep (Review HIGH 1, RECURRING_PITFALLS.md Pattern G).
          *
          * Distinct from [isInitialized]: this facade reflects the full app-discovery pipeline, while
          * [isInitialized] reflects only the standard-library readiness (Gemini LOW 3).
@@ -657,7 +657,7 @@ class AppleScriptSystemDictionaryRegistryService
          * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
          * [ApplicationDiscoveryService.findApplicationBundleFile]. The body now lives on the
          * discovery service (including the EDT guard added in Wave 3 per RESEARCH Open Question 1
-         * + Phase 3 Codex MEDIUM 1). The pre-Wave-3 visibility was `private`; Wave 3 promotes
+         * + Phase 3 Review MEDIUM 1). The pre-Wave-3 visibility was `private`; Wave 3 promotes
          * to `public` to match the typed-API contract — no external callers existed pre-Wave-3,
          * so the visibility widening is harmless.
          *

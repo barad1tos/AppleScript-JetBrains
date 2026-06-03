@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Codex HIGH 3 — verifies the D-04 hybrid silent->visible progress UX via
+ * Review HIGH 3 — verifies the D-04 hybrid silent->visible progress UX via
  * `DiscoveryProgressPolicy` + `RecordingFake` test seam. NO Job-tree
  * `toString().contains()` reflection-by-string (deleted from the prior plan
  * revision).
@@ -69,7 +69,7 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
     }
 
     /**
-     * Codex HIGH 3 — recording fake for `ProgressTaskCompat` assertions. Captures
+     * Review HIGH 3 — recording fake for `ProgressTaskCompat` assertions. Captures
      * `show()` / `dismiss()` call counts so tests can deterministically lock the
      * policy's state-machine transitions WITHOUT inspecting Job-tree internals.
      */
@@ -196,7 +196,7 @@ class ProgressBackgroundableTest : BasePlatformTestCase() {
 
     /**
      * (c) Cancellation propagation — cancelling the parent coroutine dismisses
-     * a visible indicator. Codex HIGH 3 — assertion on RecordingFake state
+     * a visible indicator. Review HIGH 3 — assertion on RecordingFake state
      * (`dismissCount` increments), NOT on Job-tree introspection.
      */
     fun testCancellation_dismissesIndicatorWhenParentCancels() =

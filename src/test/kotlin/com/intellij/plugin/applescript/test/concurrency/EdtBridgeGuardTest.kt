@@ -17,7 +17,7 @@ import kotlinx.coroutines.test.TestScope
 import org.junit.Assume
 
 /**
- * Codex MEDIUM 1 + Gemini LOW 1 — proves the EDT guard at facade entry returns
+ * Review MEDIUM 1 + Gemini LOW 1 — proves the EDT guard at facade entry returns
  * `emptyList()` (no 2s freeze) when called from the EDT. Without the guard a future
  * EDT caller would block the IDE for 2 seconds on the `runBlockingCancellable` bridge.
  *
