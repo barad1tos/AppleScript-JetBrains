@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="320" height="320" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">AppleScript Support</title>
+  <desc id="desc">A neutral IDE-style AppleScript Support mark with AS lettering and a script prompt.</desc>
+  <defs>
+    <linearGradient id="accent" x1="42" y1="38" x2="282" y2="286" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6CA8FF"/>
+      <stop offset=".52" stop-color="#7C4DFF"/>
+      <stop offset="1" stop-color="#23C284"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="78" y1="66" x2="246" y2="264" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#182338"/>
+      <stop offset="1" stop-color="#0F1724"/>
+    </linearGradient>
+    <filter id="shadow" x="28" y="28" width="264" height="280" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#020617" flood-opacity=".35"/>
+    </filter>
+  </defs>
+  <rect width="320" height="320" rx="76" fill="#202431"/>
+  <path d="M34 34h116L34 150z" fill="#6CA8FF"/>
+  <path d="M286 286H168l118-118z" fill="#23C284"/>
+  <path d="M254 34h52v118z" fill="#7C4DFF" opacity=".9"/>
+  <g filter="url(#shadow)">
+    <rect x="62" y="58" width="196" height="216" rx="28" fill="url(#panel)" stroke="url(#accent)" stroke-width="8"/>
+    <rect x="78" y="82" width="164" height="42" rx="14" fill="#202431"/>
+    <circle cx="100" cy="103" r="6" fill="#FF6B6B"/>
+    <circle cx="120" cy="103" r="6" fill="#FFD166"/>
+    <circle cx="140" cy="103" r="6" fill="#23C284"/>
+  </g>
+  <text x="160" y="191" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="800" text-anchor="middle" letter-spacing="2">AS</text>
+  <path d="M104 226l22 14-22 14" fill="none" stroke="#23C284" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M142 240h76" stroke="#6CA8FF" stroke-width="12" stroke-linecap="round"/>
+  <path d="M92 140h126" stroke="#FFFFFF" stroke-opacity=".25" stroke-width="10" stroke-linecap="round"/>
+</svg>

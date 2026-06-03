@@ -111,6 +111,6 @@ The plugin is now compatible with modern JetBrains IDEs (2024.3+) and is fully r
 - Built with the modern IntelliJ Platform Gradle Plugin 2.x toolchain on Gradle 9.5.
 - Kotlin 2.3 / JVM target 17.
 
-### Known issues
+### Next
 
-- Idiomatic Kotlin API surface (property syntax across hand-written PSI/SDEF interfaces, sealed hierarchies, structured concurrency for SDEF loading) is planned for the 1.1 milestone — for 1.0 the API shape mirrors the original Java 1:1 to keep the rewrite reviewable.
+- The first compatibility release intentionally mirrored the original Java API shape to keep the rewrite reviewable. Later maintenance releases continue API ergonomics, dictionary loading, and parser hardening work while preserving existing user workflows.

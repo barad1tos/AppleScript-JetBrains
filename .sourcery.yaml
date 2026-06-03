@@ -4,6 +4,3 @@ ignore:
   - .kotlin/**
   - .intellijPlatform/**
   - src/main/gen/**
-  - lang-doc/**
-  - lib/**
-  - img/**
