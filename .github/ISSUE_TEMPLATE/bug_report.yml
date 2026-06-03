@@ -6,6 +6,8 @@ body:
     attributes:
       value: |
         Thanks for reporting. Please include enough detail to reproduce the issue in a JetBrains IDE.
+        Do not include secrets, tokens, or private data in public issues.
+        Report security issues privately through GitHub Security Advisories.
 
   - type: dropdown
     id: area
