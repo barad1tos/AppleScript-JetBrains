@@ -1,0 +1,96 @@
+name: Bug Report
+description: Report an AppleScript parsing, completion, dictionary, runtime, or IDE integration issue
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please include enough detail to reproduce the issue in a JetBrains IDE.
+        Do not include secrets, tokens, or private data in public issues.
+        Report security issues privately through GitHub Security Advisories.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Parser / syntax errors
+        - Syntax highlighting
+        - Code completion
+        - Application dictionary / SDEF
+        - Run configuration / script execution
+        - Navigation / find usages / rename
+        - Live templates
+        - Plugin installation / compatibility
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: ide
+    attributes:
+      label: IDE and version
+      placeholder: "e.g. IntelliJ IDEA 2025.2.1 Community"
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      placeholder: "e.g. 2.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "e.g. macOS 15.5, Windows 11, Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: script
+    attributes:
+      label: Minimal AppleScript sample
+      description: Paste the smallest script that reproduces the issue.
+      render: applescript
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe what you expected and what actually happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dictionary
+    attributes:
+      label: Dictionary context
+      description: If relevant, name the target application or attach the `.sdef` / `.xml` dictionary file.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: "Paste relevant errors from Help > Show Log in Finder/Explorer (`idea.log`)."
+      render: text
+    validations:
+      required: false

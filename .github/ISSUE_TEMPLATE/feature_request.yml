@@ -1,0 +1,51 @@
+name: Feature Request
+description: Suggest an AppleScript language, dictionary, IDE, or Marketplace-readiness improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea for AppleScript Support? Please describe the workflow it improves.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Parser / grammar support
+        - Syntax highlighting
+        - Code completion
+        - Application dictionary / SDEF
+        - Run configuration
+        - Navigation / find usages / rename
+        - Live templates
+        - Documentation / Marketplace listing
+        - Build / CI / verifier
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What would you like to see added or changed?
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: How would this improve your AppleScript workflow?
+    validations:
+      required: false
+
+  - type: textarea
+    id: sample
+    attributes:
+      label: Example script or dictionary term
+      description: If relevant, include a script snippet, SDEF term, or application dictionary example.
+      render: applescript
+    validations:
+      required: false

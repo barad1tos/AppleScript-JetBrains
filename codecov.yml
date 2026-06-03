@@ -16,9 +16,6 @@ coverage:
 ignore:
   - "src/main/gen/**"
   - "src/test/**"
-  - "lang-doc/**"
-  - "img/**"
-  - "lib/**"
 
 comment:
   layout: "condensed_header, condensed_files, condensed_footer"

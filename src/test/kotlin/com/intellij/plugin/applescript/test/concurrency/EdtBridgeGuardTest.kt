@@ -17,11 +17,11 @@ import kotlinx.coroutines.test.TestScope
 import org.junit.Assume
 
 /**
- * Review MEDIUM 1 + Gemini LOW 1 — proves the EDT guard at facade entry returns
- * `emptyList()` (no 2s freeze) when called from the EDT. Without the guard a future
- * EDT caller would block the IDE for 2 seconds on the `runBlockingCancellable` bridge.
+ * Proves the EDT guard at facade entry returns `emptyList()` when called from the EDT.
+ * Without the guard, a future EDT caller would block the IDE for 2 seconds on the
+ * `runBlockingCancellable` bridge.
  *
- * Heavy-gated per Phase 1 D-09 convention.
+ * Heavy-gated because it exercises IntelliJ threading behavior.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class EdtBridgeGuardTest : BasePlatformTestCase() {

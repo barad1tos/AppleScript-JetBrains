@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, kotlin-rewrite]
+    branches: [master]
   pull_request:
     branches: [master]
   workflow_dispatch:
@@ -100,6 +100,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
+
+      - name: Free disk space
+        uses: ./.github/actions/free-disk-space
 
       - name: Set up JDK 17
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5

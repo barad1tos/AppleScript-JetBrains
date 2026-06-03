@@ -212,11 +212,11 @@ class AppleScriptSystemDictionaryRegistryService
          * Returns `true` only when the standard SDEF suite (StandardAdditions + CocoaStandard) has been
          * parsed AND indexed successfully. A completed-but-failed [standardReady] (init threw before the
          * `Result.success(Unit)` line) returns `false` — readers see "not ready" rather than a
-         * false-positive "ready" for a failed init (Review HIGH 1, RECURRING_PITFALLS.md Pattern G).
+         * false-positive "ready" for a failed init.
          *
          * Distinct from [areAppDictionariesIndexed]: this facade reflects the parser fast path readiness
          * (standard-library suite only), while [areAppDictionariesIndexed] reflects the full
-         * `/Applications` discovery sweep (Gemini LOW 3).
+         * `/Applications` discovery sweep.
          *
          * @return `true` if [standardReady] completed successfully; `false` if pending OR failed.
          */
@@ -226,10 +226,10 @@ class AppleScriptSystemDictionaryRegistryService
          * Returns `true` only when the full application catalog discovery has completed successfully.
          * Completion contributors and the annotator gate on this facade. A failed [appsReady] returns
          * `false` — readers see "not ready" rather than a false-positive "ready" for a failed
-         * app-discovery sweep (Review HIGH 1, RECURRING_PITFALLS.md Pattern G).
+         * app-discovery sweep.
          *
          * Distinct from [isInitialized]: this facade reflects the full app-discovery pipeline, while
-         * [isInitialized] reflects only the standard-library readiness (Gemini LOW 3).
+         * [isInitialized] reflects only the standard-library readiness.
          *
          * @return `true` if [appsReady] completed successfully; `false` if pending OR failed.
          */

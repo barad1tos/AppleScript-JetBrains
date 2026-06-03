@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Code of conduct report
+    url: mailto:barad1tos@gmail.com
+    about: Report conduct concerns privately
+  - name: Security reports
+    url: https://github.com/barad1tos/AppleScript-JetBrains/security/advisories/new
+    about: Report vulnerabilities privately through GitHub Security Advisories
+  - name: Repository README
+    url: https://github.com/barad1tos/AppleScript-JetBrains#readme
+    about: Review compatibility, installation, limitations, and local build instructions
