@@ -58,6 +58,7 @@ class AppleScriptSystemDictionaryRegistryService
         // `StandardTestDispatcher` still get the 2-arg overload for runCurrent / advanceUntilIdle
         // determinism (Codex HIGH 2). Discovered during Phase 03 gap closure (DEBUG.md REVISION).
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        private val progressTaskCompat: ProgressTaskCompat = ProgressTaskCompatDefault(),
     ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()),
         ParsableScriptHelper {
         // persisted data
@@ -130,7 +131,7 @@ class AppleScriptSystemDictionaryRegistryService
             // testable via a RecordingFake ProgressTaskCompat. Production uses
             // `Task.Backgroundable(null, ...)` for application-scope progress.
             serviceScope.launch {
-                val policy = DiscoveryProgressPolicy(taskCompat = ProgressTaskCompatDefault())
+                val policy = DiscoveryProgressPolicy(taskCompat = progressTaskCompat)
                 policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
                     appsReady.await()
                 }
