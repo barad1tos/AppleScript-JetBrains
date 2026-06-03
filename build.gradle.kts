@@ -482,8 +482,10 @@ tasks {
             "between releases. Strategy B (filesystem walk of verifier IDE lib/ dirs): " +
             "infers core version from standalone kotlinx-coroutines-slf4j-<VERSION>.jar " +
             "(core itself is merged into app.jar in 2024.3+/2025.x — verified)."
-        // Run this after `verifyPlugin` in CI/release. Clean `build` runs do not materialise
-        // verifier IDE directories, so wiring this task into `check` reports false MISSING drift.
+        // `verifyPlugin` materialises the verifier IDE directories that this task inspects.
+        // Keep this dependency local to the release/CI drift gate instead of wiring the task into
+        // `check`, where clean builds would otherwise pay for full plugin verification.
+        dependsOn("verifyPlugin")
         val snapshotFile = layout.projectDirectory.file("gradle/coroutinesBundledVersions.json")
         inputs.file(snapshotFile)
         doLast {

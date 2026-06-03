@@ -122,10 +122,7 @@ jobs:
         run: ./gradlew detekt ktlintCheck --stacktrace
 
       - name: Verify plugin against target IDEs
-        run: ./gradlew verifyPlugin --stacktrace
-
-      - name: Verify bundled coroutines versions
-        run: ./gradlew verifyBundledCoroutinesVersions --stacktrace
+        run: ./gradlew verifyPlugin verifyBundledCoroutinesVersions --stacktrace
 
       - name: Fail on internal API verifier findings
         run: python3 scripts/verify-plugin-verifier.py
