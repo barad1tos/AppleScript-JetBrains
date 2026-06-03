@@ -7,9 +7,11 @@ import com.intellij.psi.codeStyle.CodeStyleSettings
 import com.intellij.psi.codeStyle.CodeStyleSettingsProvider
 
 class AppleScriptCodeStyleSettingsProvider : CodeStyleSettingsProvider() {
-
     override fun getConfigurableDisplayName(): String = "AppleScript"
 
-    override fun createSettingsPage(settings: CodeStyleSettings, originalSettings: CodeStyleSettings): Configurable =
-        AppleScriptCodeStyleConfigurable(settings, originalSettings)
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun createSettingsPage(
+        settings: CodeStyleSettings,
+        originalSettings: CodeStyleSettings,
+    ): Configurable = AppleScriptCodeStyleConfigurable(settings, originalSettings)
 }

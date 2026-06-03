@@ -13,7 +13,6 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.containers.SortedList
 
 object AppleScriptResolveUtil {
-
     @JvmStatic
     fun toCandidateInfoArray(elements: List<PsiElement?>?): Array<ResolveResult> {
         if (elements == null) return ResolveResult.EMPTY_ARRAY
@@ -21,7 +20,10 @@ object AppleScriptResolveUtil {
         return Array(filtered.size) { i -> PsiElementResolveResult(filtered[i]) }
     }
 
-    // TODO: move to ScriptObject and simplify variables extraction.
+    // KEEP (Phase 8 / v2.0 backlog): relocating this to AppleScriptScriptObject and
+    // simplifying the three-way variable extraction is a real refactor that touches the
+    // PSI-adjacent resolve surface, not a one-liner. Deferred — out of the v1.x cleanup
+    // scope (behaviour-preserving only).
     @JvmStatic
     fun getNamedSubComponentsFor(script: AppleScriptScriptObject): List<AppleScriptComponent> {
         val result = ArrayList<AppleScriptComponent>()
@@ -53,17 +55,5 @@ object AppleScriptResolveUtil {
             }
         }
         return resultList
-    }
-
-    @JvmStatic
-    fun getTellStatementScope(myElement: PsiElement): PsiElement? {
-        var tellStatement: PsiElement? = myElement
-        while (tellStatement != null) {
-            tellStatement = tellStatement.parent
-            if (tellStatement is AppleScriptTellSimpleStatement || tellStatement is AppleScriptTellCompoundStatement) {
-                return tellStatement
-            }
-        }
-        return null
     }
 }

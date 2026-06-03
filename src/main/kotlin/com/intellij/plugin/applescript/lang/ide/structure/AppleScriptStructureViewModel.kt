@@ -11,10 +11,11 @@ import com.intellij.plugin.applescript.psi.AppleScriptScriptBody
 import com.intellij.plugin.applescript.psi.AppleScriptScriptObject
 import com.intellij.psi.PsiFile
 
-class AppleScriptStructureViewModel internal constructor(psiFile: PsiFile, editor: Editor?) :
-    StructureViewModelBase(psiFile, editor, AppleScriptStructureViewElement(psiFile)),
+class AppleScriptStructureViewModel internal constructor(
+    psiFile: PsiFile,
+    editor: Editor?,
+) : StructureViewModelBase(psiFile, editor, AppleScriptStructureViewElement(psiFile)),
     StructureViewModel.ElementInfoProvider {
-
     init {
         withSorters(Sorter.ALPHA_SORTER)
         withSuitableClasses(AppleScriptScriptBody::class.java, AppleScriptScriptObject::class.java)
@@ -24,6 +25,5 @@ class AppleScriptStructureViewModel internal constructor(psiFile: PsiFile, edito
 
     override fun isAlwaysShowsPlus(element: StructureViewTreeElement): Boolean = isAlwaysLeaf(element)
 
-    override fun isAlwaysLeaf(element: StructureViewTreeElement): Boolean =
-        element.value is AppleScriptIdentifier
+    override fun isAlwaysLeaf(element: StructureViewTreeElement): Boolean = element.value is AppleScriptIdentifier
 }

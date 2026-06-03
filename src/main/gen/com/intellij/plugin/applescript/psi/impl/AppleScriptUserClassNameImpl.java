@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptUserClassNameImpl extends AppleScriptReferenceElementImpl implements AppleScriptUserClassName {
 
-  public AppleScriptUserClassNameImpl(ASTNode node) {
+  public AppleScriptUserClassNameImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitUserClassName(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

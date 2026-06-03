@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptSimpleFormalParameterImpl extends AbstractAppleScriptComponent implements AppleScriptSimpleFormalParameter {
 
-  public AppleScriptSimpleFormalParameterImpl(ASTNode node) {
+  public AppleScriptSimpleFormalParameterImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptSimpleFormalParameterImpl extends AbstractAppleScriptCom
     visitor.visitSimpleFormalParameter(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

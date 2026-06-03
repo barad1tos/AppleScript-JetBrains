@@ -7,7 +7,7 @@ import com.intellij.psi.PsiElement;
 
 public interface AppleScriptScriptPropertyDeclaration extends AppleScriptComponent {
 
-  @NotNull
+  @Nullable
   AppleScriptExpression getExpression();
 
   @Nullable

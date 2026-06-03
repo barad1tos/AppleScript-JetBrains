@@ -6,9 +6,10 @@ import com.intellij.plugin.applescript.psi.AppleScriptNamedElement
 import com.intellij.psi.PsiElement
 
 class AppleScriptElementRefactoringSupportProvider : RefactoringSupportProvider() {
-
     override fun isSafeDeleteAvailable(element: PsiElement): Boolean = element is AppleScriptNamedElement
 
-    override fun isInplaceRenameAvailable(element: PsiElement, context: PsiElement?): Boolean =
-        element !is AppleScriptHandler
+    override fun isInplaceRenameAvailable(
+        element: PsiElement,
+        context: PsiElement?,
+    ): Boolean = element !is AppleScriptHandler
 }

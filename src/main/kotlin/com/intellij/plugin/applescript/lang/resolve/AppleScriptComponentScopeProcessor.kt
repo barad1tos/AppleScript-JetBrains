@@ -8,18 +8,26 @@ import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
 import com.intellij.psi.ResolveState
 import com.intellij.psi.scope.PsiScopeProcessor
 
-class AppleScriptComponentScopeProcessor(private val myResult: MutableSet<AppleScriptComponent>) :
-    AppleScriptPsiScopeProcessor() {
-
+class AppleScriptComponentScopeProcessor(
+    private val myResult: MutableSet<AppleScriptComponent>,
+) : AppleScriptPsiScopeProcessor() {
     private val myCollectedTargets: MutableMap<String, AppleScriptTargetVariable> = HashMap()
 
-    override fun doExecute(element: AppleScriptPsiElement, state: ResolveState): Boolean {
+    override fun doExecute(
+        element: AppleScriptPsiElement,
+        state: ResolveState,
+    ): Boolean {
         if (element is AppleScriptTargetVariable) {
-            val name = element.getName() ?: return true
+            val name = element.name ?: return true
             if (!myCollectedTargets.containsKey(name)) {
                 myCollectedTargets[name] = element
                 myResult.add(element)
-            } else if (element.containingFile !== myCollectedTargets[name]!!.containingFile) {
+                // Reached only in the else of !containsKey(name), so the map holds a value for `name`.
+            } else if (element.containingFile !==
+                requireNotNull(
+                    myCollectedTargets[name],
+                ) { "myCollectedTargets[$name] present: this branch implies containsKey(name)" }.containingFile
+            ) {
                 myResult.add(element) // should not happen if the file is the same
                 // If a variable with the same name is already collected it must live in the same local scope
                 // (file, handler, etc.).
@@ -33,5 +41,8 @@ class AppleScriptComponentScopeProcessor(private val myResult: MutableSet<AppleS
 
     override fun <T> getHint(hintKey: Key<T>): T? = null
 
-    override fun handleEvent(event: PsiScopeProcessor.Event, associated: Any?) = Unit
+    override fun handleEvent(
+        event: PsiScopeProcessor.Event,
+        associated: Any?,
+    ) = Unit
 }

@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptTryStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptTryStatement {
 
-  public AppleScriptTryStatementImpl(ASTNode node) {
+  public AppleScriptTryStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptTryStatementImpl extends AppleScriptPsiElementImpl imple
     visitor.visitTryStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

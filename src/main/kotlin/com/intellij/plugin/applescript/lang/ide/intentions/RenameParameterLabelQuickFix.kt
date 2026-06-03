@@ -15,30 +15,44 @@ class RenameParameterLabelQuickFix(
     private val myHandlerParameterLabel: AppleScriptHandlerParameterLabel,
     private val myNewLabelName: String,
 ) : BaseIntentionAction() {
-
     override fun getFamilyName(): String = "AppleScript"
 
-    override fun isAvailable(project: Project, editor: Editor?, file: PsiFile?): Boolean =
-        file?.fileType is AppleScriptFileType
+    override fun isAvailable(
+        project: Project,
+        editor: Editor?,
+        file: PsiFile?,
+    ): Boolean = file?.fileType is AppleScriptFileType
 
     @Throws(IncorrectOperationException::class)
-    override fun invoke(project: Project, editor: Editor?, file: PsiFile?) {
+    override fun invoke(
+        project: Project,
+        editor: Editor?,
+        file: PsiFile?,
+    ) {
         ApplicationManager.getApplication().invokeLater {
             ApplicationManager.getApplication().runWriteAction {
                 CommandProcessor.getInstance().executeCommand(
                     project,
                     {
-                        val newLabel = AppleScriptPsiElementFactory.createHandlerParameterLabel(project, myNewLabelName)
+                        val newLabel =
+                            AppleScriptPsiElementFactory.createHandlerParameterLabel(
+                                project,
+                                myNewLabelName,
+                            )
                         if (newLabel != null) {
                             myHandlerParameterLabel.replace(newLabel)
                         }
                     },
-                    text,
+                    RENAME_PARAMETER_LABEL_COMMAND,
                     null,
                 )
             }
         }
     }
 
-    override fun getText(): String = "rename parameter label"
+    override fun getText(): String = "Rename parameter label"
+
+    private companion object {
+        private const val RENAME_PARAMETER_LABEL_COMMAND = "Rename Parameter Label"
+    }
 }

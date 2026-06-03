@@ -12,6 +12,9 @@ public interface AppleScriptAssignmentStatement extends AppleScriptPsiElement {
   AppleScriptApplicationReference getApplicationReference();
 
   @Nullable
+  AppleScriptApplicationObjectReference getApplicationObjectReference();
+
+  @Nullable
   AppleScriptArbitraryReference getArbitraryReference();
 
   @Nullable

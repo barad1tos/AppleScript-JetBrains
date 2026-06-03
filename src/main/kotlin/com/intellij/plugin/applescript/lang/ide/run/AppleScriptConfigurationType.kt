@@ -8,23 +8,27 @@ import com.intellij.execution.configurations.RunConfiguration
 import com.intellij.openapi.project.Project
 import com.intellij.plugin.applescript.AppleScriptIcons
 
-class AppleScriptConfigurationType : ConfigurationTypeBase(
-    "AppleScriptRunType",
-    "Run AppleScript",
-    "Run Configuration for AppleScript",
-    AppleScriptIcons.FILE,
-) {
-
+class AppleScriptConfigurationType :
+    ConfigurationTypeBase(
+        "AppleScriptRunType",
+        "Run AppleScript",
+        "Run Configuration for AppleScript",
+        AppleScriptIcons.FILE,
+    ) {
     init {
-        addFactory(object : ConfigurationFactory(this) {
-            override fun getId(): String = "AppleScript"
+        addFactory(
+            object : ConfigurationFactory(this) {
+                override fun getId(): String = "AppleScript"
 
-            override fun isConfigurationSingletonByDefault(): Boolean = true
+                @Suppress("OVERRIDE_DEPRECATION")
+                override fun isConfigurationSingletonByDefault(): Boolean = true
 
-            override fun canConfigurationBeSingleton(): Boolean = false
+                @Suppress("OVERRIDE_DEPRECATION")
+                override fun canConfigurationBeSingleton(): Boolean = false
 
-            override fun createTemplateConfiguration(project: Project): RunConfiguration =
-                AppleScriptRunConfiguration(project, this, " Template config")
-        })
+                override fun createTemplateConfiguration(project: Project): RunConfiguration =
+                    AppleScriptRunConfiguration(project, this, " Template config")
+            },
+        )
     }
 }

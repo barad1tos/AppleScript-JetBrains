@@ -22,6 +22,7 @@ public interface AppleScriptLabeledParameterDeclarationList extends AppleScriptP
   @Nullable
   AppleScriptTargetVariable getTargetVariable();
 
+  @NotNull
   List<AppleScriptComponent> getComponentList();
 
 }

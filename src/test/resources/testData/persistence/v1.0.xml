@@ -1,0 +1,18 @@
+<application>
+  <component name="AppleScriptSystemDictionaryRegistryComponent">
+    <applicationsInfo>
+      <dictionary-info applicationName="Standard Additions">
+        <option name="dictionaryUrl" value="/var/folders/00/StandardAdditions.sdef" />
+        <option name="applicationUrl" value="/System/Library/ScriptingAdditions/StandardAdditions.osax" />
+      </dictionary-info>
+      <dictionary-info applicationName="TestApp">
+        <option name="dictionaryUrl" value="/Users/test/Library/Caches/AppleScriptDictionaries/TestApp.sdef" />
+        <option name="applicationUrl" value="/Applications/TestApp.app" />
+      </dictionary-info>
+    </applicationsInfo>
+    <notScriptableApplications>
+      <item value="Calculator" />
+      <item value="Stickies" />
+    </notScriptableApplications>
+  </component>
+</application>

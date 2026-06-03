@@ -13,7 +13,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptDictionaryClassNameImpl extends AbstractDictionaryClassSpecifier implements AppleScriptDictionaryClassName {
 
-  public AppleScriptDictionaryClassNameImpl(ASTNode node) {
+  public AppleScriptDictionaryClassNameImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -21,6 +21,7 @@ public class AppleScriptDictionaryClassNameImpl extends AbstractDictionaryClassS
     visitor.visitDictionaryClassName(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

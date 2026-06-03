@@ -1,0 +1,141 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$previousElement === TokenType.WHITE_SPACE || previousElement === MY || previousElement === APPLICATION || previousElement === STRING_LITERAL || previousElement == null || previousElement === ID</ID>
+    <ID>CyclomaticComplexMethod:AppleScriptComponentType.kt$AppleScriptComponentType.Companion$@JvmStatic fun typeOf(element: PsiElement?): AppleScriptComponentType?</ID>
+    <ID>CyclomaticComplexMethod:AppleScriptDictionaryResolveProcessor.kt$AppleScriptDictionaryResolveProcessor$override fun doExecute( element: AppleScriptPsiElement, state: ResolveState, ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:AppleScriptDocHelper.kt$AppleScriptDocHelper$@JvmStatic internal fun getDocumentationElementForLink( psiManager: PsiManager, link: String, context: PsiElement, ): PsiElement?</ID>
+    <ID>CyclomaticComplexMethod:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$@JvmStatic fun parseDictionaryConstant( builder: PsiBuilder, level: Int, ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$private fun parseDictionaryClassName( builder: PsiBuilder, level: Int, currentTokenText: Ref&lt;String>, isPluralForm: Boolean, toldApplicationName: String, areThereUseStatements: Boolean, applicationsToImportFrom: Set&lt;String>?, ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:AppleScriptPairedBraceMatcher.kt$AppleScriptPairedBraceMatcher$override fun isLBraceToken( iterator: HighlighterIterator, fileText: CharSequence, fileType: FileType, ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:AppleScriptPsiElementImpl.kt$AppleScriptPsiElementImpl.Companion$@JvmStatic fun processDeclarationsImpl( context: PsiElement?, processor: PsiScopeProcessor, state: ResolveState, lastParent: PsiElement?, referencingElement: PsiElement?, ): Boolean</ID>
+    <ID>CyclomaticComplexMethod:AppleScriptStructureViewElement.kt$AppleScriptStructureViewElement$override fun getChildrenBase(): Collection&lt;StructureViewTreeElement></ID>
+    <ID>CyclomaticComplexMethod:SdefFileProvider.kt$SdefFileProvider$fun initializeScriptingAdditions()</ID>
+    <ID>CyclomaticComplexMethod:SdefFileProvider.kt$SdefFileProvider$private fun createDictionaryInfoForApplication( applicationName: String, applicationIoFile: File, ): DictionaryInfo?</ID>
+    <ID>CyclomaticComplexMethod:SdefParser.kt$SdefParser$@JvmStatic fun parseRootTag( parsedDictionary: ApplicationDictionary, rootTag: XmlTag, )</ID>
+    <ID>CyclomaticComplexMethod:SdefParser.kt$SdefParser$private fun parseCommandTag( commandTag: XmlTag, suite: Suite, ): AppleScriptCommand?</ID>
+    <ID>CyclomaticComplexMethod:SdefParser.kt$SdefParser$private fun processIncludes( parsedDictionary: ApplicationDictionary, includes: Array&lt;XmlTag>?, )</ID>
+    <ID>FunctionOnlyReturningConstant:AbstractParsingFixtureTestCase.kt$AbstractParsingFixtureTestCase$private fun printRanges(): Boolean</ID>
+    <ID>FunctionOnlyReturningConstant:AbstractParsingFixtureTestCase.kt$AbstractParsingFixtureTestCase$private fun skipSpaces(): Boolean</ID>
+    <ID>FunctionOnlyReturningConstant:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$@JvmStatic fun parseCommandParameterSelector( builder: PsiBuilder, level: Int, ): Boolean</ID>
+    <ID>LargeClass:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil$Companion</ID>
+    <ID>LongParameterList:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$( builder: PsiBuilder, level: Int, command: AppleScriptCommand, parsedParameterSelector: Ref&lt;String>, givenForm: Boolean, first: Boolean, )</ID>
+    <ID>LongParameterList:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$( builder: PsiBuilder, level: Int, currentTokenText: Ref&lt;String>, isPluralForm: Boolean, toldApplicationName: String, areThereUseStatements: Boolean, applicationsToImportFrom: Set&lt;String>?, )</ID>
+    <ID>LongParameterList:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$( builder: PsiBuilder, level: Int, parsedName: Ref&lt;String>, toldApplicationName: String, areThereUseStatements: Boolean, applicationsToImportFrom: Set&lt;String>?, )</ID>
+    <ID>LoopWithTooManyJumpStatements:AppleScriptPairedBraceMatcher.kt$AppleScriptPairedBraceMatcher$while</ID>
+    <ID>LoopWithTooManyJumpStatements:SdefParser.kt$SdefParser$for</ID>
+    <ID>MagicNumber:AbstractDictionaryComponent.kt$AbstractDictionaryComponent$10</ID>
+    <ID>MagicNumber:AbstractDictionaryComponent.kt$AbstractDictionaryComponent$11</ID>
+    <ID>MagicNumber:AbstractDictionaryComponent.kt$AbstractDictionaryComponent$15</ID>
+    <ID>MagicNumber:AppleScriptDocHelper.kt$AppleScriptDocHelper$8</ID>
+    <ID>MagicNumber:AppleScriptLanguageCodeStyleSettingsProvider.kt$AppleScriptLanguageCodeStyleSettingsProvider$4</ID>
+    <ID>MagicNumber:SdefFileProvider.kt$SdefFileProvider$5L</ID>
+    <ID>MagicNumber:SdefIndexService.kt$SdefIndexService$2_000</ID>
+    <ID>MagicNumber:SdefParser.kt$SdefParser$4</ID>
+    <ID>MaxLineLength:AbstractAppleScriptCommandHandlerCall.kt$AbstractAppleScriptCommandHandlerCall$override fun getDirectParameter(): PsiElement?</ID>
+    <ID>MaxLineLength:AbstractDictionaryComponent.kt$AbstractDictionaryComponent$val displayType = if (capitalizedType.lowercase().contains("dictionary")) capitalizedType.substring(10) else capitalizedType</ID>
+    <ID>MaxLineLength:AppleScriptBlock.kt$AppleScriptBlock$val childBlock = AppleScriptBlock(childNode, createChildWrap(childNode), Alignment.createAlignment(), mySettings)</ID>
+    <ID>MaxLineLength:AppleScriptCodeStyleConfigurable.kt$AppleScriptCodeStyleConfigurable$override fun createPanel(settings: CodeStyleSettings): CodeStyleAbstractPanel</ID>
+    <ID>MaxLineLength:AppleScriptColorsAndFontsPage.kt$AppleScriptColorsAndFontsPage.Companion$AttributesDescriptor("Dictionary constant", AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR)</ID>
+    <ID>MaxLineLength:AppleScriptColorsAndFontsPage.kt$AppleScriptColorsAndFontsPage.Companion$AttributesDescriptor("Dictionary property", AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR)</ID>
+    <ID>MaxLineLength:AppleScriptConfigurationProducer.kt$AppleScriptConfigurationProducer$class</ID>
+    <ID>MaxLineLength:AppleScriptFormattingModelBuilder.kt$AppleScriptFormattingModelBuilder$return AppleScriptFormattingModel(containingFile, rootBlock, FormattingDocumentModelImpl.createOn(containingFile))</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$)</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$ParsableScriptSuiteRegistryHelper.isClassWithPrefixExist(applicationName, currentTokenText.get())</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$classWithPrefixExists = ParsableScriptSuiteRegistryHelper.isStdClassPluralWithPrefixExist(nextTokenText)</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$commandDefinition.getParameterByName(parsedParameterSelector.get())?.let(mandatoryParameters::remove)</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$if</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$private fun IElementType?.hasText(text: String): Boolean</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$private fun isClassDirectSelectorAnchor(tokenType: IElementType?): Boolean</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$private fun isPropertyTerminatorAnchor(tokenType: IElementType?): Boolean</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$result = parseApplicationClassName(builder, level + 1, currentTokenText, isPluralForm, applicationName)</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$var commandWithPrefixExists = ParsableScriptSuiteRegistryHelper.isStdCommandWithPrefixExist(parsedName.get())</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$var result = nextTokenIsFast(builder, LPAREN) &amp;&amp; AppleScriptParser.parenthesizedExpression(builder, level + 1)</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$var result = parseApplicationClassName(builder, level + 1, currentTokenText, isPluralForm, toldApplicationName)</ID>
+    <ID>MaxLineLength:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$}</ID>
+    <ID>MaxLineLength:AppleScriptHandlerReferencesSearch.kt$AppleScriptHandlerReferencesSearch$val searchWord = if (firstSelector.endsWith(":")) firstSelector.substring(0, firstSelector.length - 1) else firstSelector</ID>
+    <ID>MaxLineLength:AppleScriptHandlerSelectorPartImpl.kt$AppleScriptHandlerSelectorPartImpl$override fun getSelectorNameIdentifier(): AppleScriptIdentifier</ID>
+    <ID>MaxLineLength:AppleScriptHandlerSelectorPartImpl.kt$AppleScriptHandlerSelectorPartImpl$return parameterId ?: PsiTreeUtil.getRequiredChildOfType(parameter ?: lastChild, AppleScriptIdentifier::class.java)</ID>
+    <ID>MaxLineLength:AppleScriptPsiElementImpl.kt$AppleScriptPsiElementImpl.Companion$referencingElement.parent is com.intellij.plugin.applescript.psi.AppleScriptHandlerPositionalParametersCallExpression</ID>
+    <ID>MaxLineLength:AppleScriptReferenceElementImpl.kt$AppleScriptReferenceElementImpl$return if (lookupElements.isNotEmpty()) lookupElements.toTypedArray&lt;Any>() else LookupElement.EMPTY_ARRAY as Array&lt;Any></ID>
+    <ID>MaxLineLength:AppleScriptRunConfiguration.kt$AppleScriptRunConfiguration$override fun getConfigurationEditor(): SettingsEditor&lt;out RunConfiguration></ID>
+    <ID>MaxLineLength:AppleScriptStringLiteralExpressionBase.kt$AppleScriptStringLiteralExpressionBase$override fun createLiteralTextEscaper(): LiteralTextEscaper&lt;AppleScriptStringLiteralExpressionBase></ID>
+    <ID>MaxLineLength:AppleScriptStringLiteralExpressionBase.kt$AppleScriptStringLiteralExpressionBase$override fun updateText(text: String): PsiLanguageInjectionHost</ID>
+    <ID>MaxLineLength:AppleScriptStructureViewFactory.kt$AppleScriptStructureViewFactory.&lt;no name provided>$override fun createStructureViewModel(editor: Editor?): StructureViewModel</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$)</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$File(requireNotNull(applicationUrl) { "applicationUrl non-null: guarded by !StringUtil.isEmpty above" })</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$File(requireNotNull(dictionaryUrl) { "dictionaryUrl non-null: guarded by !StringUtil.isEmpty above" })</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$fun</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$fun isDictionaryInitialized(applicationName: String): Boolean</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$internal</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$val isStd: InputStream? = javaClass.getResourceAsStream(ApplicationDictionary.COCOA_STANDARD_FILE)</ID>
+    <ID>MaxLineLength:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService.Companion$private val LOG: Logger = Logger.getInstance("#${AppleScriptSystemDictionaryRegistryService::class.java.name}")</ID>
+    <ID>MaxLineLength:AppleScriptTargetElementEvaluator.kt$AppleScriptTargetElementEvaluator$override fun includeSelfInGotoImplementation(element: PsiElement): Boolean</ID>
+    <ID>MaxLineLength:AppleScriptTemplateContextType.kt$AppleScriptTemplateContextType$override fun createHighlighter(): SyntaxHighlighter?</ID>
+    <ID>MaxLineLength:ApplicationDiscoveryService.kt$ApplicationDiscoveryService$fun</ID>
+    <ID>MaxLineLength:CreateAppleScriptFileAction.kt$CreateAppleScriptFileAction$CreateFileFromTemplateAction("AppleScript File", "Creates a AppleScript file from the specified template", AppleScriptIcons.FILE)</ID>
+    <ID>MaxLineLength:DictionaryComponent.kt$DictionaryComponent$/** Name, starting with suite code name and including component code (not necessarily unique). JVM-visible as `getQualifiedName()`. */</ID>
+    <ID>MaxLineLength:IngestResult.kt$IngestResult$*</ID>
+    <ID>MaxLineLength:LoadDictionaryAction.kt$LoadDictionaryAction.Companion$)</ID>
+    <ID>MaxLineLength:LoadDictionaryAction.kt$LoadDictionaryAction.Companion$requireNotNull(applicationName) { "applicationName non-null: guarded by StringUtil.isEmpty continue above" }</ID>
+    <ID>MaxLineLength:ParsableScriptSuiteRegistryHelper.kt$ParsableScriptSuiteRegistryHelper$fun</ID>
+    <ID>MaxLineLength:ParsableScriptSuiteRegistryHelper.kt$ParsableScriptSuiteRegistryHelper$suspend</ID>
+    <ID>MaxLineLength:ParserUtilContractTest.kt$ParserUtilContractTest.Companion$"findApplicationCommands(com.intellij.openapi.project.Project,java.lang.String,java.lang.String):java.util.List"</ID>
+    <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider$ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY -> ApplicationDictionary.STANDARD_ADDITIONS_FILE</ID>
+    <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider$fileGenerated = doGenerateDictionaryFile(applicationName, serializePath, cmdName, applicationIoFile.path)</ID>
+    <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider$if (ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(appExtension)) applicationIoFile else null</ID>
+    <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider.Companion$fun</ID>
+    <ID>MaxLineLength:SdefFileTypeRegistrar.kt$SdefFileTypeRegistrar.Companion$fun</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$applicationNameToClassNamePluralSet = applicationNameToClassNamePluralSetMap.mapValues { it.value.toSet() }</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$applicationNameToEnumerationNameSet = applicationNameToEnumerationNameSetMap.mapValues { it.value.toSet() }</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseElementsForApplication(classTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseElementsForApplication(recordTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseHashElementsForApplication(classTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseHashElementsForApplication(recordTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$private val applicationNameToEnumeratorConstantNameSetMap: MutableMap&lt;String, MutableSet&lt;String>> = ConcurrentHashMap()</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$private val stdClassNamePluralToApplicationNameSetMap: MutableMap&lt;String, MutableSet&lt;String>> = ConcurrentHashMap()</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$private val stdEnumerationNameToApplicationNameSetMap: MutableMap&lt;String, MutableSet&lt;String>> = ConcurrentHashMap()</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap&lt;String, MutableSet&lt;String>> = ConcurrentHashMap()</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$stdCommandNameToApplicationNameSet = stdCommandNameToApplicationNameSetMap.mapValues { it.value.toSet() }</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$val className = if (isExtends) classElement.getAttributeValue("extends") else classElement.getAttributeValue("name")</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService.Companion$fun</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService.Companion$hashSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)</ID>
+    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService.Companion$parseSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)</ID>
+    <ID>MaxLineLength:SdefParser.kt$SdefParser$parsedDictionary.setName(requireNotNull(dicTitle) { "dicTitle non-null: guarded by !StringUtil.isEmpty above" })</ID>
+    <ID>MaxLineLength:SdefPersistenceService.kt$SdefPersistenceService$*</ID>
+    <ID>MaxLineLength:SdefPersistenceService.kt$SdefPersistenceService$fun</ID>
+    <ID>MaxLineLength:SdefPersistenceService.kt$SdefPersistenceService$private fun facade(): AppleScriptSystemDictionaryRegistryService</ID>
+    <ID>MaxLineLength:SdefPersistenceService.kt$SdefPersistenceService.Companion$fun</ID>
+    <ID>MaxLineLength:XcodeDetectionService.kt$XcodeDetectionService$"tell application \"Finder\" to return POSIX path of (get application file id \"com.apple.dt.Xcode\" "</ID>
+    <ID>MaxLineLength:XcodeDetectionService.kt$XcodeDetectionService.Companion$fun</ID>
+    <ID>NestedBlockDepth:AppleScriptDictionaryResolveProcessor.kt$AppleScriptDictionaryResolveProcessor$override fun doExecute( element: AppleScriptPsiElement, state: ResolveState, ): Boolean</ID>
+    <ID>NestedBlockDepth:AppleScriptScriptCommandLineState.kt$AppleScriptScriptCommandLineState$@Throws(ExecutionException::class) override fun startProcess(): ProcessHandler</ID>
+    <ID>NestedBlockDepth:SdefFileProvider.kt$SdefFileProvider$fun initializeScriptingAdditions()</ID>
+    <ID>PrintStackTrace:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$e</ID>
+    <ID>PrintStackTrace:SdefFileProvider.kt$SdefFileProvider$e</ID>
+    <ID>PrintStackTrace:SdefIndexService.kt$SdefIndexService$e</ID>
+    <ID>ProtectedMemberInFinalClass:AppleScriptTemplateContextType.kt$AppleScriptTemplateContextType$protected constructor()</ID>
+    <ID>RethrowCaughtException:DiscoveryProgressPolicy.kt$DiscoveryProgressPolicy$throw e</ID>
+    <ID>SwallowedException:AppleScriptGeneratedParserUtilJvmSignatureTest.kt$AppleScriptGeneratedParserUtilJvmSignatureTest$exception: NoSuchFieldException</ID>
+    <ID>SwallowedException:AppleScriptGeneratedParserUtilJvmSignatureTest.kt$AppleScriptGeneratedParserUtilJvmSignatureTest$exception: NoSuchMethodException</ID>
+    <ID>SwallowedException:ParserUtilContractTest.kt$ParserUtilContractTest$e: NoSuchMethodException</ID>
+    <ID>SwallowedException:PsiGetterJvmSignatureTest.kt$PsiGetterJvmSignatureTest$e: NoSuchMethodException</ID>
+    <ID>TooGenericExceptionCaught:AppleScriptScriptCommandLineState.kt$AppleScriptScriptCommandLineState$e: IndexOutOfBoundsException</ID>
+    <ID>TooGenericExceptionCaught:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService$t: Throwable</ID>
+    <ID>TooGenericExceptionCaught:SdefFileProvider.kt$SdefFileProvider$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SdefFileProvider.kt$SdefFileProvider$t: Throwable</ID>
+    <ID>TooGenericExceptionThrown:AbstractParsingFixtureTestCase.kt$AbstractParsingFixtureTestCase$throw Exception("$targetDir is not a directory")</ID>
+    <ID>TooManyFunctions:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil$Companion</ID>
+    <ID>TooManyFunctions:AppleScriptHandlerSelectorPart.kt$AppleScriptHandlerSelectorPart : AppleScriptNamedElementPsiNameIdentifierOwner</ID>
+    <ID>TooManyFunctions:AppleScriptSystemDictionaryRegistryService.kt$AppleScriptSystemDictionaryRegistryService : SimplePersistentStateComponentParsableScriptHelper</ID>
+    <ID>TooManyFunctions:ApplicationDictionary.kt$ApplicationDictionary : DictionarySuite</ID>
+    <ID>TooManyFunctions:ParsableScriptHelper.kt$ParsableScriptHelper</ID>
+    <ID>TooManyFunctions:ParsableScriptSuiteRegistryHelper.kt$ParsableScriptSuiteRegistryHelper</ID>
+    <ID>TooManyFunctions:SdefIndexService.kt$SdefIndexService</ID>
+    <ID>UnusedParameter:AppleScriptDocHelper.kt$AppleScriptDocHelper$psiManager: PsiManager</ID>
+    <ID>UnusedParameter:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$builder: PsiBuilder</ID>
+    <ID>UnusedParameter:AppleScriptGeneratedParserUtil.kt$AppleScriptGeneratedParserUtil.Companion$level: Int</ID>
+  </CurrentIssues>
+</SmellBaseline>

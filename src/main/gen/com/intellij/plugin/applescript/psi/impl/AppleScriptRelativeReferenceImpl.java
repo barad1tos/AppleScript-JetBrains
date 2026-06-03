@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRelativeReferenceImpl extends AppleScriptPsiElementImpl implements AppleScriptRelativeReference {
 
-  public AppleScriptRelativeReferenceImpl(ASTNode node) {
+  public AppleScriptRelativeReferenceImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptRelativeReferenceImpl extends AppleScriptPsiElementImpl 
     visitor.visitRelativeReference(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -29,6 +30,12 @@ public class AppleScriptRelativeReferenceImpl extends AppleScriptPsiElementImpl 
   @Nullable
   public AppleScriptApplicationReference getApplicationReference() {
     return findChildByClass(AppleScriptApplicationReference.class);
+  }
+
+  @Override
+  @Nullable
+  public AppleScriptApplicationObjectReference getApplicationObjectReference() {
+    return findChildByClass(AppleScriptApplicationObjectReference.class);
   }
 
   @Override

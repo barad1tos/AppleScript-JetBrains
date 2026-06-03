@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRawDictionaryCommandHandlerCallExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptRawDictionaryCommandHandlerCallExpression {
 
-  public AppleScriptRawDictionaryCommandHandlerCallExpressionImpl(ASTNode node) {
+  public AppleScriptRawDictionaryCommandHandlerCallExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitRawDictionaryCommandHandlerCallExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

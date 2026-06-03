@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptUsingTermsFromStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptUsingTermsFromStatement {
 
-  public AppleScriptUsingTermsFromStatementImpl(ASTNode node) {
+  public AppleScriptUsingTermsFromStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptUsingTermsFromStatementImpl extends AppleScriptPsiElemen
     visitor.visitUsingTermsFromStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -43,11 +44,13 @@ public class AppleScriptUsingTermsFromStatementImpl extends AppleScriptPsiElemen
     return findChildByClass(AppleScriptTopBlockBody.class);
   }
 
+  @Override
   @Nullable
   public String getApplicationName() {
     return AppleScriptPsiImplUtil.getApplicationName(this);
   }
 
+  @Override
   public boolean withImportingStdLibrary() {
     return AppleScriptPsiImplUtil.withImportingStdLibrary(this);
   }

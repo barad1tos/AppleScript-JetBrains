@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRawParameterSelectorImpl extends AppleScriptPsiElementImpl implements AppleScriptRawParameterSelector {
 
-  public AppleScriptRawParameterSelectorImpl(ASTNode node) {
+  public AppleScriptRawParameterSelectorImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptRawParameterSelectorImpl extends AppleScriptPsiElementIm
     visitor.visitRawParameterSelector(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

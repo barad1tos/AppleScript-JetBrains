@@ -7,7 +7,6 @@ import com.intellij.psi.AbstractElementManipulator
 import com.intellij.util.IncorrectOperationException
 
 class AppleScriptStringManipulator : AbstractElementManipulator<AppleScriptStringLiteralExpression>() {
-
     override fun getRangeInElement(element: AppleScriptStringLiteralExpression): TextRange {
         val length = element.textLength
         return if (length > 1) TextRange.from(1, length - 2) else super.getRangeInElement(element)

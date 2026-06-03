@@ -392,7 +392,7 @@ private literalExpression ::=
 
 /** Numeric, string, regexp, boolean, date, string(space,tab,return) constant*/
 builtInConstantLiteralExpression ::= boolean_constant|date_time_constants|text_constant|itMeProperty
-|currentApplicationConstant| missing_value_constant | scriptingAdditionsFolderConstant
+|currentApplicationConstant| missing_value_constant | scriptingAdditionsFolderConstant | currentDateConstant
 //|appleScriptPropertiesConstant
 private scriptingAdditionsFolderConstant ::= <<parseExpression '"scripting additions"' SCRIPTING_ADDITIONS>>
 
@@ -468,8 +468,15 @@ private boolean_constant ::= true|false
 applicationReference ::= applicationName [of THE_KW? machine machineName (of THE_KW? zone appleTalkZoneName)?] | THE_KW? currentApplicationConstant
 {methods=[getApplicationName]}
 
-private applicationName ::= (APPLICATION|APP)? (STRING_LITERAL | identifier)
-                         | <<parseApplicationName tellStatementStartCondition>>
+// NOTE: the literal alternative `(APPLICATION|APP)? (STRING_LITERAL | identifier)` was removed.
+// The old Grammar-Kit generator collapsed this rule to the external call only; GK 2023.3 emits the
+// literal alternative faithfully, where `identifier ::= var_identifier` greedily matches a bare
+// identifier (e.g. `folder`, `album`, `library`). Since applicationReference is the first alternative
+// of primaryReferenceExpression, that greedy match shadowed referenceForm's className/composite/index
+// path and broke object-reference parsing. The external <<parseApplicationName>> already handles
+// APPLICATION/APP + STRING_LITERAL/ID, so the literal alternative was redundant for valid cases and
+// harmful otherwise. Removing it restores the pre-migration parse behavior. (Phase 08-04)
+private applicationName ::= <<parseApplicationName tellStatementStartCondition>>
 
 private machineName ::= STRING_LITERAL
 private appleTalkZoneName ::= STRING_LITERAL
@@ -528,6 +535,16 @@ userClassName ::= identifier
 {mixin="com.intellij.plugin.applescript.psi.impl.AppleScriptReferenceElementImpl"
 implements="com.intellij.plugin.applescript.psi.AppleScriptReferenceElement"}
 
+// PARSE-03 (08-06, D-06): generic application-object reference for ANY scriptable app —
+// `current <class>` and `<id> <integer index>` — parser-level (SDEF-independent, D-07).
+// Placed LAST in primaryReferenceExpression so className/composite/index forms win first
+// (Pitfall 1: do not shadow the D-15 dictionary-class path). Navigation hook only (D-09 —
+// no resolver wiring). Single-bareword whose-context index (`folder 1`) is deferred to 08-07.
+application_object_reference ::= CURRENT applicationObjectTerm | applicationObjectTerm integerLiteralExpression
+{mixin="com.intellij.plugin.applescript.psi.impl.AbstractApplicationObjectReference"}
+
+private applicationObjectTerm ::= var_identifier | EVENT | TAB | FILE | DATE
+
 middleElemReference ::= middle typeSpecifier {pin=1}
 
 left nameReference ::= nameReferenceString //could be any expression (clashed with indexReference)
@@ -541,8 +558,8 @@ rangeFromReference ::= from [THE_KW] (beginning|expression) to [THE_KW](end|expr
 rangeIndexReference ::= startIndex (thru|through) stopIndex
 everyRangeReference ::= every (singularClassName|userClassName) from (beginning|expression) to (end|expression)
 
-private stopIndex::= integerLiteralExpression | expression
-private startIndex ::= integerLiteralExpression | expression
+private stopIndex::= integerLiteralExpression | (referenceExpression &(of|in|RPAREN|NLS)) | expression
+private startIndex ::= integerLiteralExpression | (referenceExpression &(thru|through)) | expression
 
 relativeReference ::=  relativeBeforeReference | relativeAfterReference
 
@@ -594,9 +611,12 @@ private month_constant ::= 'January'|'February'|'March'|'April'|'May'|'June'|'Ju
                     |'November'|'December' |'Jan'|'Feb'|'Mar'|'Apr'|'Jun'|'Jul'|'Aug'|'Sep'|'Oct'|'Nov'|'Dec'
 
 private currentApplicationConstant ::= CURRENT_APPLICATION|CURRENT_APP|(CURRENT APPLICATION) //'current application'|'current app'//current applicationClass
+// PARSE-04 (08-05, D-06): 'current date' is two discrete lexer tokens (CURRENT + DATE); the
+// commented-out CURRENT_DATE macro in _AppleScriptLexer.flex stays commented (no lexer regen).
+private currentDateConstant ::= CURRENT DATE
 private missing_value_constant ::= MISSING_VALUE
 //private save_opt_constant ::= yes|no|ask
-private text_constant ::=  return|space|tab|linefeed|quote
+private text_constant ::=  return|space|(tab !(DIGITS|of|in))|linefeed|quote
 private anythingProperty ::= anything
 private resultProperty ::= result
 private parentProperty ::= parent
@@ -604,7 +624,9 @@ private versionProperty ::= version
 
 //todo redefine necessary methods (is property, getName etc.)
 appleScriptProperty ::= BUILT_IN_PROPERTY|resultProperty|versionProperty|anythingProperty
-|textItemDelimitersProperty|parentProperty//|itMeProperty//|text_constant /*?? */
+|textItemDelimitersProperty|parentProperty|endDateProperty//|itMeProperty//|text_constant /*?? */
+
+private endDateProperty ::= END DATE
 
 private itMeProperty ::= it|me|ITS //see https://bitbucket.org/adernov/applescript-internal/issues/16/parsing-its-possessive-form-of-it
 //todo add via regexp (spaces)
@@ -785,7 +807,7 @@ launchCommandExpression ::= launch expression?
 private copyCommandStatement ::= (copy|put) expression (to|into) (targetVariablePattern|objectReferenceWrapper)
 
 //>>count<<
-countCommandExpression ::= (count [[each|every] typeSpecifier (in|of)] composite_value) | (number of [typeSpecifier (in|of)] composite_value)
+countCommandExpression ::= (count parenthesizedExpression) | (count [[each|every] typeSpecifier (in|of)] composite_value) | (number of [typeSpecifier (in|of)] composite_value)
 
 private typeSpecifier ::= pluralClassName | singularClassName
 private pluralClassName ::= builtInClassIdentifierPlural | dictionaryClassIdentifierPlural | rawClassExpression //items?
@@ -805,7 +827,8 @@ rawDataExpression ::= RAW_LBR DATA DIGITS RAW_RBR
 getCommandExpression ::= get <<parseCommandParametersExpression>>
 
 //>>Run<< / Run Script
-runCommandExpression ::= ("run" [script] [script_object_variable])|("run" [referenceToApplicationVar]) // application command syntax
+runCommandExpression ::= ("run" [script] [script_object_variable] [runCommandInputParameter])|("run" [referenceToApplicationVar]) // application command syntax
+private runCommandInputParameter ::= with identifier expression
 private referenceToApplicationVar ::= applicationReference
 private script_object_variable ::= referenceExpression
 // log - is a built into Script Editor command http://stackoverflow.com/a/21341372/2000323
@@ -875,6 +898,8 @@ implements="com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeName"}
 private primaryExpression ::=
      literalExpression
  |   dictionaryCommandHandlerCallExpression
+ |   asciiObjectExpression
+ |   pathToConstantExpression
  |   rawDictionaryCommandHandlerCallExpression
  |   rawDataExpression
  | ( primaryReferenceExpression
@@ -886,12 +911,23 @@ private primaryExpression ::=
  |   parenthesizedExpression
  |   appleScriptCommandExpression
 
+// PARSE-04 (08-05, D-06): explicit Standard Additions object tokens — additive, parser-level
+// from existing lexer tokens (no lexer change). Guarded on the VAR_IDENTIFIER text via
+// parseExpression so they fire only on these SA constructs; placed below
+// dictionaryCommandHandlerCallExpression so a loaded-StandardAdditions command path still wins.
+// All private: no PSI surface, no AppleScriptPsiImplUtil methods (test asserts zero errors only).
+private asciiObjectExpression ::= <<parseExpression '"ASCII"' asciiObjectExpressionInner>>
+private asciiObjectExpressionInner ::= var_identifier (CHARACTER|NUMBER) expression
+private pathToConstantExpression ::= <<parseExpression '"path"' pathToConstantExpressionInner>>
+private pathToConstantExpressionInner ::= var_identifier to pathToConstantName [from pathToConstantName]
+private pathToConstantName ::= var_identifier var_identifier?
+
 incompleteCommandHandlerCall ::= <<parseIncompleteCommandCall>>
 {mixin="com.intellij.plugin.applescript.psi.sdef.impl.DictionaryCompositeNameImpl"
 implements="com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeName"}
 
 // todo: left associate to class name (range, name, relative, index) ! checking that this is not a property first.. !
-private primaryReferenceExpression ::= applicationReference | referenceForm | referenceExpression
+private primaryReferenceExpression ::= applicationReference | referenceForm | application_object_reference | referenceExpression
 
 private referenceForm ::=
       (my handlerInterleavedCallOrPropertyReferenceOrReferenceIdentifier )

@@ -12,12 +12,14 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.impl.FakePsiElement
 import com.intellij.psi.xml.XmlElement
 
+/**
+ * Thin PSI adapter that forwards platform text/range/navigation methods to the backing XML element.
+ */
 abstract class DictionaryComponentBase<P : DictionaryComponent, D : XmlElement> protected constructor(
     @JvmField protected val myXmlElement: D,
     @JvmField protected val myParent: P,
 ) : FakePsiElement(),
     AppleScriptPsiElement {
-
     override fun getLanguage(): Language = AppleScriptLanguage
 
     override fun getTextRange(): TextRange? = myXmlElement.textRange
@@ -26,22 +28,22 @@ abstract class DictionaryComponentBase<P : DictionaryComponent, D : XmlElement> 
 
     override fun getTextLength(): Int = myXmlElement.textLength
 
-    override fun findElementAt(offset: Int): PsiElement? = myXmlElement.findElementAt(offset)
-
     override fun getTextOffset(): Int = myXmlElement.textOffset
 
-    override fun getOriginalElement(): PsiElement = myXmlElement.originalElement
-
-    override fun getProject(): Project = getDictionaryParentComponent().getProject()
+    override fun getProject(): Project = dictionaryParentComponent.project
 
     override fun getContainingFile(): PsiFile =
-        if (myXmlElement.isValid) myXmlElement.containingFile else parent.containingFile
+        when {
+            myXmlElement.isValid -> myXmlElement.containingFile
+            else -> parent.containingFile
+        }
 
     override fun getText(): String? = myXmlElement.text
 
     override fun getNode(): ASTNode? = myXmlElement.node
 
-    override fun getParent(): PsiElement = getDictionaryParentComponent()
+    override fun getParent(): PsiElement = dictionaryParentComponent
 
-    fun getDictionaryParentComponent(): P = myParent
+    /** JVM-visible as `getDictionaryParentComponent()`; satisfies `DictionaryComponent.dictionaryParentComponent`. */
+    val dictionaryParentComponent: P get() = myParent
 }

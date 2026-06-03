@@ -6,7 +6,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 
 class AppleScriptSyntaxHighlighterFactory : SyntaxHighlighterFactory() {
-
-    override fun getSyntaxHighlighter(project: Project?, virtualFile: VirtualFile?): SyntaxHighlighter =
-        AppleScriptSyntaxHighlighter()
+    override fun getSyntaxHighlighter(
+        project: Project?,
+        virtualFile: VirtualFile?,
+    ): SyntaxHighlighter = AppleScriptSyntaxHighlighter()
 }

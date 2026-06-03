@@ -8,6 +8,6 @@ import com.intellij.psi.PsiElement;
 public interface AppleScriptRunCommandExpression extends AppleScriptExpression {
 
   @Nullable
-  AppleScriptReferenceExpression getReferenceExpression();
+  AppleScriptIdentifier getIdentifier();
 
 }

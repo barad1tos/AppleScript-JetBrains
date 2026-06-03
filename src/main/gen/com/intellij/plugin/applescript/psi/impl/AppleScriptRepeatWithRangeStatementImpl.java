@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRepeatWithRangeStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptRepeatWithRangeStatement {
 
-  public AppleScriptRepeatWithRangeStatementImpl(ASTNode node) {
+  public AppleScriptRepeatWithRangeStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptRepeatWithRangeStatementImpl extends AppleScriptPsiEleme
     visitor.visitRepeatWithRangeStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

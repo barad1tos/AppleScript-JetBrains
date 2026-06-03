@@ -29,16 +29,18 @@ import com.intellij.psi.impl.source.resolve.ResolveCache
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.IncorrectOperationException
 
-abstract class AppleScriptReferenceElementImpl(node: ASTNode) :
-    AppleScriptExpressionImpl(node),
+abstract class AppleScriptReferenceElementImpl(
+    node: ASTNode,
+) : AppleScriptExpressionImpl(node),
     AppleScriptReferenceElement,
     PsiPolyVariantReference {
-
     override fun multiResolve(incompleteCode: Boolean): Array<ResolveResult> = multiResolveInner(incompleteCode)
 
     protected open fun multiResolveInner(incompleteCode: Boolean): Array<ResolveResult> {
-        val elements = ResolveCache.getInstance(project)
-            .resolveWithCaching(this, AppleScriptResolver, true, incompleteCode)
+        val elements =
+            ResolveCache
+                .getInstance(project)
+                .resolveWithCaching(this, AppleScriptResolver, true, incompleteCode)
         return AppleScriptResolveUtil.toCandidateInfoArray(elements)
     }
 
@@ -50,7 +52,7 @@ abstract class AppleScriptReferenceElementImpl(node: ASTNode) :
         val textRange = textRange
         val refs: Array<out AppleScriptReferenceElement>? =
             PsiTreeUtil.getChildrenOfType(this, AppleScriptReferenceElement::class.java)
-        if (refs != null && refs.isNotEmpty()) {
+        if (!refs.isNullOrEmpty()) {
             val last = refs[refs.size - 1].textRange
             return UnfairTextRange(
                 last.startOffset - textRange.startOffset,
@@ -68,8 +70,6 @@ abstract class AppleScriptReferenceElementImpl(node: ASTNode) :
             else -> results[0].element
         }
     }
-
-    override fun getCanonicalText(): String = text
 
     @Throws(IncorrectOperationException::class)
     override fun handleElementRename(newElementName: String): PsiElement {
@@ -99,65 +99,79 @@ abstract class AppleScriptReferenceElementImpl(node: ASTNode) :
     }
 
     override fun getVariants(): Array<Any> {
-        val elements: List<PsiElement>? = ResolveCache.getInstance(project)
-            .resolveWithCaching(this, AppleScriptComponentScopeResolver, true, true)
+        val elements: List<PsiElement>? =
+            ResolveCache
+                .getInstance(project)
+                .resolveWithCaching(this, AppleScriptComponentScopeResolver, true, true)
 
         val resolveProcessor = AppleScriptDictionaryResolveProcessor(project, canonicalText)
-        val state = ResolveState.initial()
-            .put(AppleScriptDictionaryResolveProcessor.COLLECT_ALL_DECLARATIONS, true)
+        val state =
+            ResolveState
+                .initial()
+                .put(AppleScriptDictionaryResolveProcessor.COLLECT_ALL_DECLARATIONS, true)
         PsiTreeUtil.treeWalkUp(resolveProcessor, getElement(), null, state)
         val dictionaryComponents: List<DictionaryComponent> = resolveProcessor.getFilteredResult()
 
         val lookupElements = mutableListOf<LookupElement>()
-        elements?.forEach { addLookupElement(lookupElements, it) }
-        dictionaryComponents.forEach { addLookupElement(lookupElements, it) }
-        addAppleScriptCommandsSuite(lookupElements)
-        @Suppress("UNCHECKED_CAST")
-        return if (lookupElements.isNotEmpty()) lookupElements.toTypedArray<Any>() else LookupElement.EMPTY_ARRAY as Array<Any>
+        elements?.forEach { lookupElements.addLookupElement(it) }
+        dictionaryComponents.forEach { lookupElements.addLookupElement(it) }
+        lookupElements.addAppleScriptCommandsSuite()
+        return lookupElements.toVariantsArray()
     }
-
-    private fun addAppleScriptCommandsSuite(lookupElements: MutableList<LookupElement>) {
-        lookupElements.add(
-            LookupElementBuilder.create(AppleScriptTypes.LAUNCH.toString().lowercase()).bold()
-                .withTypeText("command", true)
-                .withIcon(AppleScriptComponentType.HANDLER.icon),
-        )
-        lookupElements.add(
-            LookupElementBuilder.create(AppleScriptTypes.ACTIVATE.toString().lowercase()).bold()
-                .withTypeText("command", true)
-                .withIcon(AppleScriptComponentType.HANDLER.icon),
-        )
-    }
-
-    private fun addLookupElement(lookupElements: MutableList<LookupElement>, el: PsiElement) {
-        if (!el.isValid) return
-        var builder: LookupElementBuilder = when (el) {
-            is DictionaryComponent -> {
-                val dName = el.getDictionary().name
-                LookupElementBuilder.createWithIcon(el).appendTailText("   $dName", true)
-            }
-
-            is AppleScriptComponent -> {
-                var b = LookupElementBuilder.createWithIcon(el)
-                if (el is AppleScriptHandlerPositionalParametersDefinition) {
-                    b = b.withInsertHandler(
-                        if (el.formalParameterList != null) {
-                            ParenthesesInsertHandler.WITH_PARAMETERS
-                        } else {
-                            ParenthesesInsertHandler.NO_PARAMETERS
-                        },
-                    )
-                }
-                b
-            }
-
-            else -> LookupElementBuilder.create(el)
-        }
-        val componentType = AppleScriptComponentType.typeOf(el)
-        val typeText = componentType?.toString()?.lowercase()
-        builder = builder.withTypeText(typeText, null, true)
-        lookupElements.add(builder)
-    }
-
-    override fun isSoft(): Boolean = false
 }
+
+private fun MutableList<LookupElement>.addAppleScriptCommandsSuite() {
+    addAppleScriptCommandSuiteElement(AppleScriptTypes.LAUNCH.toString().lowercase())
+    addAppleScriptCommandSuiteElement(AppleScriptTypes.ACTIVATE.toString().lowercase())
+}
+
+private fun MutableList<LookupElement>.addAppleScriptCommandSuiteElement(commandName: String) {
+    add(
+        LookupElementBuilder
+            .create(commandName)
+            .bold()
+            .withTypeText("command", true)
+            .withIcon(AppleScriptComponentType.HANDLER.icon),
+    )
+}
+
+private fun MutableList<LookupElement>.addLookupElement(element: PsiElement) {
+    if (!element.isValid) return
+    val componentType = AppleScriptComponentType.typeOf(element)
+    val typeText = componentType?.toString()?.lowercase()
+    val builder = createLookupElement(element).withTypeText(typeText, null, true)
+    add(builder)
+}
+
+private fun createLookupElement(element: PsiElement): LookupElementBuilder =
+    when (element) {
+        is DictionaryComponent -> {
+            val dictionaryName = element.dictionary.getName()
+            LookupElementBuilder.createWithIcon(element).appendTailText("   $dictionaryName", true)
+        }
+
+        is AppleScriptComponent ->
+            createComponentLookupElement(element)
+
+        else -> LookupElementBuilder.create(element)
+    }
+
+private fun createComponentLookupElement(component: AppleScriptComponent): LookupElementBuilder {
+    val builder = LookupElementBuilder.createWithIcon(component)
+    return if (component is AppleScriptHandlerPositionalParametersDefinition) {
+        builder.withInsertHandler(component.parenthesesInsertHandler())
+    } else {
+        builder
+    }
+}
+
+private fun AppleScriptHandlerPositionalParametersDefinition.parenthesesInsertHandler() =
+    if (formalParameterList != null) {
+        ParenthesesInsertHandler.WITH_PARAMETERS
+    } else {
+        ParenthesesInsertHandler.NO_PARAMETERS
+    }
+
+@Suppress("UNCHECKED_CAST")
+private fun List<LookupElement>.toVariantsArray(): Array<Any> =
+    if (isNotEmpty()) toTypedArray<Any>() else LookupElement.EMPTY_ARRAY as Array<Any>

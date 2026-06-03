@@ -8,8 +8,11 @@ import com.intellij.psi.PsiElement
 import com.intellij.util.Consumer
 
 class AppleScriptHandlerDeclarationSearcher : PomDeclarationSearcher() {
-
-    override fun findDeclarationsAt(element: PsiElement, offsetInElement: Int, consumer: Consumer<in PomTarget>) {
+    override fun findDeclarationsAt(
+        element: PsiElement,
+        offsetInElement: Int,
+        consumer: Consumer<in PomTarget>,
+    ) {
         if (element is AppleScriptSelectorId) {
             val contextElement = element.context?.context
             if (contextElement is AppleScriptHandlerInterleavedParameters) {

@@ -14,6 +14,7 @@ public interface AppleScriptTypes {
   IElementType ADDITIVE_EXPRESSION = new AppleScriptElementType("ADDITIVE_EXPRESSION");
   IElementType APPLE_SCRIPT_PROPERTY = new AppleScriptElementType("APPLE_SCRIPT_PROPERTY");
   IElementType APPLICATION_HANDLER_DEFINITION = new AppleScriptElementType("APPLICATION_HANDLER_DEFINITION");
+  IElementType APPLICATION_OBJECT_REFERENCE = new AppleScriptElementType("APPLICATION_OBJECT_REFERENCE");
   IElementType APPLICATION_REFERENCE = new AppleScriptElementType("APPLICATION_REFERENCE");
   IElementType ARBITRARY_REFERENCE = new AppleScriptElementType("ARBITRARY_REFERENCE");
   IElementType ARGUMENT_SELECTOR = new AppleScriptElementType("ARGUMENT_SELECTOR");
@@ -196,7 +197,7 @@ public interface AppleScriptTypes {
   IElementType EACH = new AppleScriptTokenType("each");
   IElementType EIGHTH = new AppleScriptTokenType("eighth");
   IElementType ELSE = new AppleScriptTokenType("else");
-  IElementType END = new AppleScriptTokenType("end");
+  IElementType END = new AppleScriptTokenType("END");
   IElementType ENDS_WITH = new AppleScriptTokenType("ENDS_WITH");
   IElementType EQ = new AppleScriptTokenType("EQ");
   IElementType ERROR = new AppleScriptTokenType("error");
@@ -372,7 +373,7 @@ public interface AppleScriptTypes {
   class Factory {
     public static PsiElement createElement(ASTNode node) {
       IElementType type = node.getElementType();
-       if (type == ACTIVATE_COMMAND_EXPRESSION) {
+      if (type == ACTIVATE_COMMAND_EXPRESSION) {
         return new AppleScriptActivateCommandExpressionImpl(node);
       }
       else if (type == ADDITIVE_EXPRESSION) {
@@ -383,6 +384,9 @@ public interface AppleScriptTypes {
       }
       else if (type == APPLICATION_HANDLER_DEFINITION) {
         return new AppleScriptApplicationHandlerDefinitionImpl(node);
+      }
+      else if (type == APPLICATION_OBJECT_REFERENCE) {
+        return new AppleScriptApplicationObjectReferenceImpl(node);
       }
       else if (type == APPLICATION_REFERENCE) {
         return new AppleScriptApplicationReferenceImpl(node);

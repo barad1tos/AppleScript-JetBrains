@@ -3,29 +3,36 @@ package com.intellij.plugin.applescript.lang.ide.highlighting
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
 class AppleScriptLineMarkerProvider : RelatedItemLineMarkerProvider() {
-
     override fun collectNavigationMarkers(
         element: PsiElement,
         result: MutableCollection<in RelatedItemLineMarkerInfo<*>>,
     ) {
-        if (element !is AppleScriptApplicationReference) return
-        val leafNode: PsiElement = PsiTreeUtil.firstChild(element) ?: return
+        createApplicationDictionaryMarker(element)?.let(result::add)
+    }
+}
 
-        val dictionaryService = element.project.getService(AppleScriptProjectDictionaryService::class.java)
-        val appName = element.getApplicationName()
-        if (dictionaryService == null || StringUtil.isEmpty(appName)) return
-        val dictionary = dictionaryService.getDictionary(appName!!) ?: return
+private fun createApplicationDictionaryMarker(element: PsiElement): RelatedItemLineMarkerInfo<*>? =
+    (element as? AppleScriptApplicationReference)?.createApplicationDictionaryMarker()
 
-        val builder = NavigationGutterIconBuilder.create(dictionary.getIcon(0))
-            .setTargets(dictionary)
+private fun AppleScriptApplicationReference.createApplicationDictionaryMarker(): RelatedItemLineMarkerInfo<*>? {
+    val leafNode: PsiElement = PsiTreeUtil.firstChild(this)
+    val dictionaryService = project.getService(AppleScriptProjectDictionaryService::class.java)
+    val dictionary =
+        getApplicationName()
+            ?.takeUnless(String::isEmpty)
+            ?.let { appName -> dictionaryService?.getDictionary(appName) }
+
+    return dictionary?.let {
+        NavigationGutterIconBuilder
+            .create(it.getIcon(0))
+            .setTargets(it)
             .setTooltipText("Navigate to application dictionary file")
-        result.add(builder.createLineMarkerInfo(leafNode))
+            .createLineMarkerInfo(leafNode)
     }
 }

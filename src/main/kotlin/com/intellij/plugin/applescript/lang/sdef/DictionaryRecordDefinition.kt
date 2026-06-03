@@ -2,20 +2,10 @@ package com.intellij.plugin.applescript.lang.sdef
 
 import com.intellij.psi.xml.XmlTag
 
-class DictionaryRecordDefinition : AbstractDictionaryComponent<Suite>, DictionaryRecord {
-
+class DictionaryRecordDefinition :
+    AbstractDictionaryComponent<Suite>,
+    DictionaryRecord {
     private var properties: List<AppleScriptPropertyDefinition>? = null
-
-    constructor(
-        suite: Suite,
-        name: String,
-        code: String,
-        properties: List<AppleScriptPropertyDefinition>?,
-        description: String?,
-        xmlTagRecord: XmlTag,
-    ) : super(suite, name, code, xmlTagRecord, description) {
-        this.properties = properties
-    }
 
     constructor(
         suite: Suite,
@@ -31,5 +21,5 @@ class DictionaryRecordDefinition : AbstractDictionaryComponent<Suite>, Dictionar
         this.properties = properties
     }
 
-    override fun getSuite(): Suite = getDictionaryParentComponent()
+    override val suite: Suite get() = myParent
 }

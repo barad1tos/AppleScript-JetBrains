@@ -1,8 +1,11 @@
 package com.intellij.plugin.applescript.lang.sdef
 
-abstract class PsiType(val typeName: String) {
-
-    private class AppleScriptBuiltInType(className: String) : PsiType(className)
+abstract class PsiType(
+    val typeName: String,
+) {
+    private class AppleScriptBuiltInType(
+        className: String,
+    ) : PsiType(className)
 
     companion object {
         @JvmField

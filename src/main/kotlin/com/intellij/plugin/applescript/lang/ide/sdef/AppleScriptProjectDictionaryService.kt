@@ -1,6 +1,5 @@
 package com.intellij.plugin.applescript.lang.ide.sdef
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -16,11 +15,11 @@ import java.io.File
  * Manages dictionaries for the project. Dictionaries created here are cached for the session.
  */
 @Service(Service.Level.PROJECT)
-class AppleScriptProjectDictionaryService(private val project: Project) {
-
+class AppleScriptProjectDictionaryService(
+    private val project: Project,
+) {
     private val dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService =
-        ApplicationManager.getApplication()
-            .getService(AppleScriptSystemDictionaryRegistryService::class.java)
+        AppleScriptSystemDictionaryRegistryService.getInstance()
 
     private val dictionaryMap: MutableMap<String, ApplicationDictionary> = HashMap()
 
@@ -42,44 +41,84 @@ class AppleScriptProjectDictionaryService(private val project: Project) {
      */
     @Synchronized
     fun createDictionary(applicationName: String): ApplicationDictionary? {
-        if (isInIgnoreList(applicationName, null)) return null
-        getDictionary(applicationName)?.let { return it }
+        val dictionary =
+            if (isInIgnoreList(applicationName)) {
+                null
+            } else {
+                getDictionary(applicationName) ?: createDictionaryFromInitializedInfo(applicationName)
+            }
+        return dictionary
+    }
+
+    private fun createDictionaryFromInitializedInfo(applicationName: String): ApplicationDictionary? {
         val info = dictionaryRegistryService.getInitializedInfo(applicationName)
-        if (info != null) {
-            return createDictionaryFromInfo(info)
+        if (info == null) {
+            LOG.warn("Failed to get initialized dictionary info for $applicationName")
         }
-        LOG.warn("Failed to get initialized dictionary info for $applicationName")
-        return null
+        return info?.let(::createDictionaryFromInfo)
     }
 
     private fun createDictionaryFromInfo(info: DictionaryInfo): ApplicationDictionary? {
-        if (!info.isInitialized()) {
-            LOG.error(
-                "Attempt to create dictionary for not initialized Dictionary Info for application" +
-                    info.getApplicationName(),
-            )
-            return null
-        }
         val applicationName = info.getApplicationName()
-        val vFile = LocalFileSystem.getInstance().findFileByIoFile(info.getDictionaryFile())
-        if (vFile != null && vFile.isValid) {
-            val xmlFile = PsiManager.getInstance(project).findFile(vFile) as? XmlFile
-            if (xmlFile != null) {
-                val dictionary = ApplicationDictionaryImpl(project, xmlFile, applicationName, info.getApplicationFile())
-                dictionaryMap[applicationName] = dictionary
-                return dictionary
+        val dictionary =
+            if (info.initialized) {
+                val vFile = LocalFileSystem.getInstance().findFileByIoFile(info.getDictionaryFile())
+                val xmlFile =
+                    vFile
+                        ?.takeIf { it.isValid }
+                        ?.let { PsiManager.getInstance(project).findFile(it) as? XmlFile }
+                if (xmlFile == null) {
+                    LOG.warn(
+                        "Failed to create dictionary from info for application: " +
+                            "$applicationName. Reason: file is null",
+                    )
+                }
+                xmlFile?.let {
+                    ApplicationDictionaryImpl(project, it, applicationName, info.getApplicationFile())
+                }
+            } else {
+                logUninitializedDictionaryInfo(applicationName)
+                null
             }
-        }
-        LOG.warn("Failed to create dictionary from info for application: $applicationName. Reason: file is null")
-        return null
+
+        dictionary?.let { dictionaryMap[applicationName] = it }
+        return dictionary
     }
+
+    private fun logUninitializedDictionaryInfo(applicationName: String) {
+        LOG.error(
+            "Attempt to create dictionary for not initialized Dictionary Info for application" +
+                applicationName,
+        )
+    }
+
+    private fun isInIgnoreList(applicationName: String): Boolean =
+        when {
+            dictionaryRegistryService.isNotScriptable(applicationName) -> {
+                LOG.debug("Application $applicationName is not scriptable. Can not create dictionary for it.")
+                true
+            }
+
+            dictionaryRegistryService.isInUnknownList(applicationName) -> {
+                LOG.debug(
+                    "WARNING: Application $applicationName was added to unknown list. " +
+                        "Can not create dictionary for it.",
+                )
+                true
+            }
+
+            else -> false
+        }
 
     /**
      * Generates the dictionary file for the application, initialises its terms for the parser, and creates
      * the [ApplicationDictionary] PSI class for the project.
      */
     @Synchronized
-    fun createDictionaryFromFile(applicationName: String, applicationFile: VirtualFile): ApplicationDictionary? {
+    fun createDictionaryFromFile(
+        applicationName: String,
+        applicationFile: VirtualFile,
+    ): ApplicationDictionary? {
         val appIoFile = File(applicationFile.path)
         val info = dictionaryRegistryService.createAndInitializeInfo(appIoFile, applicationName)
         if (info != null) {
@@ -87,24 +126,6 @@ class AppleScriptProjectDictionaryService(private val project: Project) {
         }
         LOG.warn("Failed to get initialized dictionary info for $applicationName from $applicationFile")
         return null
-    }
-
-    /**
-     * @return true if the application is either not scriptable or wasn't found in the system, false otherwise.
-     */
-    private fun isInIgnoreList(applicationName: String, applicationFile: VirtualFile?): Boolean {
-        if (dictionaryRegistryService.isNotScriptable(applicationName)) {
-            LOG.debug("Application $applicationName is not scriptable. Can not create dictionary for it.")
-            return true
-        }
-        if (applicationFile == null && dictionaryRegistryService.isInUnknownList(applicationName)) {
-            LOG.debug(
-                "WARNING: Application $applicationName was added to unknown list. " +
-                    "Can not create dictionary for it.",
-            )
-            return true
-        }
-        return false
     }
 
     fun getDictionary(applicationName: String): ApplicationDictionary? = dictionaryMap[applicationName]

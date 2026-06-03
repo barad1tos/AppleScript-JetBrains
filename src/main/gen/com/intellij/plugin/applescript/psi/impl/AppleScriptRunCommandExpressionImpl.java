@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptRunCommandExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptRunCommandExpression {
 
-  public AppleScriptRunCommandExpressionImpl(ASTNode node) {
+  public AppleScriptRunCommandExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitRunCommandExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -27,8 +29,8 @@ public class AppleScriptRunCommandExpressionImpl extends AppleScriptExpressionIm
 
   @Override
   @Nullable
-  public AppleScriptReferenceExpression getReferenceExpression() {
-    return findChildByClass(AppleScriptReferenceExpression.class);
+  public AppleScriptIdentifier getIdentifier() {
+    return findChildByClass(AppleScriptIdentifier.class);
   }
 
 }

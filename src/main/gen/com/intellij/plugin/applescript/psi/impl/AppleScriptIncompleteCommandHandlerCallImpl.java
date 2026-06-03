@@ -13,7 +13,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptIncompleteCommandHandlerCallImpl extends DictionaryCompositeNameImpl implements AppleScriptIncompleteCommandHandlerCall {
 
-  public AppleScriptIncompleteCommandHandlerCallImpl(ASTNode node) {
+  public AppleScriptIncompleteCommandHandlerCallImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -21,6 +21,7 @@ public class AppleScriptIncompleteCommandHandlerCallImpl extends DictionaryCompo
     visitor.visitIncompleteCommandHandlerCall(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

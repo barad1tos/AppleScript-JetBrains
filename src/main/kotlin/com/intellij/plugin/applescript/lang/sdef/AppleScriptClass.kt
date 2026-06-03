@@ -1,26 +1,50 @@
 package com.intellij.plugin.applescript.lang.sdef
 
-interface AppleScriptClass : DictionaryComponent {
+/**
+ * GROUP A (0 gen-implementer) SDEF interface — Phase 5 (v1.4) property conversion (PSI-03).
+ *
+ * Pure no-arg getters became `val` properties (Java names preserved by property-name choice, locked by
+ * `PsiGetterJvmSignatureTest`). The [properties] accessor is `var` because its setter `setProperties`
+ * returns `Unit` (Kotlin synthesizes `setProperties(List)` for the matching `var`).
+ *
+ * Conversion caveats (NON-NEGOTIABLE):
+ *  - [setPluralClassName] RETURNS `DictionaryClass` (not Unit) → cannot be a property setter; it stays
+ *    `fun` while [pluralClassName] is the read-only `val` getter.
+ *  - [suite] narrows `DictionaryComponent.suite: Suite?` to non-null `Suite` — converted in lockstep
+ *    with the supertype this wave (05-04). JVM-visible as `getSuite()`.
+ *  - [code] narrows `DictionaryComponent.code: String?` to non-null `String`; SDEF classes always have
+ *    a dictionary code, while top-level application dictionaries may still report `null`.
+ */
+sealed interface AppleScriptClass : DictionaryComponent {
+    /** JVM-visible as `getContents()`. */
+    val contents: List<AppleScriptClass>
 
-    fun getContents(): List<AppleScriptClass>
+    /** JVM-visible as `getProperties()` / `setProperties(List)`. */
+    var properties: List<@JvmSuppressWildcards AppleScriptPropertyDefinition>
 
-    fun getProperties(): List<AppleScriptPropertyDefinition>
+    /** JVM-visible as `getSuite()`; narrows `DictionaryComponent.suite` to non-null. */
+    override val suite: Suite
 
-    fun setProperties(properties: List<@JvmSuppressWildcards AppleScriptPropertyDefinition>)
+    /** JVM-visible as `getCode()`; narrows `DictionaryComponent.code` to non-null. */
+    override val code: String
 
-    override fun getSuite(): Suite
+    /** JVM-visible as `getParentClassName()`. */
+    val parentClassName: String?
 
-    fun getParentClassName(): String?
+    /** JVM-visible as `getParentClass()`. */
+    val parentClass: AppleScriptClass?
 
-    fun getParentClass(): AppleScriptClass?
+    /** JVM-visible as `getElementNames()`. */
+    val elementNames: List<String>?
 
-    fun getElementNames(): List<String>?
+    /** JVM-visible as `getElements()`. */
+    val elements: List<AppleScriptClass>
 
-    fun getElements(): List<AppleScriptClass>
+    /** JVM-visible as `getRespondingCommands()`. */
+    val respondingCommands: List<AppleScriptCommand>
 
-    fun getRespondingCommands(): List<AppleScriptCommand>
-
-    fun getPluralClassName(): String
+    /** JVM-visible as `getPluralClassName()`; paired mutator [setPluralClassName] stays `fun`. */
+    val pluralClassName: String
 
     fun setPluralClassName(pluralClassName: String): DictionaryClass
 }

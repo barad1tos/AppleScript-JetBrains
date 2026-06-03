@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptConsideringStatementImpl extends AppleScriptPsiElementImpl implements AppleScriptConsideringStatement {
 
-  public AppleScriptConsideringStatementImpl(ASTNode node) {
+  public AppleScriptConsideringStatementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptConsideringStatementImpl extends AppleScriptPsiElementIm
     visitor.visitConsideringStatement(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

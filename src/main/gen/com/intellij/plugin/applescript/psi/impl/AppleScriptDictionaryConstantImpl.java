@@ -13,7 +13,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptDictionaryConstantImpl extends AbstractDictionaryConstantSpecifier implements AppleScriptDictionaryConstant {
 
-  public AppleScriptDictionaryConstantImpl(ASTNode node) {
+  public AppleScriptDictionaryConstantImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -21,6 +21,7 @@ public class AppleScriptDictionaryConstantImpl extends AbstractDictionaryConstan
     visitor.visitDictionaryConstant(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

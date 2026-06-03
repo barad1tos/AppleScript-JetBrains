@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptFilterReferenceImpl extends AppleScriptPsiElementImpl implements AppleScriptFilterReference {
 
-  public AppleScriptFilterReferenceImpl(ASTNode node) {
+  public AppleScriptFilterReferenceImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptFilterReferenceImpl extends AppleScriptPsiElementImpl im
     visitor.visitFilterReference(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -29,6 +30,12 @@ public class AppleScriptFilterReferenceImpl extends AppleScriptPsiElementImpl im
   @Nullable
   public AppleScriptApplicationReference getApplicationReference() {
     return findChildByClass(AppleScriptApplicationReference.class);
+  }
+
+  @Override
+  @Nullable
+  public AppleScriptApplicationObjectReference getApplicationObjectReference() {
+    return findChildByClass(AppleScriptApplicationObjectReference.class);
   }
 
   @Override
@@ -83,12 +90,6 @@ public class AppleScriptFilterReferenceImpl extends AppleScriptPsiElementImpl im
   @NotNull
   public List<AppleScriptExpression> getExpressionList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptExpression.class);
-  }
-
-  @Override
-  @Nullable
-  public AppleScriptFilterReference getFilterReference() {
-    return findChildByClass(AppleScriptFilterReference.class);
   }
 
   @Override

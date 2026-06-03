@@ -2,6 +2,92 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.0] - TBD
+
+### Added
+
+- Standard Additions object tokens — `ASCII character N`, `ASCII number C`, `current date`, and `path to <folder>` — are now understood as valid expressions instead of being flagged as errors.
+- Application-specific object references such as `library playlist N` and `current track` are recognised for any scriptable application, even before its dictionary has loaded.
+- Non-ASCII comparison and math operators (≥, ≤, ≠, ÷) are recognised in expressions.
+
+### Fixed
+
+- `whose` filter clauses, including compound boolean conditions with parentheses, are no longer reported as incomplete.
+- `tell application "Name" … end tell` blocks nested inside script handlers no longer produce spurious errors.
+- `try … on error errMsg number errNum … end try` handlers now parse cleanly.
+
+### Compatibility
+
+- Verified against IntelliJ IDEA Community 2025.1 and 2025.2. Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported.
+
+## [1.6.0] - TBD
+
+### Changed
+
+- Final maintenance release of the internal-modernization series. No user-facing changes to completion, navigation, documentation, or run-configuration behavior.
+
+### Compatibility
+
+- Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2.)
+
+## [1.5.0] - TBD
+
+### Changed
+
+- Internal maintenance and stability improvements. This is a maintenance release with no user-facing changes to completion, navigation, documentation, or run-configuration behavior.
+
+### Compatibility
+
+- Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2.)
+
+## [1.4.0] - TBD
+
+### Changed
+
+- Internal modernization of the application-dictionary model. This is a maintenance release with no change to completion, navigation, documentation, or run-configuration behavior.
+
+### Compatibility
+
+- Verified against IntelliJ IDEA Community 2025.1 and 2025.2. Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2.)
+
+## [1.3.0] - TBD
+
+### Changed
+
+- Internal code organization improved to make room for upcoming features. No user-visible changes in this release.
+
+### Compatibility
+
+- Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2 — re-stated for clarity.)
+
+## [1.2.0] - TBD
+
+### Changed
+
+- Dictionary loading no longer blocks IDE startup. AppleScript completion becomes available within seconds, while the full application catalog finishes indexing quietly in the background.
+- When dictionary indexing takes more than a couple of seconds, a cancellable progress indicator appears in the status bar so you can see what the plugin is doing — and stop it if you don't need application-aware completion in the current session.
+
+### Compatibility
+
+- Minimum supported IDE raised to 2025.1 (`sinceBuild = 251`). 2024.3 users should stay on the 1.1.x line; the IDE shipped with that release does not include the runtime support needed for the new background dictionary loading.
+
+## [1.1.0] - TBD
+
+### Fixed
+
+- Completion on overloaded AppleScript commands (same name across different suites) now lists all overloads instead of dropping to a single arbitrary one. Cmd+Click still navigates to a stable first-inserted overload, so existing workflows are unaffected.
+- Eliminated a long-standing race condition in dictionary `xi:include` processing that could surface as sporadic `NullPointerException`s or, more rarely, a `HashMap` resize stuck-spin when several scripts opened at once during plugin warm-up.
+
+### Removed
+
+- The hidden "Generate Script Object" action stub was deleted. It was never registered in the menu and never had a UX attached — no user-visible change.
+
+## [1.0.1] - YYYY-MM-DD
+
+### Fixed
+
+- Resolved a data race in the dictionary registry that could cause sporadic `NullPointerException`s or brief IDE hangs when an AppleScript file was opened or completion was triggered while the plugin was still warming up. Affected users typically saw the issue right after IDE startup or after a project switch.
+
 ## [1.0.0] - 2026-05-22
 
 The plugin is now compatible with modern JetBrains IDEs (2024.3+) and is fully rewritten in Kotlin.

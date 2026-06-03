@@ -11,6 +11,9 @@ public interface AppleScriptFilterReference extends AppleScriptPsiElement {
   AppleScriptApplicationReference getApplicationReference();
 
   @Nullable
+  AppleScriptApplicationObjectReference getApplicationObjectReference();
+
+  @Nullable
   AppleScriptArbitraryReference getArbitraryReference();
 
   @Nullable
@@ -36,9 +39,6 @@ public interface AppleScriptFilterReference extends AppleScriptPsiElement {
 
   @NotNull
   List<AppleScriptExpression> getExpressionList();
-
-  @Nullable
-  AppleScriptFilterReference getFilterReference();
 
   @Nullable
   AppleScriptHandlerInterleavedParametersCall getHandlerInterleavedParametersCall();

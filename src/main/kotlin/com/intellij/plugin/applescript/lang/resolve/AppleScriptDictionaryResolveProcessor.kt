@@ -4,14 +4,9 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.KeyWithDefaultValue
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptProjectDictionaryService
-import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
-import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
-import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
-import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumerator
 import com.intellij.plugin.applescript.psi.AppleScriptBuiltInClassIdentifier
 import com.intellij.plugin.applescript.psi.AppleScriptDictionaryClassIdentifierPlural
 import com.intellij.plugin.applescript.psi.AppleScriptDictionaryClassName
@@ -27,7 +22,6 @@ import com.intellij.psi.scope.PsiScopeProcessor
 import com.intellij.util.containers.SortedList
 
 class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
-
     private val myProject: Project
     private val myElement: DictionaryCompositeElement?
     private val myElementName: String
@@ -51,97 +45,106 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
         myElement = null
     }
 
-    override fun doExecute(element: AppleScriptPsiElement, state: ResolveState): Boolean {
+    override fun doExecute(
+        element: AppleScriptPsiElement,
+        state: ResolveState,
+    ): Boolean {
         if (element !is ApplicationDictionaryDeclarator) return true
+
         val collectAll = state.get(COLLECT_ALL_DECLARATIONS) == java.lang.Boolean.TRUE
+        val targetElement = myElement
 
-        if (!collectAll && myElement != null) {
-            val dictionaryRegistry = element.project.getService(AppleScriptProjectDictionaryService::class.java)
-            val appName = element.getApplicationName()
-            if (appName == null || dictionaryRegistry == null) return true
-
-            val importedDictionary = dictionaryRegistry.getDictionary(appName)
-                ?: dictionaryRegistry.createDictionary(appName)
-
-            if (element is AppleScriptUseStatement) {
-                mySortedUseStatements.add(element)
-                if (element.withImporting()) {
-                    importedDictionary?.let { collectedDictionaries.add(it) }
-
-                    // Result := the closest application dictionary across all use statements.
-                    for (sortedUseStatement in mySortedUseStatements) {
-                        if (!sortedUseStatement.withImporting()) continue
-                        val currAppName = sortedUseStatement.getApplicationName()
-                        if (!StringUtil.isEmpty(currAppName)) {
-                            val currentDictionary = dictionaryRegistry.getDictionary(currAppName!!)
-                            if (currentDictionary != null) {
-                                // The sorted list ordering means the first match is the closest use statement.
-                                if (setResult(currentDictionary, myElement)) {
-                                    foundInUseStatementFlag = true
-                                    break
-                                }
-                            }
-                        }
-                    }
-                }
-            } else if (!foundInUseStatementFlag) {
-                if (importedDictionary != null) {
-                    collectedDictionaries.add(importedDictionary)
-                    return !setResult(importedDictionary, myElement)
-                }
-            }
-            return true
+        return if (!collectAll && targetElement != null) {
+            executeTargetedDeclaration(element, targetElement)
         } else { // collecting all declarations
-            val dictionaryRegistry = element.project.getService(AppleScriptProjectDictionaryService::class.java)
-            val appName = element.getApplicationName()
-            var importedDictionary: ApplicationDictionary? = null
-            if (appName != null && dictionaryRegistry != null) {
-                importedDictionary = dictionaryRegistry.getDictionary(appName)
-                    ?: dictionaryRegistry.createDictionary(appName)
-            }
-            if (element is AppleScriptUseStatement) {
-                mySortedUseStatements.add(element)
-                if (element.withImporting() && importedDictionary != null) {
-                    collectedDictionaries.add(importedDictionary)
-                }
-            } else if (importedDictionary != null) {
-                collectedDictionaries.add(importedDictionary)
+            collectDeclaration(element)
+            true
+        }
+    }
+
+    private fun executeTargetedDeclaration(
+        element: ApplicationDictionaryDeclarator,
+        targetElement: DictionaryCompositeElement,
+    ): Boolean {
+        val dictionaryRegistry = element.project.getService(AppleScriptProjectDictionaryService::class.java)
+        val appName = element.getApplicationName()
+        if (dictionaryRegistry == null || appName == null) return true
+
+        val importedDictionary = findOrCreateDictionary(dictionaryRegistry, appName)
+        return if (element is AppleScriptUseStatement) {
+            collectUseStatement(element, targetElement, dictionaryRegistry, importedDictionary)
+            true
+        } else if (foundInUseStatementFlag || importedDictionary == null) {
+            true
+        } else {
+            collectedDictionaries.add(importedDictionary)
+            !setResult(importedDictionary, targetElement)
+        }
+    }
+
+    private fun collectUseStatement(
+        useStatement: AppleScriptUseStatement,
+        targetElement: DictionaryCompositeElement,
+        dictionaryRegistry: AppleScriptProjectDictionaryService,
+        importedDictionary: ApplicationDictionary?,
+    ) {
+        mySortedUseStatements.add(useStatement)
+        if (!useStatement.withImporting()) return
+
+        importedDictionary?.let(collectedDictionaries::add)
+        for (sortedUseStatement in mySortedUseStatements) {
+            val currentDictionary = sortedUseStatement.getImportingDictionary(dictionaryRegistry)
+            if (currentDictionary != null && setResult(currentDictionary, targetElement)) {
+                foundInUseStatementFlag = true
+                return
             }
         }
-        return true
     }
 
-    private fun setResultFromCocoaStandardLibrary(element: DictionaryCompositeElement): Boolean {
+    private fun collectDeclaration(element: ApplicationDictionaryDeclarator) {
         val dictionaryRegistry = element.project.getService(AppleScriptProjectDictionaryService::class.java)
-            ?: return false
-        val cocoaStandard = dictionaryRegistry.getCocoaStandardTerminology()
-        return cocoaStandard != null && setResult(cocoaStandard, element)
+        val importedDictionary = dictionaryRegistry?.let(element::getImportedDictionary)
+
+        if (element is AppleScriptUseStatement) {
+            mySortedUseStatements.add(element)
+            if (element.withImporting()) {
+                importedDictionary?.let(collectedDictionaries::add)
+            }
+        } else {
+            importedDictionary?.let(collectedDictionaries::add)
+        }
     }
 
-    private fun setResultFromStandardAdditionsLibrary(element: DictionaryCompositeElement): Boolean {
-        val dictionaryRegistry = element.project.getService(AppleScriptProjectDictionaryService::class.java)
-            ?: return false
-        val scriptingAdditions = dictionaryRegistry.getScriptingAdditionsTerminology()
-        return scriptingAdditions != null && setResult(scriptingAdditions, element)
+    private fun setResultFromTerminology(
+        element: DictionaryCompositeElement,
+        terminologyProvider: AppleScriptProjectDictionaryService.() -> ApplicationDictionary?,
+    ): Boolean {
+        val dictionaryRegistry =
+            element.project.getService(AppleScriptProjectDictionaryService::class.java)
+                ?: return false
+
+        val terminology = dictionaryRegistry.terminologyProvider()
+        return terminology != null && setResult(terminology, element)
     }
 
     private fun setResult(
         importedDictionary: ApplicationDictionary,
         element: DictionaryCompositeElement,
     ): Boolean {
-        val res: DictionaryComponent? = when (element) {
-            is AppleScriptCommandHandlerCall -> importedDictionary.findCommand(myElementName)
-            is AppleScriptDictionaryClassName, is AppleScriptBuiltInClassIdentifier ->
-                importedDictionary.findClass(myElementName)
-            is AppleScriptDictionaryPropertyName -> importedDictionary.findProperty(myElementName)
-            is AbstractDictionaryConstantSpecifier -> importedDictionary.findEnumerator(myElementName)
-            is AppleScriptDictionaryClassIdentifierPlural ->
-                importedDictionary.findClassByPluralName(myElementName)
-            else -> {
-                LOG.warn("WARNING: unknown dictionary reference element: ${element.javaClass.name}")
-                null
+        val res: DictionaryComponent? =
+            when (element) {
+                is AppleScriptCommandHandlerCall -> importedDictionary.findCommand(myElementName)
+                is AppleScriptDictionaryClassName, is AppleScriptBuiltInClassIdentifier ->
+                    importedDictionary.findClass(myElementName)
+                is AppleScriptDictionaryPropertyName -> importedDictionary.findProperty(myElementName)
+                is AbstractDictionaryConstantSpecifier -> importedDictionary.findEnumerator(myElementName)
+                is AppleScriptDictionaryClassIdentifierPlural ->
+                    importedDictionary.findClassByPluralName(myElementName)
+                else -> {
+                    LOG.warn("WARNING: unknown dictionary reference element: ${element.javaClass.name}")
+                    null
+                }
             }
-        }
         if (res != null) {
             myResult = res
             return true
@@ -151,14 +154,26 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
 
     override fun <T> getHint(hintKey: Key<T>): T? = null
 
-    override fun handleEvent(event: PsiScopeProcessor.Event, associated: Any?) = Unit
+    override fun handleEvent(
+        event: PsiScopeProcessor.Event,
+        associated: Any?,
+    ) = Unit
 
     fun getMyResult(): DictionaryComponent? {
-        if (myResult == null && myElement != null) {
-            // No terms in <tell>/<using terms>/<use> statements — fall back to CocoaStandard (always
-            // available for scriptable apps), and to StandardAdditions only when there were no <use> stmts.
-            if (!setResultFromCocoaStandardLibrary(myElement) && mySortedUseStatements.size == 0) {
-                setResultFromStandardAdditionsLibrary(myElement)
+        val targetElement = myElement.takeIf { myResult == null }
+        // No terms in <tell>/<using terms>/<use> statements — fall back to CocoaStandard (always
+        // available for scriptable apps), and to StandardAdditions only when there were no <use> stmts.
+        if (targetElement != null) {
+            val resolvedFromCocoa =
+                setResultFromTerminology(
+                    targetElement,
+                    AppleScriptProjectDictionaryService::getCocoaStandardTerminology,
+                )
+            if (!resolvedFromCocoa && mySortedUseStatements.isEmpty()) {
+                setResultFromTerminology(
+                    targetElement,
+                    AppleScriptProjectDictionaryService::getScriptingAdditionsTerminology,
+                )
             }
         }
         return myResult
@@ -177,7 +192,7 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
             appendResultsIfNeeded(
                 result,
                 myProject,
-                mySortedUseStatements.size > 0,
+                mySortedUseStatements.isNotEmpty(),
                 collectedDictionaries.contains(dictionaryRegistry.getScriptingAdditionsTerminology()),
                 filterStdCocoaTerminologyFlag,
             )
@@ -202,8 +217,9 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
             filterStandardAdditions: Boolean,
             filterCocoaStandard: Boolean,
         ) {
-            val dictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
-                ?: return
+            val dictionaryRegistry =
+                project.getService(AppleScriptProjectDictionaryService::class.java)
+                    ?: return
             if (!filterStandardAdditions && !areThereUseStatements) {
                 val scriptAdditions = dictionaryRegistry.getScriptingAdditionsTerminology()
                 collectAllComponentsFromDictionary(scriptAdditions, result, false)
@@ -224,39 +240,70 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
             dictionaryComponents: MutableCollection<DictionaryComponent>,
             withCocoaStdLibFiltering: Boolean,
         ) {
-            if (importedDict == null) return
-            if (withCocoaStdLibFiltering) {
-                val dictionaryRegistry =
-                    importedDict.getProject().getService(AppleScriptProjectDictionaryService::class.java)
-                val cocoaStandard: ApplicationDictionary? = dictionaryRegistry?.getCocoaStandardTerminology()
-                if (cocoaStandard != null) {
-                    for (dicConst: DictionaryEnumerator in importedDict.getDictionaryEnumeratorMap().values) {
-                        if (cocoaStandard.findEnumerator(dicConst.getName()) == null) {
-                            dictionaryComponents.add(dicConst)
-                        }
-                    }
-                    for (clz: AppleScriptClass in importedDict.getDictionaryClassMap().values) {
-                        if (cocoaStandard.findClass(clz.getName()) == null) {
-                            dictionaryComponents.add(clz)
-                        }
-                    }
-                    for (cmd: AppleScriptCommand in importedDict.getAllCommands()) {
-                        if (cocoaStandard.findCommand(cmd.getName()) == null) {
-                            dictionaryComponents.add(cmd)
-                        }
-                    }
-                    for (prop: AppleScriptPropertyDefinition in importedDict.getDictionaryPropertyMap().values) {
-                        if (cocoaStandard.findCommand(prop.getName()) == null) {
-                            dictionaryComponents.add(prop)
-                        }
-                    }
-                }
-            } else {
-                dictionaryComponents.addAll(importedDict.getDictionaryEnumeratorMap().values)
-                dictionaryComponents.addAll(importedDict.getDictionaryPropertyMap().values)
-                dictionaryComponents.addAll(importedDict.getDictionaryClassMap().values)
-                dictionaryComponents.addAll(importedDict.getAllCommands())
+            if (importedDict == null) {
+                return
             }
+
+            if (withCocoaStdLibFiltering) {
+                collectComponentsMissingFromCocoa(importedDict, dictionaryComponents)
+            } else {
+                collectAllComponents(importedDict, dictionaryComponents)
+            }
+        }
+
+        private fun collectComponentsMissingFromCocoa(
+            importedDict: ApplicationDictionary,
+            dictionaryComponents: MutableCollection<DictionaryComponent>,
+        ) {
+            val cocoaStandard =
+                importedDict.project
+                    .getService(AppleScriptProjectDictionaryService::class.java)
+                    ?.getCocoaStandardTerminology()
+
+            if (cocoaStandard != null) {
+                importedDict.dictionaryEnumeratorMap.values.filterTo(dictionaryComponents) {
+                    cocoaStandard.findEnumerator(it.getName()) == null
+                }
+                importedDict.dictionaryClassMap.values.filterTo(dictionaryComponents) {
+                    cocoaStandard.findClass(it.getName()) == null
+                }
+                importedDict.allCommands.filterTo(dictionaryComponents) {
+                    cocoaStandard.findCommand(it.getName()) == null
+                }
+                importedDict.dictionaryPropertyMap.values.filterTo(dictionaryComponents) {
+                    cocoaStandard.findCommand(it.getName()) == null
+                }
+            }
+        }
+
+        private fun collectAllComponents(
+            importedDict: ApplicationDictionary,
+            dictionaryComponents: MutableCollection<DictionaryComponent>,
+        ) {
+            dictionaryComponents.addAll(importedDict.dictionaryEnumeratorMap.values)
+            dictionaryComponents.addAll(importedDict.dictionaryPropertyMap.values)
+            dictionaryComponents.addAll(importedDict.dictionaryClassMap.values)
+            dictionaryComponents.addAll(importedDict.allCommands)
         }
     }
 }
+
+private fun ApplicationDictionaryDeclarator.getImportedDictionary(
+    dictionaryRegistry: AppleScriptProjectDictionaryService,
+): ApplicationDictionary? {
+    val appName = getApplicationName() ?: return null
+    return findOrCreateDictionary(dictionaryRegistry, appName)
+}
+
+private fun AppleScriptUseStatement.getImportingDictionary(
+    dictionaryRegistry: AppleScriptProjectDictionaryService,
+): ApplicationDictionary? =
+    takeIf { it.withImporting() }
+        ?.getApplicationName()
+        ?.takeUnless(String::isEmpty)
+        ?.let(dictionaryRegistry::getDictionary)
+
+private fun findOrCreateDictionary(
+    dictionaryRegistry: AppleScriptProjectDictionaryService,
+    appName: String,
+): ApplicationDictionary? = dictionaryRegistry.getDictionary(appName) ?: dictionaryRegistry.createDictionary(appName)

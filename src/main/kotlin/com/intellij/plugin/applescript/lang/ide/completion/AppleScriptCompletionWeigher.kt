@@ -5,11 +5,19 @@ import com.intellij.codeInsight.completion.CompletionWeigher
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.plugin.applescript.lang.sdef.CommandParameter
 
-class AppleScriptCompletionWeigher : CompletionWeigher() {
+private const val NEUTRAL_COMPLETION_WEIGHT = 0
+private const val OPTIONAL_PARAMETER_COMPLETION_WEIGHT = -10
 
-    override fun weigh(element: LookupElement, location: CompletionLocation): Int {
-        val lookupObject = element.`object`
-        val parameter = lookupObject as? CommandParameter
-        return if (parameter != null && parameter.isOptional()) -10 else 0
+class AppleScriptCompletionWeigher : CompletionWeigher() {
+    override fun weigh(
+        element: LookupElement,
+        location: CompletionLocation,
+    ): Int {
+        val parameter = element.`object` as? CommandParameter
+        return if (parameter?.isOptional == true) {
+            OPTIONAL_PARAMETER_COMPLETION_WEIGHT
+        } else {
+            NEUTRAL_COMPLETION_WEIGHT
+        }
     }
 }

@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptArbitraryReferenceImpl extends AppleScriptPsiElementImpl implements AppleScriptArbitraryReference {
 
-  public AppleScriptArbitraryReferenceImpl(ASTNode node) {
+  public AppleScriptArbitraryReferenceImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptArbitraryReferenceImpl extends AppleScriptPsiElementImpl
     visitor.visitArbitraryReference(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

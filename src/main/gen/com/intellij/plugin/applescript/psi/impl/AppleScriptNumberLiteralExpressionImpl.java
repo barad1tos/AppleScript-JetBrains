@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptNumberLiteralExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptNumberLiteralExpression {
 
-  public AppleScriptNumberLiteralExpressionImpl(ASTNode node) {
+  public AppleScriptNumberLiteralExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitNumberLiteralExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

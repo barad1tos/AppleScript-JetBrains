@@ -9,14 +9,14 @@ import com.intellij.plugin.applescript.psi.AppleScriptPsiElementFactory
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiNameIdentifierOwner
 import com.intellij.psi.PsiReference
-import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.IncorrectOperationException
+import com.intellij.psi.util.PsiTreeUtil.getRequiredChildOfType as requiredChild
 
-abstract class AppleScriptNamedElementImpl(node: ASTNode) :
-    AppleScriptPsiElementImpl(node),
+abstract class AppleScriptNamedElementImpl(
+    node: ASTNode,
+) : AppleScriptPsiElementImpl(node),
     AppleScriptNamedElement,
     PsiNameIdentifierOwner {
-
     @Throws(IncorrectOperationException::class)
     override fun setName(newElementName: String): PsiElement {
         val identifier = getIdentifier()
@@ -27,19 +27,16 @@ abstract class AppleScriptNamedElementImpl(node: ASTNode) :
         return this
     }
 
-    override fun getReference(): PsiReference? = super<AppleScriptPsiElementImpl>.getReference()
+    override fun getReference(): PsiReference? = super.getReference()
 
     override fun getPresentation(): ItemPresentation? {
         val parent = parent
         return if (parent is NavigationItem) parent.presentation else null
     }
 
-    override fun getName(): String? =
-        getNameIdentifier()?.text ?: getIdentifier().text
+    override fun getName(): String? = getNameIdentifier()?.text ?: getIdentifier().text
 
     override fun getNameIdentifier(): PsiElement? = getIdentifier()
 
-    override fun getIdentifier(): AppleScriptIdentifier =
-        PsiTreeUtil.getChildOfType(this, AppleScriptIdentifier::class.java)
-            ?: error("AppleScriptIdentifier missing on ${node.elementType}")
+    override fun getIdentifier(): AppleScriptIdentifier = requiredChild(this, AppleScriptIdentifier::class.java)
 }

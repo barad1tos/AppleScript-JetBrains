@@ -6,9 +6,13 @@ import com.intellij.psi.ResolveState
 import com.intellij.psi.scope.PsiScopeProcessor
 
 abstract class AppleScriptPsiScopeProcessor : PsiScopeProcessor {
+    override fun execute(
+        element: PsiElement,
+        state: ResolveState,
+    ): Boolean = element !is AppleScriptPsiElement || doExecute(element, state)
 
-    override fun execute(element: PsiElement, state: ResolveState): Boolean =
-        element !is AppleScriptPsiElement || doExecute(element, state)
-
-    protected abstract fun doExecute(element: AppleScriptPsiElement, state: ResolveState): Boolean
+    protected abstract fun doExecute(
+        element: AppleScriptPsiElement,
+        state: ResolveState,
+    ): Boolean
 }

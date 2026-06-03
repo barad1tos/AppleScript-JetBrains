@@ -8,8 +8,10 @@ import com.intellij.psi.PsiNamedElement
 import com.intellij.usageView.UsageViewLongNameLocation
 
 class AppleScriptElementDescriptionProvider : ElementDescriptionProvider {
-
-    override fun getElementDescription(element: PsiElement, location: ElementDescriptionLocation): String? {
+    override fun getElementDescription(
+        element: PsiElement,
+        location: ElementDescriptionLocation,
+    ): String? {
         if (location is UsageViewLongNameLocation && element is PsiNamedElement && element is AppleScriptPsiElement) {
             return element.name
         }

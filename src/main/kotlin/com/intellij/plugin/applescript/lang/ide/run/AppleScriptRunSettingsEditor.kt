@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package com.intellij.plugin.applescript.lang.ide.run
 
 import com.intellij.openapi.fileChooser.FileChooserDescriptor
@@ -14,10 +12,8 @@ import javax.swing.JPanel
 import javax.swing.JTextField
 
 class AppleScriptRunSettingsEditor(
-    @Suppress("unused") private val project: Project,
-    private val runConfiguration: AppleScriptRunConfiguration,
+    project: Project,
 ) : SettingsEditor<AppleScriptRunConfiguration>() {
-
     // Initialised by the IntelliJ UI Designer instrumentation from AppleScriptRunSettingsEditor.form.
     private lateinit var mainPanel: JPanel
     private lateinit var scriptTextField: TextFieldWithBrowseButton
@@ -26,16 +22,22 @@ class AppleScriptRunSettingsEditor(
     private lateinit var showAppleEventsCheckBox: JCheckBox
 
     init {
-        val descriptor = FileChooserDescriptor(true, false, false, false, false, false)
-        scriptTextField.addBrowseFolderListener("Chose script", "Please choose script to run", project, descriptor)
+        val descriptor =
+            FileChooserDescriptor(true, false, false, false, false, false)
+                .withTitle("Choose Script")
+                .withDescription("Please choose script to run")
+        scriptTextField.addBrowseFolderListener(project, descriptor)
     }
 
     override fun resetEditorFrom(configuration: AppleScriptRunConfiguration) {
         val scriptPath = configuration.scriptPath
         if (!StringUtil.isEmpty(scriptPath)) {
-            scriptTextField.text = scriptPath!!
+            // Kotlin flow-analysis cannot see through the opaque StringUtil.isEmpty guard above;
+            // requireNotNull asserts (and smart-casts) the non-null invariant.
+            requireNotNull(scriptPath) { "scriptPath non-null: guarded by !StringUtil.isEmpty above" }
+            scriptTextField.text = scriptPath
             val parts = scriptPath.split("/")
-            if (parts.isNotEmpty()) runConfiguration.name = parts.last()
+            if (parts.isNotEmpty()) configuration.name = parts.last()
         }
         configuration.scriptParameters?.let { if (it.isNotEmpty()) parametersTextField.text = it }
         configuration.scriptOptions?.let { if (it.isNotEmpty()) scriptOptionsTextField.text = it }
@@ -51,7 +53,4 @@ class AppleScriptRunSettingsEditor(
     }
 
     override fun createEditor(): JComponent = mainPanel
-
-    val scriptName: String?
-        get() = runConfiguration.scriptPath
 }

@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptDateLiteralExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptDateLiteralExpression {
 
-  public AppleScriptDateLiteralExpressionImpl(ASTNode node) {
+  public AppleScriptDateLiteralExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitDateLiteralExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

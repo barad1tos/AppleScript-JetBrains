@@ -17,7 +17,6 @@ class DictionaryIdentifierImpl(
     xmlAttributeValue: XmlElement,
 ) : DictionaryComponentBase<DictionaryComponent, XmlElement>(xmlAttributeValue, parent),
     DictionaryIdentifier {
-
     private val varIdentifierTextList: List<String> = varIdentifierText.split(" ").toMutableList()
     private val myVarIdentifier: DictionaryIdentifier =
         DictionaryIdentifierImpl(parent, varIdentifierTextList[0], myXmlElement)

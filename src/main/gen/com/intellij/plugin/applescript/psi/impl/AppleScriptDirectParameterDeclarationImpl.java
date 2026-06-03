@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptDirectParameterDeclarationImpl extends AbstractAppleScriptComponent implements AppleScriptDirectParameterDeclaration {
 
-  public AppleScriptDirectParameterDeclarationImpl(ASTNode node) {
+  public AppleScriptDirectParameterDeclarationImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptDirectParameterDeclarationImpl extends AbstractAppleScri
     visitor.visitDirectParameterDeclaration(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

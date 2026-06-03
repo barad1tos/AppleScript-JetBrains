@@ -18,7 +18,6 @@ import com.intellij.util.IncorrectOperationException
 abstract class AbstractDictionaryReferenceElement :
     PsiPolyVariantCachingReference(),
     DictionaryReference {
-
     override fun getRanges(): List<TextRange> {
         val result = ArrayList<TextRange>()
         val parentOffset = -getElement().textRange.startOffset
@@ -31,7 +30,10 @@ abstract class AbstractDictionaryReferenceElement :
         return result
     }
 
-    override fun resolveInner(incompleteCode: Boolean, containingFile: PsiFile): Array<ResolveResult> {
+    override fun resolveInner(
+        incompleteCode: Boolean,
+        containingFile: PsiFile,
+    ): Array<ResolveResult> {
         val resolveProcessor = AppleScriptDictionaryResolveProcessor(getElement(), canonicalText)
         val maxScope = AppleScriptResolveUtil.getTellStatementResolveScope(getElement())
         val res = ArrayList<PsiElement>()
@@ -57,10 +59,10 @@ abstract class AbstractDictionaryReferenceElement :
     }
 
     override fun isReferenceTo(element: PsiElement): Boolean {
-        if (element is DictionaryComponent) {
-            if (element.getName() == getElement().getCompositeNameElement().getCompositeName()) {
-                return resolve() === element
-            }
+        if (element is DictionaryComponent &&
+            element.getName() == getElement().getCompositeNameElement().getCompositeName()
+        ) {
+            return resolve() === element
         }
         return super.isReferenceTo(element)
     }

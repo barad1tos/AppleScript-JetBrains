@@ -12,7 +12,7 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptHandlerPositionalParametersDefinitionImpl extends AbstractAppleScriptComponent implements AppleScriptHandlerPositionalParametersDefinition {
 
-  public AppleScriptHandlerPositionalParametersDefinitionImpl(ASTNode node) {
+  public AppleScriptHandlerPositionalParametersDefinitionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
@@ -20,6 +20,7 @@ public class AppleScriptHandlerPositionalParametersDefinitionImpl extends Abstra
     visitor.visitHandlerPositionalParametersDefinition(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);

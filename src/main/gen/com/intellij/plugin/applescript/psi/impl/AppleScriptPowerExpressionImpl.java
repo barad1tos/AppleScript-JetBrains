@@ -12,14 +12,16 @@ import com.intellij.plugin.applescript.psi.*;
 
 public class AppleScriptPowerExpressionImpl extends AppleScriptExpressionImpl implements AppleScriptPowerExpression {
 
-  public AppleScriptPowerExpressionImpl(ASTNode node) {
+  public AppleScriptPowerExpressionImpl(@NotNull ASTNode node) {
     super(node);
   }
 
+  @Override
   public void accept(@NotNull AppleScriptVisitor visitor) {
     visitor.visitPowerExpression(this);
   }
 
+  @Override
   public void accept(@NotNull PsiElementVisitor visitor) {
     if (visitor instanceof AppleScriptVisitor) accept((AppleScriptVisitor)visitor);
     else super.accept(visitor);
@@ -29,6 +31,12 @@ public class AppleScriptPowerExpressionImpl extends AppleScriptExpressionImpl im
   @NotNull
   public List<AppleScriptApplicationReference> getApplicationReferenceList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptApplicationReference.class);
+  }
+
+  @Override
+  @NotNull
+  public List<AppleScriptApplicationObjectReference> getApplicationObjectReferenceList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptApplicationObjectReference.class);
   }
 
   @Override

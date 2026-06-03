@@ -5,11 +5,11 @@ import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeElement
 import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeName
 import com.intellij.plugin.applescript.psi.sdef.DictionaryReference
 
-open class AbstractDictionaryClassSpecifier(node: ASTNode) :
-    DictionaryCompositeNameImpl(node),
+open class AbstractDictionaryClassSpecifier(
+    node: ASTNode,
+) : DictionaryCompositeNameImpl(node),
     DictionaryCompositeElement,
     DictionaryCompositeName {
-
     override fun getReference(): DictionaryReference = DictionaryClassSpecifierReference()
 
     override fun getCompositeNameElement(): DictionaryCompositeName = this
@@ -17,7 +17,6 @@ open class AbstractDictionaryClassSpecifier(node: ASTNode) :
     private inner class DictionaryClassSpecifierReference :
         AbstractDictionaryReferenceElement(),
         DictionaryReference {
-
         override fun getMyElement(): DictionaryCompositeElement = this@AbstractDictionaryClassSpecifier
     }
 }
