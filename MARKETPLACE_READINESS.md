@@ -28,8 +28,11 @@ This document tracks repository and plugin metadata readiness for a JetBrains Ma
 - [x] Apache 2.0 license retained.
 - [x] CI, CodeQL, Dependabot, pre-commit, zizmor, ktlint, detekt, and plugin-verifier wiring are present.
 - [x] GitHub community files added: contributing guide, code of conduct, security policy, issue templates, PR template, and CODEOWNERS.
+- [x] GitHub Issues and Private Vulnerability Reporting enabled for the repository.
+- [x] Bundled runtime dependencies enumerated in `THIRD_PARTY_NOTICES.md`.
 - [ ] Latest CI status confirmed on the publication branch.
 - [x] Local validation commands rerun after this metadata pass.
+- [ ] Bundled dependency license posture reviewed before paid Marketplace publication, especially multi-license dependencies such as JNA and delight-rhino-sandbox.
 - [ ] Marketplace screenshots captured and uploaded through the Marketplace media section.
 - [ ] Pricing, trial, refund/support, and paid-vs-free publication decisions made.
 - [ ] Developer EULA and privacy-policy requirements reviewed for paid Marketplace publication.

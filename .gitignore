@@ -37,7 +37,6 @@ gradle/wrapper/dists/
 # Manual test scripts (working artifacts)
 test_*.applescript
 update_test_data*.py
-regenerate_test_data.sh
 
 # Working/handoff artifacts from past sessions
 INTEGRATION_TEST_RESULTS.txt

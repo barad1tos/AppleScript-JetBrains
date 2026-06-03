@@ -2,7 +2,7 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
-## [2.0.0] - TBD
+## [2.0.0] - 2026-06-03
 
 ### Added
 
@@ -20,7 +20,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - Verified against IntelliJ IDEA Community 2025.1 and 2025.2. Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported.
 
-## [1.6.0] - TBD
+## [1.6.0] - 2026-06-03
 
 ### Changed
 
@@ -30,7 +30,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2.)
 
-## [1.5.0] - TBD
+## [1.5.0] - 2026-06-03
 
 ### Changed
 
@@ -40,7 +40,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2.)
 
-## [1.4.0] - TBD
+## [1.4.0] - 2026-06-03
 
 ### Changed
 
@@ -50,7 +50,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - Verified against IntelliJ IDEA Community 2025.1 and 2025.2. Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2.)
 
-## [1.3.0] - TBD
+## [1.3.0] - 2026-06-03
 
 ### Changed
 
@@ -60,7 +60,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported. (Unchanged from 1.2 — re-stated for clarity.)
 
-## [1.2.0] - TBD
+## [1.2.0] - 2026-06-03
 
 ### Changed
 
@@ -71,7 +71,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - Minimum supported IDE raised to 2025.1 (`sinceBuild = 251`). 2024.3 users should stay on the 1.1.x line; the IDE shipped with that release does not include the runtime support needed for the new background dictionary loading.
 
-## [1.1.0] - TBD
+## [1.1.0] - 2026-06-03
 
 ### Fixed
 
@@ -82,7 +82,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - The hidden "Generate Script Object" action stub was deleted. It was never registered in the menu and never had a UX attached — no user-visible change.
 
-## [1.0.1] - YYYY-MM-DD
+## [1.0.1] - 2026-06-03
 
 ### Fixed
 
