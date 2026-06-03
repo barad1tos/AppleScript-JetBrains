@@ -4,8 +4,6 @@ import com.intellij.plugin.applescript.AppleScriptLanguage
 import com.intellij.psi.tree.IElementType
 import org.jetbrains.annotations.NonNls
 
-open class AppleScriptTokenType(@NonNls debugName: String) :
-    IElementType(debugName, AppleScriptLanguage) {
-
-    fun getMyDebugName(): String = "AppleScriptTokenType.${super.toString()}"
-}
+open class AppleScriptTokenType(
+    @NonNls debugName: String,
+) : IElementType(debugName, AppleScriptLanguage)

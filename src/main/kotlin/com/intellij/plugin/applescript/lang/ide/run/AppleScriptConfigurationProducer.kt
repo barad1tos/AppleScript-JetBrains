@@ -8,8 +8,10 @@ import com.intellij.openapi.util.Ref
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.psi.PsiElement
 
-class AppleScriptConfigurationProducer : RunConfigurationProducer<AppleScriptRunConfiguration>(AppleScriptConfigurationType()) {
-
+class AppleScriptConfigurationProducer :
+    RunConfigurationProducer<AppleScriptRunConfiguration>(
+        AppleScriptConfigurationType(),
+    ) {
     override fun setupConfigurationFromContext(
         configuration: AppleScriptRunConfiguration,
         context: ConfigurationContext,
@@ -30,8 +32,11 @@ class AppleScriptConfigurationProducer : RunConfigurationProducer<AppleScriptRun
         configuration: AppleScriptRunConfiguration,
         context: ConfigurationContext,
     ): Boolean {
-        val file = context.psiLocation?.containingFile ?: return false
-        val currentFile = file.virtualFile ?: return false
-        return currentFile.path == configuration.scriptPath
+        val currentPath =
+            context.psiLocation
+                ?.containingFile
+                ?.virtualFile
+                ?.path
+        return currentPath?.let { it == configuration.scriptPath } ?: false
     }
 }

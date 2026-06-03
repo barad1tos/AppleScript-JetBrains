@@ -13,7 +13,6 @@ package com.intellij.plugin.applescript.lang.sdef
  * `isOptional()` (NOT `getOptional()`).
  */
 sealed interface CommandParameter : DictionaryComponent {
-
     /** JVM-visible as `isOptional()` — `is`-prefix preserved. */
     val isOptional: Boolean
 

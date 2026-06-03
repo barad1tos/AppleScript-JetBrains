@@ -31,7 +31,6 @@ import java.util.concurrent.atomic.AtomicReference
  * finishing within the wall-clock budget.
  */
 class StressTest : BasePlatformTestCase() {
-
     override fun setUp() {
         Assume.assumeTrue(
             "StressTest only runs with -PincludeHeavyTests=true",

@@ -19,7 +19,6 @@ import java.io.File
  * scans /Applications.
  */
 class ParserRegressionTest : BasePlatformTestCase() {
-
     override fun getTestDataPath(): String = File(REGRESSION_DIR).absolutePath
 
     fun testTryMinimal() = assertNoParserErrors("try_minimal.scpt")
@@ -41,12 +40,13 @@ class ParserRegressionTest : BasePlatformTestCase() {
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
         if (errors.isEmpty()) return
         val text = psiFile.text
-        val report = errors.joinToString("\n") { err ->
-            val offset = err.textRange.startOffset
-            val line = text.substring(0, offset).count { it == '\n' } + 1
-            val snippet = err.text.replace("\n", "\\n").take(40)
-            "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
-        }
+        val report =
+            errors.joinToString("\n") { err ->
+                val offset = err.textRange.startOffset
+                val line = text.substring(0, offset).count { it == '\n' } + 1
+                val snippet = err.text.replace("\n", "\\n").take(40)
+                "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
+            }
         fail("$fileName has ${errors.size} parser error(s):\n$report")
     }
 

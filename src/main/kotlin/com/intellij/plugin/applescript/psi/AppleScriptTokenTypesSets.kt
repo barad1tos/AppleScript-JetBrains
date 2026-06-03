@@ -72,8 +72,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INSTEAD_OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTEGER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTERNATIONAL_TEXT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.INT_DIV
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.INT_DIV
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IS_CONTAIN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IS_IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IS_NOT_IN
@@ -92,8 +92,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.LT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ME
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MIDDLE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MINUS
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.MOD
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MISSING_VALUE
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.MOD
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NINTH
@@ -141,8 +141,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.TENTH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TEXT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TEXT_ITEM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THAT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.THE_KW
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THEN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.THE_KW
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THIRD
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THROUGH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THRU
@@ -166,12 +166,32 @@ import com.intellij.psi.TokenType
 import com.intellij.psi.tree.TokenSet
 
 object AppleScriptTokenTypesSets {
-
     @JvmField
-    val OPERATORS: TokenSet = TokenSet.create(
-        PLUS, MINUS, MOD, POW, BAND, LNOT, DIV, INT_DIV, STAR, INT_DIV, EQ, NE, IS_IN,
-        IS_CONTAIN, IS_NOT_IN, LE, GE, GT, LT, LCURLY, RCURLY, AS,
-    )
+    val OPERATORS: TokenSet =
+        TokenSet.create(
+            PLUS,
+            MINUS,
+            MOD,
+            POW,
+            BAND,
+            LNOT,
+            DIV,
+            INT_DIV,
+            STAR,
+            INT_DIV,
+            EQ,
+            NE,
+            IS_IN,
+            IS_CONTAIN,
+            IS_NOT_IN,
+            LE,
+            GE,
+            GT,
+            LT,
+            LCURLY,
+            RCURLY,
+            AS,
+        )
 
     @JvmField
     val NUMBERS: TokenSet = TokenSet.create(DIGITS, DEC_EXPONENT)
@@ -180,58 +200,219 @@ object AppleScriptTokenTypesSets {
     val LOGICAL_OPERATORS: TokenSet = TokenSet.create(LAND, LOR, LNOT)
 
     @JvmField
-    val COMPARISON_OPERATORS: TokenSet = TokenSet.create(
-        EQ, NE, LE, GE, GT, LT, IS_IN, IS_NOT_IN, IS_CONTAIN, DOES_NOT_CONTAIN,
-        STARTS_BEGINS_WITH, ENDS_WITH,
-    )
+    val COMPARISON_OPERATORS: TokenSet =
+        TokenSet.create(
+            EQ,
+            NE,
+            LE,
+            GE,
+            GT,
+            LT,
+            IS_IN,
+            IS_NOT_IN,
+            IS_CONTAIN,
+            DOES_NOT_CONTAIN,
+            STARTS_BEGINS_WITH,
+            ENDS_WITH,
+        )
 
     @JvmField
-    val LANGUAGE_LITERALS: TokenSet = TokenSet.create(
-        TRUE, FALSE, MISSING_VALUE, CURRENT, CURRENT_APP, CURRENT_APPLICATION,
-    )
+    val LANGUAGE_LITERALS: TokenSet =
+        TokenSet.create(
+            TRUE,
+            FALSE,
+            MISSING_VALUE,
+            CURRENT,
+            CURRENT_APP,
+            CURRENT_APPLICATION,
+        )
 
     @JvmField
-    val BUILT_IN_TYPES: TokenSet = TokenSet.create(
-        ALIAS, ANY, BOOLEAN, BUILT_IN_TYPE_S, CHARACTER, CLASS, CONSTANT, CUBIC_VOL,
-        DATA, DATE, FILE, FILE_SPECIFICATION, INTEGER, INTERNATIONAL_TEXT, ITEM, LIST,
-        LOCATION_SPECIFIER, NUMBER, PARAGRAPH, POINT, REAL, RECORD, RECTANGLE, REFERENCE,
-        RGB_COLOR, SPECIFIER, SQUARE_AREA, STRING, STYLED_CLIPBOARD_TEXT, STYLED_TEXT,
-        TEMPERATURE, TEXT, TEXT_ITEM, TYPE, UNICODE_TEXT, WORD,
-    )
+    val BUILT_IN_TYPES: TokenSet =
+        TokenSet.create(
+            ALIAS,
+            ANY,
+            BOOLEAN,
+            BUILT_IN_TYPE_S,
+            CHARACTER,
+            CLASS,
+            CONSTANT,
+            CUBIC_VOL,
+            DATA,
+            DATE,
+            FILE,
+            FILE_SPECIFICATION,
+            INTEGER,
+            INTERNATIONAL_TEXT,
+            ITEM,
+            LIST,
+            LOCATION_SPECIFIER,
+            NUMBER,
+            PARAGRAPH,
+            POINT,
+            REAL,
+            RECORD,
+            RECTANGLE,
+            REFERENCE,
+            RGB_COLOR,
+            SPECIFIER,
+            SQUARE_AREA,
+            STRING,
+            STYLED_CLIPBOARD_TEXT,
+            STYLED_TEXT,
+            TEMPERATURE,
+            TEXT,
+            TEXT_ITEM,
+            TYPE,
+            UNICODE_TEXT,
+            WORD,
+        )
 
     @JvmField
-    val KEYWORDS: TokenSet = TokenSet.create(
-        AROUND, AS, ASIDE_FROM, AT, BACK, BEFORE, BEGINNING, BEHIND, BELOW, BENEATH,
-        BESIDE, BETWEEN, BUT, BY, CONSIDERING, CONTINUE, COPY, DIV, DOES, EIGHTH, ELSE,
-        END, EQ, ERROR, EVERY, EXIT, FALSE, FIFTH, FIRST, FOR, FOURTH, FROM, FRONT,
-        GET, GIVEN, GLOBAL, IF, IGNORING, IN, INSTEAD_OF, INTO, IT, LAST, LOCAL, ME,
-        MIDDLE, MOD, MY, NINTH, LNOT, OF, ON, ONTO, LOR, OUT_OF, OVER, PROP, PROPERTY,
-        PUT, REFERENCE, REPEAT, RETURN, RETURNING, SCRIPT, SECOND, SET, SEVENTH, SINCE,
-        SIXTH, SOME, TELL, TENTH, THAT, THE_KW, THEN, THIRD, THROUGH, THRU, TIMEOUT,
-        TIMES, TO, TRANSACTION, TRUE, TRY, UNTIL, WHERE, WHILE, WHOSE, WITH, WITHOUT,
-    )
+    val KEYWORDS: TokenSet =
+        TokenSet.create(
+            AROUND,
+            AS,
+            ASIDE_FROM,
+            AT,
+            BACK,
+            BEFORE,
+            BEGINNING,
+            BEHIND,
+            BELOW,
+            BENEATH,
+            BESIDE,
+            BETWEEN,
+            BUT,
+            BY,
+            CONSIDERING,
+            CONTINUE,
+            COPY,
+            DIV,
+            DOES,
+            EIGHTH,
+            ELSE,
+            END,
+            EQ,
+            ERROR,
+            EVERY,
+            EXIT,
+            FALSE,
+            FIFTH,
+            FIRST,
+            FOR,
+            FOURTH,
+            FROM,
+            FRONT,
+            GET,
+            GIVEN,
+            GLOBAL,
+            IF,
+            IGNORING,
+            IN,
+            INSTEAD_OF,
+            INTO,
+            IT,
+            LAST,
+            LOCAL,
+            ME,
+            MIDDLE,
+            MOD,
+            MY,
+            NINTH,
+            LNOT,
+            OF,
+            ON,
+            ONTO,
+            LOR,
+            OUT_OF,
+            OVER,
+            PROP,
+            PROPERTY,
+            PUT,
+            REFERENCE,
+            REPEAT,
+            RETURN,
+            RETURNING,
+            SCRIPT,
+            SECOND,
+            SET,
+            SEVENTH,
+            SINCE,
+            SIXTH,
+            SOME,
+            TELL,
+            TENTH,
+            THAT,
+            THE_KW,
+            THEN,
+            THIRD,
+            THROUGH,
+            THRU,
+            TIMEOUT,
+            TIMES,
+            TO,
+            TRANSACTION,
+            TRUE,
+            TRY,
+            UNTIL,
+            WHERE,
+            WHILE,
+            WHOSE,
+            WITH,
+            WITHOUT,
+        )
 
     @JvmField
-    val HANDLER_PARAMETER_LABELS: TokenSet = TokenSet.create(
-        ABOUT, ABOVE, AGAINST, APART_FROM, AROUND, ASIDE_FROM, AT, BELOW, BENEATH,
-        BESIDE, BETWEEN, BY, FOR, FROM, INSTEAD_OF, INTO, ON, ONTO, OUT_OF, OVER,
-        SINCE, THRU, THROUGH, UNDER, TO,
-    )
+    val HANDLER_PARAMETER_LABELS: TokenSet =
+        TokenSet.create(
+            ABOUT,
+            ABOVE,
+            AGAINST,
+            APART_FROM,
+            AROUND,
+            ASIDE_FROM,
+            AT,
+            BELOW,
+            BENEATH,
+            BESIDE,
+            BETWEEN,
+            BY,
+            FOR,
+            FROM,
+            INSTEAD_OF,
+            INTO,
+            ON,
+            ONTO,
+            OUT_OF,
+            OVER,
+            SINCE,
+            THRU,
+            THROUGH,
+            UNDER,
+            TO,
+        )
 
     @JvmField
-    val HANDLER_DEFINITIONS: TokenSet = TokenSet.create(
-        HANDLER_POSITIONAL_PARAMETERS_DEFINITION,
-        HANDLER_INTERLEAVED_PARAMETERS_DEFINITION,
-        HANDLER_LABELED_PARAMETERS_DEFINITION,
-    )
+    val HANDLER_DEFINITIONS: TokenSet =
+        TokenSet.create(
+            HANDLER_POSITIONAL_PARAMETERS_DEFINITION,
+            HANDLER_INTERLEAVED_PARAMETERS_DEFINITION,
+            HANDLER_LABELED_PARAMETERS_DEFINITION,
+        )
 
     @JvmField
     val STRINGS: TokenSet = TokenSet.create(STRING_LITERAL)
+
+    @JvmField
+    val PARSER_WHITE_SPACES: TokenSet = TokenSet.create(TokenType.WHITE_SPACE)
+
+    @JvmField
+    val COMMENTS: TokenSet = TokenSet.create(COMMENT)
 
     @JvmField
     val WHITE_SPACES_SET: TokenSet = TokenSet.create(NLS, TokenType.WHITE_SPACE)
 
     @JvmField
     val COMMENT_OR_WHITE_SPACE: TokenSet = TokenSet.create(NLS, TokenType.WHITE_SPACE, COMMENT)
-
 }

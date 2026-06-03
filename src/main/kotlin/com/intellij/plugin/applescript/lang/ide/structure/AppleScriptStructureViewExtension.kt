@@ -8,7 +8,6 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.xml.XmlTag
 
 class AppleScriptStructureViewExtension : StructureViewExtension {
-
     override fun getType(): Class<out PsiElement> = XmlTag::class.java
 
     override fun getChildren(parent: PsiElement?): Array<StructureViewTreeElement> {
@@ -18,7 +17,10 @@ class AppleScriptStructureViewExtension : StructureViewExtension {
         return emptyArray()
     }
 
-    override fun getCurrentEditorElement(editor: Editor?, parent: PsiElement?): Any? {
+    override fun getCurrentEditorElement(
+        editor: Editor?,
+        parent: PsiElement?,
+    ): Any? {
         if (parent is AppleScriptPsiElement) {
             return AppleScriptStructureViewModel(parent.containingFile, editor).currentEditorElement
         }

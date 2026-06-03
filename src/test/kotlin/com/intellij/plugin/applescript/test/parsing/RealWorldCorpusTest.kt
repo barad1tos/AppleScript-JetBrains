@@ -25,7 +25,6 @@ import java.io.File
  * AppleScriptSystemDictionaryRegistryService scans /Applications.
  */
 class RealWorldCorpusTest : BasePlatformTestCase() {
-
     override fun getTestDataPath(): String = File(CORPUS_DIR).absolutePath
 
     fun testMusicLibrary() = assertNoParserErrors("music_library.applescript")
@@ -59,12 +58,13 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
         if (errors.isEmpty()) return
         val text = psiFile.text
-        val report = errors.joinToString("\n") { err ->
-            val offset = err.textRange.startOffset
-            val line = text.substring(0, offset).count { it == '\n' } + 1
-            val snippet = err.text.replace("\n", "\\n").take(40)
-            "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
-        }
+        val report =
+            errors.joinToString("\n") { err ->
+                val offset = err.textRange.startOffset
+                val line = text.substring(0, offset).count { it == '\n' } + 1
+                val snippet = err.text.replace("\n", "\\n").take(40)
+                "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
+            }
         fail("$fileName has ${errors.size} parser error(s):\n$report")
     }
 

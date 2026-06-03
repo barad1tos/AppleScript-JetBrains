@@ -14,7 +14,6 @@ import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
 import com.intellij.util.ProcessingContext
 
 class ApplicationNameCompletionContributor : CompletionContributor() {
-
     init {
         val inAppReferenceString = psiElement().withSuperParent(1, AppleScriptApplicationReference::class.java)
         extend(

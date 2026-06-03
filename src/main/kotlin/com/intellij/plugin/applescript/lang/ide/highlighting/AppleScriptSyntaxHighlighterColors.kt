@@ -5,7 +5,6 @@ import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.editor.colors.TextAttributesKey.createTextAttributesKey
 
 object AppleScriptSyntaxHighlighterColors {
-
     const val APPLE_SCRIPT_KEYWORD: String = "APPLE_SCRIPT_KEYWORD"
     const val APPLE_SCRIPT_LOGICAL_OPERATOR: String = "APPLE_SCRIPT_LOGICAL_OPERATOR"
     const val APPLE_SCRIPT_COMPARISON_OPERATOR: String = "APPLE_SCRIPT_COMPARISON_OPERATOR"

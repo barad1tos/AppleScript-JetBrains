@@ -14,23 +14,21 @@ class DictionaryInfo(
     private val dictionaryFile: File,
     private val applicationFile: File?,
 ) {
-    private val state: State = State(
-        applicationName,
-        dictionaryFile.path,
-        applicationFile?.path,
-    )
+    val state: State =
+        State(
+            applicationName,
+            dictionaryFile.path,
+            applicationFile?.path,
+        )
 
-    private var initialized: Boolean = false
+    var initialized: Boolean = false
+        private set
 
     fun getApplicationName(): String = applicationName
 
     fun getDictionaryFile(): File = dictionaryFile
 
     fun getApplicationFile(): File? = applicationFile
-
-    fun getState(): State = state
-
-    fun isInitialized(): Boolean = initialized
 
     fun setInitialized(initialized: Boolean): Boolean {
         this.initialized = initialized

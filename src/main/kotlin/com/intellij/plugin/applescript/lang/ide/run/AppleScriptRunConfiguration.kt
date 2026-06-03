@@ -19,18 +19,18 @@ class AppleScriptRunConfiguration internal constructor(
     configurationFactory: ConfigurationFactory,
     name: String,
 ) : LocatableConfigurationBase<RunConfiguration>(project, configurationFactory, name) {
-
     internal var scriptPath: String? = null
     internal var scriptParameters: String? = null
     internal var scriptOptions: String? = null
     internal var showAppleEvents: Boolean = false
 
-    override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> =
-        AppleScriptRunSettingsEditor(project, this)
+    override fun getConfigurationEditor(): SettingsEditor<out RunConfiguration> = AppleScriptRunSettingsEditor(project)
 
     @Throws(ExecutionException::class)
-    override fun getState(executor: Executor, environment: ExecutionEnvironment): RunProfileState =
-        AppleScriptScriptCommandLineState(this, environment)
+    override fun getState(
+        executor: Executor,
+        environment: ExecutionEnvironment,
+    ): RunProfileState = AppleScriptScriptCommandLineState(this, environment)
 
     @Throws(InvalidDataException::class)
     override fun readExternal(element: Element) {

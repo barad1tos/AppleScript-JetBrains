@@ -32,7 +32,6 @@ import org.junit.Assume
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppCommandGatingTest : BasePlatformTestCase() {
-
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var testScope: TestScope
 

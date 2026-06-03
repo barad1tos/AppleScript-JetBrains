@@ -4,7 +4,6 @@ import com.intellij.openapi.fileTypes.LanguageFileType
 import javax.swing.Icon
 
 object AppleScriptFileType : LanguageFileType(AppleScriptLanguage) {
-
     override fun getName(): String = "AppleScript"
 
     override fun getDescription(): String = "AppleScript file"

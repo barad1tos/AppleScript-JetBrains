@@ -8,7 +8,6 @@ interface AppleScriptCommandHandlerCall :
     AppleScriptPsiElement,
     DictionaryCompositeElement,
     AppleScriptExpression {
-
     fun getCommandName(): String
 
     fun getDirectParameter(): PsiElement?

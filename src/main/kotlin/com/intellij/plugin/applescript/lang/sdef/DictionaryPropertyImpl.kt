@@ -2,37 +2,30 @@ package com.intellij.plugin.applescript.lang.sdef
 
 import com.intellij.psi.xml.XmlTag
 
-open class DictionaryPropertyImpl :
-    AbstractDictionaryComponent<DictionaryComponent>,
+data class DictionaryPropertyData(
+    val name: String,
+    val code: String,
+    val typeSpecifier: String,
+    val description: String?,
+    val accessType: AccessType = AccessType.RW,
+)
+
+open class DictionaryPropertyImpl(
+    classOrRecord: DictionaryComponent,
+    data: DictionaryPropertyData,
+    xmlTagProperty: XmlTag,
+) : AbstractDictionaryComponent<DictionaryComponent>(
+        classOrRecord,
+        data.name,
+        data.code,
+        xmlTagProperty,
+        data.description,
+    ),
     AppleScriptPropertyDefinition {
+    private val backingTypeSpecifier: String = data.typeSpecifier
+    private var backingAccessType: AccessType? = data.accessType
 
-    private val backingTypeSpecifier: String
-    private var backingAccessType: AccessType? = AccessType.RW
-
-    constructor(
-        classOrRecord: DictionaryComponent,
-        name: String,
-        code: String,
-        typeSpecifier: String,
-        description: String?,
-        xmlTagProperty: XmlTag,
-        accessType: AccessType?,
-    ) : super(classOrRecord, name, code, xmlTagProperty, description) {
-        this.backingTypeSpecifier = typeSpecifier
-        if (accessType != null) this.backingAccessType = accessType
-        check(myParent is AppleScriptClass || myParent is DictionaryRecord)
-    }
-
-    protected constructor(
-        classOrRecord: DictionaryComponent,
-        name: String,
-        code: String,
-        typeSpecifier: String,
-        accessType: AccessType?,
-        xmlTagProperty: XmlTag,
-    ) : super(classOrRecord, name, code, xmlTagProperty) {
-        this.backingTypeSpecifier = typeSpecifier
-        this.backingAccessType = accessType
+    init {
         check(myParent is AppleScriptClass || myParent is DictionaryRecord)
     }
 
@@ -55,12 +48,12 @@ open class DictionaryPropertyImpl :
     override fun isObjectProperty(): Boolean = true
 
     override val suite: Suite
-        // Structural invariant: a dictionary property is constructed against a class/record parent
-        // (enforced by the `check(myParent is ...)` in both constructors), and that parent always
-        // belongs to a suite. Neither is ever null for a live property node.
-        get() = requireNotNull(
-            requireNotNull(dictionaryParentComponent) { "property ${getName()} has a parent component" }.suite,
-        ) { "property ${getName()}'s parent component belongs to a suite" }
+        get() =
+            when (val parent = myParent) {
+                is AppleScriptClass -> parent.suite
+                is DictionaryRecord -> parent.suite
+                else -> error("property ${getName()} has a class or record parent")
+            }
 
     override val typeSpecifier: String get() = backingTypeSpecifier
 }

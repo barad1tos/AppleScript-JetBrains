@@ -25,7 +25,6 @@ import org.junit.Assume
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ManualServiceScopeCancellationTest : BasePlatformTestCase() {
-
     override fun setUp() {
         Assume.assumeTrue(
             "ManualServiceScopeCancellationTest only runs with -PincludeHeavyTests=true",
@@ -34,21 +33,23 @@ class ManualServiceScopeCancellationTest : BasePlatformTestCase() {
         super.setUp()
     }
 
-    fun testManualScopeCancelsOnDispose() = runTest {
-        val parent = Disposer.newDisposable("test-parent")
-        val testScope = TestScope()
-        val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
-        Disposer.register(parent) { testScope.cancel() }
+    fun testManualScopeCancelsOnDispose() =
+        runTest {
+            val parent = Disposer.newDisposable("test-parent")
+            val testScope = TestScope()
+            val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+            Disposer.register(parent) { testScope.cancel() }
 
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
-        val launchedJob: Job = testScope.coroutineContext[Job]
-            ?: error("TestScope must expose its Job")
-        assertFalse("Job should be active before dispose", launchedJob.isCancelled)
+            val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+            val launchedJob: Job =
+                testScope.coroutineContext[Job]
+                    ?: error("TestScope must expose its Job")
+            assertFalse("Job should be active before dispose", launchedJob.isCancelled)
 
-        Disposer.dispose(parent)
+            Disposer.dispose(parent)
 
-        assertTrue("Job MUST be cancelled after parent dispose", launchedJob.isCancelled)
-        assertFalse(service.isInitialized())
-        assertFalse(service.areAppDictionariesIndexed())
-    }
+            assertTrue("Job MUST be cancelled after parent dispose", launchedJob.isCancelled)
+            assertFalse(service.isInitialized())
+            assertFalse(service.areAppDictionariesIndexed())
+        }
 }

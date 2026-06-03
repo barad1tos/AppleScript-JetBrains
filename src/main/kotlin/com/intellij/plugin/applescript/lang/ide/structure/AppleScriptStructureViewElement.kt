@@ -22,7 +22,6 @@ class AppleScriptStructureViewElement :
     PsiTreeElementBase<NavigatablePsiElement>,
     ItemPresentation,
     StructureViewTreeElement {
-
     private var isRoot: Boolean = false
 
     internal constructor(element: NavigatablePsiElement) : super(element) {
@@ -34,59 +33,68 @@ class AppleScriptStructureViewElement :
     }
 
     override fun getChildrenBase(): Collection<StructureViewTreeElement> {
-        val element: NavigatablePsiElement? = element
-        val result = ArrayList<StructureViewTreeElement>()
-        val myComponents = HashSet<AppleScriptComponent>()
-        if (element is AppleScriptFile) {
-            if (!isRoot) {
-                result.add(AppleScriptStructureViewElement(element, true))
-            }
-            AppleScriptPsiElementImpl.processDeclarationsImpl(
-                element,
-                AppleScriptComponentScopeProcessor(myComponents),
-                ResolveState.initial(),
-                null,
-                element,
-            )
-        } else if (element is AppleScriptScriptObject) {
-            myComponents.addAll(AppleScriptResolveUtil.getNamedSubComponentsFor(element))
+        val currentElement: NavigatablePsiElement? = element
+        val result = mutableListOf<StructureViewTreeElement>()
+
+        if (currentElement is AppleScriptFile && !isRoot) {
+            result.add(AppleScriptStructureViewElement(currentElement, true))
         }
 
-        for (component in myComponents) {
-            when {
-                component is AppleScriptHandlerPositionalParametersDefinition ->
-                    result.add(AppleScriptStructureViewElement(component))
-                component is AppleScriptScriptPropertyDeclaration ->
-                    result.add(AppleScriptStructureViewElement(component))
-                component is AppleScriptVarAccessDeclaration || component is AppleScriptVarDeclarationListPart ->
-                    result.add(AppleScriptStructureViewElement(component as NavigatablePsiElement))
-                component is AppleScriptScriptObject && component !== element ->
-                    result.add(AppleScriptStructureViewElement(component, true))
-                component is AppleScriptHandler ->
-                    result.add(AppleScriptStructureViewElement(component))
-                component.getName() != null &&
-                    component !is AppleScriptHandlerInterleavedParametersSelectorPart &&
-                    component !== element ->
-                    result.add(AppleScriptStructureViewElement(component as NavigatablePsiElement))
-            }
-        }
+        collectComponents(currentElement)
+            .mapNotNull { component -> component.toStructureViewElement(currentElement) }
+            .forEach(result::add)
 
-        result.sortWith(Comparator { o1, o2 ->
-            if (o1 is AppleScriptStructureViewElement && o2 is AppleScriptStructureViewElement) {
-                val element1 = o1.element
-                val element2 = o2.element
-                if (element1 != null && element2 != null) {
-                    return@Comparator element1.textOffset - element2.textOffset
-                }
-            }
-            0
-        })
-
-        return result
+        return result.sortedByTextOffset()
     }
 
     override fun getPresentableText(): String? {
         val element: NavigatablePsiElement? = element
         return element?.presentation?.presentableText
     }
+
+    private fun collectComponents(element: NavigatablePsiElement?): Set<AppleScriptComponent> {
+        val components = HashSet<AppleScriptComponent>()
+        when (element) {
+            is AppleScriptFile ->
+                AppleScriptPsiElementImpl.processDeclarationsImpl(
+                    element,
+                    AppleScriptComponentScopeProcessor(components),
+                    ResolveState.initial(),
+                    null,
+                    element,
+                )
+            is AppleScriptScriptObject ->
+                components.addAll(AppleScriptResolveUtil.getNamedSubComponentsFor(element))
+        }
+        return components
+    }
+
+    private fun AppleScriptComponent.toStructureViewElement(owner: NavigatablePsiElement?): StructureViewTreeElement? =
+        when {
+            this is AppleScriptHandlerPositionalParametersDefinition ->
+                AppleScriptStructureViewElement(this)
+            this is AppleScriptScriptPropertyDeclaration ->
+                AppleScriptStructureViewElement(this)
+            this is AppleScriptVarAccessDeclaration || this is AppleScriptVarDeclarationListPart ->
+                AppleScriptStructureViewElement(this as NavigatablePsiElement)
+            this is AppleScriptScriptObject && this !== owner ->
+                AppleScriptStructureViewElement(this, true)
+            this is AppleScriptHandler ->
+                AppleScriptStructureViewElement(this)
+            shouldShowNamedComponent(owner) ->
+                AppleScriptStructureViewElement(this as NavigatablePsiElement)
+            else -> null
+        }
+
+    private fun AppleScriptComponent.shouldShowNamedComponent(owner: NavigatablePsiElement?): Boolean =
+        name != null &&
+            this !is AppleScriptHandlerInterleavedParametersSelectorPart &&
+            this !== owner
+
+    private fun Collection<StructureViewTreeElement>.sortedByTextOffset(): List<StructureViewTreeElement> =
+        sortedBy { treeElement ->
+            (treeElement as? AppleScriptStructureViewElement)
+                ?.element
+                ?.textOffset ?: 0
+        }
 }

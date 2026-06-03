@@ -13,7 +13,6 @@ import com.intellij.util.Processor
 import com.intellij.util.QueryExecutor
 
 class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, ReferencesSearch.SearchParameters> {
-
     override fun execute(
         queryParameters: ReferencesSearch.SearchParameters,
         consumer: Processor<in PsiReference>,
@@ -28,23 +27,25 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
         //  1. TargetElementEvaluator#getElementByReference / TargetElementEvaluatorEx2#getNamedElement
         //  2. PomDeclarationSearcher#findDeclarationsAt
         val element = queryParameters.elementToSearch
-        val handler = element as? AppleScriptHandler ?: return true
+        val handler = element as? AppleScriptHandler
 
-        val parts = handler.getParameters()
-        if (parts.isEmpty()) return true
-        val handlerSelector = handler.getSelector()
-        val helper = PsiSearchHelper.getInstance(element.project)
+        val parts = handler?.getParameters().orEmpty()
+        return if (handler == null || parts.isEmpty()) {
+            true
+        } else {
+            val handlerSelector = handler.getSelector()
+            val helper = PsiSearchHelper.getInstance(element.project)
+            val searchWord = parts[0].getSelectorPart().removeSuffix(":")
 
-        val firstSelector = parts[0].getSelectorPart()
-        val searchWord = if (firstSelector.endsWith(":")) firstSelector.substring(0, firstSelector.length - 1) else firstSelector
-
-        return searchWord.isEmpty() || helper.processElementsWithWord(
-            MyOccurrenceProcessor(handler, handlerSelector, consumer),
-            queryParameters.effectiveSearchScope,
-            searchWord,
-            UsageSearchContext.IN_CODE,
-            true,
-        )
+            searchWord.isEmpty() ||
+                helper.processElementsWithWord(
+                    MyOccurrenceProcessor(handler, handlerSelector, consumer),
+                    queryParameters.effectiveSearchScope,
+                    searchWord,
+                    UsageSearchContext.IN_CODE,
+                    true,
+                )
+        }
     }
 
     private class MyOccurrenceProcessor(
@@ -52,19 +53,17 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
         private val myHandlerSelector: String,
         private val myConsumer: Processor<in PsiReference>,
     ) : TextOccurenceProcessor {
-
-        override fun execute(element: PsiElement, offsetInElement: Int): Boolean {
-            if (element is AppleScriptHandlerCall) {
-                val selector = element.getHandlerSelector()
-                if (myHandlerSelector == selector) {
-                    for (ref in element.references) {
-                        if (ref.isReferenceTo(myHandler)) {
-                            return myConsumer.process(ref)
-                        }
-                    }
+        override fun execute(
+            element: PsiElement,
+            offsetInElement: Int,
+        ): Boolean {
+            val reference =
+                if (element is AppleScriptHandlerCall && myHandlerSelector == element.getHandlerSelector()) {
+                    element.references.firstOrNull { it.isReferenceTo(myHandler) }
+                } else {
+                    null
                 }
-            }
-            return true
+            return reference?.let(myConsumer::process) ?: true
         }
     }
 }

@@ -17,7 +17,6 @@ import java.io.File
  * the dictionary registry scans installed applications.
  */
 abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
-
     // The Java original initialised this field eagerly:
     //   String myTargetTestDataDir = getMyTestDataDir() + "/" + getMyTargetDirectoryPath();
     // That calls the overridable getMyTargetDirectoryPath() during construction. A naive Kotlin
@@ -38,7 +37,8 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
         val targetDir = File(myTargetTestDataDir)
         if (!targetDir.isDirectory) throw Exception("$targetDir is not a directory")
 
-        targetDir.listFiles { pathname -> pathname.name.endsWith("scpt") }
+        targetDir
+            .listFiles { pathname -> pathname.name.endsWith("scpt") }
             ?.forEach { file -> myPsiFiles.add(myFixture.configureByFile(file.canonicalPath)) }
     }
 
@@ -47,8 +47,12 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
         for (psiFile in myPsiFiles) {
             LOG.info("File: " + psiFile.name)
             ParsingTestCase.doCheckResult(
-                myTargetTestDataDir, psiFile, checkAllPsiRoots(),
-                psiFile.virtualFile.nameWithoutExtension, skipSpaces(), printRanges()
+                myTargetTestDataDir,
+                psiFile,
+                checkAllPsiRoots(),
+                psiFile.virtualFile.nameWithoutExtension,
+                skipSpaces(),
+                printRanges(),
             )
         }
     }
@@ -58,8 +62,12 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
             val dataName = psiFile.virtualFile.nameWithoutExtension
             if (dataName == fileNameWithoutExtension) {
                 ParsingTestCase.doCheckResult(
-                    myTargetTestDataDir, psiFile, checkAllPsiRoots(), dataName, skipSpaces(),
-                    printRanges()
+                    myTargetTestDataDir,
+                    psiFile,
+                    checkAllPsiRoots(),
+                    dataName,
+                    skipSpaces(),
+                    printRanges(),
                 )
             }
         }

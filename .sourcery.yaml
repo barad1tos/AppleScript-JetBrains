@@ -1,0 +1,9 @@
+ignore:
+  - build/**
+  - .gradle/**
+  - .kotlin/**
+  - .intellijPlatform/**
+  - src/main/gen/**
+  - lang-doc/**
+  - lib/**
+  - img/**

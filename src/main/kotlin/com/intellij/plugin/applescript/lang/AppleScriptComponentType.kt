@@ -14,7 +14,9 @@ import com.intellij.psi.PsiElement
 import com.intellij.util.PlatformIcons
 import javax.swing.Icon
 
-enum class AppleScriptComponentType(@JvmField val icon: Icon) {
+enum class AppleScriptComponentType(
+    @JvmField val icon: Icon,
+) {
     PROPERTY(PlatformIcons.PROPERTY_ICON),
     HANDLER(PlatformIcons.FUNCTION_ICON),
     SCRIPT(AppleScriptIcons.FILE),
@@ -32,28 +34,33 @@ enum class AppleScriptComponentType(@JvmField val icon: Icon) {
 
     fun getIcon(): Icon = icon
 
-    @Suppress("unused")
-    fun getIcon(component: AppleScriptComponent): Icon = icon
-
     override fun toString(): String = super.toString().replace("_", " ")
 
     companion object {
         @JvmStatic
         fun typeOf(element: PsiElement?): AppleScriptComponentType? {
             if (element !is AppleScriptComponent) return null
-            return when {
+            return appleScriptTypeOf(element) ?: dictionaryTypeOf(element)
+        }
+
+        private fun appleScriptTypeOf(element: AppleScriptComponent): AppleScriptComponentType? =
+            when {
                 element.isHandler() -> HANDLER
                 element is AppleScriptSimpleFormalParameter || element is CommandParameter -> PARAMETER
                 element.isVariable() -> VARIABLE
                 element.isScriptProperty() || element.isObjectProperty() -> PROPERTY
                 element is AppleScriptScriptObject -> SCRIPT
-                element is AppleScriptClass -> DICTIONARY_CLASS
-                element is AppleScriptCommand -> DICTIONARY_COMMAND
-                element is DictionaryEnumeratorImpl -> DICTIONARY_ENUMERATOR
-                element is SuiteImpl -> DICTIONARY_SUITE
-                element is ApplicationDictionary -> APPLICATION_DICTIONARY
                 else -> null
             }
-        }
+
+        private fun dictionaryTypeOf(element: AppleScriptComponent): AppleScriptComponentType? =
+            when (element) {
+                is AppleScriptClass -> DICTIONARY_CLASS
+                is AppleScriptCommand -> DICTIONARY_COMMAND
+                is DictionaryEnumeratorImpl -> DICTIONARY_ENUMERATOR
+                is SuiteImpl -> DICTIONARY_SUITE
+                is ApplicationDictionary -> APPLICATION_DICTIONARY
+                else -> null
+            }
     }
 }

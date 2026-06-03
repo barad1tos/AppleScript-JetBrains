@@ -33,7 +33,6 @@ import java.lang.reflect.Proxy
  * `AppleScriptCommand.getCode`) and otherwise return `null`.
  */
 class SuiteAddCommandTest {
-
     @Test
     fun testFirstAddReturnsTrue() {
         val suite = buildSuite()
@@ -98,7 +97,10 @@ class SuiteAddCommandTest {
             }
         } as XmlTag
 
-    private fun stubCommand(name: String, code: String): AppleScriptCommand =
+    private fun stubCommand(
+        name: String,
+        code: String,
+    ): AppleScriptCommand =
         Proxy.newProxyInstance(
             AppleScriptCommand::class.java.classLoader,
             arrayOf(AppleScriptCommand::class.java),

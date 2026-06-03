@@ -25,7 +25,6 @@ import java.io.File
  * `SdefFileTypeRegistrarTest` — Wave 1 deviation #4).
  */
 class SdefPersistenceServiceTest : BasePlatformTestCase() {
-
     fun testReadDictionaryInfoSnapshotReturnsList() {
         val service = SdefPersistenceService.getInstance()
         val snapshot = service.readDictionaryInfoSnapshot()
@@ -75,7 +74,6 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
         // Random unique name — must NOT be in the notScriptable list.
         val randomName = "__random_not_scriptable_${System.nanoTime()}"
         assertFalse("Unknown name not in notScriptable list", service.isNotScriptable(randomName))
-        assertFalse("Unknown name not in unknown list", service.isInUnknownList(randomName))
     }
 
     fun testFacadeTrampolineRoutesThroughService() {
@@ -148,7 +146,7 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
             service.loadFromState(secondState)
             assertTrue(
                 "After loadFromState, marker is restored in the facade's snapshot",
-                marker in service.readNotScriptableSnapshot(),
+                marker in facade.getNotScriptableApplicationList(),
             )
         } finally {
             service.removeNotScriptable(marker)

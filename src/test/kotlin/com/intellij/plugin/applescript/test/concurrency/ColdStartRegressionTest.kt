@@ -30,7 +30,6 @@ import org.junit.Assume
  * it pass.
  */
 class ColdStartRegressionTest : BasePlatformTestCase() {
-
     override fun setUp() {
         Assume.assumeTrue(
             "ColdStartRegressionTest only runs with -PincludeHeavyTests=true",

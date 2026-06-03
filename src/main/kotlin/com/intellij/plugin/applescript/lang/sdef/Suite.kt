@@ -10,7 +10,6 @@ package com.intellij.plugin.applescript.lang.sdef
  * locked by the reflective `PsiGetterJvmSignatureTest`.
  */
 interface Suite : DictionaryComponent {
-
     fun addClass(appleScriptClass: AppleScriptClass): Boolean
 
     fun getClassByName(name: String): AppleScriptClass?

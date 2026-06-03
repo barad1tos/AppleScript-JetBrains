@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.test.codeinsight
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInsight.generation.actions.CommentByLineCommentAction
+import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
@@ -24,7 +25,6 @@ import java.io.File
  * filter before Phase 6 — D-03).
  */
 class AppleScriptCodeInsightTest : BasePlatformTestCase() {
-
     override fun getTestDataPath(): String = File(MY_TEST_DATA_DIR).absolutePath
 
     fun testCompletion() {
@@ -52,8 +52,28 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         myFixture.checkHighlighting(true, false, true)
     }
 
+    fun testUnknownApplicationHighlightIsWeakWarning() {
+        val script = """tell application "NoSuchApp_xyz" to activate"""
+        myFixture.configureByText(AppleScriptFileType, script)
+
+        val highlights = myFixture.doHighlighting()
+        val range = textRangeFor(myFixture.editor.document, "NoSuchApp_xyz")
+        val severities =
+            highlights
+                .filter { highlight -> range.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+
+        assertTrue(
+            "unknown app must be a weak warning; severities=$severities",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse("unknown app must not enter Problems as WARNING", severities.contains(HighlightSeverity.WARNING))
+        assertFalse("unknown app must not be an ERROR", severities.contains(HighlightSeverity.ERROR))
+    }
+
     fun testDatePropertyReferencesUsePropertyHighlighting() {
-        val script = """
+        val script =
+            """
             on formatDate(theDate)
                 if class of theDate is date then
                     set y to year of theDate
@@ -64,7 +84,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
                     set ssInt to seconds of theDate
                 end if
             end formatDate
-        """.trimIndent()
+            """.trimIndent()
 
         myFixture.configureByText(AppleScriptFileType, script)
         val highlights = myFixture.doHighlighting()
@@ -84,7 +104,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     fun testMyHandlerCallUsesFunctionHighlighting() {
-        val script = """
+        val script =
+            """
             on run
                 set rawStatus to "matched"
                 set statusText to my normalize_cloud_status(rawStatus)
@@ -93,7 +114,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             on normalize_cloud_status(statusValue)
                 return statusValue
             end normalize_cloud_status
-        """.trimIndent()
+            """.trimIndent()
 
         myFixture.configureByText(AppleScriptFileType, script)
         val highlights = myFixture.doHighlighting()
@@ -151,16 +172,25 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertEquals("myVar", resolveResult.text)
     }
 
-    private fun highlightingKeysFor(highlights: List<HighlightInfo>, textRange: TextRange): Set<TextAttributesKey> =
+    private fun highlightingKeysFor(
+        highlights: List<HighlightInfo>,
+        textRange: TextRange,
+    ): Set<TextAttributesKey> =
         highlights
             .filter { highlight -> textRange.intersects(highlight.startOffset, highlight.endOffset) }
             .mapNotNullTo(mutableSetOf()) { highlight -> highlight.forcedTextAttributesKey }
 
-    private fun highlightingKeyNamesFor(highlights: List<HighlightInfo>, textRange: TextRange): Set<String> =
+    private fun highlightingKeyNamesFor(
+        highlights: List<HighlightInfo>,
+        textRange: TextRange,
+    ): Set<String> =
         highlightingKeysFor(highlights, textRange)
             .mapTo(mutableSetOf()) { key -> key.externalName }
 
-    private fun textRangeFor(document: Document, text: String): TextRange {
+    private fun textRangeFor(
+        document: Document,
+        text: String,
+    ): TextRange {
         val startOffset = document.charsSequence.indexOf(text)
         assertTrue("expected to find '$text'", startOffset >= 0)
         return TextRange(startOffset, startOffset + text.length)
@@ -174,22 +204,24 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         // BASIC completion on the std-lib fixture. assertContains (kotlin.test) is NOT on the
         // classpath — use assertTrue(list.contains(x), msg). The set is confirmed against live
         // completion output on the first heavy run (A2 confirmation).
-        private val STABLE_TERMS = listOf(
-            "do shell script",
-            "display dialog",
-            "say",
-            "path to",
-            "current date",
-        )
+        private val STABLE_TERMS =
+            listOf(
+                "do shell script",
+                "display dialog",
+                "say",
+                "path to",
+                "current date",
+            )
 
-        private val DATE_PROPERTY_TERMS = listOf(
-            "class",
-            "year",
-            "month",
-            "day",
-            "hours",
-            "minutes",
-            "seconds",
-        )
+        private val DATE_PROPERTY_TERMS =
+            listOf(
+                "class",
+                "year",
+                "month",
+                "day",
+                "hours",
+                "minutes",
+                "seconds",
+            )
     }
 }

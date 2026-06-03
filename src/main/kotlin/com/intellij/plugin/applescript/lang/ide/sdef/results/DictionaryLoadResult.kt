@@ -22,12 +22,13 @@ import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryInfo
  * Phase 5 PSI-05 (RESEARCH §9 sealed types catalog).
  */
 sealed interface DictionaryLoadResult {
-
     /** No dictionary available for the requested application. */
     object Empty : DictionaryLoadResult
 
     /** Dictionary successfully generated / cached and registered with persistence. */
-    data class Loaded(val info: DictionaryInfo) : DictionaryLoadResult
+    data class Loaded(
+        val info: DictionaryInfo,
+    ) : DictionaryLoadResult
 
     /**
      * Dictionary fetch failed for [applicationName] with the given [reason]. [cause] is

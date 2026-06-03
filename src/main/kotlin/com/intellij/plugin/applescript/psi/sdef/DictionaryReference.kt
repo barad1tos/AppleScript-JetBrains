@@ -6,6 +6,5 @@ import com.intellij.psi.PsiPolyVariantReference
 interface DictionaryReference :
     MultiRangeReference,
     PsiPolyVariantReference {
-
     override fun getElement(): DictionaryCompositeElement
 }

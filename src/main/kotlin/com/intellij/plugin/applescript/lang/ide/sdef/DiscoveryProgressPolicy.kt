@@ -1,10 +1,9 @@
 package com.intellij.plugin.applescript.lang.ide.sdef
 
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -19,14 +18,14 @@ import kotlin.time.Duration.Companion.seconds
  * dismissed when the block completes OR when the parent coroutine is cancelled.
  *
  * Test seam: [taskCompat] is constructor-injected. Production uses
- * [ProgressTaskCompatDefault] (wrapping `Task.Backgroundable(null, ...)` per the
- * Codex MEDIUM 4 spike outcome); tests pass a `RecordingFake` for deterministic
+ * [ProgressTaskCompatDefault] (wrapping `Task.Backgroundable(null, ...)` for
+ * application-scope progress); tests pass a `RecordingFake` for deterministic
  * assertions on `show()`/`dismiss()` call counts and ordering. NO Job-tree
  * `toString().contains()` reflection-by-string (Pattern I compliance per
  * `~/.claude/agents/RECURRING_PITFALLS.md`).
  *
  * Structured concurrency: the internal "show after threshold" coroutine is
- * launched via `CoroutineScope(coroutineContext).launch { ... }`, so it inherits
+ * launched via `CoroutineScope(currentCoroutineContext()).launch { ... }`, so it inherits
  * the parent's Job — when the caller's scope is cancelled (e.g. plugin unload,
  * `serviceScope` cancellation), both the threshold-watcher and the underlying
  * block receive structured cancellation. The `finally` block always runs to
@@ -46,7 +45,6 @@ internal class DiscoveryProgressPolicy(
     //   DiscoveryProgressPolicy(taskCompat = fake, visibilityThreshold = 50.milliseconds)
     private val visibilityThreshold: Duration = 2.seconds,
 ) {
-
     /**
      * Runs [block]; if its execution exceeds [visibilityThreshold], surfaces a
      * progress indicator titled [displayName] until the block completes or the
@@ -63,26 +61,20 @@ internal class DiscoveryProgressPolicy(
     ) {
         // Inherit the caller's coroutine context so the threshold-watcher is a
         // child of the same Job tree — structured cancellation reaches it.
-        val scope = CoroutineScope(coroutineContext)
+        val scope = CoroutineScope(currentCoroutineContext())
         var indicatorShown = false
-        val showJob = scope.launch {
-            try {
+        val showJob =
+            scope.launch {
                 delay(visibilityThreshold)
                 taskCompat.show(displayName)
                 indicatorShown = true
-            } catch (e: CancellationException) {
-                // Threshold-watcher cancelled because the block completed first OR
-                // the parent scope was cancelled — silent path. RECURRING_PITFALLS.md
-                // Pattern B: re-throw CancellationException, never swallow.
-                throw e
             }
-        }
         try {
             block()
         } finally {
             // Pattern G: every show() has a matching dismiss(). The threshold-
             // watcher cancellation also handles the "block finished before threshold"
-            // case — showJob.cancel() pre-empts the not-yet-fired show().
+            // case — showJob.cancel() preempts the not-yet-fired show().
             showJob.cancel()
             if (indicatorShown) taskCompat.dismiss()
         }

@@ -2,8 +2,8 @@ package com.intellij.plugin.applescript.test.service
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.plugin.applescript.lang.ide.sdef.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.ide.sdef.ApplicationDiscoveryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
 
@@ -32,7 +32,6 @@ import kotlinx.coroutines.runBlocking
  * [SdefFileTypeRegistrarTest] and [SdefPersistenceServiceTest] — Wave 1 deviation #4).
  */
 class ApplicationDiscoveryServiceTest : BasePlatformTestCase() {
-
     /**
      * Phase 8 D-15 macOS invariant. Discovery must find at least 5 application names —
      * every macOS dev machine has Finder, System Settings, App Store, Safari, Mail, etc.
@@ -118,9 +117,12 @@ class ApplicationDiscoveryServiceTest : BasePlatformTestCase() {
         val service = ApplicationDiscoveryService.getInstance()
         // BasePlatformTestCase test methods run on the EDT, so dispatch to a pooled thread
         // explicitly to exercise the production code path (parser-util calls this off-EDT).
-        val result = ApplicationManager.getApplication().executeOnPooledThread<java.io.File?> {
-            service.findApplicationBundleFile("Finder")
-        }.get()
+        val result =
+            ApplicationManager
+                .getApplication()
+                .executeOnPooledThread<java.io.File?> {
+                    service.findApplicationBundleFile("Finder")
+                }.get()
         assertNotNull(
             "Finder.app should resolve on macOS via APP_BUNDLE_DIRECTORIES walk",
             result,

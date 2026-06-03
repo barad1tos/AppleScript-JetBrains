@@ -9,7 +9,6 @@ import com.intellij.plugin.applescript.AppleScriptFileType
 import javax.swing.Icon
 
 class AppleScriptColorsAndFontsPage : ColorSettingsPage {
-
     override fun getIcon(): Icon = AppleScriptFileType.icon
 
     override fun getHighlighter(): SyntaxHighlighter = AppleScriptSyntaxHighlighter()
@@ -25,42 +24,50 @@ class AppleScriptColorsAndFontsPage : ColorSettingsPage {
     override fun getDisplayName(): String = "AppleScript"
 
     private companion object {
-        private val ATTRS: Array<AttributesDescriptor> = arrayOf(
-            AttributesDescriptor("Keyword", AppleScriptSyntaxHighlighterColors.KEYWORD),
-            AttributesDescriptor("Logical operator", AppleScriptSyntaxHighlighterColors.LOGICAL_OPERATOR),
-            AttributesDescriptor("Comparison operator", AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR),
-            AttributesDescriptor("Language literal", AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL),
-            AttributesDescriptor("Built-in type", AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE),
-            AttributesDescriptor("Handler call", AppleScriptSyntaxHighlighterColors.HANDLER_CALL),
-            AttributesDescriptor("String", AppleScriptSyntaxHighlighterColors.STRING),
-            AttributesDescriptor("Operator", AppleScriptSyntaxHighlighterColors.OPERATION_SIGN),
-            AttributesDescriptor("Comment", AppleScriptSyntaxHighlighterColors.COMMENT),
-            AttributesDescriptor("Dictionary command", AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR),
-            AttributesDescriptor(
-                "Command parameter name",
-                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
-            ),
-            AttributesDescriptor("Dictionary class", AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR),
-            AttributesDescriptor("Dictionary property", AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR),
-            AttributesDescriptor("Dictionary constant", AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR),
-        )
+        private val ATTRS: Array<AttributesDescriptor> =
+            arrayOf(
+                AttributesDescriptor("Keyword", AppleScriptSyntaxHighlighterColors.KEYWORD),
+                AttributesDescriptor("Logical operator", AppleScriptSyntaxHighlighterColors.LOGICAL_OPERATOR),
+                AttributesDescriptor("Comparison operator", AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR),
+                AttributesDescriptor("Language literal", AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL),
+                AttributesDescriptor("Built-in type", AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE),
+                AttributesDescriptor("Handler call", AppleScriptSyntaxHighlighterColors.HANDLER_CALL),
+                AttributesDescriptor("String", AppleScriptSyntaxHighlighterColors.STRING),
+                AttributesDescriptor("Operator", AppleScriptSyntaxHighlighterColors.OPERATION_SIGN),
+                AttributesDescriptor("Comment", AppleScriptSyntaxHighlighterColors.COMMENT),
+                AttributesDescriptor("Dictionary command", AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR),
+                AttributesDescriptor(
+                    "Command parameter name",
+                    AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+                ),
+                AttributesDescriptor("Dictionary class", AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR),
+                AttributesDescriptor(
+                    "Dictionary property",
+                    AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
+                ),
+                AttributesDescriptor(
+                    "Dictionary constant",
+                    AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR,
+                ),
+            )
 
-        private val OUR_TAGS: Map<String, TextAttributesKey> = mapOf(
-            "keyword" to AppleScriptSyntaxHighlighterColors.KEYWORD,
-            "logical operator" to AppleScriptSyntaxHighlighterColors.LOGICAL_OPERATOR,
-            "comparison operator" to AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR,
-            "language literal" to AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL,
-            "built-in type" to AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE,
-            "handler call" to AppleScriptSyntaxHighlighterColors.HANDLER_CALL,
-            "string" to AppleScriptSyntaxHighlighterColors.STRING,
-            "operator" to AppleScriptSyntaxHighlighterColors.OPERATION_SIGN,
-            "comment" to AppleScriptSyntaxHighlighterColors.COMMENT,
-            "command" to AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
-            "command parameter" to AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
-            "dictionary class" to AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR,
-            "dictionary property" to AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
-            "dictionary constant" to AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR,
-        )
+        private val OUR_TAGS: Map<String, TextAttributesKey> =
+            mapOf(
+                "keyword" to AppleScriptSyntaxHighlighterColors.KEYWORD,
+                "logical operator" to AppleScriptSyntaxHighlighterColors.LOGICAL_OPERATOR,
+                "comparison operator" to AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR,
+                "language literal" to AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL,
+                "built-in type" to AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE,
+                "handler call" to AppleScriptSyntaxHighlighterColors.HANDLER_CALL,
+                "string" to AppleScriptSyntaxHighlighterColors.STRING,
+                "operator" to AppleScriptSyntaxHighlighterColors.OPERATION_SIGN,
+                "comment" to AppleScriptSyntaxHighlighterColors.COMMENT,
+                "command" to AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+                "command parameter" to AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+                "dictionary class" to AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR,
+                "dictionary property" to AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
+                "dictionary constant" to AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR,
+            )
 
         private const val DEMO_TEXT: String =
             "searchFiles for ff of minimumValue(2, 3) for \"LeChateau\"\n" +

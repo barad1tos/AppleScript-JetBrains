@@ -7,7 +7,7 @@ import com.intellij.formatting.FormattingModelBuilder
 import com.intellij.lang.ASTNode
 import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.AppleScriptLanguage
-import com.intellij.plugin.applescript.psi.impl.AppleScriptPsiImplUtil
+import com.intellij.plugin.applescript.psi.impl.isWhiteSpaceOrNls
 import com.intellij.psi.PsiFile
 import com.intellij.psi.TokenType
 import com.intellij.psi.formatter.FormatterUtil
@@ -17,32 +17,43 @@ import com.intellij.psi.impl.source.tree.TreeUtil
 import com.intellij.psi.tree.IElementType
 
 class AppleScriptFormattingModelBuilder : FormattingModelBuilder {
-
     override fun createModel(formattingContext: FormattingContext): FormattingModel {
         val element = formattingContext.psiElement
         val settings = formattingContext.codeStyleSettings
-        val containingFile = checkNotNull(element.containingFile.viewProvider.getPsi(AppleScriptLanguage)) {
-            element.containingFile
-        }
+        val containingFile =
+            checkNotNull(element.containingFile.viewProvider.getPsi(AppleScriptLanguage)) {
+                element.containingFile
+            }
         val astNode = checkNotNull(containingFile.node)
         val rootBlock = AppleScriptBlock(astNode, null, null, settings)
-        return AppleScriptFormattingModel(containingFile, rootBlock, FormattingDocumentModelImpl.createOn(containingFile))
+        return AppleScriptFormattingModel(
+            containingFile,
+            rootBlock,
+            FormattingDocumentModelImpl.createOn(containingFile),
+        )
     }
 
-    override fun getRangeAffectingIndent(file: PsiFile?, offset: Int, elementAtOffset: ASTNode?): TextRange? = null
+    override fun getRangeAffectingIndent(
+        file: PsiFile?,
+        offset: Int,
+        elementAtOffset: ASTNode?,
+    ): TextRange? = null
 
     private class AppleScriptFormattingModel(
         file: PsiFile,
         rootBlock: Block,
         documentModel: FormattingDocumentModelImpl,
     ) : PsiBasedFormattingModel(file, rootBlock, documentModel) {
-
-        override fun replaceWithPsiInLeaf(textRange: TextRange, whiteSpace: String, leafElement: ASTNode): String? {
-            if (!myCanModifyAllWhiteSpaces && AppleScriptPsiImplUtil.isWhiteSpaceOrNls(leafElement)) return null
+        override fun replaceWithPsiInLeaf(
+            textRange: TextRange,
+            whiteSpace: String,
+            leafElement: ASTNode,
+        ): String? {
+            if (!myCanModifyAllWhiteSpaces && isWhiteSpaceOrNls(leafElement)) return null
 
             var elementTypeToUse: IElementType = TokenType.WHITE_SPACE
             val prevNode = TreeUtil.prevLeaf(leafElement)
-            if (prevNode != null && AppleScriptPsiImplUtil.isWhiteSpaceOrNls(prevNode)) {
+            if (prevNode != null && isWhiteSpaceOrNls(prevNode)) {
                 elementTypeToUse = prevNode.elementType
             }
             FormatterUtil.replaceWhiteSpace(whiteSpace, leafElement, elementTypeToUse, textRange)

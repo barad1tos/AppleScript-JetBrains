@@ -15,52 +15,16 @@ import com.intellij.psi.xml.XmlTag
  *    without round-tripping through a builder for each parameter — see the
  *    `AppleScriptCommandImpl.setParameters` body for the routing.
  *  - Why not `data class : FakePsiElement`? PITFALLS §1.1 BLOCKER: Kotlin
- *    synthesises `equals`/`hashCode` from primary-constructor properties,
+ *    synthesizes `equals`/`hashCode` from primary-constructor properties,
  *    overriding the platform's PSI identity contract and breaking caches.
  *
- * The public constructor surface is preserved verbatim so `SDEF_Parser.parseCommandTag`
- * (line 410) continues to compile unchanged (D-06 façade). Internally each
- * constructor materialises the immutable `data: CommandParameterData` once.
+ * The SDEF parser constructs the immutable `CommandParameterData` value and
+ * wraps it here as a PSI element.
  */
 class CommandParameterImpl :
     AbstractDictionaryComponent<AppleScriptCommand>,
     CommandParameter {
-
     internal val data: CommandParameterData
-
-    constructor(
-        myCommand: AppleScriptCommand,
-        name: String,
-        code: String,
-        optional: Boolean,
-        typeSpecifier: String,
-        description: String?,
-        xmlTagParameter: XmlTag,
-    ) : super(myCommand, name, code, xmlTagParameter, description) {
-        this.data = CommandParameterData(
-            name = name,
-            code = code,
-            type = typeSpecifier,
-            optional = optional,
-            description = description,
-        )
-    }
-
-    constructor(
-        myCommand: AppleScriptCommand,
-        name: String,
-        code: String,
-        typeSpecifier: String,
-        xmlTagParameter: XmlTag,
-    ) : super(myCommand, name, code, xmlTagParameter) {
-        this.data = CommandParameterData(
-            name = name,
-            code = code,
-            type = typeSpecifier,
-            optional = false,
-            description = null,
-        )
-    }
 
     /**
      * Hybrid back-link constructor — used by `AppleScriptCommandImpl.getParameters`
@@ -70,7 +34,7 @@ class CommandParameterImpl :
      * structurally equivalent for caller intent, while preserving the PSI
      * identity hierarchy.
      */
-    internal constructor(
+    constructor(
         myCommand: AppleScriptCommand,
         data: CommandParameterData,
         xmlTagParameter: XmlTag,

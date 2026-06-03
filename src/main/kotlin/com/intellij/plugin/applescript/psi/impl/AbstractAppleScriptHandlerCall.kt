@@ -22,28 +22,29 @@ import com.intellij.psi.impl.source.resolve.reference.impl.PsiPolyVariantCaching
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.IncorrectOperationException
 
-abstract class AbstractAppleScriptHandlerCall(node: ASTNode) :
-    AppleScriptPsiElementImpl(node),
-    AppleScriptHandlerCall {
+private typealias HandlerArguments = List<AppleScriptHandlerArgument>
 
+abstract class AbstractAppleScriptHandlerCall(
+    node: ASTNode,
+) : AppleScriptPsiElementImpl(node),
+    AppleScriptHandlerCall {
     private val mySelectorReference = SelectorReference()
 
-    override fun getHandlerSelector(): String = buildString {
-        for (argument in getArguments()) {
-            append(argument.argumentSelector.selectorName)
+    override fun getHandlerSelector(): String =
+        buildString {
+            for (argument in getArguments()) {
+                append(argument.argumentSelector.selectorName)
+            }
         }
-    }
 
     override fun getReference(): PsiReference = mySelectorReference
 
-    override fun getArguments(): List<AppleScriptHandlerArgument> =
-        findChildrenByType(AppleScriptTypes.HANDLER_ARGUMENT)
+    override fun getArguments(): HandlerArguments = findChildrenByType(AppleScriptTypes.HANDLER_ARGUMENT)
 
     private inner class SelectorReference :
         PsiPolyVariantCachingReference(),
         MultiRangeReference,
         PsiPolyVariantReference {
-
         override fun getRanges(): List<TextRange> {
             val parentOffset = -getElement().textRange.startOffset
             val result = mutableListOf<TextRange>()
@@ -57,7 +58,10 @@ abstract class AbstractAppleScriptHandlerCall(node: ASTNode) :
             return result
         }
 
-        override fun resolveInner(incompleteCode: Boolean, containingFile: PsiFile): Array<ResolveResult> {
+        override fun resolveInner(
+            incompleteCode: Boolean,
+            containingFile: PsiFile,
+        ): Array<ResolveResult> {
             val resolveProcessor = AppleScriptResolveProcessor(getHandlerSelector())
             PsiTreeUtil.treeWalkUp(resolveProcessor, this@AbstractAppleScriptHandlerCall, null, ResolveState.initial())
             return AppleScriptResolveUtil.toCandidateInfoArray(listOf(resolveProcessor.getResult()))

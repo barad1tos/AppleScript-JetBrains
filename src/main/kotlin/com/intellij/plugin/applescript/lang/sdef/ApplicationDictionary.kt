@@ -15,11 +15,12 @@ import java.io.File
  *  - [setRootTag] RETURNS `ApplicationDictionary` (not Unit) → cannot be a property setter; it stays
  *    `fun` while [rootTag] is the read-only `val` getter.
  *  - Every `find*` / `process*` / `add*` / arg-taking `get*` member stays `fun` (not a no-arg getter).
- *  - The `companion object` `@JvmField` constants are NOT getters — left untouched.
+ *  - String constants stay `const val`; collection constants stay companion values.
  */
-interface ApplicationDictionary : DictionarySuite {
-
-    fun processInclude(includedFile: XmlFile): PsiFile?
+interface ApplicationDictionary :
+    DictionarySuite,
+    ApplicationDictionaryLookup {
+    fun processInclude(includedFile: XmlFile): PsiFile
 
     fun addSuite(suite: Suite): Boolean
 
@@ -44,18 +45,8 @@ interface ApplicationDictionary : DictionarySuite {
     /** JVM-visible as `getDictionaryClassMap()`. */
     val dictionaryClassMap: Map<String, AppleScriptClass>
 
-    fun findClass(name: String?): AppleScriptClass?
-
-    fun getParameterNamesForCommand(name: String): List<String>?
-
     /** JVM-visible as `getApplicationName()`. */
     val applicationName: String
-
-    fun findEnumerator(name: String): DictionaryEnumerator?
-
-    fun findEnumeration(name: String): DictionaryEnumeration?
-
-    fun findProperty(name: String): AppleScriptPropertyDefinition?
 
     /** JVM-visible as `getDictionaryPropertyMap()`. */
     val dictionaryPropertyMap: Map<String, AppleScriptPropertyDefinition>
@@ -68,6 +59,86 @@ interface ApplicationDictionary : DictionarySuite {
     /** JVM-visible as `getAllCommands()`. */
     val allCommands: Collection<AppleScriptCommand>
 
+    companion object {
+        private const val XML_EXTENSION = "xml"
+        private const val APPLICATION_BUNDLE_EXTENSION = "app"
+
+        @Suppress("SpellCheckingInspection")
+        private const val SCRIPTING_ADDITION_EXTENSION = "osax"
+
+        @Suppress("SpellCheckingInspection")
+        private const val SCRIPT_BUNDLE_EXTENSION = "scptd"
+
+        @Suppress("SpellCheckingInspection")
+        private const val SCRIPTING_DEFINITION_EXTENSION = "sdef"
+
+        private const val DICTIONARY_RESOURCE_FOLDER = "/$SCRIPTING_DEFINITION_EXTENSION"
+
+        val SUPPORTED_DICTIONARY_EXTENSIONS: List<String> =
+            listOf(
+                XML_EXTENSION,
+                APPLICATION_BUNDLE_EXTENSION,
+                SCRIPTING_ADDITION_EXTENSION,
+                SCRIPT_BUNDLE_EXTENSION,
+                SCRIPTING_DEFINITION_EXTENSION,
+            )
+
+        val SUPPORTED_APPLICATION_EXTENSIONS: List<String> =
+            listOf(
+                APPLICATION_BUNDLE_EXTENSION,
+                SCRIPTING_ADDITION_EXTENSION,
+                SCRIPT_BUNDLE_EXTENSION,
+            )
+
+        const val COCOA_STANDARD_LIBRARY: String = "Standard Terminology"
+
+        const val SCRIPTING_ADDITIONS_LIBRARY: String = "Scripting Additions"
+
+        const val COCOA_STANDARD_LIBRARY_PATH: String =
+            "/System/Library/ScriptingDefinitions/CocoaStandard.$SCRIPTING_DEFINITION_EXTENSION"
+
+        val SCRIPTING_ADDITIONS_FOLDERS: Array<String> =
+            arrayOf(
+                "/System/Library/ScriptingAdditions/",
+                "/Library/ScriptingAdditions/",
+            )
+
+        const val COCOA_STANDARD_FILE: String =
+            "$DICTIONARY_RESOURCE_FOLDER/CocoaStandard.$SCRIPTING_DEFINITION_EXTENSION"
+
+        const val STANDARD_ADDITIONS_FILE: String =
+            "$DICTIONARY_RESOURCE_FOLDER/StandardAdditions.$SCRIPTING_DEFINITION_EXTENSION"
+
+        val APP_BUNDLE_DIRECTORIES: Array<String> =
+            arrayOf(
+                "/Applications",
+                // macOS Catalina (10.15) moved bundled apps (Music, TV, Podcasts,
+                // App Store, Stocks, Books, Home, …) here. Without this entry the
+                // dictionary registry hits notFoundApplicationList on every script
+                // targeting them, even when the apps are installed and running.
+                "/System/Applications",
+                "/System/Applications/Utilities",
+                "/System/Library/CoreServices",
+                "/Library/ScriptingAdditions",
+                // User-installed apps under ~/Applications. System.getProperty
+                // resolves at class init time, which matches everything else
+                // here being a static path.
+                System.getProperty("user.home") + "/Applications",
+            )
+    }
+}
+
+interface ApplicationDictionaryLookup {
+    fun findClass(name: String?): AppleScriptClass?
+
+    fun getParameterNamesForCommand(name: String): List<String>?
+
+    fun findEnumerator(name: String): DictionaryEnumerator?
+
+    fun findEnumeration(name: String): DictionaryEnumeration?
+
+    fun findProperty(name: String): AppleScriptPropertyDefinition?
+
     fun findCommand(name: String?): AppleScriptCommand?
 
     fun findSuiteByCode(suiteCode: String): Suite?
@@ -77,57 +148,4 @@ interface ApplicationDictionary : DictionarySuite {
     fun findDirectParameterForCommand(commandName: String): CommandDirectParameter?
 
     fun findAllCommandsWithName(name: String): List<AppleScriptCommand>
-
-    companion object {
-        @JvmField
-        val SUPPORTED_DICTIONARY_EXTENSIONS: List<String> = listOf("xml", "app", "osax", "scptd", "sdef")
-
-        @JvmField
-        val SUPPORTED_APPLICATION_EXTENSIONS: List<String> = listOf("app", "osax", "scptd")
-
-        @JvmField
-        val COCOA_STANDARD_LIBRARY: String = "Standard Terminology"
-
-        @JvmField
-        val SCRIPTING_ADDITIONS_LIBRARY: String = "Scripting Additions"
-
-        @JvmField
-        val COCOA_STANDARD_LIBRARY_PATH: String =
-            "/System/Library/ScriptingDefinitions/CocoaStandard.sdef"
-
-        @JvmField
-        val SCRIPTING_ADDITIONS_FOLDERS: Array<String> = arrayOf(
-            "/System/Library/ScriptingAdditions/",
-            "/Library/ScriptingAdditions/",
-        )
-
-        @JvmField
-        val SDEF_FOLDER: String = "/sdef"
-
-        @JvmField
-        val COCOA_STANDARD_FILE: String = "$SDEF_FOLDER/CocoaStandard.sdef"
-
-        @JvmField
-        val STANDARD_ADDITIONS_FILE: String = "$SDEF_FOLDER/StandardAdditions.sdef"
-
-        @JvmField
-        val STANDARD_DEFINITION_FILES: Array<String> = arrayOf(COCOA_STANDARD_FILE, STANDARD_ADDITIONS_FILE)
-
-        @JvmField
-        val APP_BUNDLE_DIRECTORIES: Array<String> = arrayOf(
-            "/Applications",
-            // macOS Catalina (10.15) moved bundled apps (Music, TV, Podcasts,
-            // App Store, Stocks, Books, Home, …) here. Without this entry the
-            // dictionary registry hits notFoundApplicationList on every script
-            // targeting them, even when the apps are installed and running.
-            "/System/Applications",
-            "/System/Applications/Utilities",
-            "/System/Library/CoreServices",
-            "/Library/ScriptingAdditions",
-            // User-installed apps under ~/Applications. System.getProperty
-            // resolves at class init time, which matches everything else
-            // here being a static path.
-            System.getProperty("user.home") + "/Applications",
-        )
-    }
 }

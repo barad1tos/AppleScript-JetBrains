@@ -16,7 +16,6 @@ import com.intellij.psi.PsiComment
 import com.intellij.util.ProcessingContext
 
 class KeywordCompletionContributor : CompletionContributor() {
-
     init {
         extend(
             CompletionType.BASIC,
@@ -27,13 +26,7 @@ class KeywordCompletionContributor : CompletionContributor() {
                     processingContext: ProcessingContext,
                     completionResultSet: CompletionResultSet,
                 ) {
-                    val file = completionParameters.originalFile
-                    if (file !is AppleScriptFile) return
-                    val position = completionParameters.position
-                    if (position is PsiComment) return
-
-                    val node = position.node
-                    if (node.elementType === AppleScriptTypes.STRING_LITERAL) return
+                    if (!completionParameters.shouldSuggestKeywords()) return
 
                     // PITFALLS Pattern J — integration lifecycle gate. Keywords come from
                     // StandardAdditions / CocoaStandard SDEFs (parser fast path), so we gate on
@@ -60,3 +53,8 @@ class KeywordCompletionContributor : CompletionContributor() {
         )
     }
 }
+
+private fun CompletionParameters.shouldSuggestKeywords(): Boolean =
+    originalFile is AppleScriptFile &&
+        position !is PsiComment &&
+        position.node.elementType !== AppleScriptTypes.STRING_LITERAL

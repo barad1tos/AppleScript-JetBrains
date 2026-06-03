@@ -24,26 +24,28 @@ import kotlinx.coroutines.test.runTest
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SdefFileTypeRegistrarTest : BasePlatformTestCase() {
-
     /**
      * Calling [SdefFileTypeRegistrar.register] twice succeeds without throwing.
      * `FileTypeManager.associateExtension` is documented as a no-op when the association
      * already exists, so the second call must be safe.
      */
-    fun testRegisterIsIdempotent() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        @Suppress("UnusedPrivateProperty") val scope = TestScope(dispatcher)
-        val registrar = SdefFileTypeRegistrar(serviceScope = scope, edtDispatcher = dispatcher)
+    fun testRegisterIsIdempotent() =
+        runTest {
+            val dispatcher = StandardTestDispatcher(testScheduler)
 
-        registrar.register()
-        registrar.register()
+            @Suppress("UnusedPrivateProperty")
+            val scope = TestScope(dispatcher)
+            val registrar = SdefFileTypeRegistrar(serviceScope = scope, edtDispatcher = dispatcher)
 
-        // After registration, .sdef MUST be recognised as XML (the production behaviour that
-        // makes `LoadDictionaryAction`'s file picker filter on .sdef). Independent end-to-end
-        // assertion: it does not rely on test-internal state.
-        val xmlType = FileTypeManager.getInstance().getFileTypeByExtension("xml")
-        assertEquals(xmlType, FileTypeManager.getInstance().getFileTypeByExtension("sdef"))
-    }
+            registrar.register()
+            registrar.register()
+
+            // After registration, .sdef MUST be recognised as XML (the production behaviour that
+            // makes `LoadDictionaryAction`'s file picker filter on .sdef). Independent end-to-end
+            // assertion: it does not rely on test-internal state.
+            val xmlType = FileTypeManager.getInstance().getFileTypeByExtension("xml")
+            assertEquals(xmlType, FileTypeManager.getInstance().getFileTypeByExtension("sdef"))
+        }
 
     /**
      * [SdefFileTypeRegistrar.getInstance] resolves the Platform-registered Light Service

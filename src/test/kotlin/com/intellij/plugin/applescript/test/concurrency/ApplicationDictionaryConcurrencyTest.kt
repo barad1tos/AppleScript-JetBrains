@@ -7,6 +7,7 @@ package com.intellij.plugin.applescript.test.concurrency
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommandImpl
 import com.intellij.plugin.applescript.lang.sdef.CommandParameter
+import com.intellij.plugin.applescript.lang.sdef.CommandParameterData
 import com.intellij.plugin.applescript.lang.sdef.CommandParameterImpl
 import com.intellij.plugin.applescript.lang.sdef.Suite
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
@@ -30,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference
  * test, not just by a single-threaded structural grep.
  *
  * Race scenario (latent since v1.0.0; Phase 1 explicitly deferred the fix to v1.1):
- *  - `ApplicationDictionaryImpl.processInclude:135` re-enters `SDEF_Parser.parseRootTag`,
+ *  - `ApplicationDictionaryImpl.processInclude:135` re-enters `SdefParser.parseRootTag`,
  *    which mutates the index maps via [ApplicationDictionaryImpl.addCommand] etc.,
  *    while background threads (resolver / completion) call
  *    [ApplicationDictionaryImpl.findAllCommandsWithName] and iterate
@@ -50,7 +51,6 @@ import java.util.concurrent.atomic.AtomicReference
  * raw `HashMap` race will surface within a few hundred iterations.
  */
 class ApplicationDictionaryConcurrencyTest : BasePlatformTestCase() {
-
     override fun setUp() {
         Assume.assumeTrue(
             "ApplicationDictionaryConcurrencyTest only runs with -PincludeHeavyTests=true",
@@ -189,16 +189,18 @@ class ApplicationDictionaryConcurrencyTest : BasePlatformTestCase() {
     /**
      * Build a real [ApplicationDictionaryImpl] over an empty in-memory XmlFile.
      * Mirrors the [com.intellij.plugin.applescript.test.sdef.ApplicationDictionaryOverloadTest]
-     * pattern from Plan 02-04: empty `<dictionary/>` so `SDEF_Parser.parse` no-ops,
+     * pattern from Plan 02-04: empty `<dictionary/>` so `SdefParser.parse` no-ops,
      * leaving the dictionary ready for direct `addCommand` calls from worker threads.
      */
     private fun buildDictionary(): ApplicationDictionaryImpl {
-        val xmlFile = PsiFileFactory.getInstance(project)
-            .createFileFromText(
-                "empty.sdef",
-                com.intellij.lang.xml.XMLLanguage.INSTANCE,
-                "<dictionary title=\"ConcurrencyTestApp\"></dictionary>",
-            ) as XmlFile
+        val xmlFile =
+            PsiFileFactory
+                .getInstance(project)
+                .createFileFromText(
+                    "empty.sdef",
+                    com.intellij.lang.xml.XMLLanguage.INSTANCE,
+                    "<dictionary title=\"ConcurrencyTestApp\"></dictionary>",
+                ) as XmlFile
         return ApplicationDictionaryImpl(
             project = project,
             dictionaryXmlFile = xmlFile,
@@ -215,13 +217,21 @@ class ApplicationDictionaryConcurrencyTest : BasePlatformTestCase() {
      * accessors that the `addCommand` / `findAllCommandsWithName` paths do
      * not exercise.
      */
-    private fun newCommand(name: String, parameters: List<String>): AppleScriptCommand {
+    private fun newCommand(
+        name: String,
+        parameters: List<String>,
+    ): AppleScriptCommand {
         val suiteStub = stubSuite()
         val xmlTagStub = stubXmlTag()
         val cmd = AppleScriptCommandImpl(suiteStub, name, name, xmlTagStub)
-        val params: List<CommandParameter> = parameters.map { pName ->
-            CommandParameterImpl(cmd, pName, "----", false, "text", null, xmlTagStub)
-        }
+        val params: List<CommandParameter> =
+            parameters.map { pName ->
+                CommandParameterImpl(
+                    cmd,
+                    CommandParameterData(name = pName, code = "----", type = "text"),
+                    xmlTagStub,
+                )
+            }
         cmd.parameters = params
         return cmd
     }

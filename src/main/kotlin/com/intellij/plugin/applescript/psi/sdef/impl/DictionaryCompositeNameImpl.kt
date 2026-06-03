@@ -6,10 +6,10 @@ import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeName
 import com.intellij.psi.PsiElement
 import com.intellij.psi.TokenType
 
-open class DictionaryCompositeNameImpl(node: ASTNode) :
-    AppleScriptPsiElementImpl(node),
+open class DictionaryCompositeNameImpl(
+    node: ASTNode,
+) : AppleScriptPsiElementImpl(node),
     DictionaryCompositeName {
-
     override fun getIdentifiers(): List<PsiElement> {
         val result = ArrayList<PsiElement>()
         var psiChild: PsiElement? = firstChild

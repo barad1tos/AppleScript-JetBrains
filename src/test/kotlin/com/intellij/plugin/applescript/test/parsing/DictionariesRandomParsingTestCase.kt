@@ -1,7 +1,6 @@
 package com.intellij.plugin.applescript.test.parsing
 
 class DictionariesRandomParsingTestCase : AbstractParsingFixtureTestCase() {
-
     override fun getMyTargetDirectoryPath(): String = "dictionaries_random"
 
     fun testWrongDictionary() = doParseScriptInPackageTest("wrong_dictionary")

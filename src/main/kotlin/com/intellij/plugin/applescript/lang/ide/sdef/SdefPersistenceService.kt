@@ -2,9 +2,6 @@ package com.intellij.plugin.applescript.lang.ide.sdef
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
-import kotlinx.coroutines.CoroutineScope
 
 /**
  * Phase 4 SERVICE-02 (plan 04-02, Wave 2): typed API over the facade's persisted-state-tagged
@@ -35,11 +32,8 @@ import kotlinx.coroutines.CoroutineScope
  * synchronisation is handled by the Platform's persistence machinery on the facade
  * (RESEARCH §6).
  *
- * Constructor follows Phase 3 COROUTINE-03: constructor-injected [CoroutineScope] +
- * `@JvmOverloads` emits the single-arg `(CoroutineScope)` JVM ctor that the Platform
- * service container expects for application-level [Service]-annotated classes (per
- * `InstantiateKt.findConstructor`). No I/O is launched by this service today — the
- * scope is held for future suspending APIs (Wave 6 cleanup may add async batch writes).
+ * Constructor is intentionally no-arg: this service does not launch coroutine work,
+ * and Platform state persistence is owned by the facade.
  *
  * Lifecycle: Light Service, lazy-on-first-access. The facade triggers it via
  * `service<SdefPersistenceService>().loadFromState(state)` from the `loadState(state)`
@@ -50,60 +44,27 @@ import kotlinx.coroutines.CoroutineScope
  * no `<applicationService>` entry needed in plugin.xml.
  */
 @Service(Service.Level.APP)
-class SdefPersistenceService constructor(
-    @Suppress("unused") private val serviceScope: CoroutineScope,
-) {
-
-    private fun facade(): AppleScriptSystemDictionaryRegistryService =
-        AppleScriptSystemDictionaryRegistryService.getInstance()
+class SdefPersistenceService {
+    private val facade: AppleScriptSystemDictionaryRegistryService
+        get() = AppleScriptSystemDictionaryRegistryService.getInstance()
 
     /**
      * Defensive snapshot of the in-memory [DictionaryInfo] collection. Returns a [List]
      * (not the live backing `Collection`), so callers cannot accidentally mutate the
      * facade's registry through the returned reference.
      */
-    fun readDictionaryInfoSnapshot(): List<DictionaryInfo> =
-        facade().dictionaryInfoSnapshotInternal()
-
-    /**
-     * Atomically replace the facade's in-memory dictionary collection with [infos] and
-     * trigger [writeToState] so the change is persisted. Used by callers that batch-import
-     * dictionaries (e.g., a future `LoadDictionaryAction` rewrite); not used in Wave 2
-     * production code paths, but the API is part of the typed contract that completes
-     * the read/write surface.
-     */
-    fun persistDictionaryInfoSnapshot(infos: Collection<DictionaryInfo>) {
-        facade().replaceDictionaryInfoCollectionInternal(infos)
-    }
+    fun readDictionaryInfoSnapshot(): List<DictionaryInfo> = facade.dictionaryInfoSnapshotInternal()
 
     /**
      * Defensive snapshot of the notScriptable application names. Returns a [Set]
      * (not the live backing `ConcurrentHashMap.KeySet`).
      */
-    fun readNotScriptableSnapshot(): Set<String> =
-        facade().notScriptableSnapshotInternal()
+    fun readNotScriptableSnapshot(): Set<String> = facade.notScriptableSnapshotInternal()
 
     /**
      * O(1) membership test on the persisted notScriptable set.
      */
-    fun isNotScriptable(applicationName: String): Boolean =
-        facade().isNotScriptableInternal(applicationName)
-
-    /**
-     * O(1) membership test on the in-memory "not found" list (apps that the discovery
-     * walk recorded as missing from APP_BUNDLE_DIRECTORIES). This list is NOT persisted —
-     * it is rebuilt per IDE session.
-     *
-     * Wave 3 re-route (SERVICE-03, 04-03): the not-found list moved from the facade to
-     * [ApplicationDiscoveryService] where it belongs (discovery artifact, not persistence
-     * artifact). This service's surface remains for back-compat with the
-     * `SdefPersistenceServiceTest.testIsNotScriptableNegativeCase` test and any future
-     * caller that conceptually groups the "is this app known?" predicate near the
-     * persistence read API. The implementation forwards to the discovery service —
-     * single source of truth.
-     */
-    fun isInUnknownList(applicationName: String): Boolean =
-        service<ApplicationDiscoveryService>().isInNotFoundList(applicationName)
+    fun isNotScriptable(applicationName: String): Boolean = facade.isNotScriptableInternal(applicationName)
 
     /**
      * Add an application to the persisted notScriptable set; returns `true` if the
@@ -111,15 +72,13 @@ class SdefPersistenceService constructor(
      * the Platform's PSC machinery serialises on its own cadence (per `getState()`),
      * matching the v1.0 behaviour byte-for-byte (SDEF-13 fixture invariant).
      */
-    fun addNotScriptable(applicationName: String): Boolean =
-        facade().addNotScriptableInternal(applicationName)
+    fun addNotScriptable(applicationName: String): Boolean = facade.addNotScriptableInternal(applicationName)
 
     /**
      * Remove an application from the persisted notScriptable set; returns `true` if
      * the name was present and removed.
      */
-    fun removeNotScriptable(applicationName: String): Boolean =
-        facade().removeNotScriptableInternal(applicationName)
+    fun removeNotScriptable(applicationName: String): Boolean = facade.removeNotScriptableInternal(applicationName)
 
     /**
      * Register a [DictionaryInfo] in the facade's in-memory registry; returns `true` if
@@ -128,8 +87,7 @@ class SdefPersistenceService constructor(
      * application from the notScriptable list, mirroring the historical
      * `addDictionaryInfo` private helper semantics on the facade.
      */
-    fun addDictionaryInfo(info: DictionaryInfo): Boolean =
-        facade().addDictionaryInfoInternal(info)
+    fun addDictionaryInfo(info: DictionaryInfo): Boolean = facade.addDictionaryInfoInternal(info)
 
     /**
      * Remove a [DictionaryInfo] by its application path. Returns `true` if a matching
@@ -139,8 +97,7 @@ class SdefPersistenceService constructor(
      * suffix (mirroring the facade's existing `getDictionaryInfoByApplicationPath`
      * resolution).
      */
-    fun removeDictionaryInfo(applicationPath: String): Boolean =
-        facade().removeDictionaryInfoByPathInternal(applicationPath)
+    fun removeDictionaryInfo(path: String): Boolean = facade.removeDictionaryInfoByPathInternal(path)
 
     /**
      * Populates the facade's in-memory [DictionaryInfo] collection from the just-loaded
@@ -153,26 +110,24 @@ class SdefPersistenceService constructor(
      * which does the same work as the pre-Wave-2 private method.
      */
     fun loadFromState(state: AppleScriptSystemDictionaryRegistryService.PersistedState) {
-        facade().initDictionariesInfoFromCacheInternal(state)
+        facade.initDictionariesInfoFromCacheInternal(state)
     }
 
     /**
      * Writes the facade's in-memory [DictionaryInfo] collection back into
-     * [state.dictionariesInfo][AppleScriptSystemDictionaryRegistryService.PersistedState.dictionariesInfo]
-     * and the notScriptable set into
-     * [state.notScriptableApplications][AppleScriptSystemDictionaryRegistryService.PersistedState.notScriptableApplications].
+     * `PersistedState.dictionariesInfo` and the notScriptable set into
+     * `PersistedState.notScriptableApplications`.
      * Called from the facade's `updateState()` method.
      */
     fun writeToState(state: AppleScriptSystemDictionaryRegistryService.PersistedState) {
-        facade().writeToStateInternal(state)
+        facade.writeToStateInternal(state)
     }
 
     companion object {
-        @Suppress("unused")
-        private val LOG: Logger = Logger.getInstance("#${SdefPersistenceService::class.java.name}")
+        private val application
+            get() = ApplicationManager.getApplication()
 
         @JvmStatic
-        fun getInstance(): SdefPersistenceService =
-            ApplicationManager.getApplication().getService(SdefPersistenceService::class.java)
+        fun getInstance(): SdefPersistenceService = application.getService(SdefPersistenceService::class.java)
     }
 }

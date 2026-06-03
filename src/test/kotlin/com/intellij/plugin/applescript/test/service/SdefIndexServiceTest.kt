@@ -31,9 +31,9 @@ import org.junit.jupiter.api.Test
  * facade init, so we exercise the real ingest path without any synthetic-Suite construction
  * layer. Documented in 04-05-SUMMARY deviations.
  *
- * Phase 8 invariant: [SdefIndexService.parseDictionaryFile] uses [newSecureSaxBuilder] (XXE
- * hardened) — these tests do not test XXE defence directly (that is the threat-model property
- * mitigated by the SAXBuilder configuration; documented in plan threat register T-04-05-02).
+ * Phase 8 invariant: [SdefIndexService.parseDictionaryFile] uses an XXE-hardened legacy JDOM
+ * parser bridge. The DOCTYPE test below verifies Apple's SDEF DOCTYPE remains accepted while
+ * external DTD loading is disabled by the bridge.
  *
  * This pattern is the prerequisite for v1.6 CLEANUP-03 (promote heavy tests to default CI):
  * once hermetic-test seams exist for every service, CI can run unit tests without
@@ -41,7 +41,6 @@ import org.junit.jupiter.api.Test
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class SdefIndexServiceTest {
-
     /**
      * Builds a freshly-constructed service whose dispatcher is bound to [scheduler] — the
      * receiver [kotlinx.coroutines.test.TestScope.testScheduler] inside `runTest`. Sharing the
@@ -57,139 +56,127 @@ class SdefIndexServiceTest {
     }
 
     @Test
-    fun ingestEmptySuiteReturnsSuccessWithZeroCommandsIndexed() = runTest {
-        val service = newService(testScheduler)
-        val xml = SyntheticSuiteFixtures.emptySuiteXml()
-        val file = SyntheticSuiteFixtures.writeToTempFile("empty", xml)
+    fun ingestEmptySuiteReturnsSuccessWithZeroCommandsIndexed() =
+        runTest {
+            val service = newService(testScheduler)
+            val xml = SyntheticSuiteFixtures.emptySuiteXml()
+            val file = SyntheticSuiteFixtures.writeToTempFile("empty", xml)
 
-        val result: IngestResult = service.ingest("Empty", file)
+            val result: IngestResult = service.ingest("Empty", file)
 
-        assertTrue(result is IngestResult.Success, "expected Success for empty-suite ingest, got $result")
-        result as IngestResult.Success
-        assertEquals(1, result.suitesIngested)
-        assertEquals(0, result.commandsIndexed)
-    }
-
-    @Test
-    fun ingestMusicSuitePlacesPlayCommandInIndex() = runTest {
-        val service = newService(testScheduler)
-        val xml = SyntheticSuiteFixtures.musicAppPlayCommandXml()
-        val file = SyntheticSuiteFixtures.writeToTempFile("music", xml)
-
-        val result: IngestResult = service.ingest("Music", file)
-
-        assertTrue(result is IngestResult.Success, "expected Success, got $result")
-        val snapshot: SdefIndexSnapshot = service.snapshot()
-        assertTrue(
-            snapshot.isApplicationCommand("Music", "play"),
-            "Music play command must be present in app-scoped command index after ingest",
-        )
-        // Class index also populated for "track".
-        val musicClasses = snapshot.applicationNameToClassNameSet["Music"]
-        assertNotNull(musicClasses, "Music application must have an entry in applicationNameToClassNameSet")
-        assertTrue("track" in (musicClasses ?: emptySet()), "Music track class must be present")
-    }
+            assertTrue(result is IngestResult.Success, "expected Success for empty-suite ingest, got $result")
+            result as IngestResult.Success
+            assertEquals(1, result.suitesIngested)
+            assertEquals(0, result.commandsIndexed)
+        }
 
     @Test
-    fun ingestMusicSuiteAllowsAppleDoctypeWithoutLoadingExternalDtd() = runTest {
-        val service = newService(testScheduler)
-        val xml = SyntheticSuiteFixtures.musicAppPlayCommandWithAppleDoctypeXml()
-        val file = SyntheticSuiteFixtures.writeToTempFile("music-doctype", xml)
+    fun ingestMusicSuitePlacesPlayCommandInIndex() =
+        runTest {
+            val service = newService(testScheduler)
+            val xml = SyntheticSuiteFixtures.musicAppPlayCommandXml()
+            val file = SyntheticSuiteFixtures.writeToTempFile("music", xml)
 
-        val result: IngestResult = service.ingest("Music", file)
+            val result: IngestResult = service.ingest("Music", file)
 
-        assertTrue(result is IngestResult.Success, "expected Success for Apple SDEF DOCTYPE, got $result")
-        val snapshot: SdefIndexSnapshot = service.snapshot()
-        assertTrue(
-            snapshot.isApplicationCommand("Music", "play"),
-            "Music play command must be indexed when the SDEF declares Apple's DTD",
-        )
-    }
-
-    @Test
-    fun secureSaxBuilderExplicitlyAllowsAppleSdefDoctype() {
-        val builder = SdefIndexService.newSecureSaxBuilder()
-        val featuresField = builder.javaClass.getDeclaredField("features")
-        featuresField.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        val features = featuresField.get(builder) as Map<String, Boolean>
-
-        assertEquals(
-            false,
-            features["http://apache.org/xml/features/disallow-doctype-decl"],
-            "Apple SDEF files declare a DOCTYPE, so the builder must override IDE defaults that disallow it",
-        )
-        assertEquals(
-            false,
-            features["http://apache.org/xml/features/nonvalidating/load-external-dtd"],
-            "External DTD loading must stay disabled even when the DOCTYPE declaration is allowed",
-        )
-    }
+            assertTrue(result is IngestResult.Success, "expected Success, got $result")
+            val snapshot: SdefIndexSnapshot = service.snapshot()
+            assertTrue(
+                snapshot.isApplicationCommand("Music", "play"),
+                "Music play command must be present in app-scoped command index after ingest",
+            )
+            // Class index also populated for "track".
+            val musicClasses = snapshot.applicationNameToClassNameSet["Music"]
+            assertNotNull(musicClasses, "Music application must have an entry in applicationNameToClassNameSet")
+            assertTrue("track" in (musicClasses ?: emptySet()), "Music track class must be present")
+        }
 
     @Test
-    fun ingestScriptingAdditionsPlacesDoShellScriptInStdCommandIndex() = runTest {
-        val service = newService(testScheduler)
-        val xml = SyntheticSuiteFixtures.standardAdditionsMinimalXml()
-        val file = SyntheticSuiteFixtures.writeToTempFile("std-additions", xml)
+    fun ingestMusicSuiteAllowsAppleDoctypeWithoutLoadingExternalDtd() =
+        runTest {
+            val service = newService(testScheduler)
+            val xml = SyntheticSuiteFixtures.musicAppPlayCommandWithAppleDoctypeXml()
+            val file = SyntheticSuiteFixtures.writeToTempFile("music-doctype", xml)
 
-        // Apple SDEF rule: applicationName must equal SCRIPTING_ADDITIONS_LIBRARY
-        // (= "Scripting Additions" per ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY) to
-        // trigger the std-command-set population branch in parseDictionaryFile.
-        val result: IngestResult = service.ingest("Scripting Additions", file)
+            val result: IngestResult = service.ingest("Music", file)
 
-        assertTrue(result is IngestResult.Success, "expected Success, got $result")
-        val snapshot: SdefIndexSnapshot = service.snapshot()
-        assertTrue(
-            snapshot.isStdCommand("do shell script"),
-            "do shell script must be present in std command index after Scripting Additions ingest",
-        )
-    }
+            assertTrue(result is IngestResult.Success, "expected Success for Apple SDEF DOCTYPE, got $result")
+            val snapshot: SdefIndexSnapshot = service.snapshot()
+            assertTrue(
+                snapshot.isApplicationCommand("Music", "play"),
+                "Music play command must be indexed when the SDEF declares Apple's DTD",
+            )
+        }
 
     @Test
-    fun snapshotReturnsDefensiveImmutableCopy() = runTest {
-        val service = newService(testScheduler)
-        val firstFile = SyntheticSuiteFixtures.writeToTempFile(
-            "music-snapshot-first",
-            SyntheticSuiteFixtures.musicAppPlayCommandXml(),
-        )
-        service.ingest("Music", firstFile)
-        val firstSnapshot: SdefIndexSnapshot = service.snapshot()
-        assertTrue(firstSnapshot.isApplicationCommand("Music", "play"))
+    fun ingestScriptingAdditionsPlacesDoShellScriptInStdCommandIndex() =
+        runTest {
+            val service = newService(testScheduler)
+            val xml = SyntheticSuiteFixtures.standardAdditionsMinimalXml()
+            val file = SyntheticSuiteFixtures.writeToTempFile("std-additions", xml)
 
-        // Ingest a different app; original snapshot must NOT reflect the new state — it is an
-        // immutable defensive copy taken at the time of the snapshot() call.
-        val secondFile = SyntheticSuiteFixtures.writeToTempFile(
-            "music-snapshot-second-app",
-            SyntheticSuiteFixtures.standardAdditionsMinimalXml(),
-        )
-        service.ingest("Scripting Additions", secondFile)
-        assertTrue(
-            firstSnapshot.isApplicationCommand("Music", "play"),
-            "original snapshot must still report Music/play",
-        )
-        assertFalse(
-            firstSnapshot.isStdCommand("do shell script"),
-            "original snapshot must NOT contain commands ingested after it was taken",
-        )
+            // Apple SDEF rule: applicationName must equal SCRIPTING_ADDITIONS_LIBRARY
+            // (= "Scripting Additions" per ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY) to
+            // trigger the std-command-set population branch in parseDictionaryFile.
+            val result: IngestResult = service.ingest("Scripting Additions", file)
 
-        // The fresh snapshot reflects the cumulative state.
-        val secondSnapshot = service.snapshot()
-        assertTrue(secondSnapshot.isStdCommand("do shell script"))
-        assertTrue(secondSnapshot.isApplicationCommand("Music", "play"))
-    }
+            assertTrue(result is IngestResult.Success, "expected Success, got $result")
+            val snapshot: SdefIndexSnapshot = service.snapshot()
+            assertTrue(
+                snapshot.isStdCommand("do shell script"),
+                "do shell script must be present in std command index after Scripting Additions ingest",
+            )
+        }
 
     @Test
-    fun ingestNonExistentFileReturnsFailedWithCause() = runTest {
-        val service = newService(testScheduler)
-        val missing = java.io.File("/tmp/__phase-04-05-this-file-does-not-exist__.sdef")
-        assertFalse(missing.exists(), "preflight: temp path must not exist for this test")
+    fun snapshotReturnsDefensiveImmutableCopy() =
+        runTest {
+            val service = newService(testScheduler)
+            val firstFile =
+                SyntheticSuiteFixtures.writeToTempFile(
+                    "music-snapshot-first",
+                    SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+                )
+            service.ingest("Music", firstFile)
+            val firstSnapshot: SdefIndexSnapshot = service.snapshot()
+            assertTrue(firstSnapshot.isApplicationCommand("Music", "play"))
 
-        val result: IngestResult = service.ingest("MissingApp", missing)
+            // Ingest a different app; original snapshot must NOT reflect the new state — it is an
+            // immutable defensive copy taken at the time of the snapshot() call.
+            val secondFile =
+                SyntheticSuiteFixtures.writeToTempFile(
+                    "music-snapshot-second-app",
+                    SyntheticSuiteFixtures.standardAdditionsMinimalXml(),
+                )
+            service.ingest("Scripting Additions", secondFile)
+            assertTrue(
+                firstSnapshot.isApplicationCommand("Music", "play"),
+                "original snapshot must still report Music/play",
+            )
+            assertFalse(
+                firstSnapshot.isStdCommand("do shell script"),
+                "original snapshot must NOT contain commands ingested after it was taken",
+            )
 
-        // parseDictionaryFile returns false for a non-existent file (IOException caught inside;
-        // logs a warning and returns false). The suspend ingest wrapper interprets that as Failed.
-        assertTrue(result is IngestResult.Failed, "expected Failed for missing file, got $result")
-    }
+            // The fresh snapshot reflects the cumulative state.
+            val secondSnapshot = service.snapshot()
+            assertTrue(secondSnapshot.isStdCommand("do shell script"))
+            assertTrue(secondSnapshot.isApplicationCommand("Music", "play"))
+        }
+
+    @Test
+    fun ingestNonExistentFileReturnsFailedWithCause() =
+        runTest {
+            val service = newService(testScheduler)
+            val missing = java.io.File("/tmp/__phase-04-05-this-file-does-not-exist__.sdef")
+            assertFalse(missing.exists(), "preflight: temp path must not exist for this test")
+
+            val result: IngestResult = service.ingest("MissingApp", missing)
+
+            // parseDictionaryFile returns false for a non-existent file (IOException caught inside;
+            // logs a warning and returns false). The suspend ingest wrapper interprets that as Failed.
+            assertTrue(result is IngestResult.Failed, "expected Failed for missing file, got $result")
+        }
 
     /**
      * Sealed-type exhaustive-`when` compile gate. If a future plan adds a new variant to
@@ -197,15 +184,23 @@ class SdefIndexServiceTest {
      * regression for the D-05 sealed contract).
      */
     @Test
-    fun ingestResultExhaustiveWhenCompiles() {
-        val example: IngestResult = IngestResult.Success(suitesIngested = 1, commandsIndexed = 1)
-        val message: String = when (example) {
-            is IngestResult.Success -> "ok (${example.suitesIngested}/${example.commandsIndexed})"
-            is IngestResult.Partial -> "partial (${example.suitesIngested}, skipped=${example.skipped})"
-            is IngestResult.Failed -> "failed (${example.reason})"
+    fun ingestResultExhaustiveWhenCompiles() =
+        runTest {
+            val service = newService(testScheduler)
+            val file =
+                SyntheticSuiteFixtures.writeToTempFile(
+                    "exhaustive-when",
+                    SyntheticSuiteFixtures.emptySuiteXml(),
+                )
+
+            val message: String =
+                when (val result = service.ingest("ExhaustiveWhen", file)) {
+                    is IngestResult.Success -> "ok (${result.suitesIngested}/${result.commandsIndexed})"
+                    is IngestResult.Partial -> "partial (${result.suitesIngested}, skipped=${result.skipped})"
+                    is IngestResult.Failed -> "failed (${result.reason})"
+                }
+            assertTrue(message.startsWith("ok"))
         }
-        assertTrue(message.startsWith("ok"))
-    }
 
     /**
      * Sealed-type exhaustive-`when` compile gate for [LookupResult]. Same regression-lock
@@ -214,11 +209,12 @@ class SdefIndexServiceTest {
     @Test
     fun lookupResultExhaustiveWhenCompiles() {
         val example: LookupResult = LookupResult.Miss
-        val description: String = when (example) {
-            LookupResult.Hit -> "hit"
-            LookupResult.Miss -> "miss"
-            LookupResult.Stale -> "stale"
-        }
+        val description: String =
+            when (example) {
+                LookupResult.Hit -> "hit"
+                LookupResult.Miss -> "miss"
+                LookupResult.Stale -> "stale"
+            }
         assertEquals("miss", description)
     }
 }

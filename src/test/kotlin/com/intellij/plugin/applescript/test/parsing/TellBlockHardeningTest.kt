@@ -16,26 +16,27 @@ import java.io.File
  * `-PskipHeavyTests=true`. Mirrors the RealWorldCorpusTest error-count harness verbatim.
  */
 class TellBlockHardeningTest : BasePlatformTestCase() {
-
     override fun getTestDataPath(): String = File(CORPUS_DIR).absolutePath
 
-    fun testNestedTellInRunHandler() = assertNoParserErrors("nested_tell_min.applescript")
+    fun testNestedTellInRunHandler() = assertNoParserErrors()
 
-    private fun assertNoParserErrors(fileName: String) {
-        val psiFile: PsiFile = myFixture.configureByFile(fileName)
+    private fun assertNoParserErrors() {
+        val psiFile: PsiFile = myFixture.configureByFile(NESTED_TELL_FILE)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
         if (errors.isEmpty()) return
         val text = psiFile.text
-        val report = errors.joinToString("\n") { err ->
-            val offset = err.textRange.startOffset
-            val line = text.substring(0, offset).count { it == '\n' } + 1
-            val snippet = err.text.replace("\n", "\\n").take(40)
-            "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
-        }
-        fail("$fileName has ${errors.size} parser error(s):\n$report")
+        val report =
+            errors.joinToString("\n") { err ->
+                val offset = err.textRange.startOffset
+                val line = text.substring(0, offset).count { it == '\n' } + 1
+                val snippet = err.text.replace("\n", "\\n").take(40)
+                "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
+            }
+        fail("$NESTED_TELL_FILE has ${errors.size} parser error(s):\n$report")
     }
 
     companion object {
         private const val CORPUS_DIR = "src/test/resources/testData/parse/realWorld"
+        private const val NESTED_TELL_FILE = "nested_tell_min.applescript"
     }
 }

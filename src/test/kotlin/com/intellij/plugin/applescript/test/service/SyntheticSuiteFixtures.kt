@@ -22,14 +22,14 @@ import java.io.File
  * minimum elements needed to exercise the corresponding index path.
  */
 object SyntheticSuiteFixtures {
-
     /**
      * Minimal Standard Additions suite with one command (`do shell script`). Triggers the
      * `parseSuiteElementForScriptingAdditions` branch in [SdefIndexService.parseDictionaryFile]
      * because the applicationName must equal `ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY`
      * (= "Standard Additions").
      */
-    fun standardAdditionsMinimalXml(): String = """
+    fun standardAdditionsMinimalXml(): String =
+        """
         <?xml version="1.0" encoding="UTF-8"?>
         <dictionary title="Standard Additions Terminology">
             <suite name="Standard Additions" code="stda" description="Standard Additions">
@@ -38,14 +38,15 @@ object SyntheticSuiteFixtures {
                 </command>
             </suite>
         </dictionary>
-    """.trimIndent()
+        """.trimIndent()
 
     /**
      * Music.app-shaped suite for app-command tests. One command (`play`) + one class (`track`).
      * The applicationName at parseDictionaryFile time MUST be "Music" to populate the
      * applicationNameToCommandNameSet entry with key "Music".
      */
-    fun musicAppPlayCommandXml(): String = """
+    fun musicAppPlayCommandXml(): String =
+        """
         <?xml version="1.0" encoding="UTF-8"?>
         <dictionary title="Music Terminology">
             <suite name="Music Suite" code="musc" description="Classes and commands for Music">
@@ -53,13 +54,14 @@ object SyntheticSuiteFixtures {
                 <class name="track" code="cTrk" description="A track in a playlist"/>
             </suite>
         </dictionary>
-    """.trimIndent()
+        """.trimIndent()
 
     /**
      * Real macOS `sdef` output includes this Apple DTD declaration. The parser must allow the
      * declaration while still refusing external DTD/entity loading.
      */
-    fun musicAppPlayCommandWithAppleDoctypeXml(): String = """
+    fun musicAppPlayCommandWithAppleDoctypeXml(): String =
+        """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
         <dictionary title="Music Terminology">
@@ -68,19 +70,23 @@ object SyntheticSuiteFixtures {
                 <class name="track" code="cTrk" description="A track in a playlist"/>
             </suite>
         </dictionary>
-    """.trimIndent()
+        """.trimIndent()
 
     /** Suite with no commands — edge case for empty-suite handling. */
-    fun emptySuiteXml(): String = """
+    fun emptySuiteXml(): String =
+        """
         <?xml version="1.0" encoding="UTF-8"?>
         <dictionary title="Empty">
             <suite name="Empty" code="empt" description="Empty suite for edge cases"/>
         </dictionary>
-    """.trimIndent()
+        """.trimIndent()
 
     /** Writes [xml] into a fresh temp file with `.sdef` suffix; the file is delete-on-exit. */
-    fun writeToTempFile(name: String, xml: String): File {
-        val file = File.createTempFile("synthetic-${name}-", ".sdef")
+    fun writeToTempFile(
+        name: String,
+        xml: String,
+    ): File {
+        val file = File.createTempFile("synthetic-$name-", ".sdef")
         file.deleteOnExit()
         file.writeText(xml)
         return file

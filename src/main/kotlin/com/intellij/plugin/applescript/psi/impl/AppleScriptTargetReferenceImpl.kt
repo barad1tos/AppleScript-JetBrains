@@ -7,10 +7,10 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiElementResolveResult
 import com.intellij.psi.ResolveResult
 
-class AppleScriptTargetReferenceImpl(private val myElement: AppleScriptComponent) :
-    AppleScriptReferenceElementImpl(myElement.node),
+class AppleScriptTargetReferenceImpl(
+    private val myElement: AppleScriptComponent,
+) : AppleScriptReferenceElementImpl(myElement.node),
     AppleScriptTargetReference {
-
     override fun getRangeInElement(): TextRange {
         val nameNode = myElement.nameIdentifier?.node ?: node
         return nameNode.textRange.shiftRight(-myElement.node.startOffset)

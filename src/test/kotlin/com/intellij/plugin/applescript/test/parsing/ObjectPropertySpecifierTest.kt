@@ -12,23 +12,23 @@ import java.io.File
  * path domains must parse cold, without loading application dictionaries.
  */
 class ObjectPropertySpecifierTest : BasePlatformTestCase() {
-
     override fun getTestDataPath(): String = File(REGRESSION_DIR).absolutePath
 
-    fun testObjectPropertySpecifiers() = assertNoParserErrors(OBJECT_PROPERTY_SPECIFIERS_FIXTURE)
+    fun testObjectPropertySpecifiers() = assertNoParserErrors()
 
-    private fun assertNoParserErrors(fileName: String) {
-        val psiFile: PsiFile = myFixture.configureByFile(fileName)
+    private fun assertNoParserErrors() {
+        val psiFile: PsiFile = myFixture.configureByFile(OBJECT_PROPERTY_SPECIFIERS_FIXTURE)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
         if (errors.isEmpty()) return
         val text = psiFile.text
-        val report = errors.joinToString("\n") { err ->
-            val offset = err.textRange.startOffset
-            val line = text.substring(0, offset).count { it == '\n' } + 1
-            val snippet = err.text.replace("\n", "\\n").take(40)
-            "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
-        }
-        fail("$fileName has ${errors.size} parser error(s):\n$report")
+        val report =
+            errors.joinToString("\n") { err ->
+                val offset = err.textRange.startOffset
+                val line = text.substring(0, offset).count { it == '\n' } + 1
+                val snippet = err.text.replace("\n", "\\n").take(40)
+                "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
+            }
+        fail("$OBJECT_PROPERTY_SPECIFIERS_FIXTURE has ${errors.size} parser error(s):\n$report")
     }
 
     companion object {
