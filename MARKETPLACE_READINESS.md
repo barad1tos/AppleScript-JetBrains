@@ -14,7 +14,7 @@ values change.
 
 - Plugin version: `2.0.0`
 - Plugin id: `com.intellij.plugin.applescript`
-- Plugin name: `AppleScript Toolkit`
+- Plugin name: `Applescript Toolkit`
 - Minimum supported build: `251` (`pluginSinceBuild=251`)
 - Current verifier targets: IntelliJ IDEA Community 2025.1 and 2025.2
 - License: Apache License 2.0
@@ -63,7 +63,7 @@ Do not change the id silently. Before a paid Marketplace publication, choose one
 
 Until that decision is made, plugin id/listing ownership remains a publication blocker.
 
-The plugin display name is standardized as `AppleScript Toolkit` in both the source descriptor and Gradle-patched distribution metadata. This avoids the generic Marketplace template term "Support" and avoids JetBrains product-name terms such as "IDEA" while keeping the legacy plugin id unchanged for the listing-ownership decision above.
+The plugin display name is standardized as `Applescript Toolkit` in both the source descriptor and Gradle-patched distribution metadata. This avoids the generic Marketplace template term "Support" and avoids JetBrains product-name terms such as "IDEA" while keeping the legacy plugin id unchanged for the listing-ownership decision above.
 
 ## Media and Listing Notes
 
