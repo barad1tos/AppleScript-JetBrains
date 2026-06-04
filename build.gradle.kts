@@ -604,7 +604,10 @@ tasks {
                     "SdefFileResources",
                 ) +
                 serviceWithOwnedFiles("SdefIndexService") +
-                serviceWithOwnedFiles("AppleScriptSystemDictionaryRegistryService")
+                serviceWithOwnedFiles(
+                    "AppleScriptSystemDictionaryRegistryService",
+                    "DictionaryRegistries",
+                )
         val services = serviceOwnerByFile.values.distinct()
         // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
         // back-edge from a service to the facade is a DATA dependency (reading state.X), not
