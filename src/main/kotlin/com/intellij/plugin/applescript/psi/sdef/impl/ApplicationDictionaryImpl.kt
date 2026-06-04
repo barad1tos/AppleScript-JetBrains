@@ -9,6 +9,7 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.plugin.applescript.AppleScriptIcons
 import com.intellij.plugin.applescript.AppleScriptLanguage
+import com.intellij.plugin.applescript.lang.dictionary.index.DictionaryIndexes
 import com.intellij.plugin.applescript.lang.ide.AppleScriptDocHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand

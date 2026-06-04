@@ -6,9 +6,8 @@ package com.intellij.plugin.applescript.lang.dictionary.index
  * Returned by [SdefIndexService.snapshot]. Callers
  * can hand this to lookup methods for hermetic-test reads OR observe it post-ingest in production.
  *
- * Modelled on Phase 2 [com.intellij.plugin.applescript.lang.sdef.DictionaryIndexes][SDEF-05] value
- * container. Each field is a read-only `Map<String, Set<String>>` — defensive snapshot, NOT the
- * live mutable index.
+ * Modelled on Phase 2 [DictionaryIndexes] value container. Each field is a read-only
+ * `Map<String, Set<String>>` — defensive snapshot, NOT the live mutable index.
  *
  * Field names match the EXACT names on the pre-Wave-5 facade (post-Wave-4 baseline), so a future
  * tool that round-trips a snapshot back into the live indexes (Wave 6+) gets a 1:1 mapping.
