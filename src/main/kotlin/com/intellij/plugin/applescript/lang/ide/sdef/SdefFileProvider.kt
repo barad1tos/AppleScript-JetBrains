@@ -14,6 +14,7 @@ import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionS
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.xml.LegacyJdomParser
+import com.intellij.plugin.applescript.lang.dictionary.xml.LegacyJdomWriter
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.extensionSupported
