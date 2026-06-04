@@ -9,9 +9,14 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
+import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
+import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -77,6 +82,45 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         )
         assertFalse("unknown app must not enter Problems as WARNING", severities.contains(HighlightSeverity.WARNING))
         assertFalse("unknown app must not be an ERROR", severities.contains(HighlightSeverity.ERROR))
+    }
+
+    fun testApplicationReferenceHighlightingDoesNotCreateProjectDictionary() {
+        val applicationName = "SyntheticAnnotatorApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "annotator-read-only",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            assertTrue(
+                "Synthetic dictionary must be indexed for the annotator fixture",
+                SdefIndexService.getInstance().parseDictionaryFile(dictionaryFile, applicationName),
+            )
+            dictionaryInfo.setInitialized(true)
+            assertNull(projectDictionaries.getDictionary(applicationName))
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            myFixture.doHighlighting()
+
+            assertNull(
+                "Highlighting must not create a project dictionary; explicit load paths own that side effect",
+                projectDictionaries.getDictionary(applicationName),
+            )
+        } finally {
+            persistence.removeDictionaryInfo(applicationFile.path)
+        }
     }
 
     fun testDatePropertyReferencesUsePropertyHighlighting() {

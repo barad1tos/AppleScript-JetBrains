@@ -3,7 +3,6 @@ package com.intellij.plugin.applescript.lang.ide.annotator
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.Annotator
 import com.intellij.lang.annotation.HighlightSeverity
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.SystemInfo
@@ -358,7 +357,6 @@ private object AppleScriptApplicationReferenceProbe {
         val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
         val state =
             if (dictionaryRegistryService.isDictionaryInitialized(appName)) {
-                ensureProjectDictionaryExists(appRef, appName)
                 ApplicationReferenceAnnotationState.Resolved
             } else {
                 resolveUninitializedApplication(appRef, appName, dictionaryRegistryService)
@@ -371,23 +369,22 @@ private object AppleScriptApplicationReferenceProbe {
         appName: String,
         dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService,
     ): ApplicationReferenceAnnotationState {
-        val warningReason = checkWarningReasonAfterInitialization(appName, dictionaryRegistryService)
+        val warningReason = checkWarningReason(appName, dictionaryRegistryService)
         return if (!warningReason.isNullOrEmpty()) {
             ApplicationReferenceAnnotationState.Warning(warningReason)
-        } else if (ensureProjectDictionaryExists(appRef, appName)) {
+        } else if (projectDictionaryExists(appRef, appName)) {
             ApplicationReferenceAnnotationState.Resolved
         } else {
             ApplicationReferenceAnnotationState.Unknown
         }
     }
 
-    private fun ensureProjectDictionaryExists(
+    private fun projectDictionaryExists(
         appRef: AppleScriptApplicationReference,
         appName: String,
     ): Boolean {
         val dictionaryProjectService = appRef.project.getService(AppleScriptProjectDictionaryService::class.java)
-        return dictionaryProjectService.getDictionary(appName) != null ||
-            dictionaryProjectService.createDictionary(appName) != null
+        return dictionaryProjectService.getDictionary(appName) != null
     }
 
     private fun checkWarningReason(
@@ -402,23 +399,8 @@ private object AppleScriptApplicationReferenceProbe {
             else -> null
         }
 
-    private fun checkWarningReasonAfterInitialization(
-        appName: String,
-        dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService,
-    ): String? {
-        val warningReason = checkWarningReason(appName, dictionaryRegistryService)
-        if (warningReason != null) {
-            return warningReason
-        }
-        dictionaryRegistryService.ensureDictionaryInitialized(appName)
-        LOG.debug("Re-checking warning reason for {}", appName)
-        return checkWarningReason(appName, dictionaryRegistryService)
-    }
-
     private const val MISSING_XCODE_WARNING =
         "Can not create dictionary: Xcode Developer Tools are not installed"
-
-    private val LOG = Logger.getInstance("#${AppleScriptColorAnnotator::class.java.name}")
 }
 
 private object AppleScriptAnnotationPredicates {
