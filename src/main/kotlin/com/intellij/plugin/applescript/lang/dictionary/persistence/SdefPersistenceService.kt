@@ -16,12 +16,10 @@ import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionary
  * class identity in every existing user's `appleScriptCachedDictionariesInfo.xml` cache.
  * Moving the annotation = lost user caches (PITFALLS 4.1 BLOCKER).
  *
- * What this service owns: a typed, side-effect-explicit API over the facade's in-memory
- * dictionary registry. Callers (within the SDEF package, completion contributors,
- * annotator, actions) stop touching facade-private fields directly and instead route
- * through these typed methods. The implementation forwards to `internal fun *Internal()`
- * helpers on the facade — the facade still owns the [java.util.concurrent.ConcurrentHashMap]
- * backing fields (HOTFIX-01 invariant) and the persisted-state-driven persistence machinery.
+ * What this service owns: a typed, side-effect-explicit API over the facade's persistence bridge.
+ * Callers (within the SDEF package, completion contributors, annotator, actions) stop touching
+ * facade-private fields directly and instead route through these typed methods. The facade still
+ * owns the persisted-state identity, while the bridge owns in-memory registry mutations.
  *
  * Wire-format contract: the SDEF-13 golden fixture (Phase 2 `PersistenceGoldenFixtureTest`)
  * regression-locks every byte of the v1.0 XML format. This service touches neither
@@ -36,10 +34,9 @@ import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionary
  * Constructor is intentionally no-arg: this service does not launch coroutine work,
  * and Platform state persistence is owned by the facade.
  *
- * Lifecycle: Light Service, lazy-on-first-access. The facade triggers it via
- * `service<SdefPersistenceService>().loadFromState(state)` from the `loadState(state)`
- * override (after `super.loadState(state)` wires the PSC state) and via
- * `service<SdefPersistenceService>().writeToState(state)` from `updateState()`.
+ * Lifecycle: Light Service, lazy-on-first-access. The facade triggers [loadFromState]
+ * from the `loadState(state)` override after `super.loadState(state)` wires the PSC state.
+ * The Platform serialises the facade state on its normal persistence cadence.
  *
  * Light Service per [Plugin Services](https://plugins.jetbrains.com/docs/intellij/plugin-services.html):
  * no `<applicationService>` entry needed in plugin.xml.
@@ -48,24 +45,26 @@ import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionary
 class SdefPersistenceService {
     private val facade: AppleScriptSystemDictionaryRegistryService
         get() = AppleScriptSystemDictionaryRegistryService.getInstance()
+    private val bridge
+        get() = facade.persistenceBridge
 
     /**
      * Defensive snapshot of the in-memory [DictionaryInfo] collection. Returns a [List]
      * (not the live backing `Collection`), so callers cannot accidentally mutate the
      * facade's registry through the returned reference.
      */
-    fun readDictionaryInfoSnapshot(): List<DictionaryInfo> = facade.dictionaryInfoSnapshotInternal()
+    fun readDictionaryInfoSnapshot(): List<DictionaryInfo> = bridge.readDictionaryInfoSnapshot()
 
     /**
      * Defensive snapshot of the notScriptable application names. Returns a [Set]
      * (not the live backing `ConcurrentHashMap.KeySet`).
      */
-    fun readNotScriptableSnapshot(): Set<String> = facade.notScriptableSnapshotInternal()
+    fun readNotScriptableSnapshot(): Set<String> = bridge.readNotScriptableSnapshot()
 
     /**
      * O(1) membership test on the persisted notScriptable set.
      */
-    fun isNotScriptable(applicationName: String): Boolean = facade.isNotScriptableInternal(applicationName)
+    fun isNotScriptable(applicationName: String): Boolean = bridge.isNotScriptable(applicationName)
 
     /**
      * Add an application to the persisted notScriptable set; returns `true` if the
@@ -73,13 +72,13 @@ class SdefPersistenceService {
      * the Platform's PSC machinery serialises on its own cadence (per `getState()`),
      * matching the v1.0 behaviour byte-for-byte (SDEF-13 fixture invariant).
      */
-    fun addNotScriptable(applicationName: String): Boolean = facade.addNotScriptableInternal(applicationName)
+    fun addNotScriptable(applicationName: String): Boolean = bridge.addNotScriptable(applicationName)
 
     /**
      * Remove an application from the persisted notScriptable set; returns `true` if
      * the name was present and removed.
      */
-    fun removeNotScriptable(applicationName: String): Boolean = facade.removeNotScriptableInternal(applicationName)
+    fun removeNotScriptable(applicationName: String): Boolean = bridge.removeNotScriptable(applicationName)
 
     /**
      * Register a [DictionaryInfo] in the facade's in-memory registry; returns `true` if
@@ -88,7 +87,7 @@ class SdefPersistenceService {
      * application from the notScriptable list, mirroring the historical
      * `addDictionaryInfo` private helper semantics on the facade.
      */
-    fun addDictionaryInfo(info: DictionaryInfo): Boolean = facade.addDictionaryInfoInternal(info)
+    fun addDictionaryInfo(info: DictionaryInfo): Boolean = bridge.addDictionaryInfo(info)
 
     /**
      * Remove a [DictionaryInfo] by its application path. Returns `true` if a matching
@@ -98,7 +97,7 @@ class SdefPersistenceService {
      * suffix (mirroring the facade's existing `getDictionaryInfoByApplicationPath`
      * resolution).
      */
-    fun removeDictionaryInfo(path: String): Boolean = facade.removeDictionaryInfoByPathInternal(path)
+    fun removeDictionaryInfo(path: String): Boolean = bridge.removeDictionaryInfoByPath(path)
 
     /**
      * Populates the facade's in-memory [DictionaryInfo] collection from the just-loaded
@@ -106,22 +105,19 @@ class SdefPersistenceService {
      * facade's `loadState(state)` override AFTER `super.loadState(state)` has wired the
      * PSC state field.
      *
-     * Preserves byte-for-byte the v1.0 wire format — the implementation simply forwards
-     * to the existing `initDictionariesInfoFromCacheInternal` helper on the facade,
-     * which does the same work as the pre-Wave-2 private method.
+     * Preserves byte-for-byte the v1.0 wire format.
      */
     fun loadFromState(state: AppleScriptSystemDictionaryRegistryService.PersistedState) {
-        facade.initDictionariesInfoFromCacheInternal(state)
+        bridge.loadFromState(state)
     }
 
     /**
      * Writes the facade's in-memory [DictionaryInfo] collection back into
      * `PersistedState.dictionariesInfo` and the notScriptable set into
      * `PersistedState.notScriptableApplications`.
-     * Called from the facade's `updateState()` method.
      */
     fun writeToState(state: AppleScriptSystemDictionaryRegistryService.PersistedState) {
-        facade.writeToStateInternal(state)
+        bridge.writeToState(state)
     }
 
     companion object {

@@ -20,9 +20,9 @@ import kotlin.coroutines.EmptyCoroutineContext
  * Light Service per the IntelliJ Platform Plugin Services docs — no `<applicationService>`
  * entry needed in plugin.xml (auto-discovered by the platform via the `@Service` annotation).
  *
- * Lifecycle: lazy-on-first-access. The facade's `runInitChain` triggers it as the first step
+ * Lifecycle: lazy-on-first-access. The startup pipeline triggers it as the first step
  * of the init pipeline via `service<SdefFileTypeRegistrar>().register()` (preserves Phase 3
- * runInitChain ordering: register -> load -> ingestStandard -> discoverApps).
+ * ordering: register -> load -> ingestStandard -> discoverApps).
  *
  * Constructor signature follows Phase 3 COROUTINE-03: constructor-injected [CoroutineScope]
  * (Platform-supplied) + injectable EDT coroutine context for test determinism. The
@@ -54,7 +54,7 @@ class SdefFileTypeRegistrar
          * [edtDispatcher] (RECURRING_PITFALLS Pattern C — `runWriteAction` requires EDT and the
          * Platform-blessed dispatcher is `Dispatchers.EDT`, NOT `kotlinx.coroutines.Dispatchers.Main`).
          *
-         * Suspend so the caller (`AppleScriptSystemDictionaryRegistryService.runInitChain`)
+         * Suspend so the startup pipeline caller
          * structurally awaits completion before progressing to step 2 (`loadFromState`). Phase 3
          * D-08 invariant preserved: the `.sdef` <-> XML association is observable user behaviour
          * (the `LoadDictionaryAction` file picker filters on `.sdef` after first invocation).

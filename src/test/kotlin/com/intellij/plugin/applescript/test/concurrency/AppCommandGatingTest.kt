@@ -25,7 +25,7 @@ import org.junit.Assume
  * app catalog before discovery completes.
  *
  * Test strategy: construct the service with a TestDispatcher (so the launched
- * `runInitChain` does NOT run real I/O), hand-complete `standardReady` with
+ * startup pipeline does NOT run real I/O), hand-complete `standardReady` with
  * `Result.success(Unit)`, then invoke `findApplicationCommands` from a background
  * thread. The facade's `areAppDictionariesIndexed()` predicate returns false (because
  * `appsReady` is incomplete) and the bounded-wait expires after 2s returning
@@ -57,7 +57,7 @@ class AppCommandGatingTest : BasePlatformTestCase() {
             testRootDisposable,
         )
         // Hand-complete standardReady only — simulate "standard suite parsed but app discovery
-        // still pending". Bypasses runInitChain entirely (TestDispatcher never advances).
+        // still pending". Bypasses startup entirely (TestDispatcher never advances).
         service.standardReady.complete(Result.success(Unit))
 
         assertTrue(

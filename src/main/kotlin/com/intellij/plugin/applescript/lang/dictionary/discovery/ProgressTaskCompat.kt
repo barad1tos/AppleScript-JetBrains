@@ -54,7 +54,7 @@ interface ProgressTaskCompat {
  * indicator's `isCanceled` flips → `run()` exits → the Backgroundable completes
  * → the indicator disappears. The discovery work itself runs OUTSIDE this task
  * (inside the registry service's `serviceScope`); cancel here does NOT cancel
- * `runInitChain`, by design (T-03-cancel-leak mitigation per the plan's STRIDE
+ * the startup pipeline, by design (T-03-cancel-leak mitigation per the plan's STRIDE
  * register).
  */
 class ProgressTaskCompatDefault : ProgressTaskCompat {
