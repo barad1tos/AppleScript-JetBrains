@@ -643,34 +643,40 @@ tasks {
                 // parseDictionaryFile + the parser map cluster migrate to SdefIndexService.
                 "SdefFileProvider" to "AppleScriptSystemDictionaryRegistryService",
             )
-        val sdefPackage = layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef")
-        inputs.dir(sdefPackage)
+        val serviceSourceRoots =
+            listOf(
+                layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef"),
+                layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/dictionary"),
+            )
+        serviceSourceRoots.forEach { inputs.dir(it) }
 
         doLast {
             val adjacency = mutableMapOf<String, MutableSet<String>>()
             services.forEach { adjacency[it] = mutableSetOf() }
 
-            sdefPackage.asFile
-                .walkTopDown()
-                .filter { it.isFile && it.extension == "kt" }
-                .forEach { file ->
-                    val owner = services.firstOrNull { file.nameWithoutExtension == it } ?: return@forEach
-                    val body = file.readText()
-                    services.forEach { dep ->
-                        if (dep == owner) return@forEach
-                        // Skip data-hop edges (RESEARCH §5).
-                        if (owner to dep in dataHopAllowlist) return@forEach
-                        val patterns =
-                            listOf(
-                                "service<$dep>",
-                                "$dep.getInstance",
-                                "service<$dep::class.java>",
-                            )
-                        if (patterns.any { body.contains(it) }) {
-                            adjacency[owner]!!.add(dep)
+            serviceSourceRoots.forEach { serviceSourceRoot ->
+                serviceSourceRoot.asFile
+                    .walkTopDown()
+                    .filter { it.isFile && it.extension == "kt" }
+                    .forEach { file ->
+                        val owner = services.firstOrNull { file.nameWithoutExtension == it } ?: return@forEach
+                        val body = file.readText()
+                        services.forEach { dep ->
+                            if (dep == owner) return@forEach
+                            // Skip data-hop edges (RESEARCH §5).
+                            if (owner to dep in dataHopAllowlist) return@forEach
+                            val patterns =
+                                listOf(
+                                    "service<$dep>",
+                                    "$dep.getInstance",
+                                    "service<$dep::class.java>",
+                                )
+                            if (patterns.any { body.contains(it) }) {
+                                adjacency[owner]!!.add(dep)
+                            }
                         }
                     }
-                }
+            }
 
             val white = 0
             val gray = 1
