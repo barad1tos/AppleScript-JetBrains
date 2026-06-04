@@ -15,7 +15,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
@@ -91,6 +90,15 @@ class AppleScriptSystemDictionaryRegistryService
             get() = ApplicationDiscoveryService.getInstance()
         private val dictionaryFiles: SdefFileProvider
             get() = SdefFileProvider.getInstance()
+        private val initializationCoordinator =
+            DictionaryInitializationCoordinator(
+                dictionaryInfoRegistry = dictionaryInfoRegistry,
+                notScriptableApplicationRegistry = notScriptableApplicationRegistry,
+                applicationDiscovery = { discovery },
+                dictionaryFiles = { dictionaryFiles },
+                areAppDictionariesIndexed = ::areAppDictionariesIndexed,
+                log = LOG,
+            )
 
         // Phase 4 SERVICE-03 (plan 04-03, Wave 3): the `notFoundApplicationList` and
         // `discoveredApplicationNames` ConcurrentHashMap-backed sets migrated to
@@ -462,37 +470,11 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * @return true if the dictionary was initialised
          */
-        fun ensureDictionaryInitialized(anyApplicationName: String): Boolean {
-            val canInitializeUnknownApplication =
-                !StringUtil.isEmptyOrSpaces(anyApplicationName) &&
-                    !isNotScriptableInternal(anyApplicationName) &&
-                    !isInUnknownListInternal(anyApplicationName)
-            val initializedUnknownApplication =
-                canInitializeUnknownApplication && getInitializedInfo(anyApplicationName) != null
+        fun ensureDictionaryInitialized(anyApplicationName: String): Boolean =
+            initializationCoordinator.ensureDictionaryInitialized(anyApplicationName)
 
-            return ensureKnownApplicationDictionaryInitialized(anyApplicationName) ||
-                initializedUnknownApplication
-        }
-
-        override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean {
-            // D-04: app-name resolver path — gated on full app-discovery sweep (appsReady).
-            // Wave 3 (SERVICE-03): discoveredApplicationNames migrated to ApplicationDiscoveryService.
-            // Route the membership test through the typed-API method `isKnownApplication`
-            // — the predicate is O(1) on the service's ConcurrentHashMap.newKeySet backing.
-            val canInitialize =
-                areAppDictionariesIndexed() &&
-                    discovery.isKnownApplication(knownApplicationName)
-            val initializedKnownApplication =
-                initializeKnownDictionaryFromCache(knownApplicationName) ||
-                    getInitializedInfo(knownApplicationName) != null
-
-            return canInitialize && initializedKnownApplication
-        }
-
-        private fun initializeKnownDictionaryFromCache(applicationName: String): Boolean {
-            val dictionaryInfo = getDictionaryInfo(applicationName) ?: return false
-            return dictionaryInfo.initialized || initializeDictionaryFromInfo(dictionaryInfo)
-        }
+        override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean =
+            initializationCoordinator.ensureKnownApplicationDictionaryInitialized(knownApplicationName)
 
         // ParsableScriptHelper trampolines.
         // Each method delegates to [SdefIndexService]; the 14 ConcurrentHashMap indexes that backed
@@ -601,28 +583,7 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * @return the [DictionaryInfo] of the generated and cached dictionary for the application, or null
          */
-        fun getInitializedInfo(applicationName: String): DictionaryInfo? =
-            if (shouldSkipInitializedInfoLookup(applicationName)) {
-                null
-            } else {
-                findInitializedInfo(applicationName)
-            }
-
-        private fun shouldSkipInitializedInfoLookup(applicationName: String): Boolean =
-            StringUtil.isEmptyOrSpaces(applicationName) ||
-                isNotScriptableInternal(applicationName) ||
-                isInUnknownListInternal(applicationName)
-
-        private fun findInitializedInfo(applicationName: String): DictionaryInfo? =
-            findSavedInitializedInfo(applicationName)
-                ?: findApplicationBundleFile(applicationName)?.let { createAndInitializeInfo(it, applicationName) }
-
-        private fun findSavedInitializedInfo(applicationName: String): DictionaryInfo? {
-            val savedDictionaryInfo = getDictionaryInfo(applicationName)
-            return savedDictionaryInfo?.takeIf {
-                it.initialized || initializeDictionaryFromInfo(it)
-            }
-        }
+        fun getInitializedInfo(applicationName: String): DictionaryInfo? = initializationCoordinator.getInitializedInfo(applicationName)
 
         /**
          * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
@@ -658,29 +619,6 @@ class AppleScriptSystemDictionaryRegistryService
         ): DictionaryInfo? = dictionaryFiles.createAndInitializeInfo(applicationIoFile, applicationName)
 
         /**
-         * @return true if dictionary terms were successfully initialised
-         *
-         * Phase 4 SERVICE-05 (Wave 5): the parse step now routes through
-         * [SdefIndexService.parseDictionaryFile]; the 14 index maps live on the service.
-         * Failure-recovery branch (remove broken file from cache) still owned by the facade
-         * because it touches the @State-backed [dictionaryInfoRegistry] (Pattern A invariant).
-         */
-        private fun initializeDictionaryFromInfo(dictionaryInfo: DictionaryInfo): Boolean {
-            val file = File(dictionaryInfo.getDictionaryFile().path)
-            val applicationName = dictionaryInfo.getApplicationName()
-            if (file.exists() && service<SdefIndexService>().parseDictionaryFile(file, applicationName)) {
-                return dictionaryInfo.setInitialized(true)
-            }
-            // Parsing failed — drop the broken generated dictionary from the registry.
-            // Routes to the in-memory helper (NOT the typed-API trampoline) because callers here
-            // identify the application by NAME, not by path. The public `removeDictionaryInfo`
-            // trampoline takes an `applicationPath`. SERVICE-02 invariant.
-            LOG.warn("Initialization failed for application [$applicationName].")
-            removeDictionaryInfoInMemoryInternal(applicationName)
-            return false
-        }
-
-        /**
          * Phase 4 SERVICE-04 (Wave 4) internal accessor: exposes the in-memory
          * [DictionaryInfo] registry lookup by name for [SdefFileProvider]. The facade still
          * owns the persisted-state-tagged [dictionaryInfoRegistry] (Pattern A — annotation is tied
@@ -697,7 +635,7 @@ class AppleScriptSystemDictionaryRegistryService
          * it touches the parser-index map cluster (Wave 5 territory).
          */
         internal fun initializeDictionaryFromInfoInternal(dictionaryInfo: DictionaryInfo): Boolean =
-            initializeDictionaryFromInfo(dictionaryInfo)
+            initializationCoordinator.initializeDictionaryFromInfo(dictionaryInfo)
 
         /** Persistent state for the application-level service. Field names are XML attribute names. */
         class PersistedState : BaseState() {
@@ -745,16 +683,6 @@ class AppleScriptSystemDictionaryRegistryService
          * itself now forwards to the service — single source of truth).
          */
         fun isInUnknownList(applicationName: String): Boolean = discovery.isInNotFoundList(applicationName)
-
-        /**
-         * Private accessor for facade-internal use (read by [getInitializedInfo] +
-         * [StandardDictionaryInitializer] hot paths). Kept inline rather than routed through
-         * [SdefFileProvider.getDictionaryFile] to avoid the service<X>() lookup hop on the
-         * parser-fast-path init flow. SdefFileProvider's migrated methods use the
-         * `internal fun getDictionaryInfoByNameInternal` accessor above (functionally
-         * identical; visibility is the only difference).
-         */
-        private fun getDictionaryInfo(applicationName: String?): DictionaryInfo? = dictionaryInfoRegistry[applicationName]
 
         /**
          * Phase 4 SERVICE-04 (Wave 4) trampoline: routes through
