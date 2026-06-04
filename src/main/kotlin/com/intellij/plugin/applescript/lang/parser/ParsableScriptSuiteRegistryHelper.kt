@@ -1,13 +1,14 @@
 package com.intellij.plugin.applescript.lang.parser
 
 import com.intellij.openapi.project.Project
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 
 /**
- * Static facade over [ParsableScriptHelper] consumed by the generated parser
- * (see `AppleScriptGeneratedParserUtil`). All methods proxy to the application-level
- * [AppleScriptSystemDictionaryRegistryService].
+ * Static facade consumed by the generated parser (see `AppleScriptGeneratedParserUtil`).
+ * Lifecycle queries proxy to [AppleScriptSystemDictionaryRegistryService], while dictionary
+ * term lookups proxy to [SdefIndexService].
  *
  * This object intentionally stays flat: the generated parser calls Java-visible static methods,
  * and the parser-util ABI guard freezes that facade shape.
@@ -17,128 +18,123 @@ object ParsableScriptSuiteRegistryHelper {
     private val registry: AppleScriptSystemDictionaryRegistryService
         get() = AppleScriptSystemDictionaryRegistryService.getInstance()
 
-    private val helper: ParsableScriptHelper
-        get() = registry
+    private val index: SdefIndexService
+        get() = SdefIndexService.getInstance()
 
     @JvmStatic
     fun ensureKnownApplicationInitialized(applicationName: String): Boolean =
-        helper.ensureKnownApplicationDictionaryInitialized(applicationName)
+        registry.ensureKnownApplicationDictionaryInitialized(applicationName)
 
     @JvmStatic
-    fun isStdLibClass(name: String): Boolean = helper.isStdLibClass(name)
+    fun isStdLibClass(name: String): Boolean = index.lookupStdLibClass(name)
 
     @JvmStatic
     fun isApplicationClass(
         applicationName: String,
         className: String,
-    ): Boolean = helper.isApplicationClass(applicationName, className)
+    ): Boolean = index.lookupApplicationClass(applicationName, className)
 
     @JvmStatic
-    fun isStdLibClassPluralName(pluralName: String): Boolean = helper.isStdLibClassPluralName(pluralName)
+    fun isStdLibClassPluralName(pluralName: String): Boolean = index.lookupStdLibClassPluralName(pluralName)
 
     @JvmStatic
     fun isApplicationClassPluralName(
         applicationName: String,
         pluralClassName: String,
-    ): Boolean = helper.isApplicationClassPluralName(applicationName, pluralClassName)
+    ): Boolean = index.lookupApplicationClassPluralName(applicationName, pluralClassName)
 
     @JvmStatic
-    fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean = helper.isStdClassWithPrefixExist(classNamePrefix)
+    fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean = index.lookupStdClassWithPrefixExist(classNamePrefix)
 
     @JvmStatic
     fun isClassWithPrefixExist(
         applicationName: String,
         classNamePrefix: String,
-    ): Boolean = helper.isClassWithPrefixExist(applicationName, classNamePrefix)
+    ): Boolean = index.lookupClassWithPrefixExist(applicationName, classNamePrefix)
 
     @JvmStatic
-    fun isStdClassPluralWithPrefixExist(prefix: String): Boolean = helper.isStdClassPluralWithPrefixExist(prefix)
+    fun isStdClassPluralWithPrefixExist(prefix: String): Boolean = index.lookupStdClassPluralWithPrefixExist(prefix)
 
     @JvmStatic
     fun isClassPluralWithPrefixExist(
         applicationName: String,
         pluralClassNamePrefix: String,
-    ): Boolean = helper.isClassPluralWithPrefixExist(applicationName, pluralClassNamePrefix)
+    ): Boolean = index.lookupClassPluralWithPrefixExist(applicationName, pluralClassNamePrefix)
 
     @JvmStatic
-    fun isStdCommand(name: String): Boolean = helper.isStdCommand(name)
+    fun isStdCommand(name: String): Boolean = index.lookupStdCommand(name)
 
     @JvmStatic
     fun isApplicationCommand(
         applicationName: String,
         commandName: String,
-    ): Boolean = helper.isApplicationCommand(applicationName, commandName)
+    ): Boolean = index.lookupApplicationCommand(applicationName, commandName)
 
     @JvmStatic
     fun isCommandWithPrefixExist(
         applicationName: String,
         commandNamePrefix: String,
-    ): Boolean = helper.isCommandWithPrefixExist(applicationName, commandNamePrefix)
+    ): Boolean = index.lookupCommandWithPrefixExist(applicationName, commandNamePrefix)
 
     @JvmStatic
-    fun isStdCommandWithPrefixExist(namePrefix: String): Boolean = helper.isStdCommandWithPrefixExist(namePrefix)
+    fun isStdCommandWithPrefixExist(namePrefix: String): Boolean = index.lookupStdCommandWithPrefixExist(namePrefix)
 
     @JvmStatic
     fun findStdCommands(
         project: Project,
         commandName: String,
-    ): Collection<AppleScriptCommand> = helper.findStdCommands(project, commandName)
+    ): Collection<AppleScriptCommand> = index.findStdCommands(project, commandName)
 
     @JvmStatic
     fun findApplicationCommands(
         project: Project,
         applicationName: String,
         commandName: String,
-    ): List<AppleScriptCommand> =
-        helper.findApplicationCommands(
-            project,
-            applicationName,
-            commandName,
-        )
+    ): List<AppleScriptCommand> = index.findApplicationCommands(project, applicationName, commandName)
 
     @JvmStatic
-    fun isStdProperty(name: String): Boolean = helper.isStdProperty(name)
+    fun isStdProperty(name: String): Boolean = index.lookupStdProperty(name)
 
     @JvmStatic
     fun isApplicationProperty(
         applicationName: String,
         propertyName: String,
-    ): Boolean = helper.isApplicationProperty(applicationName, propertyName)
+    ): Boolean = index.lookupApplicationProperty(applicationName, propertyName)
 
     @JvmStatic
-    fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean = helper.isStdPropertyWithPrefixExist(namePrefix)
+    fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean = index.lookupStdPropertyWithPrefixExist(namePrefix)
 
     @JvmStatic
     fun isPropertyWithPrefixExist(
         applicationName: String,
         propertyNamePrefix: String,
-    ): Boolean = helper.isPropertyWithPrefixExist(applicationName, propertyNamePrefix)
+    ): Boolean = index.lookupPropertyWithPrefixExist(applicationName, propertyNamePrefix)
 
     @JvmStatic
-    fun isStdConstant(name: String): Boolean = helper.isStdConstant(name)
+    fun isStdConstant(name: String): Boolean = index.lookupStdConstant(name)
 
     @JvmStatic
     fun isApplicationConstant(
         applicationName: String,
         constantName: String,
-    ): Boolean = helper.isApplicationConstant(applicationName, constantName)
+    ): Boolean = index.lookupApplicationConstant(applicationName, constantName)
 
     @JvmStatic
-    fun isStdConstantWithPrefixExist(namePrefix: String): Boolean = helper.isStdConstantWithPrefixExist(namePrefix)
+    fun isStdConstantWithPrefixExist(namePrefix: String): Boolean = index.lookupStdConstantWithPrefixExist(namePrefix)
 
     @JvmStatic
     fun isConstantWithPrefixExist(
         applicationName: String,
         constantNamePrefix: String,
-    ): Boolean = helper.isConstantWithPrefixExist(applicationName, constantNamePrefix)
+    ): Boolean = index.lookupConstantWithPrefixExist(applicationName, constantNamePrefix)
 
     @Suppress("unused")
     @JvmStatic
-    fun getScriptingAdditions(): HashSet<String> = helper.getScriptingAdditions()
+    fun getScriptingAdditions(): HashSet<String> = registry.getScriptingAdditions()
 
     // D-01 / D-04 facade dispatchers — additive, no existing method touched (D-08 parser-util
-    // contract preserved). The two new booleans live on the registry-service class (NOT the
-    // ParsableScriptHelper interface), so these proxies go via getInstance() directly.
+    // contract preserved). The two new booleans live on the registry-service class, so these
+    // proxies go via getInstance() directly.
 
     @JvmStatic
     fun isInitialized(): Boolean = registry.isInitialized()

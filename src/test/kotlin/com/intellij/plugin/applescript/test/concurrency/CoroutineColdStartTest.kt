@@ -10,6 +10,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
 import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
@@ -255,8 +256,13 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
      */
     fun testNeverHalfBroken_everyStateIsEitherCorrectOrEmpty() {
         val service = newTestService()
+        ApplicationManager.getApplication().replaceService(
+            AppleScriptSystemDictionaryRegistryService::class.java,
+            service,
+            testRootDisposable,
+        )
         repeat(5) {
-            val result = service.findStdCommands(project, "do shell script")
+            val result = SdefIndexService.getInstance().findStdCommands(project, "do shell script")
             assertTrue(
                 "result must be empty OR contain 'do shell script' command",
                 result.isEmpty() || result.any { it.name == "do shell script" },

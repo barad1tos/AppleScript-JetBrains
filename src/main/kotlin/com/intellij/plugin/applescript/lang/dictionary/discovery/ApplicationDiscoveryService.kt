@@ -23,6 +23,73 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
+// Mirrors the pre-Wave-3 facade constant byte-for-byte (`APP_DEPTH_SEARCH = 3`).
+// Phase 8 D-15 invariant — depth bound is part of the discovery contract that
+// Parser fixtures regression-lock this depth bound.
+private const val APP_DEPTH_SEARCH: Int = 3
+
+private val LOG: Logger = Logger.getInstance("#${ApplicationDiscoveryService::class.java.name}")
+
+private fun findStandardApplicationFile(applicationName: String): File? =
+    ApplicationDictionary.APP_BUNDLE_DIRECTORIES
+        .asSequence()
+        .flatMap { applicationsDirectory ->
+            ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS
+                .asSequence()
+                .map { extension -> File("$applicationsDirectory/$applicationName.$extension") }
+        }.firstOrNull { applicationFile -> applicationFile.exists() && applicationFile.isFile }
+
+private fun findRecursiveApplicationFile(applicationName: String): File? =
+    ApplicationDictionary.APP_BUNDLE_DIRECTORIES
+        .asSequence()
+        .map(::File)
+        .filter { applicationDirectory ->
+            applicationDirectory.exists() && applicationDirectory.isDirectory
+        }.mapNotNull { applicationDirectory ->
+            LocalFileSystem.getInstance().findFileByIoFile(applicationDirectory)
+        }.mapNotNull { applicationDirectory ->
+            findApplicationFileRecursively(applicationDirectory, applicationName)
+        }.firstOrNull { applicationFile -> applicationFile.exists() }
+
+/**
+ * Recursive VFS search for an `.app` / `.osax` / `.sdef` bundle matching
+ * [applicationName] under [appDirectory]. Body migrated byte-for-byte from the
+ * pre-Wave-3 facade — same [VirtualFileVisitor] flags (depth limit, `SKIP_ROOT`,
+ * `NO_FOLLOW_SYMLINKS`), same [MyStopVisitingException] exception-based short-circuit,
+ * same `File(e.result.path)` conversion at the exception catch.
+ *
+ * `NO_FOLLOW_SYMLINKS` + depth limit ([APP_DEPTH_SEARCH]) defend against the
+ * symlink-loop DoS surface (T-04-03-02 in the Wave 3 STRIDE register).
+ */
+private fun findApplicationFileRecursively(
+    appDirectory: VirtualFile,
+    applicationName: String,
+): File? {
+    val fileVisitor =
+        object : VirtualFileVisitor<VirtualFile>(
+            limit(APP_DEPTH_SEARCH),
+            SKIP_ROOT,
+            NO_FOLLOW_SYMLINKS,
+        ) {
+            override fun visitFile(file: VirtualFile): Boolean {
+                if (ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(file.extension)) {
+                    if (applicationName == file.nameWithoutExtension) {
+                        throw MyStopVisitingException(file)
+                    }
+                    return false // do not search inside application bundles
+                }
+                return true
+            }
+        }
+    return try {
+        VfsUtilCore.visitChildrenRecursively(appDirectory, fileVisitor, MyStopVisitingException::class.java)
+        null
+    } catch (e: MyStopVisitingException) {
+        LOG.debug("Application file found for application $applicationName : ${e.result}")
+        File(e.result.path)
+    }
+}
+
 /**
  * Phase 4 SERVICE-03 (plan 04-03, Wave 3): off-EDT walker over the standard application
  * bundle directories ([ApplicationDictionary.APP_BUNDLE_DIRECTORIES]) plus the sync
@@ -176,27 +243,6 @@ class ApplicationDiscoveryService
          * `notFoundApplicationList.add` side effect.
          */
         fun findApplicationBundleFile(applicationName: String): File? {
-            fun findStandardApplicationFile(): File? =
-                ApplicationDictionary.APP_BUNDLE_DIRECTORIES
-                    .asSequence()
-                    .flatMap { applicationsDirectory ->
-                        ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS
-                            .asSequence()
-                            .map { extension -> File("$applicationsDirectory/$applicationName.$extension") }
-                    }.firstOrNull { applicationFile -> applicationFile.exists() && applicationFile.isFile }
-
-            fun findRecursiveApplicationFile(): File? =
-                ApplicationDictionary.APP_BUNDLE_DIRECTORIES
-                    .asSequence()
-                    .map(::File)
-                    .filter { applicationDirectory ->
-                        applicationDirectory.exists() && applicationDirectory.isDirectory
-                    }.mapNotNull { applicationDirectory ->
-                        LocalFileSystem.getInstance().findFileByIoFile(applicationDirectory)
-                    }.mapNotNull { applicationDirectory ->
-                        findApplicationFileRecursively(applicationDirectory, applicationName)
-                    }.firstOrNull { applicationFile -> applicationFile.exists() }
-
             val isDispatchThread = ApplicationManager.getApplication().isDispatchThread
             val applicationFile =
                 when {
@@ -210,7 +256,9 @@ class ApplicationDiscoveryService
                         null
                     }
 
-                    else -> findStandardApplicationFile() ?: findRecursiveApplicationFile()
+                    else ->
+                        findStandardApplicationFile(applicationName)
+                            ?: findRecursiveApplicationFile(applicationName)
                 }
 
             if (applicationFile == null && !isDispatchThread && SystemInfo.isMac) {
@@ -265,53 +313,7 @@ class ApplicationDiscoveryService
             )
         }
 
-        /**
-         * Recursive VFS search for an `.app` / `.osax` / `.sdef` bundle matching
-         * [applicationName] under [appDirectory]. Body migrated byte-for-byte from the
-         * pre-Wave-3 facade — same [VirtualFileVisitor] flags (depth limit, `SKIP_ROOT`,
-         * `NO_FOLLOW_SYMLINKS`), same [MyStopVisitingException] exception-based short-circuit,
-         * same `File(e.result.path)` conversion at the exception catch.
-         *
-         * `NO_FOLLOW_SYMLINKS` + depth limit ([APP_DEPTH_SEARCH]) defend against the
-         * symlink-loop DoS surface (T-04-03-02 in the Wave 3 STRIDE register).
-         */
-        private fun findApplicationFileRecursively(
-            appDirectory: VirtualFile,
-            applicationName: String,
-        ): File? {
-            val fileVisitor =
-                object : VirtualFileVisitor<VirtualFile>(
-                    limit(APP_DEPTH_SEARCH),
-                    SKIP_ROOT,
-                    NO_FOLLOW_SYMLINKS,
-                ) {
-                    override fun visitFile(file: VirtualFile): Boolean {
-                        if (ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(file.extension)) {
-                            if (applicationName == file.nameWithoutExtension) {
-                                throw MyStopVisitingException(file)
-                            }
-                            return false // do not search inside application bundles
-                        }
-                        return true
-                    }
-                }
-            return try {
-                VfsUtilCore.visitChildrenRecursively(appDirectory, fileVisitor, MyStopVisitingException::class.java)
-                null
-            } catch (e: MyStopVisitingException) {
-                LOG.debug("Application file found for application $applicationName : ${e.result}")
-                File(e.result.path)
-            }
-        }
-
         companion object {
-            // Mirrors the pre-Wave-3 facade constant byte-for-byte (`APP_DEPTH_SEARCH = 3`).
-            // Phase 8 D-15 invariant — depth bound is part of the discovery contract that
-            // Parser fixtures regression-lock this depth bound.
-            private const val APP_DEPTH_SEARCH: Int = 3
-
-            private val LOG: Logger = Logger.getInstance("#${ApplicationDiscoveryService::class.java.name}")
-
             @JvmStatic
             fun getInstance(): ApplicationDiscoveryService =
                 ApplicationManager.getApplication().getService(ApplicationDiscoveryService::class.java)

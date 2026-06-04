@@ -1,13 +1,16 @@
 // AUDIT 2026-05-24: EDT-context assumption pre-check at line ~65 is structurally incompatible
 // with BasePlatformTestCase's EDT-by-default threading model. Fixed in Plan 03-11 by removing
 // the redundant pre-check (the production gate logic in findApplicationCommands is thread-
-// context-agnostic — runBlockingCancellable + withTimeoutOrNull(2_000) returns emptyList()
-// from both EDT and off-EDT callers). See DEBUG.md ADDENDUM Layer 5 + DEBUG-edttestutil.md.
+// context-agnostic and returns emptyList() while appsReady is incomplete).
+// See DEBUG.md ADDENDUM Layer 5 + DEBUG-edttestutil.md.
 package com.intellij.plugin.applescript.test.concurrency
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.testFramework.replaceService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -48,6 +51,11 @@ class AppCommandGatingTest : BasePlatformTestCase() {
 
     fun testStandardReadyAloneDoesNotUnblockAppCommands() {
         val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+        ApplicationManager.getApplication().replaceService(
+            AppleScriptSystemDictionaryRegistryService::class.java,
+            service,
+            testRootDisposable,
+        )
         // Hand-complete standardReady only — simulate "standard suite parsed but app discovery
         // still pending". Bypasses runInitChain entirely (TestDispatcher never advances).
         service.standardReady.complete(Result.success(Unit))
@@ -62,20 +70,19 @@ class AppCommandGatingTest : BasePlatformTestCase() {
         )
 
         // findApplicationCommands MUST NOT return contents — its gate is appsReady, not
-        // standardReady. The facade bridges through runBlockingCancellable + withTimeoutOrNull
-        // (2_000) and returns emptyList() when the 2s timeout expires without appsReady completing.
+        // standardReady. The index lookup bridges through the facade-owned readiness gates and
+        // returns emptyList() while appsReady is incomplete.
         // Plan 03-11 (Layer 5): the prior `assertFalse(...isDispatchThread)` pre-check was
         // structurally incompatible with BasePlatformTestCase's EDT-by-default threading model
         // (the test method runs ON the EDT). The production gate logic in findApplicationCommands
-        // is thread-context-agnostic — runBlockingCancellable + withTimeoutOrNull(2_000) returns
-        // emptyList() regardless of caller thread. Running the gate from the EDT exercises the
-        // same code path (the facade also has an EdtBridgeGuardTest-verified short-circuit for
+        // is thread-context-agnostic. Running the gate from the EDT exercises the
+        // same code path (the index lookup also has an EdtBridgeGuardTest-verified short-circuit for
         // EDT callers that returns emptyList() without blocking). The pre-check is removed as
         // redundant. See DEBUG-edttestutil.md (B1 probe NOT-FOUND) for the rationale: the
         // hypothesised `EdtTestUtil.runInBackground` does not exist in the IntelliJ Platform
         // 2024.1+ public API surface across the 2024.3.7.1 / 2025.1.7.1 / 2025.2.6.2 verifier
         // IDE matrix; only the inverse `runInEdtAndGet` / `runInEdtAndWait` are documented.
-        val result = service.findApplicationCommands(project, "Music", "play")
+        val result = SdefIndexService.getInstance().findApplicationCommands(project, "Music", "play")
         assertTrue(
             "findApplicationCommands must return empty while appsReady is incomplete",
             result.isEmpty(),

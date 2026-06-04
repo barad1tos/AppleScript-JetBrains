@@ -1,13 +1,13 @@
 package com.intellij.plugin.applescript.lang.ide.sdef
 
-import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
-import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import java.io.File
+
+private val LOG: Logger = Logger.getInstance("#${DictionaryInitializationCoordinator::class.java.name}")
 
 internal class DictionaryInitializationCoordinator(
     private val dictionaryInfoRegistry: DictionaryInfoRegistry,
@@ -15,7 +15,7 @@ internal class DictionaryInitializationCoordinator(
     private val applicationDiscovery: () -> ApplicationDiscoveryService,
     private val dictionaryFiles: () -> SdefFileProvider,
     private val areAppDictionariesIndexed: () -> Boolean,
-    private val log: Logger,
+    private val parseDictionaryFile: (File, String) -> Boolean,
 ) {
     fun ensureDictionaryInitialized(anyApplicationName: String): Boolean {
         val canInitializeUnknownApplication =
@@ -50,11 +50,11 @@ internal class DictionaryInitializationCoordinator(
     fun initializeDictionaryFromInfo(dictionaryInfo: DictionaryInfo): Boolean {
         val file = File(dictionaryInfo.getDictionaryFile().path)
         val applicationName = dictionaryInfo.getApplicationName()
-        if (file.exists() && service<SdefIndexService>().parseDictionaryFile(file, applicationName)) {
+        if (file.exists() && parseDictionaryFile(file, applicationName)) {
             return dictionaryInfo.setInitialized(true)
         }
 
-        log.warn("Initialization failed for application [$applicationName].")
+        LOG.warn("Initialization failed for application [$applicationName].")
         dictionaryInfoRegistry.removeInMemory(applicationName)
         return false
     }

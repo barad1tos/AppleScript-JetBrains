@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -41,8 +42,9 @@ private fun startsWithWord(
  * those facade-owned predicates via [ParsableScriptSuiteRegistryHelper] (the @JvmStatic shim in
  * `lang/parser/`, NOT in the services list scanned by `verifyServiceDependencyGraph`). This
  * avoids the `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` back-edge that DFS
- * would otherwise detect as a cycle (the facade depends on SdefIndexService via the lookup
- * trampolines added in Wave 5 Task 2).
+ * would otherwise detect as a cycle. Parser-facing lookup trampolines live on
+ * [ParsableScriptSuiteRegistryHelper], while the application-level facade only invokes the write
+ * path through an injected parser dependency.
  *
  * Dependencies (real service-graph edges):
  * - service<AppleScriptProjectDictionaryService> — accessed from `findApplicationCommands` to

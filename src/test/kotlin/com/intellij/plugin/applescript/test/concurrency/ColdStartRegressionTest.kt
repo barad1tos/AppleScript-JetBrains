@@ -4,15 +4,15 @@
 // (DEBUG.md ADDENDUM Layer 5 sweep).
 package com.intellij.plugin.applescript.test.concurrency
 
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.junit.Assume
 
 /**
  * Locks the latch contract: immediately after the service is instantiated, every reader on
- * [com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper] returns a deterministic
- * answer — either the fully-populated result (init already complete) OR the empty-fallback
- * (init not yet complete, `initLatch.count > 0L`). NEVER a `NullPointerException`, NEVER a
+ * [com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper] returns a
+ * deterministic answer — either the fully-populated result (init already complete) OR the
+ * empty-fallback (init not yet complete, `initLatch.count > 0L`). NEVER a `NullPointerException`, NEVER a
  * half-populated index hit where `containsKey` reports true but the inner `Set` value is not
  * yet visible.
  *
@@ -39,18 +39,18 @@ class ColdStartRegressionTest : BasePlatformTestCase() {
     }
 
     fun testReadersReturnDeterministicAnswerImmediatelyAfterInstantiation() {
-        val service = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val indexService = SdefIndexService.getInstance()
 
         // Predicate: must be Boolean, never throw. Both `true` and `false` are valid —
         // `true` means init completed before this call; `false` means init still in flight
         // and the latch-gated reader returned the empty fallback. The fact that this line
         // executes without throwing is the assertion.
-        val predicate = service.isStdCommand("set")
+        val predicate = indexService.lookupStdCommand("set")
 
         // Resolver: must be a non-null Collection (possibly empty). The latch-gated reader
         // returns `emptyList()` while init is in flight; the populated reader returns the
         // matching command(s).
-        val resolved = service.findStdCommands(project, "set")
+        val resolved = indexService.findStdCommands(project, "set")
         assertNotNull(
             "findStdCommands returned null — must always return a (possibly empty) Collection",
             resolved,

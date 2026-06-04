@@ -4,10 +4,9 @@ package com.intellij.plugin.applescript.lang.dictionary.index
  * Phase 4 SERVICE-09 (D-05): Sealed return type for [SdefIndexService]
  * internal lookups.
  *
- * Service-INTERNAL — the public [com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper]
- * methods on the facade return primitive `Boolean` / `Collection` per the frozen contract; this
- * sealed type is used in SdefIndexService internal callers and unit tests for richer outcome
- * semantics.
+ * Service-INTERNAL — the public [com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper]
+ * methods return primitive `Boolean` / `Collection` per the frozen parser contract; this sealed
+ * type is used in SdefIndexService internal callers and unit tests for richer outcome semantics.
  */
 sealed interface LookupResult {
     /** Name was found in the requested index. */

@@ -16,9 +16,9 @@ import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInf
  *              exception when available.
  *
  * Service-INTERNAL scope only — this type does NOT cross any
- * [com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper] boundary, does NOT
- * appear on any `@JvmStatic` parser-util method, and is NOT exposed on the facade's public
- * signature. PSI-side sealing for resolver / completion shapes is deferred to v1.4
+ * [com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper] boundary,
+ * does NOT appear on any `@JvmStatic` parser-util method, and is NOT exposed on the facade's
+ * public signature. PSI-side sealing for resolver / completion shapes is deferred to v1.4
  * Phase 5 PSI-05 (RESEARCH §9 sealed types catalog).
  */
 sealed interface DictionaryLoadResult {
