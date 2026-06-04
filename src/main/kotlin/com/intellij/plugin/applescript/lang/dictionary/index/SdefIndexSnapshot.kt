@@ -1,4 +1,4 @@
-package com.intellij.plugin.applescript.lang.ide.sdef.results
+package com.intellij.plugin.applescript.lang.dictionary.index
 
 /**
  * Phase 4 D-03: Immutable snapshot of the SDEF index state.

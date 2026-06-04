@@ -1,4 +1,4 @@
-package com.intellij.plugin.applescript.lang.ide.sdef.results
+package com.intellij.plugin.applescript.lang.dictionary.index
 
 /**
  * Result of ingesting a dictionary file into the dictionary index.

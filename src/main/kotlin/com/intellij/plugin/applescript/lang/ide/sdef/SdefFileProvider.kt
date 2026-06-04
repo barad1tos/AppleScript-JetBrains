@@ -6,7 +6,9 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
-import com.intellij.plugin.applescript.lang.ide.sdef.results.DictionaryLoadResult
+import com.intellij.plugin.applescript.lang.dictionary.discovery.DeveloperToolsNotInstalledException
+import com.intellij.plugin.applescript.lang.dictionary.discovery.DictionaryLoadResult
+import com.intellij.plugin.applescript.lang.dictionary.discovery.NotScriptableApplicationException
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.extensionSupported

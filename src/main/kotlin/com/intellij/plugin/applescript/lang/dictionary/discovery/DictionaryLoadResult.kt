@@ -1,4 +1,4 @@
-package com.intellij.plugin.applescript.lang.ide.sdef.results
+package com.intellij.plugin.applescript.lang.dictionary.discovery
 
 import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryInfo
 

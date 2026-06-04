@@ -5,8 +5,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.plugin.applescript.lang.ide.sdef.results.IngestResult
-import com.intellij.plugin.applescript.lang.ide.sdef.results.SdefIndexSnapshot
+import com.intellij.plugin.applescript.lang.dictionary.index.IngestResult
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexSnapshot
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary

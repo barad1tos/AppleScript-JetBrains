@@ -1,9 +1,9 @@
 package com.intellij.plugin.applescript.test.service
 
+import com.intellij.plugin.applescript.lang.dictionary.index.IngestResult
+import com.intellij.plugin.applescript.lang.dictionary.index.LookupResult
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexSnapshot
 import com.intellij.plugin.applescript.lang.ide.sdef.SdefIndexService
-import com.intellij.plugin.applescript.lang.ide.sdef.results.IngestResult
-import com.intellij.plugin.applescript.lang.ide.sdef.results.LookupResult
-import com.intellij.plugin.applescript.lang.ide.sdef.results.SdefIndexSnapshot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
