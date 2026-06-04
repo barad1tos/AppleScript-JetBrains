@@ -13,7 +13,6 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
@@ -25,8 +24,6 @@ import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegi
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
-import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
-import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.util.xmlb.annotations.AbstractCollection
 import com.intellij.util.xmlb.annotations.CollectionBean
@@ -80,8 +77,7 @@ class AppleScriptSystemDictionaryRegistryService
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         private val progressTaskCompat: ProgressTaskCompat = ProgressTaskCompatDefault(),
         private val daemonRestartScheduler: () -> Unit = ::restartOpenProjectDaemons,
-    ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()),
-        ParsableScriptHelper {
+    ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()) {
         private val dictionaryInfoRegistry = DictionaryInfoRegistry()
         private val notScriptableApplicationRegistry = NotScriptableApplicationRegistry()
         private val persistence: SdefPersistenceService
@@ -97,7 +93,9 @@ class AppleScriptSystemDictionaryRegistryService
                 applicationDiscovery = { discovery },
                 dictionaryFiles = { dictionaryFiles },
                 areAppDictionariesIndexed = ::areAppDictionariesIndexed,
-                log = LOG,
+                parseDictionaryFile = { file, applicationName ->
+                    SdefIndexService.getInstance().parseDictionaryFile(file, applicationName)
+                },
             )
 
         // Phase 4 SERVICE-03 (plan 04-03, Wave 3): the `notFoundApplicationList` and
@@ -115,8 +113,8 @@ class AppleScriptSystemDictionaryRegistryService
         // Phase 4 SERVICE-05 (plan 04-05, Wave 5): the 14 parser-index ConcurrentHashMap fields
         // (applicationNameTo*Map + std*Map; class, classPlural, command, record, property,
         // enumeration, enumeratorConstant — 7 application-scoped + 7 std-scoped) migrated to
-        // [SdefIndexService]. The 21 [ParsableScriptHelper] lookup methods + [findStdCommands]
-        // + [findApplicationCommands] are now trampolines below. The XML parsing pipeline
+        // [SdefIndexService]. The parser-facing lookup methods now route through
+        // ParsableScriptSuiteRegistryHelper directly to the index service. The XML parsing pipeline
         // (parseDictionaryFile + parseSuiteElementForApplication + parseSuiteElementForScriptingAdditions
         // + parseClassElement + 7 companion helpers + newSecureSaxBuilder XXE-hardened factory)
         // also migrated to the service.
@@ -381,7 +379,7 @@ class AppleScriptSystemDictionaryRegistryService
         // [SdefFileProvider] (populated by initializeScriptingAdditions, consumed by
         // mergeScriptingAdditions). The defensive-snapshot semantics are preserved by the
         // service's `getScriptingAdditions()` implementation.
-        override fun getScriptingAdditions(): HashSet<String> = dictionaryFiles.getScriptingAdditions()
+        fun getScriptingAdditions(): HashSet<String> = dictionaryFiles.getScriptingAdditions()
 
         override fun loadState(state: PersistedState) {
             super.loadState(state)
@@ -454,109 +452,8 @@ class AppleScriptSystemDictionaryRegistryService
         fun ensureDictionaryInitialized(anyApplicationName: String): Boolean =
             initializationCoordinator.ensureDictionaryInitialized(anyApplicationName)
 
-        override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean =
+        fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean =
             initializationCoordinator.ensureKnownApplicationDictionaryInitialized(knownApplicationName)
-
-        // ParsableScriptHelper trampolines.
-        // Each method delegates to [SdefIndexService]; the 14 ConcurrentHashMap indexes that backed
-        // these lookups live on the service post-Wave-5. External callers ([ParsableScriptSuiteRegistryHelper]
-        // @JvmStatic proxies + parser-util) see byte-for-byte identical signatures.
-
-        override fun isStdLibClass(name: String): Boolean = service<SdefIndexService>().lookupStdLibClass(name)
-
-        override fun isApplicationClass(
-            applicationName: String,
-            className: String,
-        ): Boolean = service<SdefIndexService>().lookupApplicationClass(applicationName, className)
-
-        override fun isStdLibClassPluralName(pluralName: String): Boolean =
-            service<SdefIndexService>().lookupStdLibClassPluralName(pluralName)
-
-        override fun isApplicationClassPluralName(
-            applicationName: String,
-            pluralClassName: String,
-        ): Boolean = service<SdefIndexService>().lookupApplicationClassPluralName(applicationName, pluralClassName)
-
-        override fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean =
-            service<SdefIndexService>().lookupStdClassWithPrefixExist(classNamePrefix)
-
-        override fun isClassWithPrefixExist(
-            applicationName: String,
-            classNamePrefix: String,
-        ): Boolean = service<SdefIndexService>().lookupClassWithPrefixExist(applicationName, classNamePrefix)
-
-        override fun isStdClassPluralWithPrefixExist(namePrefix: String): Boolean =
-            service<SdefIndexService>().lookupStdClassPluralWithPrefixExist(namePrefix)
-
-        override fun isClassPluralWithPrefixExist(
-            applicationName: String,
-            pluralClassNamePrefix: String,
-        ): Boolean =
-            service<SdefIndexService>().lookupClassPluralWithPrefixExist(
-                applicationName,
-                pluralClassNamePrefix,
-            )
-
-        override fun isStdCommand(name: String): Boolean = service<SdefIndexService>().lookupStdCommand(name)
-
-        override fun isApplicationCommand(
-            applicationName: String,
-            commandName: String,
-        ): Boolean = service<SdefIndexService>().lookupApplicationCommand(applicationName, commandName)
-
-        override fun isCommandWithPrefixExist(
-            applicationName: String,
-            commandNamePrefix: String,
-        ): Boolean = service<SdefIndexService>().lookupCommandWithPrefixExist(applicationName, commandNamePrefix)
-
-        override fun isStdCommandWithPrefixExist(namePrefix: String): Boolean =
-            service<SdefIndexService>().lookupStdCommandWithPrefixExist(namePrefix)
-
-        override fun findStdCommands(
-            project: Project,
-            commandName: String,
-        ): Collection<AppleScriptCommand> = service<SdefIndexService>().findStdCommands(project, commandName)
-
-        override fun findApplicationCommands(
-            project: Project,
-            applicationName: String,
-            commandName: String,
-        ): List<AppleScriptCommand> =
-            service<SdefIndexService>().findApplicationCommands(
-                project,
-                applicationName,
-                commandName,
-            )
-
-        override fun isStdProperty(name: String): Boolean = service<SdefIndexService>().lookupStdProperty(name)
-
-        override fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean =
-            service<SdefIndexService>().lookupStdPropertyWithPrefixExist(namePrefix)
-
-        override fun isApplicationProperty(
-            applicationName: String,
-            propertyName: String,
-        ): Boolean = service<SdefIndexService>().lookupApplicationProperty(applicationName, propertyName)
-
-        override fun isPropertyWithPrefixExist(
-            applicationName: String,
-            propertyNamePrefix: String,
-        ): Boolean = service<SdefIndexService>().lookupPropertyWithPrefixExist(applicationName, propertyNamePrefix)
-
-        override fun isStdConstant(name: String): Boolean = service<SdefIndexService>().lookupStdConstant(name)
-
-        override fun isApplicationConstant(
-            applicationName: String,
-            constantName: String,
-        ): Boolean = service<SdefIndexService>().lookupApplicationConstant(applicationName, constantName)
-
-        override fun isStdConstantWithPrefixExist(namePrefix: String): Boolean =
-            service<SdefIndexService>().lookupStdConstantWithPrefixExist(namePrefix)
-
-        override fun isConstantWithPrefixExist(
-            applicationName: String,
-            namePrefix: String,
-        ): Boolean = service<SdefIndexService>().lookupConstantWithPrefixExist(applicationName, namePrefix)
 
         /**
          * Initialises dictionary information for [applicationName] either from a previously generated cached

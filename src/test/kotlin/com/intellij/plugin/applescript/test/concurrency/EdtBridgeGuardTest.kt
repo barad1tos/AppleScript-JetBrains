@@ -6,14 +6,8 @@
 package com.intellij.plugin.applescript.test.concurrency
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.util.Disposer
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestDispatcher
-import kotlinx.coroutines.test.TestScope
 import org.junit.Assume
 
 /**
@@ -23,31 +17,23 @@ import org.junit.Assume
  *
  * Heavy-gated because it exercises IntelliJ threading behavior.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class EdtBridgeGuardTest : BasePlatformTestCase() {
-    private lateinit var testDispatcher: TestDispatcher
-    private lateinit var testScope: TestScope
-
     override fun setUp() {
         Assume.assumeTrue(
             "EdtBridgeGuardTest only runs with -PincludeHeavyTests=true",
             System.getProperty("includeHeavyTests") == "true",
         )
         super.setUp()
-        testScope = TestScope()
-        testDispatcher = StandardTestDispatcher(testScope.testScheduler)
-        Disposer.register(testRootDisposable) { testScope.cancel() }
     }
 
     fun testFindStdCommandsReturnsEmptyWhenCalledFromEdt() {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
         var resultFromEdt: Collection<*>? = null
         ApplicationManager.getApplication().invokeAndWait {
             assertTrue(
                 "Pre-check: must be on EDT here",
                 ApplicationManager.getApplication().isDispatchThread,
             )
-            resultFromEdt = service.findStdCommands(project, "anything")
+            resultFromEdt = SdefIndexService.getInstance().findStdCommands(project, "anything")
         }
         assertNotNull(resultFromEdt)
         assertTrue(
@@ -57,14 +43,13 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
     }
 
     fun testFindApplicationCommandsReturnsEmptyWhenCalledFromEdt() {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
         var resultFromEdt: List<*>? = null
         ApplicationManager.getApplication().invokeAndWait {
             assertTrue(
                 "Pre-check: must be on EDT here",
                 ApplicationManager.getApplication().isDispatchThread,
             )
-            resultFromEdt = service.findApplicationCommands(project, "Music", "play")
+            resultFromEdt = SdefIndexService.getInstance().findApplicationCommands(project, "Music", "play")
         }
         assertNotNull(resultFromEdt)
         assertTrue(

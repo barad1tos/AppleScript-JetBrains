@@ -4,6 +4,7 @@
 // (DEBUG.md ADDENDUM Layer 5 sweep).
 package com.intellij.plugin.applescript.test.concurrency
 
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.junit.Assume
@@ -40,7 +41,8 @@ class StressTest : BasePlatformTestCase() {
     }
 
     fun testConcurrentReadersDoNotThrowOrDeadlock() {
-        val service = AppleScriptSystemDictionaryRegistryService.getInstance()
+        AppleScriptSystemDictionaryRegistryService.getInstance()
+        val indexService = SdefIndexService.getInstance()
         val readerCount = 16
         val durationMillis = 2_000L
         val deadline = System.currentTimeMillis() + durationMillis
@@ -55,10 +57,10 @@ class StressTest : BasePlatformTestCase() {
                     try {
                         startGate.await()
                         while (System.currentTimeMillis() < deadline && firstFailure.get() == null) {
-                            service.isStdCommand("set")
-                            service.isStdLibClass("application")
-                            service.isStdCommandWithPrefixExist("se")
-                            service.isStdLibClassPluralName("applications")
+                            indexService.lookupStdCommand("set")
+                            indexService.lookupStdLibClass("application")
+                            indexService.lookupStdCommandWithPrefixExist("se")
+                            indexService.lookupStdLibClassPluralName("applications")
                         }
                     } catch (throwable: Throwable) {
                         // Reader threads run outside the JUnit EDT; any escaped Throwable
