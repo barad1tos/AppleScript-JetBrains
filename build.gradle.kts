@@ -253,17 +253,17 @@ intellijPlatform {
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.1.7.1")
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.2.6.2")
         }
-        // Legacy plugin ID `com.intellij.plugin.applescript` and name
-        // `AppleScript Support` trip three structure rules (com.intellij
-        // prefix, word "intellij" in id, word "IDEA" in name). Kept on
-        // purpose so existing 0.130 users on Marketplace get a normal
-        // auto-update path when 1.0.0 ships — renaming would orphan them.
+        // Legacy plugin ID `com.intellij.plugin.applescript` trips structure rules:
+        // `com.intellij` prefix and the word "intellij" in the id. Kept on purpose so
+        // existing 0.130 users on Marketplace get a normal auto-update path when 1.0.0
+        // ships — renaming would orphan them. The display name is intentionally not
+        // muted so Marketplace naming regressions stay visible in CI.
         // Pass mute flags directly to Plugin Verifier CLI per the error
         // message hint; compatibility / API / dependency checks still gate.
         freeArgs =
             listOf(
                 "-mute",
-                "ForbiddenPluginIdPrefix,TemplateWordInPluginId,TemplateWordInPluginName",
+                "ForbiddenPluginIdPrefix,TemplateWordInPluginId",
             )
     }
 }
