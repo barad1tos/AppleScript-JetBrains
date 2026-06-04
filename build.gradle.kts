@@ -573,8 +573,8 @@ tasks {
     // ---------------------------------------------------------------------
     // Plan 04-01 (v1.3 / SERVICE-10 + SERVICE-11): Wave 1 verification
     // scaffolding for the service-decomposition phase.
-    //   - verifyServiceDependencyGraph: DFS cycle detection over the 6 SDEF
-    //     service classes (5 new + the facade). Modelled on verifyNoRunBlocking.
+    //   - verifyServiceDependencyGraph: DFS cycle detection over dictionary
+    //     service classes and their extracted helper files. Modelled on verifyNoRunBlocking.
     //   - verifyGeneratedSourcesMatch: re-runs grammarkit/jflex into a tmp
     //     directory and diffs against committed src/main/gen. Drift gate.
     // Both wired into `check` so every CI run gates on them.
@@ -583,8 +583,8 @@ tasks {
     val verifyServiceDependencyGraph by registering {
         group = "verification"
         description = "Fails if the SDEF service dependency graph contains a cycle. " +
-            "Scans `service<X>()` / `X.getInstance()` references between the 6 SDEF service " +
-            "classes (5 new in Phase 4 + the facade). DFS with WHITE/GRAY/BLACK colouring. " +
+            "Scans `service<X>()` / `X.getInstance()` references between dictionary service " +
+            "classes and owned helpers. DFS with WHITE/GRAY/BLACK colouring. " +
             "Phase 4 SERVICE-11."
 
         val services =
@@ -592,10 +592,18 @@ tasks {
                 "SdefFileTypeRegistrar",
                 "SdefPersistenceService",
                 "ApplicationDiscoveryService",
+                "XcodeDetectionService",
                 "SdefFileProvider",
                 "SdefIndexService",
                 "AppleScriptSystemDictionaryRegistryService",
             )
+        val serviceOwnerByFile =
+            services.associateWith { it } +
+                mapOf(
+                    "ScriptingAdditionsMerger" to "SdefFileProvider",
+                    "SdefDictionaryFileGenerator" to "SdefFileProvider",
+                    "SdefFileResources" to "SdefFileProvider",
+                )
         // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
         // back-edge from a service to the facade is a DATA dependency (reading state.X), not
         // a service-graph dependency. RESEARCH §5 calls this out explicitly: "the back-edge
@@ -659,7 +667,7 @@ tasks {
                     .walkTopDown()
                     .filter { it.isFile && it.extension == "kt" }
                     .forEach { file ->
-                        val owner = services.firstOrNull { file.nameWithoutExtension == it } ?: return@forEach
+                        val owner = serviceOwnerByFile[file.nameWithoutExtension] ?: return@forEach
                         val body = file.readText()
                         services.forEach { dep ->
                             if (dep == owner) return@forEach
