@@ -331,10 +331,13 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
             level: Int,
         ): Boolean {
             if (!recursion_guard_(builder, level, "parseCommandParametersExpression")) return false
+            val previousCommandParameterContext = builder.getUserData(PARSING_COMMAND_HANDLER_CALL_PARAMETERS)
             builder.putUserData(PARSING_COMMAND_HANDLER_CALL_PARAMETERS, true)
-            val result = AppleScriptParser.expression(builder, level + 1)
-            builder.putUserData(PARSING_COMMAND_HANDLER_CALL_PARAMETERS, false)
-            return result
+            return try {
+                AppleScriptParser.expression(builder, level + 1)
+            } finally {
+                builder.putUserData(PARSING_COMMAND_HANDLER_CALL_PARAMETERS, previousCommandParameterContext)
+            }
         }
 
         @JvmStatic
