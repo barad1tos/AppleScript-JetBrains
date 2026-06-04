@@ -1,10 +1,10 @@
-package com.intellij.plugin.applescript.lang.ide.sdef.results
+package com.intellij.plugin.applescript.lang.dictionary.discovery
 
-import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 
 /**
  * Phase 4 SERVICE-09 (plan 04-04 / D-05): sealed return type for
- * [com.intellij.plugin.applescript.lang.ide.sdef.SdefFileProvider.fetch].
+ * [com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider.fetch].
  *
  * Three variants give call sites compile-time exhaustive `when` and a typed channel for
  * each fetch outcome:

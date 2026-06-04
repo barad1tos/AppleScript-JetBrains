@@ -1,10 +1,12 @@
-package com.intellij.plugin.applescript.lang.ide.sdef
+package com.intellij.plugin.applescript.lang.dictionary.project
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
+import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.psi.PsiManager

@@ -1,12 +1,12 @@
-package com.intellij.plugin.applescript.lang.ide.sdef
+package com.intellij.plugin.applescript.lang.dictionary.index
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.plugin.applescript.lang.ide.sdef.results.IngestResult
-import com.intellij.plugin.applescript.lang.ide.sdef.results.SdefIndexSnapshot
+import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.dictionary.xml.LegacyJdomParser
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
@@ -591,8 +591,7 @@ class SdefIndexService
         ): Boolean = nameSet?.any { objectName -> startsWithWord(objectName, namePrefix) } == true
 
         /**
-         * Thin proxy to the facade's
-         * [AppleScriptSystemDictionaryRegistryService.isInitialized]
+         * Thin proxy to the facade's `isInitialized` trampoline
          * that bypasses the service-graph by going through Phase 3's @JvmStatic helper class
          * ([ParsableScriptSuiteRegistryHelper], NOT in the services list scanned by
          * `verifyServiceDependencyGraph`). This avoids the

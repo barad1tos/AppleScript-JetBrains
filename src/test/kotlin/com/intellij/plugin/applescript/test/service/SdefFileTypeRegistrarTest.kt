@@ -1,7 +1,7 @@
 package com.intellij.plugin.applescript.test.service
 
 import com.intellij.openapi.fileTypes.FileTypeManager
-import com.intellij.plugin.applescript.lang.ide.sdef.SdefFileTypeRegistrar
+import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher

@@ -5,8 +5,8 @@
 package com.intellij.plugin.applescript.test.concurrency
 
 import com.intellij.openapi.util.Disposer
-import com.intellij.plugin.applescript.lang.ide.sdef.DiscoveryProgressPolicy
-import com.intellij.plugin.applescript.lang.ide.sdef.ProgressTaskCompat
+import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers

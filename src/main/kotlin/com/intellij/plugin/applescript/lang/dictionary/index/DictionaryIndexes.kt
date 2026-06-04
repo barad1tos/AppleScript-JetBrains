@@ -1,4 +1,4 @@
-package com.intellij.plugin.applescript.psi.sdef.impl
+package com.intellij.plugin.applescript.lang.dictionary.index
 
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
@@ -6,6 +6,7 @@ import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
 import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumeration
 import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumerator
 import com.intellij.plugin.applescript.lang.sdef.DictionaryRecord
+import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import java.util.concurrent.ConcurrentHashMap
 
 /**

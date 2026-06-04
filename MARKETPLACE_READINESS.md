@@ -1,7 +1,7 @@
 # Marketplace Readiness
 
 **Status:** Draft
-**Last reviewed:** 2026-06-03
+**Last reviewed:** 2026-06-04
 
 This document tracks repository and plugin metadata readiness for a JetBrains Marketplace publication. It does not authorize publishing, tagging, or changing the Marketplace listing.
 
@@ -14,7 +14,7 @@ values change.
 
 - Plugin version: `2.0.0`
 - Plugin id: `com.intellij.plugin.applescript`
-- Plugin name: `AppleScript Toolkit`
+- Plugin name: `Applescript Toolkit`
 - Minimum supported build: `251` (`pluginSinceBuild=251`)
 - Current verifier targets: IntelliJ IDEA Community 2025.1 and 2025.2
 - License: Apache License 2.0
@@ -63,7 +63,17 @@ Do not change the id silently. Before a paid Marketplace publication, choose one
 
 Until that decision is made, plugin id/listing ownership remains a publication blocker.
 
-The plugin display name is standardized as `AppleScript Toolkit` in both the source descriptor and Gradle-patched distribution metadata. This avoids the generic Marketplace template term "Support" and avoids JetBrains product-name terms such as "IDEA" while keeping the legacy plugin id unchanged for the listing-ownership decision above.
+The plugin display name is standardized as `Applescript Toolkit` in both the source descriptor and Gradle-patched distribution metadata. This avoids the generic Marketplace template term "Support" and avoids JetBrains product-name terms such as "IDEA" while keeping the legacy plugin id unchanged for the listing-ownership decision above.
+
+## Technical Positioning
+
+This repository should be presented as a maintained modern fork, not as a from-scratch parser rewrite.
+
+The handwritten IntelliJ Platform implementation has been substantially modernized, including Kotlin ports, current Gradle and IntelliJ Platform tooling, dictionary loading hardening, structured-concurrency cleanup, CI, static analysis, and Plugin Verifier coverage.
+
+The AppleScript parser and lexer remain based on the existing Grammar-Kit/JFlex core from the original plugin line. This is intentional for the first Marketplace-ready line: AppleScript has many natural-language and dictionary-specific edge cases, and preserving the accumulated parser shape reduces the risk of breaking existing scripts while the maintained fork hardens behavior with focused regression tests and real-world corpus fixtures.
+
+Future parser-core modernization is a roadmap item, not a blocker for the initial Marketplace release, as long as release validation continues to cover generated-source drift, parser regressions, real-world fixtures, and Plugin Verifier compatibility.
 
 ## Media and Listing Notes
 

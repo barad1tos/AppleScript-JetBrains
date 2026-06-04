@@ -1,4 +1,4 @@
-package com.intellij.plugin.applescript.lang.ide.sdef;
+package com.intellij.plugin.applescript.lang.dictionary.xml;
 
 import org.jdom.Document;
 import org.jdom.JDOMException;
@@ -7,7 +7,7 @@ import org.jdom.input.SAXBuilder;
 import java.io.File;
 import java.io.IOException;
 
-final class LegacyJdomParser {
+public final class LegacyJdomParser {
     private static final String DISALLOW_DOCTYPE_DECL =
             "http://apache.org/xml/features/disallow-doctype-decl";
     private static final String LOAD_EXTERNAL_DTD =
@@ -21,7 +21,7 @@ final class LegacyJdomParser {
     }
 
     @SuppressWarnings("deprecation")
-    static Document build(File file) throws JDOMException, IOException {
+    public static Document build(File file) throws JDOMException, IOException {
         return newSecureBuilder().build(file);
     }
 

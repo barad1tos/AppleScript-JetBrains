@@ -8,10 +8,10 @@ import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.intentions.AddApplicationDictionaryQuickFix
 import com.intellij.plugin.applescript.lang.ide.intentions.RenameParameterLabelQuickFix
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptAppleScriptProperty
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference

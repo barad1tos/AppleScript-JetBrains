@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="AppleScript Toolkit" width="160">
+  <img src="assets/logo.svg" alt="Applescript Toolkit" width="160">
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
 
 <br>
 
-AppleScript Toolkit brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a Kotlin rewrite and revival of the original Apache-2.0 AppleScript plugin, maintained by Roman Borodavkin and updated for the modern IntelliJ Platform.
+Applescript Toolkit brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a maintained revival of the original Apache-2.0 AppleScript plugin, with the handwritten IntelliJ Platform implementation modernized in Kotlin and the existing Grammar-Kit parser core preserved and hardened.
 
 The project is not affiliated with Apple, JetBrains, or the original maintainer.
 
@@ -146,7 +146,9 @@ Security issue? Please use GitHub Private Vulnerability Reporting as described i
 
 This project is derived from the original AppleScript plugin for JetBrains IDEs by Andrey Dernov, distributed under the Apache License 2.0. The original plugin was free and targeted older IntelliJ Platform versions.
 
-This maintained fork keeps the Apache-2.0 attribution while updating the implementation for current JetBrains IDEs, including a Kotlin rewrite, modern IntelliJ Platform Gradle Plugin migration, dictionary loading hardening, parser compatibility work, and current CI/plugin-verifier coverage.
+This maintained fork keeps the Apache-2.0 attribution while updating the implementation for current JetBrains IDEs, including a Kotlin modernization of the handwritten platform layer, modern IntelliJ Platform Gradle Plugin migration, dictionary loading hardening, parser compatibility work, and current CI/plugin-verifier coverage.
+
+The parser and lexer remain based on the existing Grammar-Kit/JFlex core from the original plugin line. This is an intentional compatibility trade-off: the maintained fork preserves accumulated AppleScript grammar behavior while hardening it with regression fixtures, real-world parser samples, generated-source checks, and plugin-verifier coverage.
 
 The current maintained fork and modifications are Copyright 2025-2026 Roman Borodavkin and contributors. That notice covers this repository's maintained derivative work and does not replace the original author attribution.
 
@@ -160,7 +162,7 @@ The legacy plugin identity is currently preserved for upgrade-continuity analysi
 
 ## Credits
 
-- Maintained fork and Kotlin rewrite by Roman Borodavkin and contributors.
+- Maintained fork, Kotlin modernization, and parser hardening by Roman Borodavkin and contributors.
 - Original AppleScript plugin by Andrey Dernov, distributed under the Apache License 2.0.
 - IntelliJ Platform SDK by JetBrains.
 

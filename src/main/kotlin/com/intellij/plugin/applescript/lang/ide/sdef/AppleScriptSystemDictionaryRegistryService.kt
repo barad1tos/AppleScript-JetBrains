@@ -15,6 +15,17 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompatDefault
+import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
+import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
+import com.intellij.plugin.applescript.lang.dictionary.files.stream2file
+import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary

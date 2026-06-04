@@ -1,4 +1,4 @@
-package com.intellij.plugin.applescript.lang.ide.sdef
+package com.intellij.plugin.applescript.lang.dictionary.persistence
 
 import com.intellij.util.xml.Required
 import com.intellij.util.xmlb.annotations.Attribute

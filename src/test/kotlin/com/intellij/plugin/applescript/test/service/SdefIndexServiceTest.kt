@@ -1,9 +1,9 @@
 package com.intellij.plugin.applescript.test.service
 
-import com.intellij.plugin.applescript.lang.ide.sdef.SdefIndexService
-import com.intellij.plugin.applescript.lang.ide.sdef.results.IngestResult
-import com.intellij.plugin.applescript.lang.ide.sdef.results.LookupResult
-import com.intellij.plugin.applescript.lang.ide.sdef.results.SdefIndexSnapshot
+import com.intellij.plugin.applescript.lang.dictionary.index.IngestResult
+import com.intellij.plugin.applescript.lang.dictionary.index.LookupResult
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexSnapshot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -89,6 +89,10 @@ class SdefIndexServiceTest {
             val musicClasses = snapshot.applicationNameToClassNameSet["Music"]
             assertNotNull(musicClasses, "Music application must have an entry in applicationNameToClassNameSet")
             assertTrue("track" in (musicClasses ?: emptySet()), "Music track class must be present")
+            assertTrue(
+                snapshot.isApplicationProperty("Music", "name"),
+                "Music track name property must be present in app-scoped property index after ingest",
+            )
         }
 
     @Test
@@ -125,6 +129,10 @@ class SdefIndexServiceTest {
             assertTrue(
                 snapshot.isStdCommand("do shell script"),
                 "do shell script must be present in std command index after Scripting Additions ingest",
+            )
+            assertTrue(
+                snapshot.isStdLibClass("application"),
+                "application class must be present in std class index after Scripting Additions ingest",
             )
         }
 

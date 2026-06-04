@@ -253,17 +253,17 @@ intellijPlatform {
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.1.7.1")
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.2.6.2")
         }
-        // Legacy plugin ID `com.intellij.plugin.applescript` and name
-        // `AppleScript Support` trip three structure rules (com.intellij
-        // prefix, word "intellij" in id, word "IDEA" in name). Kept on
-        // purpose so existing 0.130 users on Marketplace get a normal
-        // auto-update path when 1.0.0 ships — renaming would orphan them.
+        // Legacy plugin ID `com.intellij.plugin.applescript` trips structure rules:
+        // `com.intellij` prefix and the word "intellij" in the id. Kept on purpose so
+        // existing 0.130 users on Marketplace get a normal auto-update path when 1.0.0
+        // ships — renaming would orphan them. The display name is intentionally not
+        // muted so Marketplace naming regressions stay visible in CI.
         // Pass mute flags directly to Plugin Verifier CLI per the error
         // message hint; compatibility / API / dependency checks still gate.
         freeArgs =
             listOf(
                 "-mute",
-                "ForbiddenPluginIdPrefix,TemplateWordInPluginId,TemplateWordInPluginName",
+                "ForbiddenPluginIdPrefix,TemplateWordInPluginId",
             )
     }
 }
@@ -643,34 +643,40 @@ tasks {
                 // parseDictionaryFile + the parser map cluster migrate to SdefIndexService.
                 "SdefFileProvider" to "AppleScriptSystemDictionaryRegistryService",
             )
-        val sdefPackage = layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef")
-        inputs.dir(sdefPackage)
+        val serviceSourceRoots =
+            listOf(
+                layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef"),
+                layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/dictionary"),
+            )
+        serviceSourceRoots.forEach { inputs.dir(it) }
 
         doLast {
             val adjacency = mutableMapOf<String, MutableSet<String>>()
             services.forEach { adjacency[it] = mutableSetOf() }
 
-            sdefPackage.asFile
-                .walkTopDown()
-                .filter { it.isFile && it.extension == "kt" }
-                .forEach { file ->
-                    val owner = services.firstOrNull { file.nameWithoutExtension == it } ?: return@forEach
-                    val body = file.readText()
-                    services.forEach { dep ->
-                        if (dep == owner) return@forEach
-                        // Skip data-hop edges (RESEARCH §5).
-                        if (owner to dep in dataHopAllowlist) return@forEach
-                        val patterns =
-                            listOf(
-                                "service<$dep>",
-                                "$dep.getInstance",
-                                "service<$dep::class.java>",
-                            )
-                        if (patterns.any { body.contains(it) }) {
-                            adjacency[owner]!!.add(dep)
+            serviceSourceRoots.forEach { serviceSourceRoot ->
+                serviceSourceRoot.asFile
+                    .walkTopDown()
+                    .filter { it.isFile && it.extension == "kt" }
+                    .forEach { file ->
+                        val owner = services.firstOrNull { file.nameWithoutExtension == it } ?: return@forEach
+                        val body = file.readText()
+                        services.forEach { dep ->
+                            if (dep == owner) return@forEach
+                            // Skip data-hop edges (RESEARCH §5).
+                            if (owner to dep in dataHopAllowlist) return@forEach
+                            val patterns =
+                                listOf(
+                                    "service<$dep>",
+                                    "$dep.getInstance",
+                                    "service<$dep::class.java>",
+                                )
+                            if (patterns.any { body.contains(it) }) {
+                                adjacency[owner]!!.add(dep)
+                            }
                         }
                     }
-                }
+            }
 
             val white = 0
             val gray = 1

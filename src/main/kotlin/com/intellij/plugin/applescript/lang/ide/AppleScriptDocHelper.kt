@@ -2,7 +2,7 @@ package com.intellij.plugin.applescript.lang.ide
 
 import com.intellij.codeInsight.documentation.DocumentationManagerProtocol
 import com.intellij.openapi.util.text.StringUtil
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.sdef.AccessType
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
