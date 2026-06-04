@@ -1,10 +1,6 @@
 package com.intellij.plugin.applescript.lang.sdef.parser
 
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.sdef.AccessType
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
@@ -29,19 +25,15 @@ import com.intellij.plugin.applescript.lang.sdef.DictionaryRecord
 import com.intellij.plugin.applescript.lang.sdef.DictionaryRecordDefinition
 import com.intellij.plugin.applescript.lang.sdef.Suite
 import com.intellij.plugin.applescript.lang.sdef.SuiteImpl
-import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiManager
 import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import com.intellij.xml.util.IncludedXmlTag
-import java.io.File
 
 private const val ATTRIBUTE_CODE = "code"
 private const val ATTRIBUTE_ACCESS = "access"
 private const val ATTRIBUTE_DESCRIPTION = "description"
 private const val ATTRIBUTE_EXTENDS = "extends"
 private const val ATTRIBUTE_HIDDEN = "hidden"
-private const val ATTRIBUTE_HREF = "href"
 private const val ATTRIBUTE_INHERITS = "inherits"
 private const val ATTRIBUTE_NAME = "name"
 private const val ATTRIBUTE_OPTIONAL = "optional"
@@ -50,7 +42,6 @@ private const val ATTRIBUTE_TITLE = "title"
 private const val ATTRIBUTE_TYPE = "type"
 private const val ATTRIBUTE_XMLNS_XI = "xmlns:xi"
 private const val CLASS_EXTENSION_FALLBACK_CODE_LENGTH = 4
-private const val FILE_URL_LOCALHOST_PREFIX = "file://localhost"
 private const val READ_ONLY_ACCESS = "r"
 private const val WRITE_ONLY_ACCESS = "w"
 private const val TAG_CLASS = "class"
@@ -62,7 +53,6 @@ private const val TAG_DOCUMENTATION = "documentation"
 private const val TAG_ELEMENT = "element"
 private const val TAG_ENUMERATION = "enumeration"
 private const val TAG_ENUMERATOR = "enumerator"
-private const val TAG_INCLUDE = "include"
 private const val TAG_PARAMETER = "parameter"
 private const val TAG_PROPERTY = "property"
 private const val TAG_RECORD_TYPE = "record-type"
@@ -77,8 +67,8 @@ private const val YES_VALUE = "yes"
  * Parses an SDEF XML file (`<dictionary>` root) into the [ApplicationDictionary] PSI model: suites
  * and their nested commands, classes, class extensions, value types, record types, and enumerations.
  *
- * Resolves `<xi:include>` directives against [AppleScriptSystemDictionaryRegistryService]'s
- * cached dictionary files to avoid the IntelliJ "file accessed outside allowed roots" assertion.
+ * Resolves `<xi:include>` directives against cached dictionary files to avoid the
+ * IntelliJ "file accessed outside allowed roots" assertion.
  */
 object SdefParser {
     private val LOG: Logger = Logger.getInstance("#${SdefParser::class.java.name}")
@@ -205,81 +195,6 @@ private class SdefRootParser(
         parsedDictionary.addSuite(suite)
     }
 }
-
-private class SdefIncludeProcessor(
-    private val project: Project,
-) {
-    fun process(
-        parsedDictionary: ApplicationDictionary,
-        includes: Array<XmlTag>?,
-    ) {
-        includes
-            .orEmpty()
-            .mapNotNull(::resolveIncludedXmlFile)
-            .forEach(parsedDictionary::processInclude)
-    }
-
-    fun getDictionaryFileFromInclude(xmlIncludeTag: IncludedXmlTag): XmlFile? {
-        var xmlFile = xmlIncludeTag.original?.containingFile as? XmlFile
-        val originalPath = xmlFile?.virtualFile?.path
-        val cachedDictionaryFile =
-            originalPath
-                ?.let(dictionaryRegistry::getDictionaryInfoByApplicationPath)
-                ?.getDictionaryFile()
-
-        if (cachedDictionaryFile?.exists() == true) {
-            xmlFile = cachedDictionaryFile.toValidVirtualFile()?.let(::toXmlFile)
-        }
-        return xmlFile
-    }
-
-    private fun resolveIncludedXmlFile(include: XmlTag): XmlFile? {
-        val includedFile =
-            include
-                .getAttributeValue(ATTRIBUTE_HREF)
-                ?.takeUnless(String::isEmpty)
-                ?.replace(FILE_URL_LOCALHOST_PREFIX, "")
-                ?.let(::File)
-
-        val ioFile = includedFile?.let(::resolveIncludedIoFile)
-        return ioFile
-            ?.takeIf(File::exists)
-            ?.toValidVirtualFile()
-            ?.let(::toXmlFile)
-    }
-
-    private fun resolveIncludedIoFile(includedFile: File): File {
-        val registryFile =
-            dictionaryRegistry
-                .getDictionaryInfoByApplicationPath(includedFile.path)
-                ?.getDictionaryFile()
-                ?: includedFile.takeIf(File::isFile)?.let(::getDictionaryFileByBaseName)
-        return registryFile?.takeIf(File::exists) ?: includedFile
-    }
-
-    private fun getDictionaryFileByBaseName(includedFile: File): File? {
-        val rawName = includedFile.name
-        val extensionIndex = rawName.lastIndexOf('.')
-        val fileName = if (extensionIndex < 0) rawName else rawName.substring(0, extensionIndex)
-        return dictionaryRegistry.getDictionaryFile(fileName)
-    }
-
-    private fun File.toValidVirtualFile(): VirtualFile? =
-        LocalFileSystem
-            .getInstance()
-            .findFileByIoFile(this)
-            ?.takeIf(VirtualFile::isValid)
-
-    private fun toXmlFile(virtualFile: VirtualFile): XmlFile? {
-        val psiFile: PsiFile? = PsiManager.getInstance(project).findFile(virtualFile)
-        return psiFile as? XmlFile
-    }
-
-    private val dictionaryRegistry: AppleScriptSystemDictionaryRegistryService
-        get() = AppleScriptSystemDictionaryRegistryService.getInstance()
-}
-
-private fun XmlTag.findIncludes(namespace: String?): Array<XmlTag>? = namespace?.let { findSubTags(TAG_INCLUDE, it) }
 
 private object SdefComponentParser {
     fun parseSuiteTag(
