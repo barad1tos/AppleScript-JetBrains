@@ -3,7 +3,7 @@ package com.intellij.plugin.applescript.lang.ide.highlighting
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil

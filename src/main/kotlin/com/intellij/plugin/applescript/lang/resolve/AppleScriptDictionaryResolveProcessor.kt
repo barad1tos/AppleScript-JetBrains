@@ -4,7 +4,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.KeyWithDefaultValue
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
 import com.intellij.plugin.applescript.psi.AppleScriptBuiltInClassIdentifier
