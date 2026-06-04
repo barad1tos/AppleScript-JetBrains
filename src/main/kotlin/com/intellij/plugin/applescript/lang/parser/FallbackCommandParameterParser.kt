@@ -36,7 +36,17 @@ internal object FallbackCommandParameterParser {
         if (mode == ParameterMode.OptionalDirectParameter) {
             parseOptionalDirectParameter(builder, level + 1)
         }
-        parseCommandParameters(builder, level + 1)
+        val previousFallbackContext =
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS)
+        builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS, true)
+        try {
+            parseCommandParameters(builder, level + 1)
+        } finally {
+            builder.putUserData(
+                AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS,
+                previousFallbackContext,
+            )
+        }
         return true
     }
 
@@ -75,7 +85,7 @@ internal object FallbackCommandParameterParser {
         builder: PsiBuilder,
         level: Int,
     ) {
-        while (isParameterStart(builder.tokenType)) {
+        while (isPrepositionParameterStart(builder.tokenType) || builder.tokenType === VAR_IDENTIFIER) {
             val marker = enter_section_(builder, level, _NONE_, "<fallback command parameter>")
             val result =
                 parseParameterSelector(builder, level + 1) &&
@@ -91,25 +101,27 @@ internal object FallbackCommandParameterParser {
     ): Boolean {
         if (!recursion_guard_(builder, level, "parseParameterSelector")) return false
         val marker = enter_section_(builder, level, _NONE_, "<fallback command parameter selector>")
-        val result =
-            when {
-                isPrepositionParameterStart(builder.tokenType) -> {
-                    val selectorStart = builder.tokenType
-                    builder.advanceLexer()
-                    if (selectorStart === WITH && builder.tokenType === VAR_IDENTIFIER) {
-                        builder.advanceLexer()
-                    }
-                    true
-                }
-                builder.tokenType === VAR_IDENTIFIER -> {
-                    parseBareParameterSelector(builder)
-                    true
-                }
-                else -> false
-            }
+        val result = parseSelectorTokens(builder)
         exit_section_(builder, level, marker, COMMAND_PARAMETER_SELECTOR, result, false, null)
         return result
     }
+
+    fun parseSelectorTokens(builder: PsiBuilder): Boolean =
+        when {
+            isPrepositionParameterStart(builder.tokenType) -> {
+                val selectorStart = builder.tokenType
+                builder.advanceLexer()
+                if (selectorStart === WITH && builder.tokenType === VAR_IDENTIFIER) {
+                    builder.advanceLexer()
+                }
+                true
+            }
+            builder.tokenType === VAR_IDENTIFIER -> {
+                parseBareParameterSelector(builder)
+                true
+            }
+            else -> false
+        }
 
     private fun parseBareParameterSelector(builder: PsiBuilder) {
         val firstWord = builder.tokenText.orEmpty()
@@ -132,8 +144,6 @@ internal object FallbackCommandParameterParser {
             tokenType !== NLS &&
             tokenType !== COMMENT &&
             !isPrepositionParameterStart(tokenType)
-
-    private fun isParameterStart(type: IElementType?) = isPrepositionParameterStart(type) || type === VAR_IDENTIFIER
 
     private fun isPrepositionParameterStart(tokenType: IElementType?): Boolean =
         tokenType === TO ||

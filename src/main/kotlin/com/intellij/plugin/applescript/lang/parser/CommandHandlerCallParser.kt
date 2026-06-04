@@ -156,11 +156,11 @@ internal object CommandHandlerCallParser {
         level: Int,
         allCommandsWithName: List<AppleScriptCommand>,
     ): Boolean {
-        val hasCompleteHandlerCall =
+        val hasAcceptedCommandSection =
             allCommandsWithName.any { command ->
                 DictionaryCommandParameterParser.parseParametersForCommand(builder, level + 1, command)
             }
-        return hasCompleteHandlerCall ||
+        return hasAcceptedCommandSection ||
             isIncompleteHandlerCall(allCommandsWithName, builder)
     }
 

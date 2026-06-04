@@ -103,6 +103,18 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                     INT,
                 ),
                 FrozenSignature.publicStatic(
+                    "isHandlerLabeledParametersCallAllowed",
+                    "boolean",
+                    PSI_BUILDER,
+                    INT,
+                ),
+                FrozenSignature.publicStatic(
+                    "isTreePrevSimpleReference",
+                    "boolean",
+                    PSI_BUILDER,
+                    INT,
+                ),
+                FrozenSignature.publicStatic(
                     "parseAssignmentStatementInner",
                     "boolean",
                     PSI_BUILDER,

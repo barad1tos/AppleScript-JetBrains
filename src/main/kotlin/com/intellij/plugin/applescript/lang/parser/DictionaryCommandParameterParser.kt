@@ -48,6 +48,7 @@ internal object DictionaryCommandParameterParser {
         }
         exit_section_(builder, level, marker, null, result, false, null)
         builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS, false)
+        // The caller observes a balanced parser section; semantic overload completeness is represented in markers.
         return true
     }
 

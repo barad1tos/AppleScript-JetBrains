@@ -13,10 +13,13 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.REFERENCE_EXPRESSION
 import java.util.Stack
 
 class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
+    // Grammar-Kit calls this companion as a static parser-util facade; implementations live in focused helpers.
     @Suppress("TooManyFunctions")
     companion object {
         internal val PARSING_COMMAND_HANDLER_CALL_PARAMETERS: Key<Boolean> =
             Key.create("applescript.parsing.command.handler.parameters")
+        internal val PARSING_FALLBACK_COMMAND_PARAMETERS: Key<Boolean> =
+            Key.create("applescript.parsing.fallback.command.parameters")
         private val PARSING_COMMAND_ASSIGNMENT_STATEMENT: Key<Boolean> =
             Key.create("applescript.parsing.assignment.statement")
         internal val PARSING_COMMAND_HANDLER_BOOLEAN_PARAMETER: Key<Boolean> =
@@ -206,7 +209,10 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
         fun parseCommandParameterSelector(
             builder: PsiBuilder,
             level: Int,
-        ): Boolean = FallbackCommandParameterParser.parseParameterSelector(builder, level)
+        ): Boolean =
+            recursion_guard_(builder, level, "parseCommandParameterSelector") &&
+                builder.getUserData(PARSING_FALLBACK_COMMAND_PARAMETERS) == true &&
+                FallbackCommandParameterParser.parseSelectorTokens(builder)
 
         @JvmStatic
         fun isPossessivePronoun(
