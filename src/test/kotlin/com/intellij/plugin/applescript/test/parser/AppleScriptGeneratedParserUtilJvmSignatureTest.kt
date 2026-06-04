@@ -49,6 +49,7 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                         "FROZEN CONTRACT VIOLATION: AppleScriptGeneratedParserUtil.${field.name} " +
                             "is no longer callable from Java. Restore the @JvmField static field " +
                             "or coordinate the generated-parser contract change in the same commit.",
+                        exception,
                     )
                 }
 
@@ -81,6 +82,7 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                 "FROZEN CONTRACT VIOLATION: AppleScriptGeneratedParserUtil.${signature.render()} " +
                     "is no longer callable from the generated parser. Restore the JVM-visible " +
                     "method shape or coordinate the BNF/generated-parser contract change in the same commit.",
+                exception,
             )
         }
     }
@@ -199,7 +201,7 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                     INT,
                 ),
                 FrozenSignature.publicStatic(
-                    "isPossessivePpronoun",
+                    "isPossessivePronoun",
                     "boolean",
                     PSI_BUILDER,
                     INT,
@@ -274,7 +276,7 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
             )
 
         private fun resolveParamType(typeName: String): Class<*> =
-            PARAM_TYPE_ALLOWLIST[typeName] ?: throw IllegalStateException(
+            PARAM_TYPE_ALLOWLIST[typeName] ?: error(
                 "Parameter type '$typeName' is not in PARAM_TYPE_ALLOWLIST. Add it explicitly " +
                     "with the frozen parser-util signature that uses it to keep reflection review safe.",
             )
@@ -294,12 +296,6 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                 returnTypeName: String,
                 vararg parameterTypeNames: String,
             ): FrozenSignature = FrozenSignature(name, returnTypeName, Visibility.PUBLIC, parameterTypeNames.toList())
-
-            fun packageStatic(
-                name: String,
-                returnTypeName: String,
-                vararg parameterTypeNames: String,
-            ): FrozenSignature = FrozenSignature(name, returnTypeName, Visibility.PACKAGE, parameterTypeNames.toList())
         }
     }
 
