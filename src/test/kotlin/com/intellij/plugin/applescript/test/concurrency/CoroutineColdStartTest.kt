@@ -9,8 +9,8 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.util.Disposer
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
+import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
-import com.intellij.plugin.applescript.lang.ide.sdef.SdefFileTypeRegistrar
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
 import kotlinx.coroutines.CoroutineDispatcher
