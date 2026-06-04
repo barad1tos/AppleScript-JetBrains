@@ -2,12 +2,14 @@ package com.intellij.plugin.applescript.lang.dictionary.index
 
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
+import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommandImpl
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
 import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumeration
 import com.intellij.plugin.applescript.lang.sdef.DictionaryEnumerator
 import com.intellij.plugin.applescript.lang.sdef.DictionaryRecord
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Encapsulates the index-map cluster previously declared inline on
@@ -80,4 +82,65 @@ internal class DictionaryIndexes {
     val dictionaryClassToPluralNameMap: MutableMap<String, AppleScriptClass> = ConcurrentHashMap()
 
     val dictionaryClassByCodeMap: MutableMap<String, AppleScriptClass> = ConcurrentHashMap()
+
+    fun parameterNames(name: String): List<String>? = dictionaryCommandMap[name]?.parameterNames
+
+    /**
+     * Convention (locked, matched by SuiteImpl.addCommand): returns true on
+     * first insert of a (name, command) pair, false on duplicate name. D-02
+     * also populates [dictionaryCommandListMap] so `findAllCommandsWithName`
+     * can return all overloaded entries; the list dedupes by `CommandData`
+     * structural equality so two impls with identical name + code + parameters
+     * + result collapse to one list entry, while genuinely overloaded commands
+     * co-exist as N entries.
+     */
+    fun addCommand(command: AppleScriptCommand): Boolean {
+        val name = command.getName()
+        val wasNew = dictionaryCommandMap.put(name, command) == null
+        val list =
+            dictionaryCommandListMap.computeIfAbsent(name) {
+                CopyOnWriteArrayList()
+            }
+        val alreadyPresent =
+            if (command is AppleScriptCommandImpl) {
+                list.any { existing ->
+                    existing is AppleScriptCommandImpl &&
+                        existing.commandData == command.commandData
+                }
+            } else {
+                list.any { it === command }
+            }
+        if (!alreadyPresent) list.add(command)
+        return wasNew
+    }
+
+    fun addClass(appleScriptClass: AppleScriptClass): Boolean {
+        val previous = dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)
+        dictionaryClassByCodeMap[appleScriptClass.code] = appleScriptClass
+        dictionaryClassToPluralNameMap[appleScriptClass.pluralClassName] = appleScriptClass
+        for (property in appleScriptClass.properties) {
+            addProperty(property)
+        }
+        return previous == null
+    }
+
+    fun addProperty(property: AppleScriptPropertyDefinition): Boolean {
+        val previous = dictionaryPropertyMap.put(property.getName(), property)
+        return previous == null
+    }
+
+    fun addEnumeration(enumeration: DictionaryEnumeration): Boolean {
+        val previous = dictionaryEnumerationMap.put(enumeration.getName(), enumeration)
+        for (enumerator in enumeration.getEnumerators().orEmpty()) {
+            dictionaryEnumeratorMap[enumerator.getName()] = enumerator
+        }
+        return previous == null
+    }
+
+    fun addRecord(record: DictionaryRecord) {
+        dictionaryRecordMap[record.getName()] = record
+        for (property in record.getProperties()) {
+            dictionaryPropertyMap[property.getName()] = property
+        }
+    }
 }

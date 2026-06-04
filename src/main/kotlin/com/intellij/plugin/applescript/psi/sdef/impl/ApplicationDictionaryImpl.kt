@@ -13,7 +13,6 @@ import com.intellij.plugin.applescript.lang.dictionary.index.DictionaryIndexes
 import com.intellij.plugin.applescript.lang.ide.AppleScriptDocHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptClass
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
-import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommandImpl
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.CommandDirectParameter
@@ -36,7 +35,6 @@ import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import com.intellij.util.IncorrectOperationException
 import java.io.File
-import java.util.concurrent.CopyOnWriteArrayList
 import javax.swing.Icon
 
 /**
@@ -136,63 +134,9 @@ class ApplicationDictionaryImpl(
 
     override fun findEnumeration(name: String): DictionaryEnumeration? = indexes.dictionaryEnumerationMap[name]
 
-    /**
-     * Convention (locked, matched by SuiteImpl.addCommand): returns true on
-     * first insert of a (name, command) pair, false on duplicate name. D-02
-     * also populates `dictionaryCommandListMap` so [findAllCommandsWithName]
-     * can return all overloaded entries; the list dedupes by `CommandData`
-     * structural equality so two impls with identical name + code + parameters
-     * + result (e.g. re-ingest of the same SDEF after a cache miss) collapse
-     * to one list entry, while genuinely overloaded commands (same name,
-     * different parameter signatures) co-exist as N entries.
-     *
-     * Concurrency: the primary `dictionaryCommandMap.put` is atomic on
-     * `ConcurrentHashMap`. For the secondary list-map we use
-     * `computeIfAbsent` (CHM-atomic create-or-fetch) backed by a
-     * [java.util.concurrent.CopyOnWriteArrayList] so the per-name list's
-     * `any { … }` read concurrent with `.add(…)` from another thread is
-     * CME-free. The dedupe-then-add sequence is *not* atomic across writers
-     * for the same name; this is acceptable because (a) overload-by-name
-     * adds are rare in practice (parser walks each suite once), and (b) the
-     * worst case is a transient duplicate list entry on a structurally-equal
-     * re-insert race — the dedupe check eventually wins on the next
-     * `addCommand`-by-name. Strict atomicity would need a per-name mutex;
-     * the cost outweighs the benefit for the observed workload.
-     */
-    override fun addCommand(command: AppleScriptCommand): Boolean {
-        val name = command.getName()
-        val wasNew = indexes.dictionaryCommandMap.put(name, command) == null
-        val list =
-            indexes.dictionaryCommandListMap.computeIfAbsent(name) {
-                CopyOnWriteArrayList()
-            }
-        // Structural-equality dedupe via `CommandData` (D-02 closure). The
-        // cast is safe because the parser only ever instantiates
-        // [AppleScriptCommandImpl]; for unexpected impl types we fall back
-        // to reference equality, which is strictly more permissive (no
-        // overload-by-content collapse) but never corrupts the list.
-        val alreadyPresent =
-            if (command is AppleScriptCommandImpl) {
-                list.any { existing ->
-                    existing is AppleScriptCommandImpl &&
-                        existing.commandData == command.commandData
-                }
-            } else {
-                list.any { it === command }
-            }
-        if (!alreadyPresent) list.add(command)
-        return wasNew
-    }
+    override fun addCommand(command: AppleScriptCommand): Boolean = indexes.addCommand(command)
 
-    override fun addClass(appleScriptClass: AppleScriptClass): Boolean {
-        val previous = indexes.dictionaryClassMap.put(appleScriptClass.getName(), appleScriptClass)
-        indexes.dictionaryClassByCodeMap[appleScriptClass.code] = appleScriptClass
-        indexes.dictionaryClassToPluralNameMap[appleScriptClass.pluralClassName] = appleScriptClass
-        for (property in appleScriptClass.properties) {
-            addProperty(property)
-        }
-        return previous == null
-    }
+    override fun addClass(appleScriptClass: AppleScriptClass): Boolean = indexes.addClass(appleScriptClass)
 
     override fun getIcon(open: Boolean): Icon = applicationIcon ?: AppleScriptIcons.OPEN_DICTIONARY
 
@@ -200,16 +144,9 @@ class ApplicationDictionaryImpl(
 
     override fun findClassByCode(code: String): AppleScriptClass? = indexes.dictionaryClassByCodeMap[code]
 
-    override fun addProperty(property: AppleScriptPropertyDefinition): Boolean =
-        indexes.dictionaryPropertyMap.put(property.getName(), property) == null
+    override fun addProperty(property: AppleScriptPropertyDefinition): Boolean = indexes.addProperty(property)
 
-    override fun addEnumeration(enumeration: DictionaryEnumeration): Boolean {
-        val previous = indexes.dictionaryEnumerationMap.put(enumeration.getName(), enumeration)
-        for (enumerator in enumeration.getEnumerators().orEmpty()) {
-            indexes.dictionaryEnumeratorMap[enumerator.getName()] = enumerator
-        }
-        return previous == null
-    }
+    override fun addEnumeration(enumeration: DictionaryEnumeration): Boolean = indexes.addEnumeration(enumeration)
 
     override val documentation: String
         get() =
@@ -252,12 +189,7 @@ class ApplicationDictionaryImpl(
 
     override val dictionaryPropertyMap: Map<String, AppleScriptPropertyDefinition> get() = indexes.dictionaryPropertyMap
 
-    override fun addRecord(record: DictionaryRecord) {
-        indexes.dictionaryRecordMap[record.getName()] = record
-        for (prop in record.getProperties()) {
-            indexes.dictionaryPropertyMap[prop.getName()] = prop
-        }
-    }
+    override fun addRecord(record: DictionaryRecord) = indexes.addRecord(record)
 
     override fun getParent(): PsiElement? = PsiManager.getInstance(getProject()).findFile(dictionaryFile)
 
@@ -337,5 +269,3 @@ class ApplicationDictionaryImpl(
         val LOG: Logger = Logger.getInstance("#${ApplicationDictionaryImpl::class.java.name}")
     }
 }
-
-private fun DictionaryIndexes.parameterNames(name: String): List<String>? = dictionaryCommandMap[name]?.parameterNames

@@ -15,7 +15,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
@@ -91,6 +90,15 @@ class AppleScriptSystemDictionaryRegistryService
             get() = ApplicationDiscoveryService.getInstance()
         private val dictionaryFiles: SdefFileProvider
             get() = SdefFileProvider.getInstance()
+        private val initializationCoordinator =
+            DictionaryInitializationCoordinator(
+                dictionaryInfoRegistry = dictionaryInfoRegistry,
+                notScriptableApplicationRegistry = notScriptableApplicationRegistry,
+                applicationDiscovery = { discovery },
+                dictionaryFiles = { dictionaryFiles },
+                areAppDictionariesIndexed = ::areAppDictionariesIndexed,
+                log = LOG,
+            )
 
         // Phase 4 SERVICE-03 (plan 04-03, Wave 3): the `notFoundApplicationList` and
         // `discoveredApplicationNames` ConcurrentHashMap-backed sets migrated to
@@ -277,8 +285,8 @@ class AppleScriptSystemDictionaryRegistryService
         // Pattern A from RESEARCH §2: the @State annotation, PersistedState inner class, and
         // SimplePersistentStateComponent inheritance ALL stay on this facade. The service offers a
         // typed API that forwards to the `internal *Internal` helpers below. External callers
-        // continue to use the public trampolines (removeDictionaryInfo /
-        // getNotScriptableApplicationList / isNotScriptable / isInUnknownList / updateState) with
+        // continue to use the public trampolines (getNotScriptableApplicationList /
+        // isNotScriptable / isInUnknownList / updateState) with
         // byte-for-byte unchanged signatures. SDEF-13 golden fixture regression-locks the wire
         // format — neither PersistedState nor DictionaryInfo.State is touched by this wave.
         //
@@ -286,18 +294,6 @@ class AppleScriptSystemDictionaryRegistryService
         // the service trampoline) to avoid the extra service<X>() lookup hop on hot paths and to
         // sidestep any circularity concerns during init.
         // ---------------------------------------------------------------------------------------------
-
-        /**
-         * Remove a [DictionaryInfo] from the in-memory registry by application NAME after
-         * dictionary parsing fails. A parse failure is not proof that the application is not
-         * scriptable; only dictionary generation failures at the `sdef` boundary mark that state.
-         *
-         * NOT the public [removeDictionaryInfo] trampoline (which takes an application PATH and
-         * routes through [SdefPersistenceService]).
-         */
-        internal fun removeDictionaryInfoInMemoryInternal(applicationName: String) {
-            dictionaryInfoRegistry.removeInMemory(applicationName)
-        }
 
         /**
          * Register a [DictionaryInfo] in the in-memory registry. Returns `true` if the application
@@ -317,13 +313,6 @@ class AppleScriptSystemDictionaryRegistryService
             notScriptableApplicationRegistry.remove(appName)
             return wasAbsent
         }
-
-        /**
-         * Trampoline (Phase 4 SERVICE-02): defers to [SdefPersistenceService.removeDictionaryInfo],
-         * which routes back to [removeDictionaryInfoByPathInternal]. Takes an application PATH
-         * (`applicationFile.path`) and resolves the matching registry entry.
-         */
-        fun removeDictionaryInfo(applicationPath: String): Boolean = persistence.removeDictionaryInfo(applicationPath)
 
         /**
          * Defensive snapshot of the in-memory [DictionaryInfo] registry. Returns a [List], NOT the
@@ -462,37 +451,11 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * @return true if the dictionary was initialised
          */
-        fun ensureDictionaryInitialized(anyApplicationName: String): Boolean {
-            val canInitializeUnknownApplication =
-                !StringUtil.isEmptyOrSpaces(anyApplicationName) &&
-                    !isNotScriptableInternal(anyApplicationName) &&
-                    !isInUnknownListInternal(anyApplicationName)
-            val initializedUnknownApplication =
-                canInitializeUnknownApplication && getInitializedInfo(anyApplicationName) != null
+        fun ensureDictionaryInitialized(anyApplicationName: String): Boolean =
+            initializationCoordinator.ensureDictionaryInitialized(anyApplicationName)
 
-            return ensureKnownApplicationDictionaryInitialized(anyApplicationName) ||
-                initializedUnknownApplication
-        }
-
-        override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean {
-            // D-04: app-name resolver path — gated on full app-discovery sweep (appsReady).
-            // Wave 3 (SERVICE-03): discoveredApplicationNames migrated to ApplicationDiscoveryService.
-            // Route the membership test through the typed-API method `isKnownApplication`
-            // — the predicate is O(1) on the service's ConcurrentHashMap.newKeySet backing.
-            val canInitialize =
-                areAppDictionariesIndexed() &&
-                    discovery.isKnownApplication(knownApplicationName)
-            val initializedKnownApplication =
-                initializeKnownDictionaryFromCache(knownApplicationName) ||
-                    getInitializedInfo(knownApplicationName) != null
-
-            return canInitialize && initializedKnownApplication
-        }
-
-        private fun initializeKnownDictionaryFromCache(applicationName: String): Boolean {
-            val dictionaryInfo = getDictionaryInfo(applicationName) ?: return false
-            return dictionaryInfo.initialized || initializeDictionaryFromInfo(dictionaryInfo)
-        }
+        override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean =
+            initializationCoordinator.ensureKnownApplicationDictionaryInitialized(knownApplicationName)
 
         // ParsableScriptHelper trampolines.
         // Each method delegates to [SdefIndexService]; the 14 ConcurrentHashMap indexes that backed
@@ -601,27 +564,9 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * @return the [DictionaryInfo] of the generated and cached dictionary for the application, or null
          */
-        fun getInitializedInfo(applicationName: String): DictionaryInfo? =
-            if (shouldSkipInitializedInfoLookup(applicationName)) {
-                null
-            } else {
-                findInitializedInfo(applicationName)
-            }
-
-        private fun shouldSkipInitializedInfoLookup(applicationName: String): Boolean =
-            StringUtil.isEmptyOrSpaces(applicationName) ||
-                isNotScriptableInternal(applicationName) ||
-                isInUnknownListInternal(applicationName)
-
-        private fun findInitializedInfo(applicationName: String): DictionaryInfo? =
-            findSavedInitializedInfo(applicationName)
-                ?: findApplicationBundleFile(applicationName)?.let { createAndInitializeInfo(it, applicationName) }
-
-        private fun findSavedInitializedInfo(applicationName: String): DictionaryInfo? {
-            val savedDictionaryInfo = getDictionaryInfo(applicationName)
-            return savedDictionaryInfo?.takeIf {
-                it.initialized || initializeDictionaryFromInfo(it)
-            }
+        fun getInitializedInfo(applicationName: String): DictionaryInfo? {
+            val coordinator = initializationCoordinator
+            return coordinator.getInitializedInfo(applicationName)
         }
 
         /**
@@ -658,29 +603,6 @@ class AppleScriptSystemDictionaryRegistryService
         ): DictionaryInfo? = dictionaryFiles.createAndInitializeInfo(applicationIoFile, applicationName)
 
         /**
-         * @return true if dictionary terms were successfully initialised
-         *
-         * Phase 4 SERVICE-05 (Wave 5): the parse step now routes through
-         * [SdefIndexService.parseDictionaryFile]; the 14 index maps live on the service.
-         * Failure-recovery branch (remove broken file from cache) still owned by the facade
-         * because it touches the @State-backed [dictionaryInfoRegistry] (Pattern A invariant).
-         */
-        private fun initializeDictionaryFromInfo(dictionaryInfo: DictionaryInfo): Boolean {
-            val file = File(dictionaryInfo.getDictionaryFile().path)
-            val applicationName = dictionaryInfo.getApplicationName()
-            if (file.exists() && service<SdefIndexService>().parseDictionaryFile(file, applicationName)) {
-                return dictionaryInfo.setInitialized(true)
-            }
-            // Parsing failed — drop the broken generated dictionary from the registry.
-            // Routes to the in-memory helper (NOT the typed-API trampoline) because callers here
-            // identify the application by NAME, not by path. The public `removeDictionaryInfo`
-            // trampoline takes an `applicationPath`. SERVICE-02 invariant.
-            LOG.warn("Initialization failed for application [$applicationName].")
-            removeDictionaryInfoInMemoryInternal(applicationName)
-            return false
-        }
-
-        /**
          * Phase 4 SERVICE-04 (Wave 4) internal accessor: exposes the in-memory
          * [DictionaryInfo] registry lookup by name for [SdefFileProvider]. The facade still
          * owns the persisted-state-tagged [dictionaryInfoRegistry] (Pattern A — annotation is tied
@@ -690,14 +612,12 @@ class AppleScriptSystemDictionaryRegistryService
         internal fun getDictionaryInfoByNameInternal(name: String?): DictionaryInfo? = dictionaryInfoRegistry[name]
 
         /**
-         * Phase 4 SERVICE-04 (Wave 4) internal helper: exposes the private parse-and-mark
-         * routine [initializeDictionaryFromInfo] for [SdefFileProvider]'s migrated methods
-         * ([SdefFileProvider.createAndInitializeInfo], [SdefFileProvider.initializeScriptingAdditions],
-         * [SdefFileProvider.initStdTerms]). The parse step itself stays on the facade because
-         * it touches the parser-index map cluster (Wave 5 territory).
+         * Phase 4 SERVICE-04 (Wave 4) internal helper: exposes
+         * [DictionaryInitializationCoordinator.initializeDictionaryFromInfo] for migrated
+         * dictionary-initialization call sites. The coordinator owns parse-and-mark cleanup.
          */
         internal fun initializeDictionaryFromInfoInternal(dictionaryInfo: DictionaryInfo): Boolean =
-            initializeDictionaryFromInfo(dictionaryInfo)
+            initializationCoordinator.initializeDictionaryFromInfo(dictionaryInfo)
 
         /** Persistent state for the application-level service. Field names are XML attribute names. */
         class PersistedState : BaseState() {
@@ -745,16 +665,6 @@ class AppleScriptSystemDictionaryRegistryService
          * itself now forwards to the service — single source of truth).
          */
         fun isInUnknownList(applicationName: String): Boolean = discovery.isInNotFoundList(applicationName)
-
-        /**
-         * Private accessor for facade-internal use (read by [getInitializedInfo] +
-         * [StandardDictionaryInitializer] hot paths). Kept inline rather than routed through
-         * [SdefFileProvider.getDictionaryFile] to avoid the service<X>() lookup hop on the
-         * parser-fast-path init flow. SdefFileProvider's migrated methods use the
-         * `internal fun getDictionaryInfoByNameInternal` accessor above (functionally
-         * identical; visibility is the only difference).
-         */
-        private fun getDictionaryInfo(applicationName: String?): DictionaryInfo? = dictionaryInfoRegistry[applicationName]
 
         /**
          * Phase 4 SERVICE-04 (Wave 4) trampoline: routes through

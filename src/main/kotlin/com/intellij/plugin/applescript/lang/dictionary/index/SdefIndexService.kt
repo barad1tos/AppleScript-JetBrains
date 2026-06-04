@@ -4,55 +4,21 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.text.StringUtil
-import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
-import com.intellij.plugin.applescript.lang.dictionary.xml.LegacyJdomParser
-import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
-import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.jdom.Document
-import org.jdom.Element
 import org.jdom.JDOMException
-import org.jdom.Namespace
 import java.io.File
 import java.io.IOException
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 private val LOG: Logger = Logger.getInstance("#${SdefIndexService::class.java.name}")
 
-private val COMMAND_READY_TIMEOUT: Duration = 2.seconds
-private const val XINCLUDE_NAMESPACE_URI: String = "http" + "://www.w3.org/2003/XInclude"
-
-private data class ParsedSuiteElements(
-    val classes: List<Element>,
-    val valueTypes: List<Element>,
-    val classExtensions: List<Element>,
-    val commands: List<Element>,
-    val recordTypes: List<Element>,
-    val enumerations: List<Element>,
-)
-
-private fun parsedSuiteElements(suiteElement: Element): ParsedSuiteElements =
-    ParsedSuiteElements(
-        classes = suiteElement.getChildren("class").toList(),
-        valueTypes = suiteElement.getChildren("value-type").toList(),
-        classExtensions = suiteElement.getChildren("class-extension").toList(),
-        commands = suiteElement.getChildren("command").toList(),
-        recordTypes = suiteElement.getChildren("record-type").toList(),
-        enumerations = suiteElement.getChildren("enumeration").toList(),
-    )
+private fun startsWithWord(
+    string: String,
+    prefix: String,
+): Boolean = string.startsWith(prefix) && (prefix.length == string.length || ' ' == string[prefix.length])
 
 /**
  * Phase 4 SERVICE-05 + SERVICE-09 (Wave 5): SDEF index ownership.
@@ -91,6 +57,8 @@ class SdefIndexService
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) {
         private val indexStore = SdefIndexStore()
+        private val indexIngestor = SdefIndexIngestor(indexStore, LOG)
+        private val commandLookup = SdefCommandLookup(serviceScope, indexStore)
 
         // CQRS write path.
 
@@ -302,31 +270,7 @@ class SdefIndexService
         fun findStdCommands(
             project: Project,
             commandName: String,
-        ): Collection<AppleScriptCommand> {
-            val isOnDispatchThread = ApplicationManager.getApplication().isDispatchThread
-            val isReady =
-                if (isOnDispatchThread) {
-                    facadeInitialized()
-                } else {
-                    isStandardReady()
-                }
-            if (!isReady) {
-                if (isOnDispatchThread) {
-                    LOG.warn(
-                        "findStdCommands called from EDT before standard dictionaries are ready; " +
-                            "returning empty list",
-                    )
-                }
-                return emptyList()
-            }
-
-            val appNameList = indexStore.stdCommandNameToApplicationNameSetMap[commandName] ?: emptySet()
-            val result = HashSet<AppleScriptCommand>()
-            for (applicationName in appNameList) {
-                result.addAll(findApplicationCommands(project, applicationName, commandName))
-            }
-            return result
-        }
+        ): Collection<AppleScriptCommand> = commandLookup.findStdCommands(project, commandName)
 
         /**
          * Resolver for app-scoped commands.
@@ -339,33 +283,7 @@ class SdefIndexService
             project: Project,
             applicationName: String,
             commandName: String,
-        ): List<AppleScriptCommand> {
-            val isOnDispatchThread = ApplicationManager.getApplication().isDispatchThread
-            val isReady =
-                if (isOnDispatchThread) {
-                    ParsableScriptSuiteRegistryHelper.areAppDictionariesIndexed()
-                } else {
-                    isAppReady()
-                }
-            if (!isReady) {
-                if (isOnDispatchThread) {
-                    LOG.warn(
-                        "findApplicationCommands called from EDT before app dictionaries are ready; " +
-                            "returning empty list",
-                    )
-                }
-                return emptyList()
-            }
-
-            val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
-            // Among the loaded dictionaries the standard additions should always be present, but if
-            // the command was not found there a new dictionary may need to be initialised here for
-            // the project — once.
-            val dictionary =
-                projectDictionaryRegistry.getDictionary(applicationName)
-                    ?: projectDictionaryRegistry.createDictionary(applicationName)
-            return dictionary?.findAllCommandsWithName(commandName) ?: emptyList()
-        }
+        ): List<AppleScriptCommand> = commandLookup.findApplicationCommands(project, applicationName, commandName)
 
         // XML parsing pipeline.
 
@@ -380,206 +298,7 @@ class SdefIndexService
         fun parseDictionaryFile(
             xmlFile: File,
             applicationName: String,
-        ): Boolean {
-            try {
-                val document: Document = LegacyJdomParser.build(xmlFile)
-                val rootNode: Element = document.rootElement
-                val suiteElements: List<Element> = rootNode.children.toList()
-
-                if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
-                    for (suiteElem in suiteElements) {
-                        parseSuiteElementForApplication(suiteElem, applicationName)
-                        parseSuiteElementForScriptingAdditions(suiteElem, applicationName)
-                    }
-                } else {
-                    for (suiteElem in suiteElements) {
-                        parseSuiteElementForApplication(suiteElem, applicationName)
-                    }
-                }
-                return true
-            } catch (e: JDOMException) {
-                LOG.warn("Exception occurred while parsing dictionary file", e)
-            } catch (e: IOException) {
-                LOG.warn("Exception occurred while parsing dictionary file", e)
-            }
-            return false
-        }
-
-        private fun parseSuiteElementForScriptingAdditions(
-            suiteElem: Element,
-            applicationName: String,
-        ) {
-            val elements = parsedSuiteElements(suiteElem)
-
-            for (valType in elements.valueTypes) {
-                parseClassElement(applicationName, valType)
-            }
-
-            for (classTag in elements.classes) {
-                parseClassElement(applicationName, classTag)
-                parseElementsForApplication(
-                    classTag.getChildren("property"),
-                    applicationName,
-                    indexStore.stdPropertyNameToDictionarySetMap,
-                )
-            }
-
-            for (classTag in elements.classExtensions) {
-                parseClassElement(applicationName, classTag)
-                parseElementsForApplication(
-                    classTag.getChildren("property"),
-                    applicationName,
-                    indexStore.stdPropertyNameToDictionarySetMap,
-                )
-            }
-
-            parseElementsForApplication(
-                elements.commands,
-                applicationName,
-                indexStore.stdCommandNameToApplicationNameSetMap,
-            )
-            parseElementsForApplication(
-                elements.recordTypes,
-                applicationName,
-                indexStore.stdRecordNameToApplicationNameSetMap,
-            )
-
-            for (recordTag in elements.recordTypes) {
-                parseElementsForApplication(
-                    recordTag.getChildren("property"),
-                    applicationName,
-                    indexStore.stdPropertyNameToDictionarySetMap,
-                )
-            }
-
-            parseElementsForApplication(
-                elements.enumerations,
-                applicationName,
-                indexStore.stdEnumerationNameToApplicationNameSetMap,
-            )
-
-            for (enumerationTag in elements.enumerations) {
-                parseElementsForApplication(
-                    enumerationTag.getChildren("enumerator"),
-                    applicationName,
-                    indexStore.stdEnumeratorConstantNameToApplicationNameListMap,
-                )
-            }
-        }
-
-        private fun parseSuiteElementForApplication(
-            suiteElem: Element,
-            applicationName: String,
-        ) {
-            val elements = parsedSuiteElements(suiteElem)
-
-            parseIncludesForApplication(suiteElem, applicationName)
-
-            for (valType in elements.valueTypes) {
-                parseClassElement(applicationName, valType)
-            }
-
-            for (classTag in elements.classes) {
-                parseClassElement(applicationName, classTag)
-                parseHashElementsForApplication(
-                    classTag.getChildren("property"),
-                    applicationName,
-                    indexStore.applicationNameToPropertySetMap,
-                )
-            }
-
-            for (classTag in elements.classExtensions) {
-                parseClassElement(applicationName, classTag)
-                parseHashElementsForApplication(
-                    classTag.getChildren("property"),
-                    applicationName,
-                    indexStore.applicationNameToPropertySetMap,
-                )
-            }
-
-            parseHashElementsForApplication(
-                elements.commands,
-                applicationName,
-                indexStore.applicationNameToCommandNameSetMap,
-            )
-            parseHashElementsForApplication(
-                elements.recordTypes,
-                applicationName,
-                indexStore.applicationNameToRecordNameSetMap,
-            )
-
-            for (recordTag in elements.recordTypes) {
-                parseHashElementsForApplication(
-                    recordTag.getChildren("property"),
-                    applicationName,
-                    indexStore.applicationNameToPropertySetMap,
-                )
-            }
-
-            parseHashElementsForApplication(
-                elements.enumerations,
-                applicationName,
-                indexStore.applicationNameToEnumerationNameSetMap,
-            )
-
-            for (enumerationTag in elements.enumerations) {
-                parseHashElementsForApplication(
-                    enumerationTag.getChildren("enumerator"),
-                    applicationName,
-                    indexStore.applicationNameToEnumeratorConstantNameSetMap,
-                )
-            }
-        }
-
-        private fun parseIncludesForApplication(
-            suiteElem: Element,
-            applicationName: String,
-        ) {
-            val xIncludeNs = Namespace.getNamespace(XINCLUDE_NAMESPACE_URI)
-            val xiIncludes: List<Element> = suiteElem.getChildren("include", xIncludeNs).toList()
-            for (include in xiIncludes) {
-                var hrefIncl = include.getAttributeValue("href")
-                hrefIncl = hrefIncl.replace("localhost", "")
-                val inclFile = File(hrefIncl)
-                if (inclFile.exists()) {
-                    parseDictionaryFile(inclFile, applicationName)
-                }
-            }
-        }
-
-        private fun parseClassElement(
-            applicationName: String,
-            classElement: Element,
-        ) {
-            val className = classElement.getAttributeValue("name")
-            val code = classElement.getAttributeValue("code")
-            var pluralClassName = classElement.getAttributeValue("plural")
-            if (className == null || code == null) return
-            pluralClassName = if (!StringUtil.isEmpty(pluralClassName)) pluralClassName else "${className}s"
-
-            updateObjectNameSetForApplication(
-                className,
-                applicationName,
-                indexStore.applicationNameToClassNameSetMap,
-            )
-            updateObjectNameSetForApplication(
-                pluralClassName,
-                applicationName,
-                indexStore.applicationNameToClassNamePluralSetMap,
-            )
-            if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
-                updateApplicationNameSetFor(
-                    className,
-                    applicationName,
-                    indexStore.stdClassNameToApplicationNameSetMap,
-                )
-                updateApplicationNameSetFor(
-                    pluralClassName,
-                    applicationName,
-                    indexStore.stdClassNamePluralToApplicationNameSetMap,
-                )
-            }
-        }
+        ): Boolean = indexIngestor.parseDictionaryFile(xmlFile, applicationName)
 
         // Helpers.
 
@@ -596,42 +315,7 @@ class SdefIndexService
          * `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` back-edge that DFS would
          * otherwise detect as a cycle (plan-checker BLOCKER 1 mitigation).
          */
-        private fun facadeInitialized(): Boolean = ParsableScriptSuiteRegistryHelper.isInitialized()
-
-        private fun isStandardReady(): Boolean =
-            facadeInitialized() ||
-                awaitReady("standardReady", ParsableScriptSuiteRegistryHelper::awaitStandardReady)
-
-        private fun isAppReady(): Boolean =
-            ParsableScriptSuiteRegistryHelper.areAppDictionariesIndexed() ||
-                awaitReady("appsReady", ParsableScriptSuiteRegistryHelper::awaitAppsReady)
-
-        private fun awaitReady(
-            gateName: String,
-            awaitGate: suspend () -> Result<Unit>,
-        ): Boolean {
-            val future = CompletableFuture<Result<Unit>>()
-            serviceScope.launch(start = CoroutineStart.UNDISPATCHED) {
-                future.complete(awaitGate())
-            }
-            val gate =
-                try {
-                    future.get(COMMAND_READY_TIMEOUT.inWholeMilliseconds, TimeUnit.MILLISECONDS)
-                } catch (e: TimeoutException) {
-                    LOG.warn(
-                        "Timed out after $COMMAND_READY_TIMEOUT waiting on $gateName; " +
-                            "returning empty results",
-                        e,
-                    )
-                    null
-                } catch (e: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    Result.failure(e)
-                } catch (e: ExecutionException) {
-                    Result.failure(e.cause ?: e)
-                }
-            return gate?.isSuccess == true
-        }
+        private fun facadeInitialized(): Boolean = SdefIndexReadiness.isInitialized()
 
         companion object {
             @JvmStatic
@@ -639,85 +323,5 @@ class SdefIndexService
                 ApplicationManager
                     .getApplication()
                     .getService(SdefIndexService::class.java)
-
-            private fun parseElementsForApplication(
-                xmlElements: List<Element>,
-                applicationName: String,
-                objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
-            ) {
-                for (applicationObjectTag in xmlElements) {
-                    parseSimpleElementForObject(
-                        applicationObjectTag,
-                        applicationName,
-                        objectTagNameToApplicationNameListMap,
-                    )
-                }
-            }
-
-            private fun parseHashElementsForApplication(
-                xmlElements: List<Element>,
-                applicationName: String,
-                objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
-            ) {
-                for (applicationObjectTag in xmlElements) {
-                    hashSimpleElementForObject(
-                        applicationObjectTag,
-                        applicationName,
-                        objectTagNameToApplicationNameListMap,
-                    )
-                }
-            }
-
-            private fun parseSimpleElementForObject(
-                suiteObjectElement: Element,
-                applicationName: String,
-                objectNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>>,
-            ) {
-                val objectName = suiteObjectElement.getAttributeValue("name")
-                val code = suiteObjectElement.getAttributeValue("code")
-                if (objectName == null || code == null) return
-                updateApplicationNameSetFor(objectName, applicationName, objectNameToApplicationNameSetMap)
-            }
-
-            private fun hashSimpleElementForObject(
-                suiteObjectElement: Element,
-                applicationName: String,
-                objectNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
-            ) {
-                val objectName = suiteObjectElement.getAttributeValue("name")
-                val code = suiteObjectElement.getAttributeValue("code")
-                if (objectName == null || code == null) return
-                updateObjectNameSetForApplication(objectName, applicationName, objectNameToApplicationNameListMap)
-            }
-
-            private fun updateApplicationNameSetFor(
-                applicationObjectName: String,
-                applicationName: String,
-                applicationNameSetMap: MutableMap<String, MutableSet<String>>,
-            ) {
-                if (StringUtil.isEmpty(applicationObjectName)) return
-                // Atomic get-or-put-and-mutate per D-03: ConcurrentHashMap.compute serialises
-                // the (lookup, allocate, insert, add) tuple inside a single bucket lock.
-                applicationNameSetMap.compute(applicationObjectName) { _, existing ->
-                    (existing ?: ConcurrentHashMap.newKeySet()).also { it.add(applicationName) }
-                }
-            }
-
-            private fun updateObjectNameSetForApplication(
-                applicationObjectName: String,
-                applicationName: String,
-                applicationNameSetMap: MutableMap<String, MutableSet<String>>,
-            ) {
-                if (StringUtil.isEmpty(applicationName)) return
-                // Atomic get-or-put-and-mutate per D-03.
-                applicationNameSetMap.compute(applicationName) { _, existing ->
-                    (existing ?: ConcurrentHashMap.newKeySet()).also { it.add(applicationObjectName) }
-                }
-            }
-
-            private fun startsWithWord(
-                string: String,
-                prefix: String,
-            ): Boolean = string.startsWith(prefix) && (prefix.length == string.length || ' ' == string[prefix.length])
         }
     }

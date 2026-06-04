@@ -610,6 +610,7 @@ tasks {
                 ) +
                 serviceWithOwnedFiles(
                     "AppleScriptSystemDictionaryRegistryService",
+                    "DictionaryInitializationCoordinator",
                     "DictionaryRegistries",
                     "StandardDictionaryInitializer",
                 )
