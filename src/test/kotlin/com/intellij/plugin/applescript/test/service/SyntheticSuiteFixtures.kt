@@ -70,6 +70,31 @@ object SyntheticSuiteFixtures {
         </dictionary>
         """.trimIndent()
 
+    fun musicAppPlayCommandWithXIncludeXml(includeHref: String?): String {
+        val includeTag =
+            if (includeHref == null) {
+                "<xi:include/>"
+            } else {
+                "<xi:include href=\"$includeHref\"/>"
+            }
+        return listOf(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<dictionary title=\"Music Terminology\">",
+            "    <suite xmlns:xi=\"http://www.w3.org/2003/XInclude\"",
+            "        name=\"Music Suite\"",
+            "        code=\"$MUSIC_SUITE_CODE\"",
+            "        description=\"Classes and commands for Music\">",
+            "        $includeTag",
+            "        <command",
+            "            name=\"play\"",
+            "            code=\"$MUSIC_PLAY_COMMAND_CODE\"",
+            "            description=\"Play the current track\"",
+            "        />",
+            "    </suite>",
+            "</dictionary>",
+        ).joinToString(separator = "\n")
+    }
+
     /**
      * Real macOS `sdef` output includes this Apple DTD declaration. The parser must allow the
      * declaration while still refusing external DTD/entity loading.

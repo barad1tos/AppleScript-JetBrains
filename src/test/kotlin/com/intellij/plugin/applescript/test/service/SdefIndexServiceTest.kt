@@ -113,6 +113,42 @@ class SdefIndexServiceTest {
         }
 
     @Test
+    fun ingestMusicSuiteSkipsXIncludeWithoutHref() =
+        runTest {
+            val service = newService(testScheduler)
+            val xml = SyntheticSuiteFixtures.musicAppPlayCommandWithXIncludeXml(includeHref = null)
+            val file = SyntheticSuiteFixtures.writeToTempFile("music-missing-xinclude-href", xml)
+
+            val result: IngestResult = service.ingest("Music", file)
+
+            assertTrue(result is IngestResult.Success, "missing XInclude href must not crash ingest, got $result")
+            assertTrue(
+                service.snapshot().isApplicationCommand("Music", "play"),
+                "Music play command must still be indexed when a malformed XInclude is skipped",
+            )
+        }
+
+    @Test
+    fun ingestMusicSuiteSkipsRecursiveXIncludeCycle() =
+        runTest {
+            val service = newService(testScheduler)
+            val firstFile = java.io.File.createTempFile("synthetic-music-include-cycle-first-", ".sdef")
+            val secondFile = java.io.File.createTempFile("synthetic-music-include-cycle-second-", ".sdef")
+            firstFile.deleteOnExit()
+            secondFile.deleteOnExit()
+            firstFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandWithXIncludeXml(secondFile.absolutePath))
+            secondFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandWithXIncludeXml(firstFile.absolutePath))
+
+            val result: IngestResult = service.ingest("Music", firstFile)
+
+            assertTrue(result is IngestResult.Success, "recursive XInclude cycle must not crash ingest, got $result")
+            assertTrue(
+                service.snapshot().isApplicationCommand("Music", "play"),
+                "Music play command must still be indexed when a recursive XInclude is skipped",
+            )
+        }
+
+    @Test
     fun ingestScriptingAdditionsPlacesDoShellScriptInStdCommandIndex() =
         runTest {
             val service = newService(testScheduler)

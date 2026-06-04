@@ -13,6 +13,7 @@ import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 private const val XINCLUDE_NAMESPACE_URI: String = "http" + "://www.w3.org/2003/XInclude"
+private const val MAX_XINCLUDE_DEPTH: Int = 64
 
 private data class ParsedSuiteElements(
     val classes: List<Element>,
@@ -47,29 +48,46 @@ internal class SdefIndexIngestor(
     fun parseDictionaryFile(
         xmlFile: File,
         applicationName: String,
-    ): Boolean {
-        try {
-            val document: Document = LegacyJdomParser.build(xmlFile)
-            val rootNode: Element = document.rootElement
-            val suiteElements: List<Element> = rootNode.children.toList()
+    ): Boolean =
+        parseDictionaryFile(
+            xmlFile = xmlFile,
+            applicationName = applicationName,
+            visitedFiles = mutableSetOf(),
+            includeDepth = 0,
+        )
 
-            if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
-                for (suiteElem in suiteElements) {
-                    parseSuiteElementForApplication(suiteElem, applicationName)
-                    parseSuiteElementForScriptingAdditions(suiteElem, applicationName)
+    private fun parseDictionaryFile(
+        xmlFile: File,
+        applicationName: String,
+        visitedFiles: MutableSet<String>,
+        includeDepth: Int,
+    ): Boolean {
+        var parsed = true
+        if (visitedFiles.add(xmlFile.stablePath())) {
+            try {
+                val document: Document = LegacyJdomParser.build(xmlFile)
+                val rootNode: Element = document.rootElement
+                val suiteElements: List<Element> = rootNode.children.toList()
+
+                if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
+                    for (suiteElem in suiteElements) {
+                        parseSuiteElementForApplication(suiteElem, applicationName, visitedFiles, includeDepth)
+                        parseSuiteElementForScriptingAdditions(suiteElem, applicationName)
+                    }
+                } else {
+                    for (suiteElem in suiteElements) {
+                        parseSuiteElementForApplication(suiteElem, applicationName, visitedFiles, includeDepth)
+                    }
                 }
-            } else {
-                for (suiteElem in suiteElements) {
-                    parseSuiteElementForApplication(suiteElem, applicationName)
-                }
+            } catch (e: JDOMException) {
+                log.warn("Exception occurred while parsing dictionary file", e)
+                parsed = false
+            } catch (e: IOException) {
+                log.warn("Exception occurred while parsing dictionary file", e)
+                parsed = false
             }
-            return true
-        } catch (e: JDOMException) {
-            log.warn("Exception occurred while parsing dictionary file", e)
-        } catch (e: IOException) {
-            log.warn("Exception occurred while parsing dictionary file", e)
         }
-        return false
+        return parsed
     }
 
     private fun parseSuiteElementForScriptingAdditions(
@@ -137,10 +155,12 @@ internal class SdefIndexIngestor(
     private fun parseSuiteElementForApplication(
         suiteElem: Element,
         applicationName: String,
+        visitedFiles: MutableSet<String>,
+        includeDepth: Int,
     ) {
         val elements = parsedSuiteElements(suiteElem)
 
-        parseIncludesForApplication(suiteElem, applicationName)
+        parseIncludesForApplication(suiteElem, applicationName, visitedFiles, includeDepth)
 
         for (valType in elements.valueTypes) {
             parseClassElement(applicationName, valType)
@@ -201,15 +221,20 @@ internal class SdefIndexIngestor(
     private fun parseIncludesForApplication(
         suiteElem: Element,
         applicationName: String,
+        visitedFiles: MutableSet<String>,
+        includeDepth: Int,
     ) {
+        if (includeDepth >= MAX_XINCLUDE_DEPTH) {
+            log.warn("Skipping SDEF XInclude chain deeper than $MAX_XINCLUDE_DEPTH for [$applicationName].")
+            return
+        }
         val xIncludeNs = Namespace.getNamespace(XINCLUDE_NAMESPACE_URI)
         val xiIncludes: List<Element> = suiteElem.getChildren("include", xIncludeNs).toList()
         for (include in xiIncludes) {
-            var hrefIncl = include.getAttributeValue("href")
-            hrefIncl = hrefIncl.replace("localhost", "")
+            val hrefIncl = include.getAttributeValue("href")?.replace("localhost", "") ?: continue
             val inclFile = File(hrefIncl)
             if (inclFile.exists()) {
-                parseDictionaryFile(inclFile, applicationName)
+                parseDictionaryFile(inclFile, applicationName, visitedFiles, includeDepth + 1)
             }
         }
     }
@@ -248,6 +273,13 @@ internal class SdefIndexIngestor(
         }
     }
 }
+
+private fun File.stablePath(): String =
+    try {
+        canonicalPath
+    } catch (_: IOException) {
+        absolutePath
+    }
 
 private fun parseElementsForApplication(
     xmlElements: List<Element>,
