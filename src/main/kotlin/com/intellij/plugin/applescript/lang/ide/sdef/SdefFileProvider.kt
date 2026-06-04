@@ -11,6 +11,7 @@ import com.intellij.plugin.applescript.lang.dictionary.discovery.DeveloperToolsN
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DictionaryLoadResult
 import com.intellij.plugin.applescript.lang.dictionary.discovery.NotScriptableApplicationException
 import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
+import com.intellij.plugin.applescript.lang.dictionary.xml.LegacyJdomParser
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.extensionSupported

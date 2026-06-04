@@ -1,7 +1,7 @@
 package com.intellij.plugin.applescript.lang.dictionary.index
 
 /**
- * Phase 4 SERVICE-09 (D-05): Sealed return type for [com.intellij.plugin.applescript.lang.ide.sdef.SdefIndexService]
+ * Phase 4 SERVICE-09 (D-05): Sealed return type for [SdefIndexService]
  * internal lookups.
  *
  * Service-INTERNAL — the public [com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper]

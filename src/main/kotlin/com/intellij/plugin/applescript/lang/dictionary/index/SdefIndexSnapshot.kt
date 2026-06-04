@@ -3,7 +3,7 @@ package com.intellij.plugin.applescript.lang.dictionary.index
 /**
  * Phase 4 D-03: Immutable snapshot of the SDEF index state.
  *
- * Returned by [com.intellij.plugin.applescript.lang.ide.sdef.SdefIndexService.snapshot]. Callers
+ * Returned by [SdefIndexService.snapshot]. Callers
  * can hand this to lookup methods for hermetic-test reads OR observe it post-ingest in production.
  *
  * Modelled on Phase 2 [com.intellij.plugin.applescript.lang.sdef.DictionaryIndexes][SDEF-05] value
