@@ -44,7 +44,6 @@ import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
-import java.util.concurrent.ConcurrentHashMap
 
 @Service(Service.Level.APP)
 @State(
@@ -72,9 +71,8 @@ class AppleScriptSystemDictionaryRegistryService
         private val progressTaskCompat: ProgressTaskCompat = ProgressTaskCompatDefault(),
     ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()),
         ParsableScriptHelper {
-        // persisted data
-        private val dictionaryInfoMap: MutableMap<String, DictionaryInfo> = ConcurrentHashMap()
-        private val notScriptableApplications: MutableSet<String> = ConcurrentHashMap.newKeySet()
+        private val dictionaryInfoRegistry = DictionaryInfoRegistry()
+        private val notScriptableApplicationRegistry = NotScriptableApplicationRegistry()
         private val persistence: SdefPersistenceService
             get() = SdefPersistenceService.getInstance()
         private val discovery: ApplicationDiscoveryService
@@ -285,7 +283,7 @@ class AppleScriptSystemDictionaryRegistryService
          * routes through [SdefPersistenceService]).
          */
         internal fun removeDictionaryInfoInMemoryInternal(applicationName: String) {
-            dictionaryInfoMap.remove(applicationName)
+            dictionaryInfoRegistry.removeInMemory(applicationName)
         }
 
         /**
@@ -296,14 +294,14 @@ class AppleScriptSystemDictionaryRegistryService
          */
         internal fun addDictionaryInfoInternal(info: DictionaryInfo): Boolean {
             val appName = info.getApplicationName()
-            val wasAbsent = dictionaryInfoMap.put(appName, info) == null
+            val wasAbsent = dictionaryInfoRegistry.add(info)
             // Wave 3 (SERVICE-03): discoveredApplicationNames lives on ApplicationDiscoveryService.
             // Internal caller routes through the service<X>() lookup — this is an init-time hot
             // path during cache load, but the static service lookup is O(1) and the wave's
             // architecture goal (single owner per state) overrides the hop-avoidance heuristic
             // from Wave 2 (which was specific to the Pattern A back-edge into the facade itself).
             discovery.addDiscoveredApplicationName(appName)
-            notScriptableApplications.remove(appName)
+            notScriptableApplicationRegistry.remove(appName)
             return wasAbsent
         }
 
@@ -319,7 +317,7 @@ class AppleScriptSystemDictionaryRegistryService
          * live `Map.values` view, so callers cannot accidentally mutate the registry through the
          * returned reference.
          */
-        internal fun dictionaryInfoSnapshotInternal(): List<DictionaryInfo> = dictionaryInfoMap.values.toList()
+        internal fun dictionaryInfoSnapshotInternal(): List<DictionaryInfo> = dictionaryInfoRegistry.snapshot
 
         /**
          * Remove a [DictionaryInfo] by its application path. Returns `true` if a matching entry
@@ -327,19 +325,8 @@ class AppleScriptSystemDictionaryRegistryService
          * well-known `CocoaStandard.sdef` suffix to preserve the historical
          * [getDictionaryInfoByApplicationPath] resolution.
          */
-        internal fun removeDictionaryInfoByPathInternal(applicationPath: String): Boolean {
-            val matchingKey =
-                dictionaryInfoMap.entries
-                    .firstOrNull { entry -> entry.value.getApplicationFile()?.path == applicationPath }
-                    ?.key
-
-            return matchingKey?.let { dictionaryInfoMap.remove(it) != null }
-                ?: removeCocoaStandardDictionaryIfMatched(applicationPath)
-        }
-
-        private fun removeCocoaStandardDictionaryIfMatched(applicationPath: String): Boolean =
-            applicationPath.endsWith("CocoaStandard.sdef") &&
-                dictionaryInfoMap.remove(ApplicationDictionary.COCOA_STANDARD_LIBRARY) != null
+        internal fun removeDictionaryInfoByPathInternal(applicationPath: String): Boolean =
+            dictionaryInfoRegistry.removeByPath(applicationPath)
 
         /**
          * Defensive snapshot of the notScriptable set. Returns a [HashSet] to preserve the
@@ -347,7 +334,7 @@ class AppleScriptSystemDictionaryRegistryService
          * callers may depend on the concrete `HashSet` API surface; Wave 6 may narrow to
          * read-only `Set`).
          */
-        internal fun notScriptableSnapshotInternal(): HashSet<String> = HashSet(notScriptableApplications)
+        internal fun notScriptableSnapshotInternal(): HashSet<String> = notScriptableApplicationRegistry.snapshot
 
         /**
          * Trampoline (Phase 4 SERVICE-02): defers to
@@ -363,7 +350,7 @@ class AppleScriptSystemDictionaryRegistryService
          * inside this facade like [getInitializedInfo]) to avoid the service lookup hop on hot
          * paths.
          */
-        internal fun isNotScriptableInternal(name: String): Boolean = name in notScriptableApplications
+        internal fun isNotScriptableInternal(name: String): Boolean = name in notScriptableApplicationRegistry
 
         /**
          * In-memory membership test on the "not found" list. Wave 3 (SERVICE-03) migrated the
@@ -380,13 +367,13 @@ class AppleScriptSystemDictionaryRegistryService
          * Idempotent. The persisted-state machinery serialises on its own cadence (per
          * `getState()`), matching the v1.0 behaviour byte-for-byte (SDEF-13 fixture invariant).
          */
-        internal fun addNotScriptableInternal(name: String): Boolean = notScriptableApplications.add(name)
+        internal fun addNotScriptableInternal(name: String): Boolean = notScriptableApplicationRegistry.add(name)
 
         /**
          * Remove an application from the notScriptable persisted set; returns `true` if the
          * name was present and removed.
          */
-        internal fun removeNotScriptableInternal(name: String): Boolean = notScriptableApplications.remove(name)
+        internal fun removeNotScriptableInternal(name: String): Boolean = notScriptableApplicationRegistry.remove(name)
 
         // Phase 4 SERVICE-04 (Wave 4) trampoline: scripting-additions set lives on
         // [SdefFileProvider] (populated by initializeScriptingAdditions, consumed by
@@ -422,61 +409,21 @@ class AppleScriptSystemDictionaryRegistryService
          * drift — the SDEF-13 golden fixture regression-locks the resulting XML format).
          */
         internal fun writeToStateInternal(state: PersistedState) {
-            val dictionaryInfos = dictionaryInfoMap.values
-            state.dictionariesInfo = Array(dictionaryInfos.size) { DictionaryInfo.State() }
-            val iterator = dictionaryInfos.iterator()
-            for (i in state.dictionariesInfo.indices) {
-                state.dictionariesInfo[i] = iterator.next().state
-            }
-            if (state.notScriptableApplications == null) {
-                state.notScriptableApplications = ArrayList()
-            } else {
-                // Reached only in the else of the == null check; the mutable BaseState property defeats
-                // smart-cast, so assert the non-null invariant the == null guard establishes.
-                requireNotNull(state.notScriptableApplications) {
-                    "notScriptableApplications non-null: this is the else branch of the == null check"
-                }.clear()
-            }
-            // notScriptableApplications is non-null after the if/else above (either freshly assigned
-            // an ArrayList, or already non-null and cleared). It is a mutable BaseState property, so
-            // Kotlin flow-analysis cannot smart-cast across the branch — assert the invariant explicitly.
-            requireNotNull(state.notScriptableApplications) {
-                "notScriptableApplications non-null: assigned-or-cleared in the if/else above"
-            }.addAll(notScriptableApplications)
+            dictionaryInfoRegistry.writeToState(state)
+            notScriptableApplicationRegistry.writeToState(state)
         }
 
         /**
-         * Fills [dictionaryInfoMap] from previously persisted [PersistedState].
+         * Fills the in-memory dictionary registry from previously persisted [PersistedState].
          *
          * Body extracted from the pre-Wave-2 private `initDictionariesInfoFromCache` byte-for-byte.
          * The SDEF-13 golden fixture regression-locks that the wire-format -> in-memory
          * reconstruction is unchanged.
          */
         internal fun initDictionariesInfoFromCacheInternal(state: PersistedState) {
-            notScriptableApplications.clear()
-            state.notScriptableApplications?.let { notScriptableApplications.addAll(it) }
-            state.dictionariesInfo.mapNotNull(::dictionaryInfoFromState).forEach { info ->
-                dictionaryInfoMap.remove(info.getApplicationName())
+            notScriptableApplicationRegistry.readFromState(state)
+            dictionaryInfoRegistry.readFromState(state) { info ->
                 addDictionaryInfoInternal(info)
-            }
-        }
-
-        private fun dictionaryInfoFromState(state: DictionaryInfo.State): DictionaryInfo? {
-            val applicationName = state.applicationName?.takeUnless { StringUtil.isEmptyOrSpaces(it) }
-            val dictionaryFile =
-                state.dictionaryUrl
-                    ?.takeUnless { StringUtil.isEmptyOrSpaces(it) }
-                    ?.let(::File)
-                    ?.takeIf { it.exists() }
-            val applicationFile =
-                state.applicationUrl
-                    ?.takeUnless { StringUtil.isEmpty(it) }
-                    ?.let(::File)
-
-            return if (applicationName != null && dictionaryFile != null) {
-                DictionaryInfo(applicationName, dictionaryFile, applicationFile)
-            } else {
-                null
             }
         }
 
@@ -530,7 +477,7 @@ class AppleScriptSystemDictionaryRegistryService
         }
 
         private fun initializeKnownDictionaryFromCache(applicationName: String): Boolean {
-            val dictionaryInfo = dictionaryInfoMap[applicationName] ?: return false
+            val dictionaryInfo = getDictionaryInfo(applicationName) ?: return false
             return dictionaryInfo.initialized || initializeDictionaryFromInfo(dictionaryInfo)
         }
 
@@ -703,7 +650,7 @@ class AppleScriptSystemDictionaryRegistryService
          * Phase 4 SERVICE-05 (Wave 5): the parse step now routes through
          * [SdefIndexService.parseDictionaryFile]; the 14 index maps live on the service.
          * Failure-recovery branch (remove broken file from cache) still owned by the facade
-         * because it touches the @State-tagged [dictionaryInfoMap] (Pattern A invariant).
+         * because it touches the @State-backed [dictionaryInfoRegistry] (Pattern A invariant).
          */
         private fun initializeDictionaryFromInfo(dictionaryInfo: DictionaryInfo): Boolean {
             val file = File(dictionaryInfo.getDictionaryFile().path)
@@ -723,11 +670,11 @@ class AppleScriptSystemDictionaryRegistryService
         /**
          * Phase 4 SERVICE-04 (Wave 4) internal accessor: exposes the in-memory
          * [DictionaryInfo] registry lookup by name for [SdefFileProvider]. The facade still
-         * owns the persisted-state-tagged [dictionaryInfoMap] (Pattern A — annotation is tied
+         * owns the persisted-state-tagged [dictionaryInfoRegistry] (Pattern A — annotation is tied
          * to class identity by `COMPONENT_NAME`); the service reads via this typed accessor
          * to avoid duplicating the map. Returns `null` when no entry exists.
          */
-        internal fun getDictionaryInfoByNameInternal(name: String?): DictionaryInfo? = dictionaryInfoMap[name]
+        internal fun getDictionaryInfoByNameInternal(name: String?): DictionaryInfo? = dictionaryInfoRegistry[name]
 
         /**
          * Phase 4 SERVICE-04 (Wave 4) internal helper: exposes the private parse-and-mark
@@ -866,7 +813,7 @@ class AppleScriptSystemDictionaryRegistryService
          * `internal fun getDictionaryInfoByNameInternal` accessor above (functionally
          * identical; visibility is the only difference).
          */
-        private fun getDictionaryInfo(applicationName: String?): DictionaryInfo? = dictionaryInfoMap[applicationName]
+        private fun getDictionaryInfo(applicationName: String?): DictionaryInfo? = dictionaryInfoRegistry[applicationName]
 
         /**
          * Phase 4 SERVICE-04 (Wave 4) trampoline: routes through
@@ -885,7 +832,7 @@ class AppleScriptSystemDictionaryRegistryService
         fun getDictionaryInfoByApplicationPath(applicationPath: String): DictionaryInfo? =
             dictionaryFiles.getDictionaryInfoByApplicationPath(applicationPath)
 
-        fun getCachedApplicationNames(): Collection<String> = dictionaryInfoMap.keys
+        fun getCachedApplicationNames(): Collection<String> = dictionaryInfoRegistry.cachedApplicationNames
 
         /**
          * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
@@ -896,7 +843,7 @@ class AppleScriptSystemDictionaryRegistryService
          */
         fun getDiscoveredApplicationNames(): HashSet<String> = discovery.getDiscoveredApplicationNames()
 
-        fun isDictionaryInitialized(name: String): Boolean = dictionaryInfoMap[name]?.initialized == true
+        fun isDictionaryInitialized(name: String): Boolean = dictionaryInfoRegistry.isInitialized(name)
 
         // Phase 4 SERVICE-05 (Wave 5): parseDictionaryFile + parseSuiteElementForApplication +
         // parseSuiteElementForScriptingAdditions + parseClassElement migrated to
