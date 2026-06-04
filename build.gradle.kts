@@ -614,15 +614,19 @@ tasks {
                 // Project-level dictionary cache reads the app-level registry, while SdefIndexService
                 // can consult project dictionaries from query paths. Keep that lifecycle boundary
                 // explicit instead of modelling project and app services as one cycle graph.
-                "AppleScriptProjectDictionaryService",
+                "src/main/kotlin/com/intellij/plugin/applescript/lang/dictionary/project/" +
+                    "AppleScriptProjectDictionaryService.kt",
             )
 
         fun serviceLookupPatterns(dep: String): List<String> =
             listOf(
                 "service<$dep>",
                 "$dep.getInstance",
-                "service<$dep::class.java>",
+                "getService($dep::class.java)",
             )
+
+        val serviceLookupPatternsByService = services.associateWith(::serviceLookupPatterns)
+        val serviceAnnotationPattern = Regex("""(^|\s)@Service(\s|\()""")
 
         // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
         // back-edge from a service to the facade is a DATA dependency (reading state.X), not
@@ -690,11 +694,14 @@ tasks {
                         val body = file.readText()
                         val owner = serviceOwnerByFile[file.nameWithoutExtension]
                         if (owner == null) {
+                            val relativePath = file.relativeTo(projectDir).invariantSeparatorsPath
                             val hasTrackedServiceLookup =
-                                services.any { dep -> serviceLookupPatterns(dep).any { body.contains(it) } }
-                            val declaresService = body.contains("@Service")
+                                serviceLookupPatternsByService.values.any { patterns ->
+                                    patterns.any { body.contains(it) }
+                                }
+                            val declaresService = serviceAnnotationPattern.containsMatchIn(body)
                             if (
-                                file.nameWithoutExtension !in filesOutsideAppServiceGraph &&
+                                relativePath !in filesOutsideAppServiceGraph &&
                                 (declaresService || hasTrackedServiceLookup)
                             ) {
                                 error(
@@ -709,7 +716,7 @@ tasks {
                             if (dep == owner) return@forEach
                             // Skip data-hop edges (RESEARCH §5).
                             if (owner to dep in dataHopAllowlist) return@forEach
-                            val patterns = serviceLookupPatterns(dep)
+                            val patterns = serviceLookupPatternsByService.getValue(dep)
                             if (patterns.any { body.contains(it) }) {
                                 adjacency[owner]!!.add(dep)
                             }
