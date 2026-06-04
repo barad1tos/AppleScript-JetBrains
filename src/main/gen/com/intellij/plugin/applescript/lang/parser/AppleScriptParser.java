@@ -4548,7 +4548,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // of|in|APS|<<isPossessivePpronoun>>
+  // of|in|APS|<<isPossessivePronoun>>
   static boolean objectPointer(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "objectPointer")) return false;
     boolean result_;
@@ -4556,7 +4556,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     result_ = consumeToken(builder_, OF);
     if (!result_) result_ = consumeToken(builder_, IN);
     if (!result_) result_ = consumeToken(builder_, APS);
-    if (!result_) result_ = isPossessivePpronoun(builder_, level_ + 1);
+    if (!result_) result_ = isPossessivePronoun(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
@@ -4821,7 +4821,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // (APS|<<isPossessivePpronoun>>) handlerInterleavedParametersCall
+  // (APS|<<isPossessivePronoun>>) handlerInterleavedParametersCall
   static boolean possessiveFormAndInterleavedCall(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "possessiveFormAndInterleavedCall")) return false;
     boolean result_;
@@ -4832,13 +4832,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // APS|<<isPossessivePpronoun>>
+  // APS|<<isPossessivePronoun>>
   private static boolean possessiveFormAndInterleavedCall_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "possessiveFormAndInterleavedCall_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeToken(builder_, APS);
-    if (!result_) result_ = isPossessivePpronoun(builder_, level_ + 1);
+    if (!result_) result_ = isPossessivePronoun(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }

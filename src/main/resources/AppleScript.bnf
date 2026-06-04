@@ -878,8 +878,8 @@ private objectReferenceWrapper ::= THE_KW? prefixExpression objectReferenceExpre
 // see <<parseObjectReference>>
 left objectReferenceExpression ::=  ( possessiveFormAndInterleavedCall | objectPointer THE_KW? prefixExpression )
 
-private possessiveFormAndInterleavedCall ::= (APS|<<isPossessivePpronoun>>) handlerInterleavedParametersCall
-private objectPointer ::= of|in|APS|<<isPossessivePpronoun>>
+private possessiveFormAndInterleavedCall ::= (APS|<<isPossessivePronoun>>) handlerInterleavedParametersCall
+private objectPointer ::= of|in|APS|<<isPossessivePronoun>>
 
 private prefixExpression ::= (prefixOperator prefixExpression) | valueExpression
 private prefixOperator ::= PLUS|MINUS

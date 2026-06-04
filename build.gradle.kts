@@ -352,6 +352,7 @@ tasks {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.DictionariesRandomParsingTestCase")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellApplicationMusicTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.FallbackCommandParameterParserTest")
                 // Phase 8 PARSE-01 (plan 08-01): RealWorldCorpusTest is the v2.0
                 // "corpus is the contract" harness — realistic production-shaped
                 // scripts asserting zero PsiErrorElement. BasePlatformTestCase boots
