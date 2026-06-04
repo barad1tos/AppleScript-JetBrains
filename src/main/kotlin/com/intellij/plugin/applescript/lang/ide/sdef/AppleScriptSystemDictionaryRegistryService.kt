@@ -20,6 +20,8 @@ import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgre
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompatDefault
 import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
+import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
+import com.intellij.plugin.applescript.lang.dictionary.files.stream2file
 import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
