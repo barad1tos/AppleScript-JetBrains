@@ -1,6 +1,6 @@
 package com.intellij.plugin.applescript.lang.dictionary.discovery
 
-import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 
 /**
  * Phase 4 SERVICE-09 (plan 04-04 / D-05): sealed return type for

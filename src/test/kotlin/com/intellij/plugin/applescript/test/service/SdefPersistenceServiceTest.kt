@@ -1,8 +1,8 @@
 package com.intellij.plugin.applescript.test.service
 
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
-import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryInfo
-import com.intellij.plugin.applescript.lang.ide.sdef.SdefPersistenceService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.io.File
 

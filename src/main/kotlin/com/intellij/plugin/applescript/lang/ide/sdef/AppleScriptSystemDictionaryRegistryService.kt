@@ -21,6 +21,8 @@ import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCom
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompatDefault
 import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary

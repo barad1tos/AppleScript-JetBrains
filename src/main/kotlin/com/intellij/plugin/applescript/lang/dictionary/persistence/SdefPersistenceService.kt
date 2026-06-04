@@ -1,7 +1,8 @@
-package com.intellij.plugin.applescript.lang.ide.sdef
+package com.intellij.plugin.applescript.lang.dictionary.persistence
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
+import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 
 /**
  * Phase 4 SERVICE-02 (plan 04-02, Wave 2): typed API over the facade's persisted-state-tagged
