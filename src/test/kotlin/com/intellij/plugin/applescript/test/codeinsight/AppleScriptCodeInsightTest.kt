@@ -112,7 +112,18 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
                 end tell
                 """.trimIndent(),
             )
-            myFixture.doHighlighting()
+            val highlights = myFixture.doHighlighting()
+            val applicationNameRange = textRangeFor(myFixture.editor.document, applicationName)
+            val applicationReferenceDescriptions =
+                highlights
+                    .filter { highlight ->
+                        applicationNameRange.intersects(highlight.startOffset, highlight.endOffset)
+                    }.mapNotNull { highlight -> highlight.description }
+
+            assertFalse(
+                "Discovered app must not be highlighted as unknown; descriptions=$applicationReferenceDescriptions",
+                applicationReferenceDescriptions.any { description -> description.contains("Unknown app") },
+            )
 
             assertNull(
                 "Highlighting must not create a project dictionary; explicit load paths own that side effect",

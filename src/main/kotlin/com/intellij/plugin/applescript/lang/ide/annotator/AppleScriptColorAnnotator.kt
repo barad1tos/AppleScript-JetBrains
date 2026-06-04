@@ -355,13 +355,16 @@ private object AppleScriptApplicationReferenceProbe {
         appName: String,
     ): ApplicationReferenceAnnotationState {
         val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-        val state =
-            if (dictionaryRegistryService.isDictionaryInitialized(appName)) {
-                ApplicationReferenceAnnotationState.Resolved
-            } else {
-                resolveUninitializedApplication(appRef, appName, dictionaryRegistryService)
-            }
-        return state
+        val isKnownOrPendingApplication =
+            !dictionaryRegistryService.areAppDictionariesIndexed() ||
+                dictionaryRegistryService.isDictionaryInitialized(appName) ||
+                dictionaryRegistryService.isKnownApplication(appName)
+
+        return if (isKnownOrPendingApplication) {
+            ApplicationReferenceAnnotationState.Resolved
+        } else {
+            resolveUninitializedApplication(appRef, appName, dictionaryRegistryService)
+        }
     }
 
     private fun resolveUninitializedApplication(

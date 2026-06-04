@@ -464,11 +464,11 @@ class AppleScriptSystemDictionaryRegistryService
         override fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean {
             // D-04: app-name resolver path — gated on full app-discovery sweep (appsReady).
             // Wave 3 (SERVICE-03): discoveredApplicationNames migrated to ApplicationDiscoveryService.
-            // Route the membership test through the typed-API method `containsDiscoveredApplication`
+            // Route the membership test through the typed-API method `isKnownApplication`
             // — the predicate is O(1) on the service's ConcurrentHashMap.newKeySet backing.
             val canInitialize =
                 areAppDictionariesIndexed() &&
-                    discovery.containsDiscoveredApplication(knownApplicationName)
+                    discovery.isKnownApplication(knownApplicationName)
             val initializedKnownApplication =
                 initializeKnownDictionaryFromCache(knownApplicationName) ||
                     getInitializedInfo(knownApplicationName) != null
@@ -842,6 +842,8 @@ class AppleScriptSystemDictionaryRegistryService
          * see the same signature.
          */
         fun getDiscoveredApplicationNames(): HashSet<String> = discovery.getDiscoveredApplicationNames()
+
+        fun isKnownApplication(appName: String): Boolean = discovery.isKnownApplication(appName)
 
         fun isDictionaryInitialized(name: String): Boolean = dictionaryInfoRegistry.isInitialized(name)
 
