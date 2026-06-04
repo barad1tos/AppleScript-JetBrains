@@ -1,3 +1,3 @@
-tell <weak_warning descr="Application \"Unknown\" not found">application "Unknown"</weak_warning>
+tell <weak_warning descr="Unknown app \"Unknown\"?">application "Unknown"</weak_warning>
 
 end tell

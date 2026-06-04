@@ -167,6 +167,23 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         assertTrue("appsReady completed", service.areAppDictionariesIndexed())
     }
 
+    fun testAfterFullInit_schedulesOpenProjectDaemonRestart() {
+        var daemonRestartCount = 0
+        val service =
+            AppleScriptSystemDictionaryRegistryService(
+                testScope,
+                testDispatcher,
+                noOpProgressTask,
+            ) {
+                daemonRestartCount++
+            }
+
+        advanceThroughFullInitialization()
+
+        assertTrue("appsReady completed", service.areAppDictionariesIndexed())
+        assertEquals("appsReady completion should trigger one daemon restart", 1, daemonRestartCount)
+    }
+
     /**
      * INVARIANT — forbidden cell `(false, true)` is unreachable. `RECURRING_PITFALLS.md`
      * Pattern L: defensive lock against pipeline-order bugs (`appsReady` completing before

@@ -120,7 +120,7 @@ class ApplicationDiscoveryService
          * `ensureKnownApplicationDictionaryInitialized` (hot path) — exposed as a typed
          * method to avoid leaking the mutable set across the service boundary.
          */
-        fun containsDiscoveredApplication(applicationName: String): Boolean = applicationName in discoveredApplications
+        fun isKnownApplication(appName: String): Boolean = appName in discoveredApplications
 
         /**
          * Add an application to the in-memory discovered set. Returns `true` if newly added.

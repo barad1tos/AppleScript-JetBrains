@@ -9,9 +9,14 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
+import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
+import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
 import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -77,6 +82,106 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         )
         assertFalse("unknown app must not enter Problems as WARNING", severities.contains(HighlightSeverity.WARNING))
         assertFalse("unknown app must not be an ERROR", severities.contains(HighlightSeverity.ERROR))
+    }
+
+    fun testApplicationReferenceHighlightingDoesNotCreateProjectDictionary() {
+        val applicationName = "SyntheticAnnotatorApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "annotator-read-only",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            PlatformTestUtil.waitWithEventsDispatching(
+                "Application dictionaries were not indexed",
+                { registryService.areAppDictionariesIndexed() },
+                10,
+            )
+            assertTrue(
+                "Synthetic dictionary must be known through discovery",
+                registryService.isKnownApplication(applicationName),
+            )
+            assertFalse(
+                "Synthetic dictionary must stay uninitialized so the test covers the discovered-app branch",
+                registryService.isDictionaryInitialized(applicationName),
+            )
+            assertNull(projectDictionaries.getDictionary(applicationName))
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val highlights = myFixture.doHighlighting()
+            val applicationNameRange = textRangeFor(myFixture.editor.document, applicationName)
+            val applicationReferenceDescriptions =
+                highlights
+                    .filter { highlight ->
+                        applicationNameRange.intersects(highlight.startOffset, highlight.endOffset)
+                    }.mapNotNull { highlight -> highlight.description }
+
+            assertFalse(
+                "Discovered app must not be highlighted as unknown; descriptions=$applicationReferenceDescriptions",
+                applicationReferenceDescriptions.any { description -> description.contains("Unknown app") },
+            )
+
+            assertNull(
+                "Highlighting must not create a project dictionary; explicit load paths own that side effect",
+                projectDictionaries.getDictionary(applicationName),
+            )
+        } finally {
+            persistence.removeDictionaryInfo(applicationFile.path)
+        }
+    }
+
+    fun testApplicationReferenceWarningReasonWinsForKnownApplication() {
+        val applicationName = "SyntheticKnownWarningApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "annotator-known-warning",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val discovery = ApplicationDiscoveryService.getInstance()
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            discovery.addToNotFoundList(applicationName)
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val highlights = myFixture.doHighlighting()
+            val applicationNameRange = textRangeFor(myFixture.editor.document, applicationName)
+            val descriptions =
+                highlights
+                    .filter { highlight ->
+                        applicationNameRange.intersects(highlight.startOffset, highlight.endOffset)
+                    }.mapNotNull { highlight -> highlight.description }
+
+            assertTrue(
+                "Known app warning reason must not be masked; descriptions=$descriptions",
+                descriptions.contains("Application \"$applicationName\" not found"),
+            )
+        } finally {
+            discovery.removeFromNotFoundList(applicationName)
+            persistence.removeDictionaryInfo(applicationFile.path)
+        }
     }
 
     fun testDatePropertyReferencesUsePropertyHighlighting() {

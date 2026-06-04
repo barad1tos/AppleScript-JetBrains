@@ -3,7 +3,6 @@ package com.intellij.plugin.applescript.lang.ide.annotator
 import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.Annotator
 import com.intellij.lang.annotation.HighlightSeverity
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.SystemInfo
@@ -264,32 +263,43 @@ private object AppleScriptApplicationReferenceAnnotator {
         appRef: AppleScriptApplicationReference,
         error: Boolean,
     ) {
-        val appName = getApplicationName(appRef)
-        if (appName != null) {
-            val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-            if (dictionaryRegistryService.isDictionaryInitialized(appName)) {
-                ensureProjectDictionaryExists(appRef, appName)
-            } else {
-                val warningReason =
-                    checkWarningReasonAfterInitialization(
-                        appName,
-                        dictionaryRegistryService,
-                    )
-                when {
-                    !warningReason.isNullOrEmpty() -> {
-                        annotateApplicationWarning(holder, appRef, appName, warningReason, error)
-                    }
-                    !ensureProjectDictionaryExists(appRef, appName) -> {
-                        annotateUnknownApplication(holder, appRef, appName, error)
-                    }
-                }
-            }
-        }
+        val appName = getApplicationName(appRef) ?: return
+
+        val annotationState = AppleScriptApplicationReferenceProbe.resolve(appRef, appName)
+        AppleScriptApplicationReferenceRenderer.annotate(holder, appRef, appName, annotationState, error)
     }
 
     private fun getApplicationName(appRef: AppleScriptApplicationReference): String? {
         val appName = getNameFromApplicationReference(appRef)
         return appName?.takeUnless { StringUtil.isEmptyOrSpaces(it) }
+    }
+}
+
+private sealed interface ApplicationReferenceAnnotationState {
+    data object Resolved : ApplicationReferenceAnnotationState
+
+    data class Warning(
+        val reason: String,
+    ) : ApplicationReferenceAnnotationState
+
+    data object Unknown : ApplicationReferenceAnnotationState
+}
+
+private object AppleScriptApplicationReferenceRenderer {
+    fun annotate(
+        holder: AnnotationHolder,
+        appRef: AppleScriptApplicationReference,
+        appName: String,
+        state: ApplicationReferenceAnnotationState,
+        error: Boolean,
+    ) {
+        when (state) {
+            ApplicationReferenceAnnotationState.Resolved -> Unit
+            is ApplicationReferenceAnnotationState.Warning ->
+                annotateApplicationWarning(holder, appRef, appName, state.reason, error)
+            ApplicationReferenceAnnotationState.Unknown ->
+                annotateUnknownApplication(holder, appRef, appName, error)
+        }
     }
 
     private fun annotateApplicationWarning(
@@ -316,15 +326,6 @@ private object AppleScriptApplicationReferenceAnnotator {
             .create()
     }
 
-    private fun ensureProjectDictionaryExists(
-        appRef: AppleScriptApplicationReference,
-        appName: String,
-    ): Boolean {
-        val dictionaryProjectService = appRef.project.getService(AppleScriptProjectDictionaryService::class.java)
-        return dictionaryProjectService.getDictionary(appName) != null ||
-            dictionaryProjectService.createDictionary(appName) != null
-    }
-
     private fun annotateUnknownApplication(
         holder: AnnotationHolder,
         appRef: AppleScriptApplicationReference,
@@ -346,6 +347,36 @@ private object AppleScriptApplicationReferenceAnnotator {
             .range(appRef)
             .create()
     }
+}
+
+private object AppleScriptApplicationReferenceProbe {
+    fun resolve(
+        appRef: AppleScriptApplicationReference,
+        appName: String,
+    ): ApplicationReferenceAnnotationState {
+        val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val warningReason = checkWarningReason(appName, dictionaryRegistryService)
+        val isKnownOrPendingApplication =
+            !dictionaryRegistryService.areAppDictionariesIndexed() ||
+                dictionaryRegistryService.isDictionaryInitialized(appName) ||
+                dictionaryRegistryService.isKnownApplication(appName)
+
+        return if (!warningReason.isNullOrEmpty()) {
+            ApplicationReferenceAnnotationState.Warning(warningReason)
+        } else if (isKnownOrPendingApplication || projectDictionaryExists(appRef, appName)) {
+            ApplicationReferenceAnnotationState.Resolved
+        } else {
+            ApplicationReferenceAnnotationState.Unknown
+        }
+    }
+
+    private fun projectDictionaryExists(
+        appRef: AppleScriptApplicationReference,
+        appName: String,
+    ): Boolean {
+        val dictionaryProjectService = appRef.project.getService(AppleScriptProjectDictionaryService::class.java)
+        return dictionaryProjectService.getDictionary(appName) != null
+    }
 
     private fun checkWarningReason(
         appName: String,
@@ -359,23 +390,8 @@ private object AppleScriptApplicationReferenceAnnotator {
             else -> null
         }
 
-    private fun checkWarningReasonAfterInitialization(
-        appName: String,
-        dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService,
-    ): String? {
-        val warningReason = checkWarningReason(appName, dictionaryRegistryService)
-        if (warningReason != null) {
-            return warningReason
-        }
-        dictionaryRegistryService.ensureDictionaryInitialized(appName)
-        LOG.debug("Re-checking warning reason for {}", appName)
-        return checkWarningReason(appName, dictionaryRegistryService)
-    }
-
     private const val MISSING_XCODE_WARNING =
         "Can not create dictionary: Xcode Developer Tools are not installed"
-
-    private val LOG = Logger.getInstance("#${AppleScriptColorAnnotator::class.java.name}")
 }
 
 private object AppleScriptAnnotationPredicates {
