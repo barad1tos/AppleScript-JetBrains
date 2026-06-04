@@ -285,8 +285,8 @@ class AppleScriptSystemDictionaryRegistryService
         // Pattern A from RESEARCH §2: the @State annotation, PersistedState inner class, and
         // SimplePersistentStateComponent inheritance ALL stay on this facade. The service offers a
         // typed API that forwards to the `internal *Internal` helpers below. External callers
-        // continue to use the public trampolines (removeDictionaryInfo /
-        // getNotScriptableApplicationList / isNotScriptable / isInUnknownList / updateState) with
+        // continue to use the public trampolines (getNotScriptableApplicationList /
+        // isNotScriptable / isInUnknownList / updateState) with
         // byte-for-byte unchanged signatures. SDEF-13 golden fixture regression-locks the wire
         // format — neither PersistedState nor DictionaryInfo.State is touched by this wave.
         //
@@ -294,18 +294,6 @@ class AppleScriptSystemDictionaryRegistryService
         // the service trampoline) to avoid the extra service<X>() lookup hop on hot paths and to
         // sidestep any circularity concerns during init.
         // ---------------------------------------------------------------------------------------------
-
-        /**
-         * Remove a [DictionaryInfo] from the in-memory registry by application NAME after
-         * dictionary parsing fails. A parse failure is not proof that the application is not
-         * scriptable; only dictionary generation failures at the `sdef` boundary mark that state.
-         *
-         * NOT the public [removeDictionaryInfo] trampoline (which takes an application PATH and
-         * routes through [SdefPersistenceService]).
-         */
-        internal fun removeDictionaryInfoInMemoryInternal(applicationName: String) {
-            dictionaryInfoRegistry.removeInMemory(applicationName)
-        }
 
         /**
          * Register a [DictionaryInfo] in the in-memory registry. Returns `true` if the application
@@ -325,13 +313,6 @@ class AppleScriptSystemDictionaryRegistryService
             notScriptableApplicationRegistry.remove(appName)
             return wasAbsent
         }
-
-        /**
-         * Trampoline (Phase 4 SERVICE-02): defers to [SdefPersistenceService.removeDictionaryInfo],
-         * which routes back to [removeDictionaryInfoByPathInternal]. Takes an application PATH
-         * (`applicationFile.path`) and resolves the matching registry entry.
-         */
-        fun removeDictionaryInfo(applicationPath: String): Boolean = persistence.removeDictionaryInfo(applicationPath)
 
         /**
          * Defensive snapshot of the in-memory [DictionaryInfo] registry. Returns a [List], NOT the
@@ -583,7 +564,10 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * @return the [DictionaryInfo] of the generated and cached dictionary for the application, or null
          */
-        fun getInitializedInfo(applicationName: String): DictionaryInfo? = initializationCoordinator.getInitializedInfo(applicationName)
+        fun getInitializedInfo(applicationName: String): DictionaryInfo? {
+            val coordinator = initializationCoordinator
+            return coordinator.getInitializedInfo(applicationName)
+        }
 
         /**
          * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
@@ -628,11 +612,9 @@ class AppleScriptSystemDictionaryRegistryService
         internal fun getDictionaryInfoByNameInternal(name: String?): DictionaryInfo? = dictionaryInfoRegistry[name]
 
         /**
-         * Phase 4 SERVICE-04 (Wave 4) internal helper: exposes the private parse-and-mark
-         * routine [initializeDictionaryFromInfo] for [SdefFileProvider]'s migrated methods
-         * ([SdefFileProvider.createAndInitializeInfo], [SdefFileProvider.initializeScriptingAdditions],
-         * [SdefFileProvider.initStdTerms]). The parse step itself stays on the facade because
-         * it touches the parser-index map cluster (Wave 5 territory).
+         * Phase 4 SERVICE-04 (Wave 4) internal helper: exposes
+         * [DictionaryInitializationCoordinator.initializeDictionaryFromInfo] for migrated
+         * dictionary-initialization call sites. The coordinator owns parse-and-mark cleanup.
          */
         internal fun initializeDictionaryFromInfoInternal(dictionaryInfo: DictionaryInfo): Boolean =
             initializationCoordinator.initializeDictionaryFromInfo(dictionaryInfo)
