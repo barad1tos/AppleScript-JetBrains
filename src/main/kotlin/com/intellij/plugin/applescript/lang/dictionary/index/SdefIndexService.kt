@@ -35,8 +35,6 @@ private val LOG: Logger = Logger.getInstance("#${SdefIndexService::class.java.na
 private val COMMAND_READY_TIMEOUT: Duration = 2.seconds
 private const val XINCLUDE_NAMESPACE_URI: String = "http" + "://www.w3.org/2003/XInclude"
 
-private typealias IndexMap = MutableMap<String, MutableSet<String>>
-
 private data class ParsedSuiteElements(
     val classes: List<Element>,
     val valueTypes: List<Element>,
@@ -63,8 +61,8 @@ private fun parsedSuiteElements(suiteElement: Element): ParsedSuiteElements =
  * - WRITE: `suspend fun ingest(applicationName, xmlFile): IngestResult` — IO-aware, hermetic-test seam.
  * - READ: sync `lookup*` methods — parser-util hot path; cannot suspend per FROZEN_CONTRACT.
  *
- * Owns:
- * - 14 ConcurrentHashMap indexes (migrated byte-for-byte from facade lines 79-92).
+ * Coordinates:
+ * - 14 ConcurrentHashMap indexes delegated to [SdefIndexStore].
  * - 21 sync lookup methods (migrated 1:1 from facade `isXxx` bodies).
  * - [findStdCommands] + [findApplicationCommands] (EDT-guarded + bounded-wait readiness
  *   bridges preserved per Phase 3 Review MEDIUM 1 + HIGH 5 / HIGH 1).
@@ -92,24 +90,7 @@ class SdefIndexService
         internal val serviceScope: CoroutineScope,
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) {
-        // Indexes migrated from the original facade.
-        // Application-scoped (7):
-        private val applicationNameToClassNameSetMap: IndexMap = ConcurrentHashMap()
-        private val applicationNameToClassNamePluralSetMap: IndexMap = ConcurrentHashMap()
-        private val applicationNameToCommandNameSetMap: IndexMap = ConcurrentHashMap()
-        private val applicationNameToRecordNameSetMap: IndexMap = ConcurrentHashMap()
-        private val applicationNameToPropertySetMap: IndexMap = ConcurrentHashMap()
-        private val applicationNameToEnumerationNameSetMap: IndexMap = ConcurrentHashMap()
-        private val applicationNameToEnumeratorConstantNameSetMap: IndexMap = ConcurrentHashMap()
-
-        // Std-scoped (7):
-        private val stdClassNameToApplicationNameSetMap: IndexMap = ConcurrentHashMap()
-        private val stdClassNamePluralToApplicationNameSetMap: IndexMap = ConcurrentHashMap()
-        private val stdCommandNameToApplicationNameSetMap: IndexMap = ConcurrentHashMap()
-        private val stdRecordNameToApplicationNameSetMap: IndexMap = ConcurrentHashMap()
-        private val stdPropertyNameToDictionarySetMap: IndexMap = ConcurrentHashMap()
-        private val stdEnumerationNameToApplicationNameSetMap: IndexMap = ConcurrentHashMap()
-        private val stdEnumeratorConstantNameToApplicationNameListMap: IndexMap = ConcurrentHashMap()
+        private val indexStore = SdefIndexStore()
 
         // CQRS write path.
 
@@ -137,7 +118,7 @@ class SdefIndexService
                     if (ok) {
                         IngestResult.Success(
                             suitesIngested = 1,
-                            commandsIndexed = applicationNameToCommandNameSetMap[applicationName]?.size ?: 0,
+                            commandsIndexed = indexStore.applicationNameToCommandNameSetMap[applicationName]?.size ?: 0,
                         )
                     } else {
                         IngestResult.Failed(reason = "parseDictionaryFile returned false for $applicationName")
@@ -153,41 +134,7 @@ class SdefIndexService
          * Builds an immutable [SdefIndexSnapshot] from the current live indexes. Defensive copies
          * (`toSet()` / `toMap()`) so callers cannot mutate live state through the returned snapshot.
          */
-        fun snapshot(): SdefIndexSnapshot =
-            SdefIndexSnapshot(
-                applicationNameToClassNameSet =
-                    applicationNameToClassNameSetMap.mapValues { it.value.toSet() },
-                applicationNameToClassNamePluralSet =
-                    applicationNameToClassNamePluralSetMap.mapValues { it.value.toSet() },
-                applicationNameToCommandNameSet =
-                    applicationNameToCommandNameSetMap.mapValues { it.value.toSet() },
-                applicationNameToRecordNameSet =
-                    applicationNameToRecordNameSetMap.mapValues { it.value.toSet() },
-                applicationNameToPropertySet =
-                    applicationNameToPropertySetMap.mapValues { it.value.toSet() },
-                applicationNameToEnumerationNameSet =
-                    applicationNameToEnumerationNameSetMap.mapValues { it.value.toSet() },
-                applicationNameToEnumeratorConstantNameSet =
-                    applicationNameToEnumeratorConstantNameSetMap
-                        .mapValues { it.value.toSet() },
-                stdClassNameToApplicationNameSet =
-                    stdClassNameToApplicationNameSetMap.mapValues { it.value.toSet() },
-                stdClassNamePluralToApplicationNameSet =
-                    stdClassNamePluralToApplicationNameSetMap
-                        .mapValues { it.value.toSet() },
-                stdCommandNameToApplicationNameSet =
-                    stdCommandNameToApplicationNameSetMap.mapValues { it.value.toSet() },
-                stdRecordNameToApplicationNameSet =
-                    stdRecordNameToApplicationNameSetMap.mapValues { it.value.toSet() },
-                stdPropertyNameToDictionarySet =
-                    stdPropertyNameToDictionarySetMap.mapValues { it.value.toSet() },
-                stdEnumerationNameToApplicationNameSet =
-                    stdEnumerationNameToApplicationNameSetMap
-                        .mapValues { it.value.toSet() },
-                stdEnumeratorConstantNameToApplicationNameList =
-                    stdEnumeratorConstantNameToApplicationNameListMap
-                        .mapValues { it.value.toSet() },
-            )
+        fun snapshot(): SdefIndexSnapshot = indexStore.snapshot()
 
         // Sync lookup methods for the parser-util hot path.
         // Each method preserves the facade's `if (!isInitialized()) return false` gate, but the
@@ -197,7 +144,7 @@ class SdefIndexService
 
         fun lookupStdLibClass(name: String): Boolean {
             if (!facadeInitialized()) return false
-            return stdClassNameToApplicationNameSetMap.containsKey(name)
+            return indexStore.stdClassNameToApplicationNameSetMap.containsKey(name)
         }
 
         fun lookupApplicationClass(
@@ -205,13 +152,13 @@ class SdefIndexService
             className: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            val classNameSet: Set<String>? = applicationNameToClassNameSetMap[applicationName]
+            val classNameSet: Set<String>? = indexStore.applicationNameToClassNameSetMap[applicationName]
             return classNameSet != null && classNameSet.contains(className)
         }
 
         fun lookupStdLibClassPluralName(pluralName: String): Boolean {
             if (!facadeInitialized()) return false
-            return stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
+            return indexStore.stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
         }
 
         fun lookupApplicationClassPluralName(
@@ -219,13 +166,13 @@ class SdefIndexService
             pluralClassName: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            val pluralClassNameSet: Set<String>? = applicationNameToClassNamePluralSetMap[applicationName]
+            val pluralClassNameSet: Set<String>? = indexStore.applicationNameToClassNamePluralSetMap[applicationName]
             return pluralClassNameSet != null && pluralClassNameSet.contains(pluralClassName)
         }
 
         fun lookupStdClassWithPrefixExist(classNamePrefix: String): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(classNamePrefix, stdClassNameToApplicationNameSetMap.keys)
+            return isNameWithPrefixExist(classNamePrefix, indexStore.stdClassNameToApplicationNameSetMap.keys)
         }
 
         fun lookupClassWithPrefixExist(
@@ -233,12 +180,12 @@ class SdefIndexService
             classNamePrefix: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(classNamePrefix, applicationNameToClassNameSetMap[applicationName])
+            return isNameWithPrefixExist(classNamePrefix, indexStore.applicationNameToClassNameSetMap[applicationName])
         }
 
         fun lookupStdClassPluralWithPrefixExist(namePrefix: String): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, stdClassNamePluralToApplicationNameSetMap.keys)
+            return isNameWithPrefixExist(namePrefix, indexStore.stdClassNamePluralToApplicationNameSetMap.keys)
         }
 
         fun lookupClassPluralWithPrefixExist(
@@ -246,12 +193,15 @@ class SdefIndexService
             pluralClassNamePrefix: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(pluralClassNamePrefix, applicationNameToClassNamePluralSetMap[applicationName])
+            return isNameWithPrefixExist(
+                pluralClassNamePrefix,
+                indexStore.applicationNameToClassNamePluralSetMap[applicationName],
+            )
         }
 
         fun lookupStdCommand(name: String): Boolean {
             if (!facadeInitialized()) return false
-            return stdCommandNameToApplicationNameSetMap.containsKey(name)
+            return indexStore.stdCommandNameToApplicationNameSetMap.containsKey(name)
         }
 
         fun lookupApplicationCommand(
@@ -259,7 +209,7 @@ class SdefIndexService
             commandName: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            val appCommands: Set<String>? = applicationNameToCommandNameSetMap[applicationName]
+            val appCommands: Set<String>? = indexStore.applicationNameToCommandNameSetMap[applicationName]
             return appCommands != null && appCommands.contains(commandName)
         }
 
@@ -268,22 +218,25 @@ class SdefIndexService
             commandNamePrefix: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(commandNamePrefix, applicationNameToCommandNameSetMap[applicationName])
+            return isNameWithPrefixExist(
+                commandNamePrefix,
+                indexStore.applicationNameToCommandNameSetMap[applicationName],
+            )
         }
 
         fun lookupStdCommandWithPrefixExist(namePrefix: String): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, stdCommandNameToApplicationNameSetMap.keys)
+            return isNameWithPrefixExist(namePrefix, indexStore.stdCommandNameToApplicationNameSetMap.keys)
         }
 
         fun lookupStdProperty(name: String): Boolean {
             if (!facadeInitialized()) return false
-            return stdPropertyNameToDictionarySetMap.containsKey(name)
+            return indexStore.stdPropertyNameToDictionarySetMap.containsKey(name)
         }
 
         fun lookupStdPropertyWithPrefixExist(namePrefix: String): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, stdPropertyNameToDictionarySetMap.keys)
+            return isNameWithPrefixExist(namePrefix, indexStore.stdPropertyNameToDictionarySetMap.keys)
         }
 
         fun lookupApplicationProperty(
@@ -291,7 +244,7 @@ class SdefIndexService
             propertyName: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            val propertySet: Set<String>? = applicationNameToPropertySetMap[applicationName]
+            val propertySet: Set<String>? = indexStore.applicationNameToPropertySetMap[applicationName]
             return propertySet != null && propertySet.contains(propertyName)
         }
 
@@ -300,12 +253,15 @@ class SdefIndexService
             propertyNamePrefix: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(propertyNamePrefix, applicationNameToPropertySetMap[applicationName])
+            return isNameWithPrefixExist(
+                propertyNamePrefix,
+                indexStore.applicationNameToPropertySetMap[applicationName],
+            )
         }
 
         fun lookupStdConstant(name: String): Boolean {
             if (!facadeInitialized()) return false
-            return stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
+            return indexStore.stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
         }
 
         fun lookupApplicationConstant(
@@ -314,13 +270,13 @@ class SdefIndexService
         ): Boolean {
             if (!facadeInitialized()) return false
             val applicationConstantSet: Set<String>? =
-                applicationNameToEnumeratorConstantNameSetMap[applicationName]
+                indexStore.applicationNameToEnumeratorConstantNameSetMap[applicationName]
             return applicationConstantSet != null && applicationConstantSet.contains(constantName)
         }
 
         fun lookupStdConstantWithPrefixExist(namePrefix: String): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, stdEnumeratorConstantNameToApplicationNameListMap.keys)
+            return isNameWithPrefixExist(namePrefix, indexStore.stdEnumeratorConstantNameToApplicationNameListMap.keys)
         }
 
         fun lookupConstantWithPrefixExist(
@@ -328,7 +284,10 @@ class SdefIndexService
             namePrefix: String,
         ): Boolean {
             if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, applicationNameToEnumeratorConstantNameSetMap[applicationName])
+            return isNameWithPrefixExist(
+                namePrefix,
+                indexStore.applicationNameToEnumeratorConstantNameSetMap[applicationName],
+            )
         }
 
         // EDT-guarded command lookup with bounded waits.
@@ -361,7 +320,7 @@ class SdefIndexService
                 return emptyList()
             }
 
-            val appNameList = stdCommandNameToApplicationNameSetMap[commandName] ?: emptySet()
+            val appNameList = indexStore.stdCommandNameToApplicationNameSetMap[commandName] ?: emptySet()
             val result = HashSet<AppleScriptCommand>()
             for (applicationName in appNameList) {
                 result.addAll(findApplicationCommands(project, applicationName, commandName))
@@ -461,7 +420,7 @@ class SdefIndexService
                 parseElementsForApplication(
                     classTag.getChildren("property"),
                     applicationName,
-                    stdPropertyNameToDictionarySetMap,
+                    indexStore.stdPropertyNameToDictionarySetMap,
                 )
             }
 
@@ -470,32 +429,40 @@ class SdefIndexService
                 parseElementsForApplication(
                     classTag.getChildren("property"),
                     applicationName,
-                    stdPropertyNameToDictionarySetMap,
+                    indexStore.stdPropertyNameToDictionarySetMap,
                 )
             }
 
-            parseElementsForApplication(elements.commands, applicationName, stdCommandNameToApplicationNameSetMap)
-            parseElementsForApplication(elements.recordTypes, applicationName, stdRecordNameToApplicationNameSetMap)
+            parseElementsForApplication(
+                elements.commands,
+                applicationName,
+                indexStore.stdCommandNameToApplicationNameSetMap,
+            )
+            parseElementsForApplication(
+                elements.recordTypes,
+                applicationName,
+                indexStore.stdRecordNameToApplicationNameSetMap,
+            )
 
             for (recordTag in elements.recordTypes) {
                 parseElementsForApplication(
                     recordTag.getChildren("property"),
                     applicationName,
-                    stdPropertyNameToDictionarySetMap,
+                    indexStore.stdPropertyNameToDictionarySetMap,
                 )
             }
 
             parseElementsForApplication(
                 elements.enumerations,
                 applicationName,
-                stdEnumerationNameToApplicationNameSetMap,
+                indexStore.stdEnumerationNameToApplicationNameSetMap,
             )
 
             for (enumerationTag in elements.enumerations) {
                 parseElementsForApplication(
                     enumerationTag.getChildren("enumerator"),
                     applicationName,
-                    stdEnumeratorConstantNameToApplicationNameListMap,
+                    indexStore.stdEnumeratorConstantNameToApplicationNameListMap,
                 )
             }
         }
@@ -504,18 +471,9 @@ class SdefIndexService
             suiteElem: Element,
             applicationName: String,
         ) {
-            val xIncludeNs = Namespace.getNamespace(XINCLUDE_NAMESPACE_URI)
-            val xiIncludes: List<Element> = suiteElem.getChildren("include", xIncludeNs).toList()
             val elements = parsedSuiteElements(suiteElem)
 
-            for (include in xiIncludes) {
-                var hrefIncl = include.getAttributeValue("href")
-                hrefIncl = hrefIncl.replace("localhost", "")
-                val inclFile = File(hrefIncl)
-                if (inclFile.exists()) {
-                    parseDictionaryFile(inclFile, applicationName)
-                }
-            }
+            parseIncludesForApplication(suiteElem, applicationName)
 
             for (valType in elements.valueTypes) {
                 parseClassElement(applicationName, valType)
@@ -526,7 +484,7 @@ class SdefIndexService
                 parseHashElementsForApplication(
                     classTag.getChildren("property"),
                     applicationName,
-                    applicationNameToPropertySetMap,
+                    indexStore.applicationNameToPropertySetMap,
                 )
             }
 
@@ -535,33 +493,57 @@ class SdefIndexService
                 parseHashElementsForApplication(
                     classTag.getChildren("property"),
                     applicationName,
-                    applicationNameToPropertySetMap,
+                    indexStore.applicationNameToPropertySetMap,
                 )
             }
 
-            parseHashElementsForApplication(elements.commands, applicationName, applicationNameToCommandNameSetMap)
-            parseHashElementsForApplication(elements.recordTypes, applicationName, applicationNameToRecordNameSetMap)
+            parseHashElementsForApplication(
+                elements.commands,
+                applicationName,
+                indexStore.applicationNameToCommandNameSetMap,
+            )
+            parseHashElementsForApplication(
+                elements.recordTypes,
+                applicationName,
+                indexStore.applicationNameToRecordNameSetMap,
+            )
 
             for (recordTag in elements.recordTypes) {
                 parseHashElementsForApplication(
                     recordTag.getChildren("property"),
                     applicationName,
-                    applicationNameToPropertySetMap,
+                    indexStore.applicationNameToPropertySetMap,
                 )
             }
 
             parseHashElementsForApplication(
                 elements.enumerations,
                 applicationName,
-                applicationNameToEnumerationNameSetMap,
+                indexStore.applicationNameToEnumerationNameSetMap,
             )
 
             for (enumerationTag in elements.enumerations) {
                 parseHashElementsForApplication(
                     enumerationTag.getChildren("enumerator"),
                     applicationName,
-                    applicationNameToEnumeratorConstantNameSetMap,
+                    indexStore.applicationNameToEnumeratorConstantNameSetMap,
                 )
+            }
+        }
+
+        private fun parseIncludesForApplication(
+            suiteElem: Element,
+            applicationName: String,
+        ) {
+            val xIncludeNs = Namespace.getNamespace(XINCLUDE_NAMESPACE_URI)
+            val xiIncludes: List<Element> = suiteElem.getChildren("include", xIncludeNs).toList()
+            for (include in xiIncludes) {
+                var hrefIncl = include.getAttributeValue("href")
+                hrefIncl = hrefIncl.replace("localhost", "")
+                val inclFile = File(hrefIncl)
+                if (inclFile.exists()) {
+                    parseDictionaryFile(inclFile, applicationName)
+                }
             }
         }
 
@@ -575,11 +557,27 @@ class SdefIndexService
             if (className == null || code == null) return
             pluralClassName = if (!StringUtil.isEmpty(pluralClassName)) pluralClassName else "${className}s"
 
-            updateObjectNameSetForApplication(className, applicationName, applicationNameToClassNameSetMap)
-            updateObjectNameSetForApplication(pluralClassName, applicationName, applicationNameToClassNamePluralSetMap)
+            updateObjectNameSetForApplication(
+                className,
+                applicationName,
+                indexStore.applicationNameToClassNameSetMap,
+            )
+            updateObjectNameSetForApplication(
+                pluralClassName,
+                applicationName,
+                indexStore.applicationNameToClassNamePluralSetMap,
+            )
             if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
-                updateApplicationNameSetFor(className, applicationName, stdClassNameToApplicationNameSetMap)
-                updateApplicationNameSetFor(pluralClassName, applicationName, stdClassNamePluralToApplicationNameSetMap)
+                updateApplicationNameSetFor(
+                    className,
+                    applicationName,
+                    indexStore.stdClassNameToApplicationNameSetMap,
+                )
+                updateApplicationNameSetFor(
+                    pluralClassName,
+                    applicationName,
+                    indexStore.stdClassNamePluralToApplicationNameSetMap,
+                )
             }
         }
 

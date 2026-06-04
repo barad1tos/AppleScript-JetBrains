@@ -15,7 +15,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
@@ -23,7 +22,6 @@ import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCom
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompatDefault
 import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
-import com.intellij.plugin.applescript.lang.dictionary.files.stream2file
 import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
@@ -44,8 +42,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
-import java.io.IOException
-import java.io.InputStream
 
 private fun restartOpenProjectDaemons() {
     val application = ApplicationManager.getApplication()
@@ -171,7 +167,7 @@ class AppleScriptSystemDictionaryRegistryService
          *      `withContext(Dispatchers.EDT)` + runWriteAction internally (Phase 4 SERVICE-01).
          *      RECURRING_PITFALLS.md Pattern C — write actions require EDT, NEVER the `Main` dispatcher.
          *   2. `initDictionariesInfoFromCacheInternal(state)` — restore persisted dictionary entries.
-         *   3. `initStandardSuite()` — parse StandardAdditions + CocoaStandard.
+         *   3. [StandardDictionaryInitializer.initialize] — parse StandardAdditions + CocoaStandard.
          *   4. Complete `standardReady` with `Result.success(Unit)` — parser fast path unblocks.
          *   5. `discoverInstalledApplicationNames()` — walk the `/Applications` directory tree.
          *   6. Complete `appsReady` with `Result.success(Unit)` — completion/annotator paths unblock.
@@ -195,7 +191,7 @@ class AppleScriptSystemDictionaryRegistryService
                     // so the call site here is a single trampoline. Init-chain ordering preserved.
                     service<SdefFileTypeRegistrar>().register()
                     initDictionariesInfoFromCacheInternal(state)
-                    initStandardSuite()
+                    StandardDictionaryInitializer(this@AppleScriptSystemDictionaryRegistryService).initialize()
                     standardReady.complete(Result.success(Unit))
                     discoverInstalledApplicationNames()
                     appsReady.complete(Result.success(Unit))
@@ -716,78 +712,6 @@ class AppleScriptSystemDictionaryRegistryService
         }
 
         /**
-         * Initialise Standard Terminology and installed Scripting Addition libraries.
-         *
-         * Phase 4 SERVICE-04 (Wave 4): orchestration STAYS on the facade (init-chain
-         * concern); each call site now routes through `service<SdefFileProvider>()` for the
-         * file-generation primitives. The body's control flow is preserved byte-for-byte:
-         * same branching, same retry-via-bundled-resource fallback, same IOException catch.
-         */
-        private fun initStandardSuite() {
-            val fileProvider = SdefFileProvider.getInstance()
-            try {
-                if (SystemInfo.isMac) {
-                    initMacStandardSuite(fileProvider)
-                } else {
-                    initBundledStandardSuite(fileProvider)
-                }
-            } catch (e: IOException) {
-                LOG.error("Failed to initialize dictionary for standard terms", e)
-            }
-        }
-
-        private fun initMacStandardSuite(fileProvider: SdefFileProvider) {
-            initScriptingAdditions(fileProvider)
-            initCocoaStandardTerminology(fileProvider)
-        }
-
-        private fun initScriptingAdditions(fileProvider: SdefFileProvider) {
-            val dictionaryInfo = getDictionaryInfo(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY)
-            if (dictionaryInfo == null) {
-                fileProvider.initializeScriptingAdditions()
-                fileProvider.mergeScriptingAdditions()
-            } else {
-                initializeDictionaryFromInfo(dictionaryInfo)
-            }
-        }
-
-        private fun initCocoaStandardTerminology(fileProvider: SdefFileProvider) {
-            val dictionaryInfo = findSavedInitializedInfo(ApplicationDictionary.COCOA_STANDARD_LIBRARY)
-            if (dictionaryInfo != null) {
-                initializeDictionaryFromInfo(dictionaryInfo)
-                return
-            }
-
-            val standardLibraryFile = cocoaStandardDictionaryFile()
-            if (standardLibraryFile.exists() && standardLibraryFile.isFile) {
-                fileProvider.createAndInitializeInfo(
-                    standardLibraryFile,
-                    ApplicationDictionary.COCOA_STANDARD_LIBRARY,
-                )
-            } else {
-                LOG.warn("Can not find standard suite dictionary in the classpath")
-            }
-        }
-
-        private fun cocoaStandardDictionaryFile(): File {
-            val standardLibraryFile = File(ApplicationDictionary.COCOA_STANDARD_LIBRARY_PATH)
-            if (standardLibraryFile.exists() && standardLibraryFile.isFile) return standardLibraryFile
-
-            val standardDictionaryStream: InputStream? =
-                javaClass.getResourceAsStream(ApplicationDictionary.COCOA_STANDARD_FILE)
-            return stream2file(
-                standardDictionaryStream,
-                ApplicationDictionary.COCOA_STANDARD_LIBRARY.replace(" ", "_"),
-                ".sdef",
-            )
-        }
-
-        private fun initBundledStandardSuite(fileProvider: SdefFileProvider) {
-            fileProvider.initStdTerms(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY)
-            fileProvider.initStdTerms(ApplicationDictionary.COCOA_STANDARD_LIBRARY)
-        }
-
-        /**
          * Phase 7 D-05 trampoline: routes through [XcodeDetectionService.isXcodeInstalled] (the
          * extracted Xcode-detection seam — was [SdefFileProvider] pre-Phase-7). The body,
          * including the lazy detection cache, lives on that service. External callers
@@ -824,7 +748,7 @@ class AppleScriptSystemDictionaryRegistryService
 
         /**
          * Private accessor for facade-internal use (read by [getInitializedInfo] +
-         * [initStandardSuite] hot paths). Kept inline rather than routed through
+         * [StandardDictionaryInitializer] hot paths). Kept inline rather than routed through
          * [SdefFileProvider.getDictionaryFile] to avoid the service<X>() lookup hop on the
          * parser-fast-path init flow. SdefFileProvider's migrated methods use the
          * `internal fun getDictionaryInfoByNameInternal` accessor above (functionally

@@ -604,10 +604,14 @@ tasks {
                     "SdefDictionaryFileGenerator",
                     "SdefFileResources",
                 ) +
-                serviceWithOwnedFiles("SdefIndexService") +
+                serviceWithOwnedFiles(
+                    "SdefIndexService",
+                    "SdefIndexStore",
+                ) +
                 serviceWithOwnedFiles(
                     "AppleScriptSystemDictionaryRegistryService",
                     "DictionaryRegistries",
+                    "StandardDictionaryInitializer",
                 )
         val services = serviceOwnerByFile.values.distinct()
         val filesOutsideAppServiceGraph =
