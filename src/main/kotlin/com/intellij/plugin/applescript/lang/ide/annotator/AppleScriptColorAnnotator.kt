@@ -264,32 +264,43 @@ private object AppleScriptApplicationReferenceAnnotator {
         appRef: AppleScriptApplicationReference,
         error: Boolean,
     ) {
-        val appName = getApplicationName(appRef)
-        if (appName != null) {
-            val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-            if (dictionaryRegistryService.isDictionaryInitialized(appName)) {
-                ensureProjectDictionaryExists(appRef, appName)
-            } else {
-                val warningReason =
-                    checkWarningReasonAfterInitialization(
-                        appName,
-                        dictionaryRegistryService,
-                    )
-                when {
-                    !warningReason.isNullOrEmpty() -> {
-                        annotateApplicationWarning(holder, appRef, appName, warningReason, error)
-                    }
-                    !ensureProjectDictionaryExists(appRef, appName) -> {
-                        annotateUnknownApplication(holder, appRef, appName, error)
-                    }
-                }
-            }
-        }
+        val appName = getApplicationName(appRef) ?: return
+
+        val annotationState = AppleScriptApplicationReferenceProbe.resolve(appRef, appName)
+        AppleScriptApplicationReferenceRenderer.annotate(holder, appRef, appName, annotationState, error)
     }
 
     private fun getApplicationName(appRef: AppleScriptApplicationReference): String? {
         val appName = getNameFromApplicationReference(appRef)
         return appName?.takeUnless { StringUtil.isEmptyOrSpaces(it) }
+    }
+}
+
+private sealed interface ApplicationReferenceAnnotationState {
+    data object Resolved : ApplicationReferenceAnnotationState
+
+    data class Warning(
+        val reason: String,
+    ) : ApplicationReferenceAnnotationState
+
+    data object Unknown : ApplicationReferenceAnnotationState
+}
+
+private object AppleScriptApplicationReferenceRenderer {
+    fun annotate(
+        holder: AnnotationHolder,
+        appRef: AppleScriptApplicationReference,
+        appName: String,
+        state: ApplicationReferenceAnnotationState,
+        error: Boolean,
+    ) {
+        when (state) {
+            ApplicationReferenceAnnotationState.Resolved -> Unit
+            is ApplicationReferenceAnnotationState.Warning ->
+                annotateApplicationWarning(holder, appRef, appName, state.reason, error)
+            ApplicationReferenceAnnotationState.Unknown ->
+                annotateUnknownApplication(holder, appRef, appName, error)
+        }
     }
 
     private fun annotateApplicationWarning(
@@ -316,15 +327,6 @@ private object AppleScriptApplicationReferenceAnnotator {
             .create()
     }
 
-    private fun ensureProjectDictionaryExists(
-        appRef: AppleScriptApplicationReference,
-        appName: String,
-    ): Boolean {
-        val dictionaryProjectService = appRef.project.getService(AppleScriptProjectDictionaryService::class.java)
-        return dictionaryProjectService.getDictionary(appName) != null ||
-            dictionaryProjectService.createDictionary(appName) != null
-    }
-
     private fun annotateUnknownApplication(
         holder: AnnotationHolder,
         appRef: AppleScriptApplicationReference,
@@ -345,6 +347,47 @@ private object AppleScriptApplicationReferenceAnnotator {
             .newAnnotation(HighlightSeverity.WEAK_WARNING, "Unknown app \"$appName\"?")
             .range(appRef)
             .create()
+    }
+}
+
+private object AppleScriptApplicationReferenceProbe {
+    fun resolve(
+        appRef: AppleScriptApplicationReference,
+        appName: String,
+    ): ApplicationReferenceAnnotationState {
+        val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val state =
+            if (dictionaryRegistryService.isDictionaryInitialized(appName)) {
+                ensureProjectDictionaryExists(appRef, appName)
+                ApplicationReferenceAnnotationState.Resolved
+            } else {
+                resolveUninitializedApplication(appRef, appName, dictionaryRegistryService)
+            }
+        return state
+    }
+
+    private fun resolveUninitializedApplication(
+        appRef: AppleScriptApplicationReference,
+        appName: String,
+        dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService,
+    ): ApplicationReferenceAnnotationState {
+        val warningReason = checkWarningReasonAfterInitialization(appName, dictionaryRegistryService)
+        return if (!warningReason.isNullOrEmpty()) {
+            ApplicationReferenceAnnotationState.Warning(warningReason)
+        } else if (ensureProjectDictionaryExists(appRef, appName)) {
+            ApplicationReferenceAnnotationState.Resolved
+        } else {
+            ApplicationReferenceAnnotationState.Unknown
+        }
+    }
+
+    private fun ensureProjectDictionaryExists(
+        appRef: AppleScriptApplicationReference,
+        appName: String,
+    ): Boolean {
+        val dictionaryProjectService = appRef.project.getService(AppleScriptProjectDictionaryService::class.java)
+        return dictionaryProjectService.getDictionary(appName) != null ||
+            dictionaryProjectService.createDictionary(appName) != null
     }
 
     private fun checkWarningReason(
