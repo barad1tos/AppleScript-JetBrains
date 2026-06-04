@@ -5,6 +5,8 @@ import com.intellij.openapi.util.SystemInfo
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DictionaryLoadResult
 import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
+import com.intellij.plugin.applescript.lang.dictionary.files.copyDictionaryFileToCacheDir
+import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
@@ -15,7 +17,7 @@ import java.nio.file.Files
  *
  * Coverage:
  *  - Cross-platform: [DictionaryLoadResult] exhaustive-when compile gate; file-copy
- *    branch on [SdefFileProvider.copyDictionaryFileToCacheDir]; predictable cache
+ *    branch on [copyDictionaryFileToCacheDir]; predictable cache
  *    path generation; `fetch()` returns [DictionaryLoadResult.Empty] for unknown
  *    application names; `isXcodeInstalled` returns a Boolean predicate (outcome
  *    depends on dev machine state); facade trampoline routing for
@@ -42,19 +44,18 @@ class SdefFileProviderTest : BasePlatformTestCase() {
     }
 
     /**
-     * Cross-platform: file-copy semantics on [SdefFileProvider.copyDictionaryFileToCacheDir]
+     * Cross-platform: file-copy semantics on [copyDictionaryFileToCacheDir]
      * — copies a source into a target, overwriting prior content (REPLACE_EXISTING).
      * Verifies the Phase 3 D-11 Guava→nio migration invariant.
      */
     fun testCopyDictionaryFileToCacheDirReplacesExisting() {
-        val provider = SdefFileProvider.getInstance()
         val src = Files.createTempFile("sdef-src", ".sdef").toFile()
         val tgt = Files.createTempFile("sdef-tgt", ".sdef").toFile()
         try {
             src.writeText("<dictionary><suite name=\"Test\"/></dictionary>")
             tgt.writeText("PREVIOUS CONTENT") // pre-fill target
 
-            val ok = provider.copyDictionaryFileToCacheDir("TestApp", src, tgt, true)
+            val ok = copyDictionaryFileToCacheDir("TestApp", src, tgt, true)
             assertTrue("Copy must succeed", ok)
             assertEquals("Target must equal source after copy", src.readText(), tgt.readText())
         } finally {
@@ -168,14 +169,13 @@ class SdefFileProviderTest : BasePlatformTestCase() {
     }
 
     /**
-     * Sanity-check: [SdefFileProvider.serializeDictionaryPathForApplication] produces
+     * Sanity-check: [serializeDictionaryPathForApplication] produces
      * a path under the system cache dir with underscore-escaping for spaces in the
      * application name. Preserves v1.0 cache layout (existing user caches use
      * underscored filenames).
      */
     fun testSerializeDictionaryPathHasExpectedShape() {
-        val provider = SdefFileProvider.getInstance()
-        val path = provider.serializeDictionaryPathForApplication("Some App With Spaces")
+        val path = serializeDictionaryPathForApplication("Some App With Spaces")
         assertTrue("Path must live under */sdef/", path.contains("/sdef/"))
         assertTrue(
             "Spaces in application name must be underscore-escaped",

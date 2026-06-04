@@ -22,7 +22,6 @@ private val DICTIONARY_FILE_EXTENSIONS: Set<String> = setOf("xml", "sdef")
 
 internal object SdefDictionaryFileGenerator {
     fun createDictionaryInfoForApplication(
-        provider: SdefFileProvider,
         applicationName: String,
         applicationIoFile: File,
     ): DictionaryInfo? {
@@ -40,7 +39,7 @@ internal object SdefDictionaryFileGenerator {
 
         val appExtension = applicationIoFile.extension
         val isDictionaryFile = appExtension in DICTIONARY_FILE_EXTENSIONS
-        val serializePath = provider.serializeDictionaryPathForApplication(applicationName)
+        val serializePath = serializeDictionaryPathForApplication(applicationName)
         val targetFile = File(serializePath)
         val parentDirectoryReady = targetFile.parentFile.exists() || targetFile.parentFile.mkdirs()
         if ((!SystemInfo.isMac && !isDictionaryFile) || !parentDirectoryReady) return null
@@ -51,7 +50,6 @@ internal object SdefDictionaryFileGenerator {
             fileGenerated =
                 generateDictionaryFileForApplication(
                     DictionaryGenerationRequest(
-                        provider,
                         applicationName,
                         applicationIoFile,
                         targetFile,
@@ -66,7 +64,6 @@ internal object SdefDictionaryFileGenerator {
             LOG.warn("Generation failed: ${e.message}")
             fileGenerated =
                 recoverDictionaryFileFromBundledSdef(
-                    provider,
                     applicationName,
                     applicationIoFile,
                     targetFile,
@@ -90,7 +87,7 @@ internal object SdefDictionaryFileGenerator {
                 request.applicationIoFile.path,
             )
         } else {
-            request.provider.copyDictionaryFileToCacheDir(
+            copyDictionaryFileToCacheDir(
                 request.applicationName,
                 request.applicationIoFile,
                 request.targetFile,
@@ -147,7 +144,6 @@ internal object SdefDictionaryFileGenerator {
     }
 
     private fun recoverDictionaryFileFromBundledSdef(
-        provider: SdefFileProvider,
         applicationName: String,
         applicationIoFile: File,
         targetFile: File,
@@ -155,7 +151,7 @@ internal object SdefDictionaryFileGenerator {
         LOG.warn("Will try to find application scripting definition file...")
         val sdefFile = findSdefForApplication(applicationIoFile)
         return if (sdefFile != null && sdefFile.exists()) {
-            provider.copyDictionaryFileToCacheDir(applicationName, sdefFile, targetFile, true)
+            copyDictionaryFileToCacheDir(applicationName, sdefFile, targetFile, true)
         } else {
             LOG.warn(
                 "Scripting definition was not found for application " +
@@ -190,7 +186,6 @@ internal object SdefDictionaryFileGenerator {
 }
 
 private data class DictionaryGenerationRequest(
-    val provider: SdefFileProvider,
     val applicationName: String,
     val applicationIoFile: File,
     val targetFile: File,
