@@ -1,7 +1,6 @@
 package com.intellij.plugin.applescript.lang.dictionary.files
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -20,8 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 
 private val LOG: Logger = Logger.getInstance("#${SdefFileProvider::class.java.name}")
@@ -29,9 +26,9 @@ private val LOG: Logger = Logger.getInstance("#${SdefFileProvider::class.java.na
 /**
  * Application-level owner for generated SDEF files and scripting-additions state.
  *
- * The service coordinates cache paths, application dictionary generation, bundled standard
- * suites, and merged scripting-additions dictionaries. Parsing and index ingestion stay on the
- * downstream registry/index services.
+ * The service coordinates application dictionary generation, bundled standard suites, and
+ * merged scripting-additions dictionaries. Parsing and index ingestion stay on the downstream
+ * registry/index services.
  */
 @Service(Service.Level.APP)
 class SdefFileProvider
@@ -90,49 +87,12 @@ class SdefFileProvider
                     }
                     val dictionaryInfo =
                         SdefDictionaryFileGenerator.createDictionaryInfoForApplication(
-                            this,
                             applicationName,
                             applicationIoFile,
                         )
                     dictionaryInfo?.takeIf { facade.initializeDictionaryFromInfoInternal(it) }
                 }
             return createdDictionaryInfo
-        }
-
-        fun copyDictionaryFileToCacheDir(
-            applicationName: String,
-            applicationDictionaryFile: File,
-            targetFile: File,
-            rewrite: Boolean,
-        ): Boolean {
-            if (!targetFile.parentFile.exists()) return false
-
-            val needsCopy = !targetFile.exists() || rewrite
-            if (needsCopy) {
-                try {
-                    if (targetFile.exists() && targetFile.delete()) {
-                        LOG.debug("Existing target file deleted: $targetFile")
-                    }
-                    Files.copy(
-                        applicationDictionaryFile.toPath(),
-                        targetFile.toPath(),
-                        StandardCopyOption.REPLACE_EXISTING,
-                    )
-                } catch (e: IOException) {
-                    LOG.error(
-                        "Failed to move file $applicationDictionaryFile to cache directory: $targetFile",
-                        e,
-                    )
-                }
-            } else {
-                LOG.debug("Generated file already exists for application $applicationName")
-            }
-
-            val fileMoved = targetFile.exists()
-            if (fileMoved) {
-                LOG.debug("Dictionary file moved to ${targetFile.parent} directory")
-            }
-            return fileMoved
         }
 
         fun initializeScriptingAdditions() {
@@ -203,11 +163,6 @@ class SdefFileProvider
 
         fun getScriptingAdditions(): HashSet<String> = HashSet(scriptingAdditions)
 
-        fun serializeDictionaryPathForApplication(applicationName: String): String {
-            val unescaped = "$GENERATED_DICTIONARIES_SYSTEM_FOLDER/${applicationName}_generated.sdef"
-            return unescaped.replace(" ", "_")
-        }
-
         fun getDictionaryFile(applicationName: String?): File? =
             AppleScriptSystemDictionaryRegistryService
                 .getInstance()
@@ -233,8 +188,6 @@ class SdefFileProvider
         }
 
         companion object {
-            private val GENERATED_DICTIONARIES_SYSTEM_FOLDER: String = "${PathManager.getSystemPath()}/sdef"
-
             @JvmStatic
             fun getInstance(): SdefFileProvider =
                 ApplicationManager
