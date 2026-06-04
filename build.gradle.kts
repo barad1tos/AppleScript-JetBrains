@@ -609,6 +609,21 @@ tasks {
                     "DictionaryRegistries",
                 )
         val services = serviceOwnerByFile.values.distinct()
+        val filesOutsideAppServiceGraph =
+            setOf(
+                // Project-level dictionary cache reads the app-level registry, while SdefIndexService
+                // can consult project dictionaries from query paths. Keep that lifecycle boundary
+                // explicit instead of modelling project and app services as one cycle graph.
+                "AppleScriptProjectDictionaryService",
+            )
+
+        fun serviceLookupPatterns(dep: String): List<String> =
+            listOf(
+                "service<$dep>",
+                "$dep.getInstance",
+                "service<$dep::class.java>",
+            )
+
         // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
         // back-edge from a service to the facade is a DATA dependency (reading state.X), not
         // a service-graph dependency. RESEARCH §5 calls this out explicitly: "the back-edge
@@ -672,18 +687,29 @@ tasks {
                     .walkTopDown()
                     .filter { it.isFile && it.extension == "kt" }
                     .forEach { file ->
-                        val owner = serviceOwnerByFile[file.nameWithoutExtension] ?: return@forEach
                         val body = file.readText()
+                        val owner = serviceOwnerByFile[file.nameWithoutExtension]
+                        if (owner == null) {
+                            val hasTrackedServiceLookup =
+                                services.any { dep -> serviceLookupPatterns(dep).any { body.contains(it) } }
+                            val declaresService = body.contains("@Service")
+                            if (
+                                file.nameWithoutExtension !in filesOutsideAppServiceGraph &&
+                                (declaresService || hasTrackedServiceLookup)
+                            ) {
+                                error(
+                                    "Unowned service-graph file detected: ${file.relativeTo(projectDir)}\n" +
+                                        "Fix: add it to serviceOwnerByFile, move it outside scanned roots, " +
+                                        "or document it in filesOutsideAppServiceGraph.",
+                                )
+                            }
+                            return@forEach
+                        }
                         services.forEach { dep ->
                             if (dep == owner) return@forEach
                             // Skip data-hop edges (RESEARCH §5).
                             if (owner to dep in dataHopAllowlist) return@forEach
-                            val patterns =
-                                listOf(
-                                    "service<$dep>",
-                                    "$dep.getInstance",
-                                    "service<$dep::class.java>",
-                                )
+                            val patterns = serviceLookupPatterns(dep)
                             if (patterns.any { body.contains(it) }) {
                                 adjacency[owner]!!.add(dep)
                             }
