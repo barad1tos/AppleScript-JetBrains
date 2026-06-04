@@ -355,27 +355,15 @@ private object AppleScriptApplicationReferenceProbe {
         appName: String,
     ): ApplicationReferenceAnnotationState {
         val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val warningReason = checkWarningReason(appName, dictionaryRegistryService)
         val isKnownOrPendingApplication =
             !dictionaryRegistryService.areAppDictionariesIndexed() ||
                 dictionaryRegistryService.isDictionaryInitialized(appName) ||
                 dictionaryRegistryService.isKnownApplication(appName)
 
-        return if (isKnownOrPendingApplication) {
-            ApplicationReferenceAnnotationState.Resolved
-        } else {
-            resolveUninitializedApplication(appRef, appName, dictionaryRegistryService)
-        }
-    }
-
-    private fun resolveUninitializedApplication(
-        appRef: AppleScriptApplicationReference,
-        appName: String,
-        dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService,
-    ): ApplicationReferenceAnnotationState {
-        val warningReason = checkWarningReason(appName, dictionaryRegistryService)
         return if (!warningReason.isNullOrEmpty()) {
             ApplicationReferenceAnnotationState.Warning(warningReason)
-        } else if (projectDictionaryExists(appRef, appName)) {
+        } else if (isKnownOrPendingApplication || projectDictionaryExists(appRef, appName)) {
             ApplicationReferenceAnnotationState.Resolved
         } else {
             ApplicationReferenceAnnotationState.Unknown

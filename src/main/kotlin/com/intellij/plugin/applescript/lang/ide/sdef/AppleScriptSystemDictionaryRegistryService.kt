@@ -2,6 +2,7 @@
 
 package com.intellij.plugin.applescript.lang.ide.sdef
 
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.components.RoamingType
@@ -13,6 +14,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
@@ -45,6 +47,21 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStream
 
+private fun restartOpenProjectDaemons() {
+    val application = ApplicationManager.getApplication()
+    if (application.isUnitTestMode || application.isHeadlessEnvironment) {
+        return
+    }
+
+    application.invokeLater {
+        for (project in ProjectManager.getInstance().openProjects) {
+            if (!project.isDisposed) {
+                DaemonCodeAnalyzer.getInstance(project).restart()
+            }
+        }
+    }
+}
+
 @Service(Service.Level.APP)
 @State(
     name = AppleScriptSystemDictionaryRegistryService.COMPONENT_NAME,
@@ -58,17 +75,16 @@ class AppleScriptSystemDictionaryRegistryService
         // tree. Same-module test code naturally accesses `internal` members — no @VisibleForTesting
         // needed on constructor parameters (annotation does not target value parameters in Kotlin).
         internal val serviceScope: CoroutineScope,
-        // @JvmOverloads on the primary constructor instructs the Kotlin compiler to emit a
-        // `(CoroutineScope)` JVM overload that delegates to `(CoroutineScope, Dispatchers.IO)`.
-        // The Platform service container expects exactly that single-arg signature for
-        // `@Service(Service.Level.APP)` services (per `InstantiateKt.findConstructor` —
-        // `[()void, (CoroutineScope)void, (Application)void, (ComponentManager)void]`).
+        // @JvmOverloads on the primary constructor instructs the Kotlin compiler to emit the
+        // `(CoroutineScope)` JVM overload expected by the Platform service container for
+        // `@Service(Service.Level.APP)` services (per `InstantiateKt.findConstructor`).
         // Without @JvmOverloads, Platform-instantiated `getInstance()` calls fail with
         // InstantiationException; tests that construct the service manually with a
         // `StandardTestDispatcher` still get the 2-arg overload for runCurrent / advanceUntilIdle
         // determinism (Review HIGH 2). Discovered during Phase 03 gap closure (DEBUG.md REVISION).
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         private val progressTaskCompat: ProgressTaskCompat = ProgressTaskCompatDefault(),
+        private val daemonRestartScheduler: () -> Unit = ::restartOpenProjectDaemons,
     ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()),
         ParsableScriptHelper {
         private val dictionaryInfoRegistry = DictionaryInfoRegistry()
@@ -183,6 +199,7 @@ class AppleScriptSystemDictionaryRegistryService
                     standardReady.complete(Result.success(Unit))
                     discoverInstalledApplicationNames()
                     appsReady.complete(Result.success(Unit))
+                    daemonRestartScheduler()
                 } catch (e: CancellationException) {
                     // Pattern B: structured cancellation re-thrown to honour the coroutine contract.
                     shouldCompleteFailures = false
