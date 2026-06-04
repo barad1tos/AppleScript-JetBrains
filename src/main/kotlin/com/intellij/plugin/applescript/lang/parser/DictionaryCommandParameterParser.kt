@@ -38,16 +38,24 @@ internal object DictionaryCommandParameterParser {
         if (!recursion_guard_(builder, level, "parseParametersForCommand")) return false
         var result = true
         val marker = enter_section_(builder, level, _NONE_, "<parse command handler call parameters>")
+        val previousCommandParameterContext =
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS)
         builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS, true)
-        parsedCommandDefinition.directParameter?.let { directParameter ->
-            consumeToken(builder, OF)
-            result = DictionaryDirectParameterParser.parseValue(builder, level + 1, directParameter)
+        try {
+            parsedCommandDefinition.directParameter?.let { directParameter ->
+                consumeToken(builder, OF)
+                result = DictionaryDirectParameterParser.parseValue(builder, level + 1, directParameter)
+            }
+            if (parsedCommandDefinition.parameters.isNotEmpty()) {
+                result = parseCommandParameters(builder, level + 1, parsedCommandDefinition)
+            }
+            exit_section_(builder, level, marker, null, result, false, null)
+        } finally {
+            builder.putUserData(
+                AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS,
+                previousCommandParameterContext,
+            )
         }
-        if (parsedCommandDefinition.parameters.isNotEmpty()) {
-            result = parseCommandParameters(builder, level + 1, parsedCommandDefinition)
-        }
-        exit_section_(builder, level, marker, null, result, false, null)
-        builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS, false)
         // The caller observes a balanced parser section; semantic overload completeness is represented in markers.
         return true
     }
