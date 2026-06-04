@@ -422,7 +422,7 @@ class AppleScriptSystemDictionaryRegistryService
          */
         internal fun initDictionariesInfoFromCacheInternal(state: PersistedState) {
             notScriptableApplicationRegistry.readFromState(state)
-            dictionaryInfoRegistry.readFromState(state) { info ->
+            dictionaryInfoRegistry.readFromState(state).forEach { info ->
                 addDictionaryInfoInternal(info)
             }
         }

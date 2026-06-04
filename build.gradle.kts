@@ -587,23 +587,25 @@ tasks {
             "classes and owned helpers. DFS with WHITE/GRAY/BLACK colouring. " +
             "Phase 4 SERVICE-11."
 
-        val services =
-            listOf(
-                "SdefFileTypeRegistrar",
-                "SdefPersistenceService",
-                "ApplicationDiscoveryService",
-                "XcodeDetectionService",
-                "SdefFileProvider",
-                "SdefIndexService",
-                "AppleScriptSystemDictionaryRegistryService",
-            )
+        fun serviceWithOwnedFiles(
+            service: String,
+            vararg ownedFiles: String,
+        ): Map<String, String> = (listOf(service) + ownedFiles).associateWith { service }
+
         val serviceOwnerByFile =
-            services.associateWith { it } +
-                mapOf(
-                    "ScriptingAdditionsMerger" to "SdefFileProvider",
-                    "SdefDictionaryFileGenerator" to "SdefFileProvider",
-                    "SdefFileResources" to "SdefFileProvider",
-                )
+            serviceWithOwnedFiles("SdefFileTypeRegistrar") +
+                serviceWithOwnedFiles("SdefPersistenceService") +
+                serviceWithOwnedFiles("ApplicationDiscoveryService") +
+                serviceWithOwnedFiles("XcodeDetectionService") +
+                serviceWithOwnedFiles(
+                    "SdefFileProvider",
+                    "ScriptingAdditionsMerger",
+                    "SdefDictionaryFileGenerator",
+                    "SdefFileResources",
+                ) +
+                serviceWithOwnedFiles("SdefIndexService") +
+                serviceWithOwnedFiles("AppleScriptSystemDictionaryRegistryService")
+        val services = serviceOwnerByFile.values.distinct()
         // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
         // back-edge from a service to the facade is a DATA dependency (reading state.X), not
         // a service-graph dependency. RESEARCH §5 calls this out explicitly: "the back-edge

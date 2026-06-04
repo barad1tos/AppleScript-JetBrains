@@ -40,15 +40,10 @@ internal class DictionaryInfoRegistry {
         }
     }
 
-    fun readFromState(
-        state: AppleScriptSystemDictionaryRegistryService.PersistedState,
-        registerDictionaryInfo: (DictionaryInfo) -> Unit,
-    ) {
-        state.dictionariesInfo.mapNotNull(::dictionaryInfoFromState).forEach { info ->
+    fun readFromState(state: AppleScriptSystemDictionaryRegistryService.PersistedState): List<DictionaryInfo> =
+        state.dictionariesInfo.mapNotNull(::dictionaryInfoFromState).onEach { info ->
             dictionaryInfoMap.remove(info.getApplicationName())
-            registerDictionaryInfo(info)
         }
-    }
 
     operator fun get(applicationName: String?): DictionaryInfo? = dictionaryInfoMap[applicationName]
 
