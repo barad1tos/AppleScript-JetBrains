@@ -2,7 +2,6 @@
 
 package com.intellij.plugin.applescript.lang.ide.sdef
 
-import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.BaseState
 import com.intellij.openapi.components.RoamingType
@@ -12,8 +11,6 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.ProcessCanceledException
-import com.intellij.openapi.project.ProjectManager
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
@@ -28,37 +25,24 @@ import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.util.xmlb.annotations.AbstractCollection
 import com.intellij.util.xmlb.annotations.CollectionBean
 import com.intellij.util.xmlb.annotations.Tag
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.jetbrains.annotations.VisibleForTesting
 import java.io.File
-
-private fun restartOpenProjectDaemons() {
-    val application = ApplicationManager.getApplication()
-    if (application.isUnitTestMode || application.isHeadlessEnvironment) {
-        return
-    }
-
-    application.invokeLater {
-        for (project in ProjectManager.getInstance().openProjects) {
-            if (!project.isDisposed) {
-                DaemonCodeAnalyzer.getInstance(project).restart()
-            }
-        }
-    }
-}
 
 @Service(Service.Level.APP)
 @State(
     name = AppleScriptSystemDictionaryRegistryService.COMPONENT_NAME,
     storages = [Storage(value = "appleScriptCachedDictionariesInfo.xml", roamingType = RoamingType.PER_OS)],
 )
+/*
+ * The service intentionally keeps the legacy facade API while data ownership moves to typed
+ * collaborators. Removing these methods in one step would break parser/completion call sites
+ * and service ABI; keep shrinking this facade before removing the suppression.
+ */
 @Suppress("TooManyFunctions")
 class AppleScriptSystemDictionaryRegistryService
     @JvmOverloads
@@ -74,9 +58,9 @@ class AppleScriptSystemDictionaryRegistryService
         // InstantiationException; tests that construct the service manually with a
         // `StandardTestDispatcher` still get the 2-arg overload for runCurrent / advanceUntilIdle
         // determinism (Review HIGH 2). Discovered during Phase 03 gap closure (DEBUG.md REVISION).
-        private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
-        private val progressTaskCompat: ProgressTaskCompat = ProgressTaskCompatDefault(),
-        private val daemonRestartScheduler: () -> Unit = ::restartOpenProjectDaemons,
+        ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+        progressTaskCompat: ProgressTaskCompat = ProgressTaskCompatDefault(),
+        daemonRestartScheduler: () -> Unit = DictionaryDaemonRestartScheduler::restartOpenProjectDaemons,
     ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()) {
         private val dictionaryInfoRegistry = DictionaryInfoRegistry()
         private val notScriptableApplicationRegistry = NotScriptableApplicationRegistry()
@@ -86,6 +70,15 @@ class AppleScriptSystemDictionaryRegistryService
             get() = ApplicationDiscoveryService.getInstance()
         private val dictionaryFiles: SdefFileProvider
             get() = SdefFileProvider.getInstance()
+        private val readiness = DictionaryReadinessTracker()
+        internal val persistenceBridge =
+            DictionaryPersistenceBridge(
+                dictionaryInfoRegistry = dictionaryInfoRegistry,
+                notScriptableApplicationRegistry = notScriptableApplicationRegistry,
+                markDiscoveredApplication = { applicationName ->
+                    discovery.addDiscoveredApplicationName(applicationName)
+                },
+            )
         private val initializationCoordinator =
             DictionaryInitializationCoordinator(
                 dictionaryInfoRegistry = dictionaryInfoRegistry,
@@ -96,6 +89,21 @@ class AppleScriptSystemDictionaryRegistryService
                 parseDictionaryFile = { file, applicationName ->
                     SdefIndexService.getInstance().parseDictionaryFile(file, applicationName)
                 },
+            )
+        private val startupPipeline =
+            DictionaryStartupPipeline(
+                ioDispatcher = ioDispatcher,
+                readiness = readiness,
+                actions =
+                    DictionaryStartupActions(
+                        registerFileTypes = { service<SdefFileTypeRegistrar>().register() },
+                        loadCachedDictionaries = { persistenceBridge.loadFromState(state) },
+                        initializeStandardDictionaries = {
+                            StandardDictionaryInitializer(this@AppleScriptSystemDictionaryRegistryService).initialize()
+                        },
+                        discoverInstalledApplicationNames = { discoverInstalledApplicationNames() },
+                        restartOpenProjectDaemons = daemonRestartScheduler,
+                    ),
             )
 
         // Phase 4 SERVICE-03 (plan 04-03, Wave 3): the `notFoundApplicationList` and
@@ -130,11 +138,13 @@ class AppleScriptSystemDictionaryRegistryService
          * Exposed `@VisibleForTesting internal` so AppCommandGatingTest + DeferredFailureSemanticsTest +
          * ServiceScopeLifecycleIntegrationTest can drive / inspect them deterministically.
          */
-        @VisibleForTesting
-        internal val standardReady: CompletableDeferred<Result<Unit>> = CompletableDeferred()
+        @get:VisibleForTesting
+        internal val standardReady: CompletableDeferred<Result<Unit>>
+            get() = readiness.standardReady
 
-        @VisibleForTesting
-        internal val appsReady: CompletableDeferred<Result<Unit>> = CompletableDeferred()
+        @get:VisibleForTesting
+        internal val appsReady: CompletableDeferred<Result<Unit>>
+            get() = readiness.appsReady
 
         init {
             // Constructor returns immediately (COROUTINE-05 non-blocking-init invariant). The launch is
@@ -143,15 +153,15 @@ class AppleScriptSystemDictionaryRegistryService
             // (Review HIGH 2) so tests pass `StandardTestDispatcher` for deterministic runCurrent /
             // advanceUntilIdle control of init progression.
             serviceScope.launch {
-                runInitChain()
+                startupPipeline.run()
             }
 
             // D-04 hybrid silent->visible UX (Plan 03-05). Sibling launch on serviceScope so it shares
-            // the same structured-concurrency parent as runInitChain — both children auto-cancel on
+            // the same structured-concurrency parent as the startup pipeline — both children auto-cancel on
             // plugin unload. The policy stays silent for the first `visibilityThreshold` (2s default,
             // see DiscoveryProgressPolicy); if `appsReady` has not completed by then, surfaces a
             // Task.Backgroundable indicator titled "AppleScript: indexing dictionaries…" with a
-            // cancel button. User cancel on the indicator does NOT cancel runInitChain — they are
+            // cancel button. User cancel on the indicator does NOT cancel dictionary startup — they are
             // sibling children (T-03-cancel-leak mitigation per the plan's STRIDE register).
             //
             // Review HIGH 3 — the timing decision + indicator surfacing lives in DiscoveryProgressPolicy,
@@ -160,79 +170,8 @@ class AppleScriptSystemDictionaryRegistryService
             serviceScope.launch {
                 val policy = DiscoveryProgressPolicy(taskCompat = progressTaskCompat)
                 policy.runOrTrackProgress("AppleScript: indexing dictionaries…") {
-                    appsReady.await()
+                    readiness.awaitAppsReady()
                 }
-            }
-        }
-
-        /**
-         * Two-stage init pipeline run inside [serviceScope] on [ioDispatcher].
-         *
-         * Order is load-bearing for the cold-start state machine (CoroutineColdStartTest Pattern L lock):
-         *   1. `service<SdefFileTypeRegistrar>().register()` — Light Service owns the
-         *      `withContext(Dispatchers.EDT)` + runWriteAction internally (Phase 4 SERVICE-01).
-         *      RECURRING_PITFALLS.md Pattern C — write actions require EDT, NEVER the `Main` dispatcher.
-         *   2. `initDictionariesInfoFromCacheInternal(state)` — restore persisted dictionary entries.
-         *   3. [StandardDictionaryInitializer.initialize] — parse StandardAdditions + CocoaStandard.
-         *   4. Complete `standardReady` with `Result.success(Unit)` — parser fast path unblocks.
-         *   5. `discoverInstalledApplicationNames()` — walk the `/Applications` directory tree.
-         *   6. Complete `appsReady` with `Result.success(Unit)` — completion/annotator paths unblock.
-         *
-         * Exception handling (RECURRING_PITFALLS.md Pattern B compliance):
-         *   - Catch [CancellationException] FIRST and re-throw — never swallow structured cancellation.
-         *   - Catch [ProcessCanceledException] before recoverable startup failures — never swallow
-         *     IntelliJ Platform cancellation.
-         *   - Catch [RuntimeException] and `LOG.error` at the service boundary.
-         *   - `finally` block completes any not-yet-completed deferred with `Result.failure(...)` so the
-         *     facades see `isCompleted && isFailure` → return `false` (not-ready) rather than a
-         *     false-positive "ready" for a failed init (Review HIGH 1, Pattern G).
-         */
-        @Suppress("TooGenericExceptionCaught")
-        private suspend fun runInitChain() {
-            withContext(ioDispatcher) {
-                var shouldCompleteFailures = true
-                try {
-                    // Phase 4 SERVICE-01 (plan 04-01): registerSdefExtension moved to SdefFileTypeRegistrar.
-                    // The Light Service owns the `withContext(Dispatchers.EDT)` + runWriteAction internally,
-                    // so the call site here is a single trampoline. Init-chain ordering preserved.
-                    service<SdefFileTypeRegistrar>().register()
-                    initDictionariesInfoFromCacheInternal(state)
-                    StandardDictionaryInitializer(this@AppleScriptSystemDictionaryRegistryService).initialize()
-                    standardReady.complete(Result.success(Unit))
-                    discoverInstalledApplicationNames()
-                    appsReady.complete(Result.success(Unit))
-                    daemonRestartScheduler()
-                } catch (e: CancellationException) {
-                    // Pattern B: structured cancellation re-thrown to honour the coroutine contract.
-                    shouldCompleteFailures = false
-                    throw e
-                } catch (e: ProcessCanceledException) {
-                    // Pattern B: IntelliJ Platform cancellation must propagate to platform machinery.
-                    shouldCompleteFailures = false
-                    throw e
-                } catch (e: RuntimeException) {
-                    LOG.error("Error while initializing service", e)
-                } finally {
-                    // Review HIGH 1: complete with Result.failure so facades see isCompleted && isFailure
-                    // → return false. NOT `completeExceptionally` (which would make `await()` throw at
-                    // callers and lose the success-vs-failure distinction at the facade boundary).
-                    if (shouldCompleteFailures) {
-                        completeDeferredFailures()
-                    }
-                }
-            }
-        }
-
-        private fun completeDeferredFailures() {
-            if (!standardReady.isCompleted) {
-                standardReady.complete(
-                    Result.failure(IllegalStateException("standardReady init failed")),
-                )
-            }
-            if (!appsReady.isCompleted) {
-                appsReady.complete(
-                    Result.failure(IllegalStateException("appsReady init failed")),
-                )
             }
         }
 
@@ -248,7 +187,7 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * @return `true` if [standardReady] completed successfully; `false` if pending OR failed.
          */
-        fun isInitialized(): Boolean = standardReady.isSuccessful()
+        fun isInitialized(): Boolean = readiness.isStandardReady()
 
         /**
          * Returns `true` only when the full application catalog discovery has completed successfully.
@@ -261,80 +200,29 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * @return `true` if [appsReady] completed successfully; `false` if pending OR failed.
          */
-        fun areAppDictionariesIndexed(): Boolean = appsReady.isSuccessful()
-
-        @OptIn(ExperimentalCoroutinesApi::class)
-        private fun CompletableDeferred<Result<Unit>>.isSuccessful(): Boolean = isCompleted && getCompleted().isSuccess
+        fun areAppDictionariesIndexed(): Boolean = readiness.areAppsReady()
 
         /**
          * Bounded-wait helper for standard dictionary readiness.
          */
-        internal suspend fun awaitStandardReadyInternal(): Result<Unit> = standardReady.await()
+        internal suspend fun awaitStandardReadyInternal(): Result<Unit> = readiness.awaitStandardReady()
 
         /**
          * Bounded-wait helper for application dictionary readiness.
          */
-        internal suspend fun awaitAppsReadyInternal(): Result<Unit> = appsReady.await()
+        internal suspend fun awaitAppsReadyInternal(): Result<Unit> = readiness.awaitAppsReady()
 
         // ---------------------------------------------------------------------------------------------
-        // Phase 4 SERVICE-02 (plan 04-02, Wave 2) — persistence trampolines + `internal *Internal`
-        // helpers used by [SdefPersistenceService].
+        // Phase 4 SERVICE-02 (plan 04-02, Wave 2) — persistence trampolines used by
+        // [SdefPersistenceService].
         //
         // Pattern A from RESEARCH §2: the @State annotation, PersistedState inner class, and
         // SimplePersistentStateComponent inheritance ALL stay on this facade. The service offers a
-        // typed API that forwards to the `internal *Internal` helpers below. External callers
-        // continue to use the public trampolines (getNotScriptableApplicationList /
-        // isNotScriptable / isInUnknownList / updateState) with
-        // byte-for-byte unchanged signatures. SDEF-13 golden fixture regression-locks the wire
-        // format — neither PersistedState nor DictionaryInfo.State is touched by this wave.
-        //
-        // Internal callers within this file invoke the `*Internal` helpers directly (NOT through
-        // the service trampoline) to avoid the extra service<X>() lookup hop on hot paths and to
-        // sidestep any circularity concerns during init.
+        // typed API over the persistence bridge. External callers continue to use the public
+        // query trampolines (getNotScriptableApplicationList / isNotScriptable /
+        // isInUnknownList). SDEF-13 golden fixture regression-locks the wire format — neither
+        // PersistedState nor DictionaryInfo.State is touched by this wave.
         // ---------------------------------------------------------------------------------------------
-
-        /**
-         * Register a [DictionaryInfo] in the in-memory registry. Returns `true` if the application
-         * was newly added (idempotent overwrite returns `true` for callers that need the
-         * "registered" predicate — matches the typed-API contract on [SdefPersistenceService]).
-         * Removes the application from the notScriptable list and adds it to the discovered set.
-         */
-        internal fun addDictionaryInfoInternal(info: DictionaryInfo): Boolean {
-            val appName = info.getApplicationName()
-            val wasAbsent = dictionaryInfoRegistry.add(info)
-            // Wave 3 (SERVICE-03): discoveredApplicationNames lives on ApplicationDiscoveryService.
-            // Internal caller routes through the service<X>() lookup — this is an init-time hot
-            // path during cache load, but the static service lookup is O(1) and the wave's
-            // architecture goal (single owner per state) overrides the hop-avoidance heuristic
-            // from Wave 2 (which was specific to the Pattern A back-edge into the facade itself).
-            discovery.addDiscoveredApplicationName(appName)
-            notScriptableApplicationRegistry.remove(appName)
-            return wasAbsent
-        }
-
-        /**
-         * Defensive snapshot of the in-memory [DictionaryInfo] registry. Returns a [List], NOT the
-         * live `Map.values` view, so callers cannot accidentally mutate the registry through the
-         * returned reference.
-         */
-        internal fun dictionaryInfoSnapshotInternal(): List<DictionaryInfo> = dictionaryInfoRegistry.snapshot
-
-        /**
-         * Remove a [DictionaryInfo] by its application path. Returns `true` if a matching entry
-         * was found and removed. Standard libraries (no `applicationFile`) are matched by the
-         * well-known `CocoaStandard.sdef` suffix to preserve the historical
-         * [getDictionaryInfoByApplicationPath] resolution.
-         */
-        internal fun removeDictionaryInfoByPathInternal(applicationPath: String): Boolean =
-            dictionaryInfoRegistry.removeByPath(applicationPath)
-
-        /**
-         * Defensive snapshot of the notScriptable set. Returns a [HashSet] to preserve the
-         * historical `getNotScriptableApplicationList(): HashSet<String>` return type (some
-         * callers may depend on the concrete `HashSet` API surface; Wave 6 may narrow to
-         * read-only `Set`).
-         */
-        internal fun notScriptableSnapshotInternal(): HashSet<String> = notScriptableApplicationRegistry.snapshot
 
         /**
          * Trampoline (Phase 4 SERVICE-02): defers to
@@ -342,38 +230,6 @@ class AppleScriptSystemDictionaryRegistryService
          * back-compat with existing call sites (annotator, completion contributors).
          */
         fun getNotScriptableApplicationList(): HashSet<String> = HashSet(persistence.readNotScriptableSnapshot())
-
-        /**
-         * In-memory membership test on the notScriptable set. Routed through
-         * [SdefPersistenceService.isNotScriptable] for the public trampoline below; this internal
-         * variant is the actual data access used by internal callers (annotator-facing paths
-         * inside this facade like [getInitializedInfo]) to avoid the service lookup hop on hot
-         * paths.
-         */
-        internal fun isNotScriptableInternal(name: String): Boolean = name in notScriptableApplicationRegistry
-
-        /**
-         * In-memory membership test on the "not found" list. Wave 3 (SERVICE-03) migrated the
-         * backing storage to [ApplicationDiscoveryService.isInNotFoundList]; this internal
-         * helper preserves the call-site signature for the bounded-wait callers
-         * ([getInitializedInfo], [ensureDictionaryInitialized]) so the hot-path test surface
-         * does not change shape. The single-line forwarder costs one `service<X>()` lookup —
-         * acceptable on the bounded-wait paths (the dictionary parse / VFS walk dominates).
-         */
-        internal fun isInUnknownListInternal(name: String): Boolean = discovery.isInNotFoundList(name)
-
-        /**
-         * Add an application to the notScriptable persisted set; returns `true` if newly added.
-         * Idempotent. The persisted-state machinery serialises on its own cadence (per
-         * `getState()`), matching the v1.0 behaviour byte-for-byte (SDEF-13 fixture invariant).
-         */
-        internal fun addNotScriptableInternal(name: String): Boolean = notScriptableApplicationRegistry.add(name)
-
-        /**
-         * Remove an application from the notScriptable persisted set; returns `true` if the
-         * name was present and removed.
-         */
-        internal fun removeNotScriptableInternal(name: String): Boolean = notScriptableApplicationRegistry.remove(name)
 
         // Phase 4 SERVICE-04 (Wave 4) trampoline: scripting-additions set lives on
         // [SdefFileProvider] (populated by initializeScriptingAdditions, consumed by
@@ -386,45 +242,10 @@ class AppleScriptSystemDictionaryRegistryService
             runCatching {
                 // Phase 4 SERVICE-02 trampoline — routes through SdefPersistenceService for clean
                 // single-source-of-truth on the load path. The service's loadFromState delegates
-                // back to initDictionariesInfoFromCacheInternal on this facade; the indirection
-                // documents the architectural boundary while keeping the wire format byte-for-byte
-                // (the inner [PersistedState] class + DictionaryInfo.State annotations untouched).
+                // to DictionaryPersistenceBridge while this facade keeps the persisted component
+                // identity and XML state class unchanged.
                 persistence.loadFromState(state)
             }.onFailure { LOG.error("Error while loading state for AppleScript dictionaries", it) }
-        }
-
-        /**
-         * Trampoline (Phase 4 SERVICE-02): writes the in-memory registry into the persisted
-         * state via [SdefPersistenceService.writeToState], which routes to
-         * [writeToStateInternal] on this facade. Public method name preserved verbatim — Phase 3
-         * D-08 invariant.
-         */
-        fun updateState() {
-            persistence.writeToState(state)
-        }
-
-        /**
-         * Writes the in-memory dictionary registry + notScriptable set back into [state].
-         * Body extracted from the pre-Wave-2 [updateState] method byte-for-byte (no behavioural
-         * drift — the SDEF-13 golden fixture regression-locks the resulting XML format).
-         */
-        internal fun writeToStateInternal(state: PersistedState) {
-            dictionaryInfoRegistry.writeToState(state)
-            notScriptableApplicationRegistry.writeToState(state)
-        }
-
-        /**
-         * Fills the in-memory dictionary registry from previously persisted [PersistedState].
-         *
-         * Body extracted from the pre-Wave-2 private `initDictionariesInfoFromCache` byte-for-byte.
-         * The SDEF-13 golden fixture regression-locks that the wire-format -> in-memory
-         * reconstruction is unchanged.
-         */
-        internal fun initDictionariesInfoFromCacheInternal(state: PersistedState) {
-            notScriptableApplicationRegistry.readFromState(state)
-            dictionaryInfoRegistry.readFromState(state).forEach { info ->
-                addDictionaryInfoInternal(info)
-            }
         }
 
         /**
@@ -436,21 +257,13 @@ class AppleScriptSystemDictionaryRegistryService
          * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
          * [ApplicationDiscoveryService.discoverInstalledApplicationNames]. The body now lives on the
          * service; the explicit `withContext(ioDispatcher)` boundary remains there (defence-in-depth
-         * even when the facade's [runInitChain] already launches on `ioDispatcher`). Public method
-         * name preserved verbatim — internal facade callers ([runInitChain]) and any future external
+         * even when the startup pipeline already launches on `ioDispatcher`). Public method
+         * name preserved verbatim — startup callers and any future external
          * callers see the same signature.
          */
         suspend fun discoverInstalledApplicationNames() {
             discovery.discoverInstalledApplicationNames()
         }
-
-        /**
-         * Called from the annotator to ensure that an application's dictionary is initialised.
-         *
-         * @return true if the dictionary was initialised
-         */
-        fun ensureDictionaryInitialized(anyApplicationName: String): Boolean =
-            initializationCoordinator.ensureDictionaryInitialized(anyApplicationName)
 
         fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean =
             initializationCoordinator.ensureKnownApplicationDictionaryInitialized(knownApplicationName)
@@ -541,8 +354,7 @@ class AppleScriptSystemDictionaryRegistryService
          * @return true if `/usr/bin/sdef` invocation previously failed to generate a dictionary
          *
          * Phase 4 SERVICE-02 trampoline: routes through [SdefPersistenceService.isNotScriptable]
-         * for external callers (annotator, completion contributors). Internal callers within
-         * this facade use [isNotScriptableInternal] directly.
+         * for external callers (annotator, completion contributors).
          */
         fun isNotScriptable(applicationName: String): Boolean = persistence.isNotScriptable(applicationName)
 
@@ -558,8 +370,6 @@ class AppleScriptSystemDictionaryRegistryService
          *
          * External callers ([com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptColorAnnotator])
          * see the same signature byte-for-byte; the re-route is invisible at the call site.
-         * Internal callers within this facade continue to use [isInUnknownListInternal] (which
-         * itself now forwards to the service — single source of truth).
          */
         fun isInUnknownList(applicationName: String): Boolean = discovery.isInNotFoundList(applicationName)
 

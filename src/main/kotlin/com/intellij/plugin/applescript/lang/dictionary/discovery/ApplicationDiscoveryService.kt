@@ -13,6 +13,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileVisitor
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryPersistenceBridge
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.extensionSupported
 import com.intellij.plugin.applescript.lang.util.MyStopVisitingException
@@ -109,15 +110,15 @@ private fun findApplicationFileRecursively(
  *   set when filtering discovered application names. The data dependency uses
  *   `service<SdefPersistenceService>()` lookups (NOT a back-edge data hop into the facade).
  *
- * Lifecycle: lazy-on-first-access. [AppleScriptSystemDictionaryRegistryService.runInitChain]
- * triggers [discoverInstalledApplicationNames] in step 5 (after the standard SDEF suite
+ * Lifecycle: lazy-on-first-access. The startup pipeline triggers
+ * [discoverInstalledApplicationNames] in step 5 (after the standard SDEF suite
  * has been ingested, before `appsReady` completes). The `DiscoveryProgressPolicy` sibling
  * launch and the `appsReady` `CompletableDeferred` STAY on the facade — they are
  * init-chain orchestration concerns, not discovery concerns (Phase 3 D-04 + D-08).
  *
  * Threading model:
  * - [discoverInstalledApplicationNames] is `suspend` and explicitly switches to
- *   [ioDispatcher] — defence-in-depth even when the facade's `runInitChain` already
+ *   [ioDispatcher] — defence-in-depth even when the startup pipeline already
  *   launches on `Dispatchers.IO`. The explicit boundary advertises the contract for
  *   future callers (RECURRING_PITFALLS.md Pattern C — EDT must NEVER walk `/Applications`).
  * - [findApplicationBundleFile] is synchronous because its only production caller
@@ -192,7 +193,7 @@ class ApplicationDiscoveryService
         /**
          * Add an application to the in-memory discovered set. Returns `true` if newly added.
          * Idempotent — repeated calls with the same name return `false` from the second call
-         * onwards. Used by [AppleScriptSystemDictionaryRegistryService.addDictionaryInfoInternal]
+         * onwards. Used by [DictionaryPersistenceBridge.addDictionaryInfo]
          * to register cached / persisted dictionary entries on the discovered set even when
          * the disk walk has not (yet) seen them.
          */
@@ -295,7 +296,7 @@ class ApplicationDiscoveryService
                                 val appName = file.nameWithoutExtension
                                 // Drop names already known to be not-scriptable. This was implicit
                                 // in pre-Wave-3 facade behaviour because the post-discovery
-                                // `getInitializedInfo` path consulted `isNotScriptableInternal`;
+                                // `getInitializedInfo` path consulted the persistence bridge;
                                 // applying it at the discovery seam centralises the filter on
                                 // the service boundary without changing observable behaviour
                                 // (the notScriptable list is empty until first dictionary parse

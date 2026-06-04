@@ -188,7 +188,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
     /**
      * INVARIANT — forbidden cell `(false, true)` is unreachable. `RECURRING_PITFALLS.md`
      * Pattern L: defensive lock against pipeline-order bugs (`appsReady` completing before
-     * `standardReady` would indicate the `runInitChain` pipeline order was inverted).
+     * `standardReady` would indicate the startup pipeline order was inverted).
      */
     fun testPipelineOrder_standardReadyCannotCompleteAfterAppsReady() {
         val service = newTestService()

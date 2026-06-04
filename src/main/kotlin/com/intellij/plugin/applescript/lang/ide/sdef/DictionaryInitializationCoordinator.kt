@@ -17,18 +17,6 @@ internal class DictionaryInitializationCoordinator(
     private val areAppDictionariesIndexed: () -> Boolean,
     private val parseDictionaryFile: (File, String) -> Boolean,
 ) {
-    fun ensureDictionaryInitialized(anyApplicationName: String): Boolean {
-        val canInitializeUnknownApplication =
-            !StringUtil.isEmptyOrSpaces(anyApplicationName) &&
-                anyApplicationName !in notScriptableApplicationRegistry &&
-                !applicationDiscovery().isInNotFoundList(anyApplicationName)
-        val initializedUnknownApplication =
-            canInitializeUnknownApplication && getInitializedInfo(anyApplicationName) != null
-
-        return ensureKnownApplicationDictionaryInitialized(anyApplicationName) ||
-            initializedUnknownApplication
-    }
-
     fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean {
         val canInitialize =
             areAppDictionariesIndexed() &&
