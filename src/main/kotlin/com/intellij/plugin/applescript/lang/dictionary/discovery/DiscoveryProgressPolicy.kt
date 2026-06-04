@@ -1,7 +1,5 @@
 package com.intellij.plugin.applescript.lang.dictionary.discovery
 
-import com.intellij.plugin.applescript.lang.ide.sdef.ProgressTaskCompat
-import com.intellij.plugin.applescript.lang.ide.sdef.ProgressTaskCompatDefault
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay

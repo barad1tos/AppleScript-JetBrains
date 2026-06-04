@@ -1,4 +1,4 @@
-package com.intellij.plugin.applescript.lang.ide.sdef
+package com.intellij.plugin.applescript.lang.dictionary.discovery
 
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager

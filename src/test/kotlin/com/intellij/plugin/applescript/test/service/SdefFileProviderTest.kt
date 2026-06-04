@@ -3,9 +3,9 @@ package com.intellij.plugin.applescript.test.service
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DictionaryLoadResult
+import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.ide.sdef.SdefFileProvider
-import com.intellij.plugin.applescript.lang.ide.sdef.XcodeDetectionService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files

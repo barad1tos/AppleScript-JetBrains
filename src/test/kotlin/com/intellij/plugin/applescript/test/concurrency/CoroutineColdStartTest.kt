@@ -7,9 +7,9 @@ package com.intellij.plugin.applescript.test.concurrency
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.util.Disposer
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.ide.sdef.ApplicationDiscoveryService
-import com.intellij.plugin.applescript.lang.ide.sdef.ProgressTaskCompat
 import com.intellij.plugin.applescript.lang.ide.sdef.SdefFileTypeRegistrar
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService

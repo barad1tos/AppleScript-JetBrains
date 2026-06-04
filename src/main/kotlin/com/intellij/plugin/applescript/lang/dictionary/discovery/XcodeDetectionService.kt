@@ -1,4 +1,4 @@
-package com.intellij.plugin.applescript.lang.ide.sdef
+package com.intellij.plugin.applescript.lang.dictionary.discovery
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service

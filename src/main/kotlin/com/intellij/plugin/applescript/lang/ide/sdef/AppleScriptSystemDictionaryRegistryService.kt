@@ -16,6 +16,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompatDefault
+import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
