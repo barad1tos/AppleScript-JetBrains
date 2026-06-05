@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION", "SpellCheckingInspection")
-
 package com.intellij.plugin.applescript.lang.ide.sdef
 
 import com.intellij.openapi.application.ApplicationManager
@@ -20,9 +18,8 @@ import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegi
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
-import com.intellij.util.xmlb.annotations.AbstractCollection
 import com.intellij.util.xmlb.annotations.CollectionBean
-import com.intellij.util.xmlb.annotations.Tag
+import com.intellij.util.xmlb.annotations.XCollection
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -258,8 +255,7 @@ class AppleScriptSystemDictionaryRegistryService
         /** Persistent state for the application-level service. Field names are XML attribute names. */
         class PersistedState : BaseState() {
             @JvmField
-            @Tag("applicationsInfo")
-            @AbstractCollection(surroundWithTag = false)
+            @XCollection(propertyElementName = "applicationsInfo", elementName = "dictionary-info")
             var dictionariesInfo: Array<DictionaryInfo.State> = emptyArray()
 
             @JvmField
