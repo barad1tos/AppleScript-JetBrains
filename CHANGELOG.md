@@ -2,6 +2,16 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.1] - 2026-06-05
+
+### Fixed
+
+- Capped published Marketplace compatibility to IntelliJ Platform 2025.1 and 2025.2 so Plugin Verifier does not treat unsupported 2025.3+ IDE lines as part of this release.
+
+### Compatibility
+
+- Verified against IntelliJ IDEA Community 2025.1 and 2025.2 (`sinceBuild = 251`, `untilBuild = 252.*`).
+
 ## [2.0.0] - 2026-06-03
 
 ### Added

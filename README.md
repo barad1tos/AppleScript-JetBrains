@@ -49,7 +49,7 @@ The project is not affiliated with Apple, JetBrains, or the original maintainer.
 
 ## Compatibility
 
-The current plugin version is `2.0.0`.
+The current plugin version is `2.0.1`.
 
 Release coordinates are defined in [gradle.properties](gradle.properties);
 Plugin Verifier target IDEs are configured in [build.gradle.kts](build.gradle.kts).
