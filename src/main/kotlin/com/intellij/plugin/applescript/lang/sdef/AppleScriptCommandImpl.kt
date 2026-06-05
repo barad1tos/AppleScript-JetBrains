@@ -49,16 +49,24 @@ open class AppleScriptCommandImpl :
      */
     internal val commandData: CommandData get() = data
 
-    @Suppress("MemberVisibilityCanBePrivate")
-    var cocoaClass: String? = null
+    private val cocoaClass: String?
 
     constructor(
         suite: Suite,
         name: String,
         code: String,
         xmlTagCommand: XmlTag,
+    ) : this(suite, name, code, xmlTagCommand, null)
+
+    constructor(
+        suite: Suite,
+        name: String,
+        code: String,
+        xmlTagCommand: XmlTag,
+        cocoaClassName: String?,
     ) : super(suite, name, code, xmlTagCommand) {
         this.data = AppleScriptCommandBuilder(name = name, code = code).build()
+        this.cocoaClass = cocoaClassName
     }
 
     override fun getParameterByName(name: String): CommandParameter? {

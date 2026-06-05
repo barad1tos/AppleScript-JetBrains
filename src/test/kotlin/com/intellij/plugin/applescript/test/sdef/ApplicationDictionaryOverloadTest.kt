@@ -14,6 +14,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.lang.reflect.Proxy
 
 private const val PLAY_COMMAND_NAME = "play"
+private const val EMPTY_DICTIONARY_XML = "<dictionary title=\"TestApp\"></dictionary>"
 
 /**
  * SDEF-02 regression fence for the D-02 TODO closure at
@@ -81,19 +82,38 @@ class ApplicationDictionaryOverloadTest : BasePlatformTestCase() {
         assertTrue("Missing name must return empty list", dict.findAllCommandsWithName("missing").isEmpty())
     }
 
+    fun testCommandCocoaClassIsParsedFromSdef() {
+        val dict =
+            buildDictionary(
+                """
+                <dictionary title="TestApp">
+                    <suite name="Test Suite" code="test">
+                        <command name="close" code="clos">
+                            <cocoa class="NSCloseCommand"/>
+                        </command>
+                    </suite>
+                </dictionary>
+                """.trimIndent(),
+            )
+
+        val command = dict.findAllCommandsWithName("close").single()
+
+        assertEquals("NSCloseCommand", command.cocoaClassName)
+    }
+
     /**
      * Build a real `ApplicationDictionaryImpl` over an empty in-memory XmlFile.
      * `SdefParser.parse` walks the empty document tree without inserting any
      * commands, leaving the dictionary ready for direct `addCommand` calls.
      */
-    private fun buildDictionary(): ApplicationDictionaryImpl {
+    private fun buildDictionary(xmlText: String = EMPTY_DICTIONARY_XML): ApplicationDictionaryImpl {
         val xmlFile =
             PsiFileFactory
                 .getInstance(project)
                 .createFileFromText(
                     "empty.sdef",
                     com.intellij.lang.xml.XMLLanguage.INSTANCE,
-                    "<dictionary title=\"TestApp\"></dictionary>",
+                    xmlText,
                 ) as XmlFile
         return ApplicationDictionaryImpl(
             project = project,
