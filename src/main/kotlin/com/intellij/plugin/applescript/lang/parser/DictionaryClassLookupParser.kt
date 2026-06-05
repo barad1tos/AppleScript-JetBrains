@@ -126,7 +126,7 @@ internal object DictionaryClassLookupParser {
         if (result) {
             currentTokenText.set(currentTokenText.get() + " " + builder.tokenText)
             propertyExists =
-                ParsableScriptSuiteRegistryHelper.isPropertyWithPrefixExist(
+                DictionaryPropertyRegistry.isPropertyWithPrefixExist(
                     propertyApplicationName,
                     currentTokenText.get(),
                 )

@@ -36,7 +36,7 @@ internal object DictionaryClassNameScanner {
         currentTokenText: Ref<String>,
     ): Boolean {
         var classWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isStdClassPluralWithPrefixExist(
+            DictionaryClassRegistry.isStdClassPluralWithPrefixExist(
                 currentTokenText.get(),
             )
         var nextTokenText = currentTokenText.get()
@@ -44,10 +44,10 @@ internal object DictionaryClassNameScanner {
         while (builder.tokenText != null && classWithPrefixExists) {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
-            classWithPrefixExists = ParsableScriptSuiteRegistryHelper.isStdClassPluralWithPrefixExist(nextTokenText)
+            classWithPrefixExists = DictionaryClassRegistry.isStdClassPluralWithPrefixExist(nextTokenText)
             if (classWithPrefixExists) {
                 currentTokenText.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isStdLibClassPluralName(currentTokenText.get())) {
+            } else if (DictionaryClassRegistry.isStdLibClassPluralName(currentTokenText.get())) {
                 result = true
                 break
             }
@@ -60,7 +60,7 @@ internal object DictionaryClassNameScanner {
         currentTokenText: Ref<String>,
     ): Boolean {
         var classWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isStdClassWithPrefixExist(
+            DictionaryClassRegistry.isStdClassWithPrefixExist(
                 currentTokenText.get(),
             )
         var nextTokenText = currentTokenText.get()
@@ -68,10 +68,10 @@ internal object DictionaryClassNameScanner {
         while (builder.tokenText != null && classWithPrefixExists) {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
-            classWithPrefixExists = ParsableScriptSuiteRegistryHelper.isStdClassWithPrefixExist(nextTokenText)
+            classWithPrefixExists = DictionaryClassRegistry.isStdClassWithPrefixExist(nextTokenText)
             if (classWithPrefixExists) {
                 currentTokenText.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isStdLibClass(currentTokenText.get())) {
+            } else if (DictionaryClassRegistry.isStdLibClass(currentTokenText.get())) {
                 result = true
                 break
             }
@@ -85,7 +85,7 @@ internal object DictionaryClassNameScanner {
         applicationName: String,
     ): Boolean {
         var classWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isClassPluralWithPrefixExist(
+            DictionaryClassRegistry.isClassPluralWithPrefixExist(
                 applicationName,
                 currentTokenText.get(),
             )
@@ -95,13 +95,13 @@ internal object DictionaryClassNameScanner {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
             classWithPrefixExists =
-                ParsableScriptSuiteRegistryHelper.isClassPluralWithPrefixExist(
+                DictionaryClassRegistry.isClassPluralWithPrefixExist(
                     applicationName,
                     nextTokenText,
                 )
             if (classWithPrefixExists) {
                 currentTokenText.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isApplicationClassPluralName(
+            } else if (DictionaryClassRegistry.isApplicationClassPluralName(
                     applicationName,
                     currentTokenText.get(),
                 )
@@ -119,7 +119,7 @@ internal object DictionaryClassNameScanner {
         applicationName: String,
     ): Boolean {
         var classWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isClassWithPrefixExist(
+            DictionaryClassRegistry.isClassWithPrefixExist(
                 applicationName,
                 currentTokenText.get(),
             )
@@ -129,13 +129,13 @@ internal object DictionaryClassNameScanner {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
             classWithPrefixExists =
-                ParsableScriptSuiteRegistryHelper.isClassWithPrefixExist(
+                DictionaryClassRegistry.isClassWithPrefixExist(
                     applicationName,
                     nextTokenText,
                 )
             if (classWithPrefixExists) {
                 currentTokenText.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isApplicationClass(
+            } else if (DictionaryClassRegistry.isApplicationClass(
                     applicationName,
                     currentTokenText.get(),
                 )

@@ -336,17 +336,15 @@ tasks {
             // BasePlatformTestCase, no /Applications scan) — fast enough to run
             // unconditionally; gates PITFALLS §1.1-§1.4 against regression.
             includeTestsMatching("com.intellij.plugin.applescript.test.sdef.*")
-            // Phase 4 SERVICE-07 (plan 04-01): ParserUtilContractTest is a reflection-only
-            // golden test of the 26 @JvmStatic methods on ParsableScriptSuiteRegistryHelper
-            // consumed by the generated parser util. No BasePlatformTestCase, no fixture
-            // boot — runs in <100ms. Unconditional so contract drift trips on every CI run.
+            // Parser tests include the generated parser-util JVM signature guard. No
+            // BasePlatformTestCase, no fixture boot — fast enough to run on every CI build.
             includeTestsMatching("com.intellij.plugin.applescript.test.parser.*")
             // Phase 5 PSI-03 (plan 05-01): PsiGetterJvmSignatureTest is the reflection-only
-            // sibling of ParserUtilContractTest — it freezes the Java-visible getter names
-            // (getX/isX/setX) produced by converting GROUP A interface getters to Kotlin
-            // properties. No BasePlatformTestCase, no fixture boot — runs in <100ms.
-            // Unconditional so a property conversion that drops/renames a Java-reachable
-            // accessor trips on every CI run, not after a runtime NoSuchMethodError.
+            // guard for Java-visible getter names (getX/isX/setX) produced by converting
+            // GROUP A interface getters to Kotlin properties. No BasePlatformTestCase, no
+            // fixture boot — runs in <100ms. Unconditional so a property conversion that
+            // drops/renames a Java-reachable accessor trips on every CI run, not after a
+            // runtime NoSuchMethodError.
             includeTestsMatching("com.intellij.plugin.applescript.test.psi.*")
             if (!skipHeavy) {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.DictionariesRandomParsingTestCase")

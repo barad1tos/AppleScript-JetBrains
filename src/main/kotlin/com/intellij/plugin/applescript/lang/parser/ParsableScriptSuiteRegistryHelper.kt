@@ -1,161 +1,30 @@
 package com.intellij.plugin.applescript.lang.parser
 
-import com.intellij.openapi.project.Project
-import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
-import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 
 /**
- * Static facade consumed by the generated parser (see `AppleScriptGeneratedParserUtil`).
- * Lifecycle queries proxy to [AppleScriptSystemDictionaryRegistryService], while dictionary
- * term lookups proxy to [SdefIndexService].
- *
- * This object intentionally stays flat: the generated parser calls Java-visible static methods,
- * and the parser-util ABI guard freezes that facade shape.
+ * Lifecycle/readiness boundary for parser and index code that must avoid a direct service cycle.
+ * Dictionary term lookups live in focused `Dictionary*Registry` parser facades.
  */
-@Suppress("TooManyFunctions")
 object ParsableScriptSuiteRegistryHelper {
     private val registry: AppleScriptSystemDictionaryRegistryService
         get() = AppleScriptSystemDictionaryRegistryService.getInstance()
 
-    private val index: SdefIndexService
-        get() = SdefIndexService.getInstance()
-
-    @JvmStatic
     fun ensureKnownApplicationInitialized(applicationName: String): Boolean =
         registry.ensureKnownApplicationDictionaryInitialized(applicationName)
 
-    @JvmStatic
-    fun isStdLibClass(name: String): Boolean = index.lookupStdLibClass(name)
-
-    @JvmStatic
-    fun isApplicationClass(
-        applicationName: String,
-        className: String,
-    ): Boolean = index.lookupApplicationClass(applicationName, className)
-
-    @JvmStatic
-    fun isStdLibClassPluralName(pluralName: String): Boolean = index.lookupStdLibClassPluralName(pluralName)
-
-    @JvmStatic
-    fun isApplicationClassPluralName(
-        applicationName: String,
-        pluralClassName: String,
-    ): Boolean = index.lookupApplicationClassPluralName(applicationName, pluralClassName)
-
-    @JvmStatic
-    fun isStdClassWithPrefixExist(prefix: String): Boolean = index.lookupStdClassWithPrefixExist(prefix)
-
-    @JvmStatic
-    fun isClassWithPrefixExist(
-        applicationName: String,
-        classNamePrefix: String,
-    ): Boolean = index.lookupClassWithPrefixExist(applicationName, classNamePrefix)
-
-    @JvmStatic
-    fun isStdClassPluralWithPrefixExist(prefix: String): Boolean = index.lookupStdClassPluralWithPrefixExist(prefix)
-
-    @JvmStatic
-    fun isClassPluralWithPrefixExist(
-        applicationName: String,
-        pluralClassNamePrefix: String,
-    ): Boolean = index.lookupClassPluralWithPrefixExist(applicationName, pluralClassNamePrefix)
-
-    @JvmStatic
-    fun isStdCommand(name: String): Boolean = index.lookupStdCommand(name)
-
-    @JvmStatic
-    fun isApplicationCommand(
-        applicationName: String,
-        commandName: String,
-    ): Boolean = index.lookupApplicationCommand(applicationName, commandName)
-
-    @JvmStatic
-    fun isCommandWithPrefixExist(
-        applicationName: String,
-        commandNamePrefix: String,
-    ): Boolean = index.lookupCommandWithPrefixExist(applicationName, commandNamePrefix)
-
-    @JvmStatic
-    fun isStdCommandWithPrefixExist(namePrefix: String): Boolean = index.lookupStdCommandWithPrefixExist(namePrefix)
-
-    @JvmStatic
-    fun findStdCommands(
-        project: Project,
-        commandName: String,
-    ): Collection<AppleScriptCommand> = index.findStdCommands(project, commandName)
-
-    @JvmStatic
-    fun findApplicationCommands(
-        project: Project,
-        applicationName: String,
-        commandName: String,
-    ): List<AppleScriptCommand> = index.findApplicationCommands(project, applicationName, commandName)
-
-    @JvmStatic
-    fun isStdProperty(name: String): Boolean = index.lookupStdProperty(name)
-
-    @JvmStatic
-    fun isApplicationProperty(
-        applicationName: String,
-        propertyName: String,
-    ): Boolean = index.lookupApplicationProperty(applicationName, propertyName)
-
-    @JvmStatic
-    fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean = index.lookupStdPropertyWithPrefixExist(namePrefix)
-
-    @JvmStatic
-    fun isPropertyWithPrefixExist(
-        applicationName: String,
-        propertyNamePrefix: String,
-    ): Boolean = index.lookupPropertyWithPrefixExist(applicationName, propertyNamePrefix)
-
-    @JvmStatic
-    fun isStdConstant(name: String): Boolean = index.lookupStdConstant(name)
-
-    @JvmStatic
-    fun isApplicationConstant(
-        applicationName: String,
-        constantName: String,
-    ): Boolean = index.lookupApplicationConstant(applicationName, constantName)
-
-    @JvmStatic
-    fun isStdConstantWithPrefixExist(namePrefix: String): Boolean = index.lookupStdConstantWithPrefixExist(namePrefix)
-
-    @JvmStatic
-    fun isConstantWithPrefixExist(
-        applicationName: String,
-        constantNamePrefix: String,
-    ): Boolean = index.lookupConstantWithPrefixExist(applicationName, constantNamePrefix)
-
-    // D-01 / D-04 facade dispatchers — additive, no existing method touched (D-08 parser-util
-    // contract preserved). The two new booleans live on the registry-service class, so these
-    // proxies go via getInstance() directly.
-
-    @JvmStatic
     fun isInitialized(): Boolean = registry.isInitialized()
 
-    @JvmStatic
     fun areAppDictionariesIndexed(): Boolean = registry.areAppDictionariesIndexed()
 
     /**
-     * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: lets the dictionary index service
-     * bound-wait on the facade-owned `standardReady` Deferred WITHOUT importing the facade directly. Routing
-     * through this static-utility class (NOT in the `verifyServiceDependencyGraph` services list)
-     * avoids the index-service -> facade back-edge that DFS would detect as a cycle.
-     *
-     * NOT marked `@JvmStatic` (unlike the 26 frozen-contract methods above) because (a) the only
-     * caller is Kotlin code in the dictionary index service — no Java parser-util call site exists — and (b)
-     * `@JvmStatic suspend fun` emits a name-mangled JVM signature (the `-IoAF18A` suffix from
-     * `Result<Unit>`'s inline-class boxing) that would force the ABI guard to enumerate those
-     * mangled names. Keeping these proxies as plain object members preserves the contract count at
-     * the original 26.
+     * Lets the dictionary index service bound-wait on the registry-owned `standardReady` gate
+     * without importing the registry service directly and creating a service dependency cycle.
      */
     suspend fun awaitStandardReady(): Result<Unit> = registry.awaitStandardReadyInternal()
 
     /**
-     * Phase 4 SERVICE-05 (Wave 5) / iteration-2 BLOCKER-fix proxy: same as [awaitStandardReady] but
-     * for the `appsReady` Deferred. See [awaitStandardReady] for cycle-prevention rationale.
+     * Same as [awaitStandardReady], but for the `appsReady` gate.
      */
     suspend fun awaitAppsReady(): Result<Unit> = registry.awaitAppsReadyInternal()
 }

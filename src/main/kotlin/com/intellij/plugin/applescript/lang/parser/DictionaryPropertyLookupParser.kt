@@ -62,7 +62,7 @@ internal object DictionaryPropertyLookupParser {
         val currentTokenText = Ref<String>()
         currentTokenText.set(builder.tokenText ?: "")
         var propertyWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isStdPropertyWithPrefixExist(
+            DictionaryPropertyRegistry.isStdPropertyWithPrefixExist(
                 currentTokenText.get(),
             )
         var nextTokenText = currentTokenText.get()
@@ -70,10 +70,10 @@ internal object DictionaryPropertyLookupParser {
         while (builder.tokenText != null && propertyWithPrefixExists) {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
-            propertyWithPrefixExists = ParsableScriptSuiteRegistryHelper.isStdPropertyWithPrefixExist(nextTokenText)
+            propertyWithPrefixExists = DictionaryPropertyRegistry.isStdPropertyWithPrefixExist(nextTokenText)
             if (propertyWithPrefixExists) {
                 currentTokenText.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isStdProperty(currentTokenText.get())) {
+            } else if (DictionaryPropertyRegistry.isStdProperty(currentTokenText.get())) {
                 result = true
                 break
             }
@@ -92,7 +92,7 @@ internal object DictionaryPropertyLookupParser {
         val currentTokenText = Ref<String>()
         currentTokenText.set(builder.tokenText ?: "")
         var propertyWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isPropertyWithPrefixExist(
+            DictionaryPropertyRegistry.isPropertyWithPrefixExist(
                 applicationName,
                 currentTokenText.get(),
             )
@@ -102,13 +102,13 @@ internal object DictionaryPropertyLookupParser {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
             propertyWithPrefixExists =
-                ParsableScriptSuiteRegistryHelper.isPropertyWithPrefixExist(
+                DictionaryPropertyRegistry.isPropertyWithPrefixExist(
                     applicationName,
                     nextTokenText,
                 )
             if (propertyWithPrefixExists) {
                 currentTokenText.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isApplicationProperty(
+            } else if (DictionaryPropertyRegistry.isApplicationProperty(
                     applicationName,
                     currentTokenText.get(),
                 )

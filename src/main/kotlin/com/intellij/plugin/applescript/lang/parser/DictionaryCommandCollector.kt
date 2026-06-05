@@ -20,7 +20,7 @@ internal object DictionaryCommandCollector {
                     addApplicationCommands(builder, applicationName, parsedCommandName)
                 }
             } else {
-                addAll(ParsableScriptSuiteRegistryHelper.findStdCommands(builder.project, parsedCommandName))
+                addAll(DictionaryCommandRegistry.findStdCommands(builder.project, parsedCommandName))
             }
             if (isEmpty()) {
                 addApplicationCommands(builder, ApplicationDictionary.COCOA_STANDARD_LIBRARY, parsedCommandName)
@@ -33,7 +33,7 @@ internal object DictionaryCommandCollector {
         commandName: String,
     ) {
         addAll(
-            ParsableScriptSuiteRegistryHelper.findApplicationCommands(
+            DictionaryCommandRegistry.findApplicationCommands(
                 builder.project,
                 applicationName,
                 commandName,

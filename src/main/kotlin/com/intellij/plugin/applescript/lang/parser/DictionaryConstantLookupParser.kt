@@ -63,7 +63,7 @@ internal object DictionaryConstantLookupParser {
         var result = false
         var propertyOrClassExists = false
         var constantWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isStdConstantWithPrefixExist(
+            DictionaryConstantRegistry.isStdConstantWithPrefixExist(
                 currentTokenText.get(),
             )
         var nextTokenText = currentTokenText.get()
@@ -71,20 +71,20 @@ internal object DictionaryConstantLookupParser {
         while (builder.tokenText != null && constantWithPrefixExists) {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
-            constantWithPrefixExists = ParsableScriptSuiteRegistryHelper.isStdConstantWithPrefixExist(nextTokenText)
+            constantWithPrefixExists = DictionaryConstantRegistry.isStdConstantWithPrefixExist(nextTokenText)
             if (constantWithPrefixExists) {
                 currentTokenText.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isStdConstant(currentTokenText.get())) {
+            } else if (DictionaryConstantRegistry.isStdConstant(currentTokenText.get())) {
                 result = true
                 break
             }
         }
         if (result) {
             currentTokenText.set(currentTokenText.get() + " " + builder.tokenText)
-            propertyOrClassExists = ParsableScriptSuiteRegistryHelper.isStdPropertyWithPrefixExist(
+            propertyOrClassExists = DictionaryPropertyRegistry.isStdPropertyWithPrefixExist(
                 currentTokenText.get(),
             ) ||
-                ParsableScriptSuiteRegistryHelper.isStdClassWithPrefixExist(currentTokenText.get())
+                DictionaryClassRegistry.isStdClassWithPrefixExist(currentTokenText.get())
         }
         result = result && !propertyOrClassExists
         exit_section_(builder, marker, null, result)
@@ -102,7 +102,7 @@ internal object DictionaryConstantLookupParser {
         var result = false
         var propertyOrClassExists = false
         var constantWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isConstantWithPrefixExist(
+            DictionaryConstantRegistry.isConstantWithPrefixExist(
                 applicationName,
                 currentTokenText.get(),
             )
@@ -112,13 +112,13 @@ internal object DictionaryConstantLookupParser {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
             constantWithPrefixExists =
-                ParsableScriptSuiteRegistryHelper.isConstantWithPrefixExist(
+                DictionaryConstantRegistry.isConstantWithPrefixExist(
                     applicationName,
                     nextTokenText,
                 )
             if (constantWithPrefixExists) {
                 currentTokenText.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isApplicationConstant(
+            } else if (DictionaryConstantRegistry.isApplicationConstant(
                     applicationName,
                     currentTokenText.get(),
                 )
@@ -128,18 +128,18 @@ internal object DictionaryConstantLookupParser {
             }
         }
         if (result) {
-            propertyOrClassExists = ParsableScriptSuiteRegistryHelper.isPropertyWithPrefixExist(
+            propertyOrClassExists = DictionaryPropertyRegistry.isPropertyWithPrefixExist(
                 applicationName,
                 currentTokenText.get(),
             ) ||
-                ParsableScriptSuiteRegistryHelper.isClassWithPrefixExist(applicationName, currentTokenText.get())
+                DictionaryClassRegistry.isClassWithPrefixExist(applicationName, currentTokenText.get())
             if (propertyOrClassExists) {
                 currentTokenText.set(currentTokenText.get() + " " + builder.tokenText)
-                propertyOrClassExists = ParsableScriptSuiteRegistryHelper.isPropertyWithPrefixExist(
+                propertyOrClassExists = DictionaryPropertyRegistry.isPropertyWithPrefixExist(
                     applicationName,
                     currentTokenText.get(),
                 ) ||
-                    ParsableScriptSuiteRegistryHelper.isClassWithPrefixExist(applicationName, currentTokenText.get())
+                    DictionaryClassRegistry.isClassWithPrefixExist(applicationName, currentTokenText.get())
             }
         }
         result = result && !propertyOrClassExists

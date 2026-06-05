@@ -15,11 +15,9 @@ import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInf
  *              permissions, malformed bundle, etc.). The `cause` carries the underlying
  *              exception when available.
  *
- * Service-INTERNAL scope only — this type does NOT cross any
- * [com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper] boundary,
- * does NOT appear on any `@JvmStatic` parser-util method, and is NOT exposed on the facade's
- * public signature. PSI-side sealing for resolver / completion shapes is deferred to v1.4
- * Phase 5 PSI-05 (RESEARCH §9 sealed types catalog).
+ * Service-INTERNAL scope only — this type does NOT appear on any `@JvmStatic` parser-util method
+ * and is NOT exposed on the parser hot path. PSI-side sealing for resolver / completion shapes is
+ * deferred until that surface is refactored.
  */
 sealed interface DictionaryLoadResult {
     /** No dictionary available for the requested application. */

@@ -22,9 +22,9 @@ private fun startsWithWord(
 ): Boolean = string.startsWith(prefix) && (prefix.length == string.length || ' ' == string[prefix.length])
 
 /**
- * Phase 4 SERVICE-05 + SERVICE-09 (Wave 5): SDEF index ownership.
+ * SDEF dictionary index ownership.
  *
- * CQRS per D-03:
+ * CQRS:
  * - WRITE: `suspend fun ingest(applicationName, xmlFile): IngestResult` — IO-aware, hermetic-test seam.
  * - READ: sync `lookup*` methods — parser-util hot path; cannot suspend per FROZEN_CONTRACT.
  *
@@ -35,16 +35,14 @@ private fun startsWithWord(
  *   bridges preserved per Phase 3 Review MEDIUM 1 + HIGH 5 / HIGH 1).
  * - XML parsing pipeline (`parseDictionaryFile` + 3 element handlers + 7 companion helpers).
  *
- * Cycle-prevention (plan-checker iteration-1 BLOCKER 1 + iteration-2 BLOCKER mitigation):
+ * Cycle-prevention:
  *
- * `isInitialized()` + `areAppDictionariesIndexed()` STAY on the facade because they own the
- * Phase 3 `CompletableDeferred<Result<Unit>>` lifecycle (D-01 / D-04). SdefIndexService consults
- * those facade-owned predicates via [ParsableScriptSuiteRegistryHelper] (the @JvmStatic shim in
- * `lang/parser/`, NOT in the services list scanned by `verifyServiceDependencyGraph`). This
- * avoids the `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` back-edge that DFS
- * would otherwise detect as a cycle. Parser-facing lookup trampolines live on
- * [ParsableScriptSuiteRegistryHelper], while the application-level facade only invokes the write
- * path through an injected parser dependency.
+ * `isInitialized()` + `areAppDictionariesIndexed()` stay on the registry service because it owns
+ * the readiness gates. SdefIndexService consults those predicates through
+ * [ParsableScriptSuiteRegistryHelper], which is not in the service list scanned by
+ * `verifyServiceDependencyGraph`. This avoids the
+ * `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` back-edge that DFS would
+ * otherwise detect as a cycle.
  *
  * Dependencies (real service-graph edges):
  * - service<AppleScriptProjectDictionaryService> — accessed from `findApplicationCommands` to
@@ -106,11 +104,8 @@ class SdefIndexService
          */
         fun snapshot(): SdefIndexSnapshot = indexStore.snapshot()
 
-        // Sync lookup methods for the parser-util hot path.
-        // Each method preserves the facade's `if (!isInitialized()) return false` gate, but the
-        // gate now routes through [ParsableScriptSuiteRegistryHelper] (the @JvmStatic shim) to
-        // avoid the SdefIndexService -> facade back-edge that verifyServiceDependencyGraph would
-        // detect as a cycle.
+        // Sync lookup methods for the parser hot path. Each method preserves the readiness gate
+        // while avoiding a direct SdefIndexService -> registry-service edge.
 
         fun lookupStdLibClass(name: String): Boolean {
             if (!facadeInitialized()) return false
@@ -310,12 +305,8 @@ class SdefIndexService
         ): Boolean = nameSet?.any { objectName -> startsWithWord(objectName, namePrefix) } == true
 
         /**
-         * Thin proxy to the facade's `isInitialized` trampoline
-         * that bypasses the service-graph by going through Phase 3's @JvmStatic helper class
-         * ([ParsableScriptSuiteRegistryHelper], NOT in the services list scanned by
-         * `verifyServiceDependencyGraph`). This avoids the
-         * `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` back-edge that DFS would
-         * otherwise detect as a cycle (plan-checker BLOCKER 1 mitigation).
+         * Thin proxy to the registry readiness state through [ParsableScriptSuiteRegistryHelper].
+         * This keeps the service graph acyclic.
          */
         private fun facadeInitialized(): Boolean = SdefIndexReadiness.isInitialized()
 

@@ -113,8 +113,8 @@ class AppleScriptSystemDictionaryRegistryService
         // Phase 4 SERVICE-05 (plan 04-05, Wave 5): the 14 parser-index ConcurrentHashMap fields
         // (applicationNameTo*Map + std*Map; class, classPlural, command, record, property,
         // enumeration, enumeratorConstant — 7 application-scoped + 7 std-scoped) migrated to
-        // [SdefIndexService]. The parser-facing lookup methods now route through
-        // ParsableScriptSuiteRegistryHelper directly to the index service. The XML parsing pipeline
+        // [SdefIndexService]. The parser-facing lookup methods now route through focused
+        // Dictionary*Registry parser facades directly to the index service. The XML parsing pipeline
         // (parseDictionaryFile + parseSuiteElementForApplication + parseSuiteElementForScriptingAdditions
         // + parseClassElement + 7 companion helpers + newSecureSaxBuilder XXE-hardened factory)
         // also migrated to the service.

@@ -9,8 +9,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.junit.Assume
 
 /**
- * Locks the latch contract: immediately after the service is instantiated, every reader on
- * [com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper] returns a
+ * Locks the latch contract: immediately after the service is instantiated, every index reader returns a
  * deterministic answer — either the fully-populated result (init already complete) OR the
  * empty-fallback (init not yet complete, `initLatch.count > 0L`). NEVER a `NullPointerException`, NEVER a
  * half-populated index hit where `containsKey` reports true but the inner `Set` value is not

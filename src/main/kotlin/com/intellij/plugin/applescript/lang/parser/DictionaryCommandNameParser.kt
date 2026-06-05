@@ -37,7 +37,7 @@ internal object DictionaryCommandNameParser {
         parsedName.set(builder.tokenText ?: "")
 
         var commandWithPrefixExists =
-            ParsableScriptSuiteRegistryHelper.isCommandWithPrefixExist(
+            DictionaryCommandRegistry.isCommandWithPrefixExist(
                 applicationName,
                 parsedName.get(),
             )
@@ -46,18 +46,18 @@ internal object DictionaryCommandNameParser {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
             commandWithPrefixExists =
-                ParsableScriptSuiteRegistryHelper.isCommandWithPrefixExist(
+                DictionaryCommandRegistry.isCommandWithPrefixExist(
                     applicationName,
                     nextTokenText,
                 )
             if (commandWithPrefixExists) {
                 parsedName.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isApplicationCommand(applicationName, parsedName.get())) {
+            } else if (DictionaryCommandRegistry.isApplicationCommand(applicationName, parsedName.get())) {
                 result =
                     !shouldCheckStandardLibrary ||
-                    !ParsableScriptSuiteRegistryHelper.isStdCommandWithPrefixExist(nextTokenText)
+                    !DictionaryCommandRegistry.isStdCommandWithPrefixExist(nextTokenText)
                 result = result &&
-                    !ParsableScriptSuiteRegistryHelper.isClassWithPrefixExist(applicationName, nextTokenText)
+                    !DictionaryClassRegistry.isClassWithPrefixExist(applicationName, nextTokenText)
                 break
             }
         }
@@ -131,15 +131,15 @@ internal object DictionaryCommandNameParser {
         parsedName.set("")
         parsedName.set(builder.tokenText ?: "")
         val marker = enter_section_(builder)
-        var commandWithPrefixExists = ParsableScriptSuiteRegistryHelper.isStdCommandWithPrefixExist(parsedName.get())
+        var commandWithPrefixExists = DictionaryCommandRegistry.isStdCommandWithPrefixExist(parsedName.get())
         var nextTokenText = parsedName.get()
         while (builder.tokenText != null && commandWithPrefixExists) {
             builder.advanceLexer()
             nextTokenText += " ${builder.tokenText}"
-            commandWithPrefixExists = ParsableScriptSuiteRegistryHelper.isStdCommandWithPrefixExist(nextTokenText)
+            commandWithPrefixExists = DictionaryCommandRegistry.isStdCommandWithPrefixExist(nextTokenText)
             if (commandWithPrefixExists) {
                 parsedName.set(nextTokenText)
-            } else if (ParsableScriptSuiteRegistryHelper.isStdCommand(parsedName.get())) {
+            } else if (DictionaryCommandRegistry.isStdCommand(parsedName.get())) {
                 result = true
                 break
             }
