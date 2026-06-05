@@ -175,9 +175,8 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                 testScope,
                 testDispatcher,
                 noOpProgressTask,
-            ) {
-                daemonRestartCount++
-            }
+                daemonRestartScheduler = { daemonRestartCount++ },
+            )
 
         advanceThroughFullInitialization()
 

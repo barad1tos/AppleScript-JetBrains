@@ -6,8 +6,9 @@ internal fun hasNameWithPrefix(
 ): Boolean = names?.any { objectName -> objectName.startsWithWord(namePrefix) } == true
 
 private fun String.startsWithWord(prefix: String): Boolean {
+    if (!startsWith(prefix)) return false
     val isCompleteWord = prefix.length == length || this[prefix.length] == ' '
-    return startsWith(prefix) && isCompleteWord
+    return isCompleteWord
 }
 
 internal class SdefClassLookup(
