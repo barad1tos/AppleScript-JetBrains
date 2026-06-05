@@ -8,6 +8,8 @@ import com.intellij.execution.configurations.RunConfigurationSingletonPolicy.SIN
 import com.intellij.openapi.project.Project
 import com.intellij.plugin.applescript.AppleScriptIcons
 
+private typealias Policy = RunConfigurationSingletonPolicy
+
 class AppleScriptConfigurationType :
     ConfigurationTypeBase(
         "AppleScriptRunType",
@@ -20,7 +22,7 @@ class AppleScriptConfigurationType :
             object : ConfigurationFactory(this) {
                 override fun getId(): String = "AppleScript"
 
-                override fun getSingletonPolicy(): RunConfigurationSingletonPolicy = SINGLE_INSTANCE_ONLY
+                override fun getSingletonPolicy(): Policy = SINGLE_INSTANCE_ONLY
 
                 override fun createTemplateConfiguration(project: Project): RunConfiguration =
                     AppleScriptRunConfiguration(project, this, " Template config")
