@@ -15,13 +15,11 @@ import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDisc
 import com.intellij.plugin.applescript.lang.dictionary.discovery.DiscoveryProgressPolicy
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompatDefault
-import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
 import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
-import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.util.xmlb.annotations.AbstractCollection
 import com.intellij.util.xmlb.annotations.CollectionBean
 import com.intellij.util.xmlb.annotations.Tag
@@ -31,19 +29,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.annotations.VisibleForTesting
-import java.io.File
 
+/*
+ * Owns the persisted dictionary component identity and startup readiness gates. Dictionary
+ * discovery, file generation, and parser index data live in typed collaborators.
+ */
 @Service(Service.Level.APP)
 @State(
     name = AppleScriptSystemDictionaryRegistryService.COMPONENT_NAME,
     storages = [Storage(value = "appleScriptCachedDictionariesInfo.xml", roamingType = RoamingType.PER_OS)],
 )
-/*
- * The service intentionally keeps the legacy facade API while data ownership moves to typed
- * collaborators. Removing these methods in one step would break parser/completion call sites
- * and service ABI; keep shrinking this facade before removing the suppression.
- */
-@Suppress("TooManyFunctions")
 class AppleScriptSystemDictionaryRegistryService
     @JvmOverloads
     constructor(
@@ -101,22 +96,19 @@ class AppleScriptSystemDictionaryRegistryService
                         initializeStandardDictionaries = {
                             StandardDictionaryInitializer(this@AppleScriptSystemDictionaryRegistryService).initialize()
                         },
-                        discoverInstalledApplicationNames = { discoverInstalledApplicationNames() },
+                        discoverInstalledApplicationNames = { discovery.discoverInstalledApplicationNames() },
                         restartOpenProjectDaemons = daemonRestartScheduler,
                     ),
             )
 
         // Phase 4 SERVICE-03 (plan 04-03, Wave 3): the `notFoundApplicationList` and
         // `discoveredApplicationNames` ConcurrentHashMap-backed sets migrated to
-        // [ApplicationDiscoveryService]. Internal callers within this facade route through
-        // `service<ApplicationDiscoveryService>().X()` (init-time hot paths accept the
-        // O(1) service-lookup overhead; service<X>() is a static lookup, not a re-instantiation).
+        // [ApplicationDiscoveryService].
 
         // Phase 4 SERVICE-04 (plan 04-04, Wave 4): the `xCodeApplicationFile` and
         // `scriptingAdditions` fields migrated to [SdefFileProvider]. The
         // `GENERATED_DICTIONARIES_SYSTEM_FOLDER` constant moved to the SdefFileProvider companion.
-        // External callers continue to route through facade trampolines (see
-        // `isXcodeInstalled`, `getScriptingAdditions`, `getDictionaryFile`, etc. below).
+        // External callers now use the typed file-provider service directly.
 
         // Phase 4 SERVICE-05 (plan 04-05, Wave 5): the 14 parser-index ConcurrentHashMap fields
         // (applicationNameTo*Map + std*Map; class, classPlural, command, record, property,
@@ -213,56 +205,23 @@ class AppleScriptSystemDictionaryRegistryService
         internal suspend fun awaitAppsReadyInternal(): Result<Unit> = readiness.awaitAppsReady()
 
         // ---------------------------------------------------------------------------------------------
-        // Phase 4 SERVICE-02 (plan 04-02, Wave 2) — persistence trampolines used by
+        // Phase 4 SERVICE-02 (plan 04-02, Wave 2) — persisted state loading used by
         // [SdefPersistenceService].
         //
         // Pattern A from RESEARCH §2: the @State annotation, PersistedState inner class, and
         // SimplePersistentStateComponent inheritance ALL stay on this facade. The service offers a
-        // typed API over the persistence bridge. External callers continue to use the public
-        // query trampolines (getNotScriptableApplicationList / isNotScriptable /
-        // isInUnknownList). SDEF-13 golden fixture regression-locks the wire format — neither
-        // PersistedState nor DictionaryInfo.State is touched by this wave.
+        // typed API over the persistence bridge. External callers use that typed API directly.
+        // SDEF-13 golden fixture regression-locks the wire format — neither PersistedState nor
+        // DictionaryInfo.State is touched by this wave.
         // ---------------------------------------------------------------------------------------------
-
-        /**
-         * Trampoline (Phase 4 SERVICE-02): defers to
-         * [SdefPersistenceService.readNotScriptableSnapshot]. Returns `HashSet<String>` for
-         * back-compat with existing call sites (annotator, completion contributors).
-         */
-        fun getNotScriptableApplicationList(): HashSet<String> = HashSet(persistence.readNotScriptableSnapshot())
-
-        // Phase 4 SERVICE-04 (Wave 4) trampoline: scripting-additions set lives on
-        // [SdefFileProvider] (populated by initializeScriptingAdditions, consumed by
-        // mergeScriptingAdditions). The defensive-snapshot semantics are preserved by the
-        // service's `getScriptingAdditions()` implementation.
-        fun getScriptingAdditions(): HashSet<String> = dictionaryFiles.getScriptingAdditions()
 
         override fun loadState(state: PersistedState) {
             super.loadState(state)
             runCatching {
-                // Phase 4 SERVICE-02 trampoline — routes through SdefPersistenceService for clean
-                // single-source-of-truth on the load path. The service's loadFromState delegates
-                // to DictionaryPersistenceBridge while this facade keeps the persisted component
-                // identity and XML state class unchanged.
+                // Route through SdefPersistenceService for a single typed load path while this
+                // facade keeps the persisted component identity and XML state class unchanged.
                 persistence.loadFromState(state)
             }.onFailure { LOG.error("Error while loading state for AppleScript dictionaries", it) }
-        }
-
-        /**
-         * Walks the standard application-bundle directories (Phase 8 invariant — `APP_BUNDLE_DIRECTORIES`
-         * preserves `/System/Applications`, `/System/Applications/Utilities`, `~/Applications`) and
-         * registers any discovered `.app` / `.osax` / `.sdef` bundles into the discovery service's
-         * in-memory name set.
-         *
-         * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
-         * [ApplicationDiscoveryService.discoverInstalledApplicationNames]. The body now lives on the
-         * service; the explicit `withContext(ioDispatcher)` boundary remains there (defence-in-depth
-         * even when the startup pipeline already launches on `ioDispatcher`). Public method
-         * name preserved verbatim — startup callers and any future external
-         * callers see the same signature.
-         */
-        suspend fun discoverInstalledApplicationNames() {
-            discovery.discoverInstalledApplicationNames()
         }
 
         fun ensureKnownApplicationDictionaryInitialized(knownApplicationName: String): Boolean =
@@ -278,39 +237,6 @@ class AppleScriptSystemDictionaryRegistryService
             val coordinator = initializationCoordinator
             return coordinator.getInitializedInfo(applicationName)
         }
-
-        /**
-         * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
-         * [ApplicationDiscoveryService.findApplicationBundleFile]. The body now lives on the
-         * discovery service (including the EDT guard added in Wave 3 per RESEARCH Open Question 1
-         * + Phase 3 Review MEDIUM 1). The pre-Wave-3 visibility was `private`; Wave 3 promotes
-         * to `public` to match the typed-API contract — no external callers existed pre-Wave-3,
-         * so the visibility widening is harmless.
-         *
-         * Internal callers within this facade ([getInitializedInfo]) continue to invoke this
-         * trampoline (NOT a `*Internal` helper) — the additional `service<X>()` lookup hop is
-         * acceptable on this code path (the recursive VFS walk dominates wall-clock time).
-         */
-        fun findApplicationBundleFile(name: String): File? = discovery.findApplicationBundleFile(name)
-
-        /**
-         * Initialises dictionary information for an application from its bundle file (or `.xml`/`.sdef` file)
-         * and persists the generated dictionary for later use by the [ApplicationDictionary] PSI class.
-         *
-         * Phase 4 SERVICE-04 (Wave 4) trampoline: body migrated to
-         * [SdefFileProvider.createAndInitializeInfo] which keeps the `@Synchronized` per-app
-         * serialisation invariant (the composite chain generate-file → put-info →
-         * init-dictionary is naturally serial per app). External callers see the same
-         * `(File, String) -> DictionaryInfo?` signature byte-for-byte.
-         *
-         * @param applicationIoFile file of the application bundle or dictionary file (.app, .osax, .xml, .sdef)
-         * @param applicationName name of the macOS application
-         * @return the [DictionaryInfo] of the generated, cached and initialised dictionary, or null
-         */
-        fun createAndInitializeInfo(
-            applicationIoFile: File,
-            applicationName: String,
-        ): DictionaryInfo? = dictionaryFiles.createAndInitializeInfo(applicationIoFile, applicationName)
 
         /**
          * Phase 4 SERVICE-04 (Wave 4) internal accessor: exposes the in-memory
@@ -340,70 +266,6 @@ class AppleScriptSystemDictionaryRegistryService
             @CollectionBean
             var notScriptableApplications: MutableList<String>? = ArrayList()
         }
-
-        /**
-         * Phase 7 D-05 trampoline: routes through [XcodeDetectionService.isXcodeInstalled] (the
-         * extracted Xcode-detection seam — was [SdefFileProvider] pre-Phase-7). The body,
-         * including the lazy detection cache, lives on that service. External callers
-         * ([com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptColorAnnotator]) see
-         * the same `() -> Boolean` signature byte-for-byte.
-         */
-        fun isXcodeInstalled(): Boolean = service<XcodeDetectionService>().isXcodeInstalled()
-
-        /**
-         * @return true if `/usr/bin/sdef` invocation previously failed to generate a dictionary
-         *
-         * Phase 4 SERVICE-02 trampoline: routes through [SdefPersistenceService.isNotScriptable]
-         * for external callers (annotator, completion contributors).
-         */
-        fun isNotScriptable(applicationName: String): Boolean = persistence.isNotScriptable(applicationName)
-
-        /**
-         * @return true if the application file was not found earlier in [findApplicationBundleFile]
-         *
-         * Phase 4 SERVICE-03 trampoline (Wave 3 re-route): routes through
-         * [ApplicationDiscoveryService.isInNotFoundList]. Wave 2 originally parked
-         * `isInUnknownList` on [SdefPersistenceService] as a temporary spot before
-         * [ApplicationDiscoveryService] existed; Wave 3 returns it to its rightful owner —
-         * the not-found list is a discovery artifact (NOT persisted, rebuilt per IDE session),
-         * so it belongs on the discovery service.
-         *
-         * External callers ([com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptColorAnnotator])
-         * see the same signature byte-for-byte; the re-route is invisible at the call site.
-         */
-        fun isInUnknownList(applicationName: String): Boolean = discovery.isInNotFoundList(applicationName)
-
-        /**
-         * Phase 4 SERVICE-04 (Wave 4) trampoline: routes through
-         * [SdefFileProvider.getDictionaryFile]. External callers
-         * ([com.intellij.plugin.applescript.lang.sdef.parser.SdefParser]) see the same
-         * `(String?) -> File?` signature.
-         */
-        fun getDictionaryFile(applicationName: String?): File? = dictionaryFiles.getDictionaryFile(applicationName)
-
-        /**
-         * Phase 4 SERVICE-04 (Wave 4) trampoline: routes through
-         * [SdefFileProvider.getDictionaryInfoByApplicationPath]. External callers
-         * ([com.intellij.plugin.applescript.lang.sdef.parser.SdefParser]) see the same
-         * `(String) -> DictionaryInfo?` signature.
-         */
-        fun getDictionaryInfoByApplicationPath(applicationPath: String): DictionaryInfo? =
-            dictionaryFiles.getDictionaryInfoByApplicationPath(applicationPath)
-
-        fun getCachedApplicationNames(): Collection<String> = dictionaryInfoRegistry.cachedApplicationNames
-
-        /**
-         * Phase 4 SERVICE-03 (Wave 3) trampoline: routes through
-         * [ApplicationDiscoveryService.getDiscoveredApplicationNames]. Defensive snapshot
-         * semantics preserved (service returns a fresh `HashSet` per call). External callers
-         * ([com.intellij.plugin.applescript.lang.ide.completion.ApplicationNameCompletionContributor])
-         * see the same signature.
-         */
-        fun getDiscoveredApplicationNames(): HashSet<String> = discovery.getDiscoveredApplicationNames()
-
-        fun isKnownApplication(appName: String): Boolean = discovery.isKnownApplication(appName)
-
-        fun isDictionaryInitialized(name: String): Boolean = dictionaryInfoRegistry.isInitialized(name)
 
         // Phase 4 SERVICE-05 (Wave 5): parseDictionaryFile + parseSuiteElementForApplication +
         // parseSuiteElementForScriptingAdditions + parseClassElement migrated to

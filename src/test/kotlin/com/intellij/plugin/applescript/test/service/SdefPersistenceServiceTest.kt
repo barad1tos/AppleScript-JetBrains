@@ -76,28 +76,6 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
         assertFalse("Unknown name not in notScriptable list", service.isNotScriptable(randomName))
     }
 
-    fun testFacadeTrampolineRoutesThroughService() {
-        // Verify the public facade trampolines actually reach the service. We add via the
-        // service and observe via the facade's public method — this proves the public surface
-        // (annotator + completion contributors) sees the same state the service writes.
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        val service = SdefPersistenceService.getInstance()
-        val name = "FacadeTrampolineTest_${System.nanoTime()}"
-        try {
-            service.addNotScriptable(name)
-            assertTrue(
-                "Facade.isNotScriptable trampoline sees the service-side write",
-                facade.isNotScriptable(name),
-            )
-            assertTrue(
-                "Facade.getNotScriptableApplicationList trampoline contains the name",
-                name in facade.getNotScriptableApplicationList(),
-            )
-        } finally {
-            service.removeNotScriptable(name)
-        }
-    }
-
     fun testParseFailureDoesNotMarkApplicationAsNotScriptable() {
         val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
         val service = SdefPersistenceService.getInstance()
@@ -145,8 +123,8 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
             service.writeToState(secondState)
             service.loadFromState(secondState)
             assertTrue(
-                "After loadFromState, marker is restored in the facade's snapshot",
-                marker in facade.getNotScriptableApplicationList(),
+                "After loadFromState, marker is restored in the persistence snapshot",
+                marker in service.readNotScriptableSnapshot(),
             )
         } finally {
             service.removeNotScriptable(marker)

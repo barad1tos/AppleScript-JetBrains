@@ -8,6 +8,9 @@ import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.lookup.LookupElementBuilder
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.patterns.PlatformPatterns.psiElement
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
+import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
@@ -35,14 +38,19 @@ class ApplicationNameCompletionContributor : CompletionContributor() {
                         return
                     }
                     val appNameList = ArrayList<String>()
+                    val persistenceService = SdefPersistenceService.getInstance()
                     if (SystemInfo.isMac) {
-                        appNameList.addAll(systemDictionaryRegistry.getDiscoveredApplicationNames())
-                        appNameList.removeAll(systemDictionaryRegistry.getNotScriptableApplicationList())
-                        appNameList.removeAll(systemDictionaryRegistry.getScriptingAdditions())
+                        appNameList.addAll(ApplicationDiscoveryService.getInstance().getDiscoveredApplicationNames())
+                        appNameList.removeAll(persistenceService.readNotScriptableSnapshot())
+                        appNameList.removeAll(SdefFileProvider.getInstance().getScriptingAdditions())
                         appNameList.remove(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY)
                         appNameList.remove(ApplicationDictionary.COCOA_STANDARD_LIBRARY)
                     } else {
-                        appNameList.addAll(systemDictionaryRegistry.getCachedApplicationNames())
+                        appNameList.addAll(
+                            persistenceService
+                                .readDictionaryInfoSnapshot()
+                                .map { it.getApplicationName() },
+                        )
                     }
                     for (appName in appNameList) {
                         result.addElement(LookupElementBuilder.create(appName))

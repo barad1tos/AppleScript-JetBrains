@@ -5,6 +5,9 @@ import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
+import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.ide.intentions.AddApplicationDictionaryQuickFix
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
@@ -109,11 +112,18 @@ private object AppleScriptApplicationReferenceProbe {
         appName: String,
     ): ApplicationReferenceAnnotationState {
         val dictionaryRegistryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-        val warningReason = checkWarningReason(appName, dictionaryRegistryService)
+        val persistenceService = SdefPersistenceService.getInstance()
+        val discoveryService = ApplicationDiscoveryService.getInstance()
+        val warningReason =
+            checkWarningReason(
+                appName = appName,
+                persistenceService = persistenceService,
+                discoveryService = discoveryService,
+            )
         val isKnownOrPendingApplication =
             !dictionaryRegistryService.areAppDictionariesIndexed() ||
-                dictionaryRegistryService.isDictionaryInitialized(appName) ||
-                dictionaryRegistryService.isKnownApplication(appName)
+                isDictionaryInitialized(persistenceService, appName) ||
+                discoveryService.isKnownApplication(appName)
 
         return if (!warningReason.isNullOrEmpty()) {
             ApplicationReferenceAnnotationState.Warning(warningReason)
@@ -132,17 +142,28 @@ private object AppleScriptApplicationReferenceProbe {
         return dictionaryProjectService.getDictionary(appName) != null
     }
 
+    private fun isDictionaryInitialized(
+        persistenceService: SdefPersistenceService,
+        appName: String,
+    ): Boolean =
+        persistenceService
+            .readDictionaryInfoSnapshot()
+            .any { it.getApplicationName() == appName && it.initialized }
+
     private fun checkWarningReason(
         appName: String,
-        dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService,
-    ): String? =
-        when {
-            dictionaryRegistryService.isNotScriptable(appName) && dictionaryRegistryService.isXcodeInstalled() ->
+        persistenceService: SdefPersistenceService,
+        discoveryService: ApplicationDiscoveryService,
+    ): String? {
+        val isXcodeInstalled = XcodeDetectionService.getInstance().isXcodeInstalled()
+        return when {
+            persistenceService.isNotScriptable(appName) && isXcodeInstalled ->
                 "Application \"$appName\" is not scriptable"
-            dictionaryRegistryService.isInUnknownList(appName) -> "Application \"$appName\" not found"
-            SystemInfo.isMac && !dictionaryRegistryService.isXcodeInstalled() -> MISSING_XCODE_WARNING
+            discoveryService.isInNotFoundList(appName) -> "Application \"$appName\" not found"
+            SystemInfo.isMac && !isXcodeInstalled -> MISSING_XCODE_WARNING
             else -> null
         }
+    }
 
     private const val MISSING_XCODE_WARNING =
         "Can not create dictionary: Xcode Developer Tools are not installed"

@@ -7,7 +7,6 @@ import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionS
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
 import com.intellij.plugin.applescript.lang.dictionary.files.copyDictionaryFileToCacheDir
 import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
 import java.nio.file.Files
@@ -20,8 +19,7 @@ import java.nio.file.Files
  *    branch on [copyDictionaryFileToCacheDir]; predictable cache
  *    path generation; `fetch()` returns [DictionaryLoadResult.Empty] for unknown
  *    application names; `isXcodeInstalled` returns a Boolean predicate (outcome
- *    depends on dev machine state); facade trampoline routing for
- *    `getScriptingAdditions` + `isXcodeInstalled`.
+ *    depends on dev machine state).
  *  - macOS-only: `fetch("Finder")` resolves Finder.app via APP_BUNDLE_DIRECTORIES and
  *    returns a non-Empty result (Loaded OR Failed depending on dev-tools state).
  *
@@ -108,37 +106,6 @@ class SdefFileProviderTest : BasePlatformTestCase() {
             "Xcode detection result must be stable within one test run",
             installed,
             detection.isXcodeInstalled(),
-        )
-    }
-
-    /**
-     * Phase 7 D-05 routing invariant: the facade's `isXcodeInstalled` trampoline routes
-     * through [XcodeDetectionService] (was SdefFileProvider pre-Phase-7). Compares facade
-     * vs the new owner's direct call — must agree (single source of truth on the
-     * lazy-cached detection result).
-     */
-    fun testFacadeIsXcodeInstalledRoutesThroughXcodeDetectionService() {
-        val detection = XcodeDetectionService.getInstance()
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        assertEquals(
-            "Facade.isXcodeInstalled must equal XcodeDetectionService.isXcodeInstalled (trampoline)",
-            detection.isXcodeInstalled(),
-            facade.isXcodeInstalled(),
-        )
-    }
-
-    /**
-     * Phase 4 SERVICE-04 routing invariant: the facade's `getScriptingAdditions`
-     * trampoline routes through SdefFileProvider. Default state (no scripting-additions
-     * yet ingested) — both must return equal sets.
-     */
-    fun testFacadeGetScriptingAdditionsRoutesThroughFileProvider() {
-        val provider = SdefFileProvider.getInstance()
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        assertEquals(
-            "Facade.getScriptingAdditions trampoline must agree with SdefFileProvider direct call",
-            provider.getScriptingAdditions(),
-            facade.getScriptingAdditions(),
         )
     }
 
