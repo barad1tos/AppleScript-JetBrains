@@ -12,7 +12,6 @@ import java.io.File
 import java.io.IOException
 import javax.swing.Icon
 
-@Suppress("SpellCheckingInspection")
 private const val ICON_FILE_EXTENSION = "icns"
 
 private const val DICTIONARY_ICON_SIZE = 13

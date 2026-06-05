@@ -63,13 +63,10 @@ interface ApplicationDictionary :
         private const val XML_EXTENSION = "xml"
         private const val APPLICATION_BUNDLE_EXTENSION = "app"
 
-        @Suppress("SpellCheckingInspection")
         private const val SCRIPTING_ADDITION_EXTENSION = "osax"
 
-        @Suppress("SpellCheckingInspection")
         private const val SCRIPT_BUNDLE_EXTENSION = "scptd"
 
-        @Suppress("SpellCheckingInspection")
         private const val SCRIPTING_DEFINITION_EXTENSION = "sdef"
 
         private const val DICTIONARY_RESOURCE_FOLDER = "/$SCRIPTING_DEFINITION_EXTENSION"
