@@ -103,7 +103,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         )
         ApplicationManager.getApplication().replaceService(
             SdefFileTypeRegistrar::class.java,
-            SdefFileTypeRegistrar(testScope, testDispatcher),
+            SdefFileTypeRegistrar(testDispatcher),
             testRootDisposable,
         )
         Disposer.register(testRootDisposable) { testScope.cancel() }
@@ -218,7 +218,6 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         try {
             val registrar =
                 SdefFileTypeRegistrar(
-                    serviceScope = scope,
                     edtDispatcher = processCanceledDispatcher,
                 )
             ApplicationManager.getApplication().replaceService(
@@ -273,7 +272,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
             )
             ApplicationManager.getApplication().replaceService(
                 SdefFileTypeRegistrar::class.java,
-                SdefFileTypeRegistrar(scope, dispatcher),
+                SdefFileTypeRegistrar(dispatcher),
                 testRootDisposable,
             )
 

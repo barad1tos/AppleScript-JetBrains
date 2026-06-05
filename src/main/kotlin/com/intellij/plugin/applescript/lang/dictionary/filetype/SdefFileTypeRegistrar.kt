@@ -4,7 +4,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.fileTypes.FileTypeManager
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.coroutines.CoroutineContext
@@ -23,18 +22,13 @@ import kotlin.coroutines.EmptyCoroutineContext
  * of the init pipeline via `service<SdefFileTypeRegistrar>().register()` (preserves Phase 3
  * ordering: register -> load -> ingestStandard -> discoverApps).
  *
- * Constructor signature follows Phase 3 COROUTINE-03: constructor-injected [CoroutineScope]
- * (Platform-supplied) + injectable EDT coroutine context for test determinism. The
- * `@JvmOverloads` annotation emits the single-arg `(CoroutineScope)` JVM constructor that
- * the Platform service container expects for `@Service(Service.Level.APP)` services (per
- * `InstantiateKt.findConstructor` — same shape as the facade at AppleScriptSystemDictionary
- * RegistryService:63-77 verified during Phase 3 gap closure).
+ * Constructor keeps only the injectable EDT coroutine context used by tests. This service
+ * does not own background jobs, so it should not request a Platform service scope.
  */
 @Service(Service.Level.APP)
 class SdefFileTypeRegistrar
     @JvmOverloads
     constructor(
-        @Suppress("unused") private val serviceScope: CoroutineScope,
         /**
          * Coroutine context for the EDT dispatch. Typed as [CoroutineContext] (not a
          * `CoroutineDispatcher`) because the Platform's

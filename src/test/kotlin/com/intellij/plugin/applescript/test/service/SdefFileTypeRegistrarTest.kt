@@ -5,7 +5,6 @@ import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegi
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 
 /**
@@ -33,8 +32,7 @@ class SdefFileTypeRegistrarTest : BasePlatformTestCase() {
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
 
-            val scope = TestScope(dispatcher)
-            val registrar = SdefFileTypeRegistrar(serviceScope = scope, edtDispatcher = dispatcher)
+            val registrar = SdefFileTypeRegistrar(edtDispatcher = dispatcher)
 
             registrar.register()
             registrar.register()
