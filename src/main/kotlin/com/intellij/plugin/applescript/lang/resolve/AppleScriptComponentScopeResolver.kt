@@ -34,14 +34,4 @@ object AppleScriptComponentScopeResolver :
         }
         return null
     }
-
-    @Suppress("unused")
-    private fun isInsideHandlerDefinition(context: PsiElement?): Boolean {
-        var cursor = context
-        while (cursor != null) {
-            if (HANDLER_DEFINITIONS.contains(cursor.node.elementType)) return true
-            cursor = cursor.context
-        }
-        return false
-    }
 }
