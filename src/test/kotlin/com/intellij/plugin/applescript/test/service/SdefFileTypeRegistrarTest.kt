@@ -33,7 +33,6 @@ class SdefFileTypeRegistrarTest : BasePlatformTestCase() {
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
 
-            @Suppress("UnusedPrivateProperty")
             val scope = TestScope(dispatcher)
             val registrar = SdefFileTypeRegistrar(serviceScope = scope, edtDispatcher = dispatcher)
 
