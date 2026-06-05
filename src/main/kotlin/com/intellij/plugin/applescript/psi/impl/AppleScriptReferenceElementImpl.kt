@@ -172,6 +172,4 @@ private fun AppleScriptHandlerPositionalParametersDefinition.parenthesesInsertHa
         ParenthesesInsertHandler.NO_PARAMETERS
     }
 
-@Suppress("UNCHECKED_CAST")
-private fun List<LookupElement>.toVariantsArray(): Array<Any> =
-    if (isNotEmpty()) toTypedArray<Any>() else LookupElement.EMPTY_ARRAY as Array<Any>
+private fun List<LookupElement>.toVariantsArray(): Array<Any> = if (isNotEmpty()) toTypedArray<Any>() else emptyArray()
