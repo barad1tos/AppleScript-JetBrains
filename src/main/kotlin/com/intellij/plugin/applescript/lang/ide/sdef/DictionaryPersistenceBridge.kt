@@ -7,9 +7,18 @@ internal class DictionaryPersistenceBridge(
     private val notScriptableApplicationRegistry: NotScriptableApplicationRegistry,
     private val markDiscoveredApplication: (String) -> Unit,
 ) {
-    fun readDictionaryInfoSnapshot(): List<DictionaryInfo> = dictionaryInfoRegistry.snapshot
+    val dictionaryInfoSnapshot: List<DictionaryInfo>
+        get() = dictionaryInfoRegistry.snapshot
 
-    fun readNotScriptableSnapshot(): Set<String> = notScriptableApplicationRegistry.snapshot
+    val cachedApplicationNamesSnapshot: List<String>
+        get() = dictionaryInfoRegistry.cachedApplicationNamesSnapshot
+
+    val notScriptableSnapshot: Set<String>
+        get() = notScriptableApplicationRegistry.snapshot
+
+    fun isDictionaryInitialized(applicationName: String): Boolean {
+        return dictionaryInfoRegistry.isInitialized(applicationName)
+    }
 
     fun isNotScriptable(applicationName: String): Boolean = applicationName in notScriptableApplicationRegistry
 

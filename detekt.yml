@@ -6,6 +6,10 @@
 # build.gradle.kts layers these overrides on top of detekt's bundled defaults.
 
 style:
+  MaxLineLength:
+    maxLineLength: 120
+    excludePackageStatements: true
+    excludeImportStatements: true
   ReturnCount:
     max: 10
   LoopWithTooManyJumpStatements:

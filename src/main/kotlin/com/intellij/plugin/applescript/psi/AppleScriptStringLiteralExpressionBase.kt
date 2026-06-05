@@ -20,7 +20,11 @@ abstract class AppleScriptStringLiteralExpressionBase(
 
     override fun isValidHost(): Boolean = true
 
-    override fun updateText(text: String): PsiLanguageInjectionHost = ElementManipulators.handleContentChange(this, text)
+    override fun updateText(text: String): PsiLanguageInjectionHost =
+        ElementManipulators.handleContentChange(
+            this,
+            text,
+        )
 
     override fun createLiteralTextEscaper(): AppleScriptStringEscaper = StringLiteralEscaper(this)
 

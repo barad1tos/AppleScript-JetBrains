@@ -12,8 +12,8 @@ internal class DictionaryInfoRegistry {
     val snapshot: List<DictionaryInfo>
         get() = dictionaryInfoMap.values.toList()
 
-    val cachedApplicationNames: Collection<String>
-        get() = dictionaryInfoMap.keys
+    val cachedApplicationNamesSnapshot: List<String>
+        get() = dictionaryInfoMap.keys.toList()
 
     fun removeInMemory(applicationName: String) {
         dictionaryInfoMap.remove(applicationName)

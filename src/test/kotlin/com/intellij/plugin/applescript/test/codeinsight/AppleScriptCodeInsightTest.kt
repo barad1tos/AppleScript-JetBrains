@@ -111,7 +111,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             assertFalse(
                 "Synthetic dictionary must stay uninitialized so the test covers the discovered-app branch",
                 persistence
-                    .readDictionaryInfoSnapshot()
+                    .dictionaryInfoSnapshot
                     .any { it.getApplicationName() == applicationName && it.initialized },
             )
             assertNull(projectDictionaries.getDictionary(applicationName))

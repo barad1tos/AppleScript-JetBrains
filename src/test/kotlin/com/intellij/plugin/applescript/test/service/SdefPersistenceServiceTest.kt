@@ -32,12 +32,12 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
         val dictionaryInfo = DictionaryInfo("SnapshotApp_${System.nanoTime()}", dictionaryFile, applicationFile)
         try {
             service.addDictionaryInfo(dictionaryInfo)
-            val snapshot = service.readDictionaryInfoSnapshot()
+            val snapshot = service.dictionaryInfoSnapshot
             (snapshot as? MutableList<*>)?.clear()
 
             val serviceStillContainsDictionary =
                 service
-                    .readDictionaryInfoSnapshot()
+                    .dictionaryInfoSnapshot
                     .any { it.getApplicationName() == dictionaryInfo.getApplicationName() }
             assertTrue(
                 "Mutating a returned snapshot must not remove dictionary info from the service",
@@ -54,7 +54,7 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
         val name = "SnapshotNotScriptable_${System.nanoTime()}"
         try {
             service.addNotScriptable(name)
-            val snapshot = service.readNotScriptableSnapshot()
+            val snapshot = service.notScriptableSnapshot
             (snapshot as? MutableSet<*>)?.clear()
 
             assertTrue(
@@ -73,7 +73,7 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
         try {
             assertTrue("First add returns true (newly added)", service.addNotScriptable(name))
             assertFalse("Second add returns false (idempotent — already present)", service.addNotScriptable(name))
-            assertTrue("Name now appears in snapshot", name in service.readNotScriptableSnapshot())
+            assertTrue("Name now appears in snapshot", name in service.notScriptableSnapshot)
             assertTrue("isNotScriptable returns true for known name", service.isNotScriptable(name))
         } finally {
             // Clean up: test runs must be repeatable, and we share the facade with other tests.
@@ -124,11 +124,10 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
 
     fun testWriteToStateThenLoadFromStateRoundTrips() {
         val service = SdefPersistenceService.getInstance()
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        // Add a marker into the facade's notScriptable in-memory set, write it into a fresh
-        // PersistedState via the service, then loadFromState into the SAME facade and confirm
-        // the marker survives the round-trip. This exercises the writeToState -> loadFromState
-        // path that the platform PSC machinery drives on save/load.
+        // Add a marker into the persistence bridge, write it into a fresh PersistedState,
+        // then load the state back and confirm the marker survives the round-trip. This
+        // exercises the writeToState -> loadFromState path that the platform PSC machinery
+        // drives on save/load.
         val marker = "RoundTripMarker_${System.nanoTime()}"
         service.addNotScriptable(marker)
         try {
@@ -146,7 +145,7 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
             service.loadFromState(secondState)
             assertTrue(
                 "After loadFromState, marker is restored in the persistence snapshot",
-                marker in service.readNotScriptableSnapshot(),
+                marker in service.notScriptableSnapshot,
             )
         } finally {
             service.removeNotScriptable(marker)

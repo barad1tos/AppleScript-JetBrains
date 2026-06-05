@@ -122,7 +122,7 @@ private object AppleScriptApplicationReferenceProbe {
             )
         val isKnownOrPendingApplication =
             !dictionaryRegistryService.areAppDictionariesIndexed() ||
-                isDictionaryInitialized(persistenceService, appName) ||
+                persistenceService.isDictionaryInitialized(appName) ||
                 discoveryService.isKnownApplication(appName)
 
         return if (!warningReason.isNullOrEmpty()) {
@@ -141,14 +141,6 @@ private object AppleScriptApplicationReferenceProbe {
         val dictionaryProjectService = appRef.project.getService(AppleScriptProjectDictionaryService::class.java)
         return dictionaryProjectService.getDictionary(appName) != null
     }
-
-    private fun isDictionaryInitialized(
-        persistenceService: SdefPersistenceService,
-        appName: String,
-    ): Boolean =
-        persistenceService
-            .readDictionaryInfoSnapshot()
-            .any { it.getApplicationName() == appName && it.initialized }
 
     private fun checkWarningReason(
         appName: String,

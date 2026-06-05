@@ -41,16 +41,12 @@ class ApplicationNameCompletionContributor : CompletionContributor() {
                     val persistenceService = SdefPersistenceService.getInstance()
                     if (SystemInfo.isMac) {
                         appNameList.addAll(ApplicationDiscoveryService.getInstance().getDiscoveredApplicationNames())
-                        appNameList.removeAll(persistenceService.readNotScriptableSnapshot())
+                        appNameList.removeAll(persistenceService.notScriptableSnapshot)
                         appNameList.removeAll(SdefFileProvider.getInstance().getScriptingAdditions())
                         appNameList.remove(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY)
                         appNameList.remove(ApplicationDictionary.COCOA_STANDARD_LIBRARY)
                     } else {
-                        appNameList.addAll(
-                            persistenceService
-                                .readDictionaryInfoSnapshot()
-                                .map { it.getApplicationName() },
-                        )
+                        appNameList.addAll(persistenceService.cachedApplicationNamesSnapshot)
                     }
                     for (appName in appNameList) {
                         result.addElement(LookupElementBuilder.create(appName))
