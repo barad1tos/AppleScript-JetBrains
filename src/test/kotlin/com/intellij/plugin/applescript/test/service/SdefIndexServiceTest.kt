@@ -4,6 +4,7 @@ import com.intellij.plugin.applescript.lang.dictionary.index.IngestResult
 import com.intellij.plugin.applescript.lang.dictionary.index.LookupResult
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexSnapshot
+import com.intellij.plugin.applescript.lang.dictionary.index.hasNameWithPrefix
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -53,6 +54,18 @@ class SdefIndexServiceTest {
         val dispatcher = StandardTestDispatcher(scheduler)
         val scope = TestScope(dispatcher)
         return SdefIndexService(serviceScope = scope, ioDispatcher = dispatcher)
+    }
+
+    @Test
+    fun prefixLookupRequiresCompleteWordBoundary() {
+        val names = setOf("current", "current date", "do shell script")
+
+        assertTrue(hasNameWithPrefix("current", names))
+        assertTrue(hasNameWithPrefix("current date", names))
+        assertTrue(hasNameWithPrefix("do shell", names))
+        assertFalse(hasNameWithPrefix("curr", names))
+        assertFalse(hasNameWithPrefix("current day", names))
+        assertFalse(hasNameWithPrefix("do shell script safely", names))
     }
 
     @Test

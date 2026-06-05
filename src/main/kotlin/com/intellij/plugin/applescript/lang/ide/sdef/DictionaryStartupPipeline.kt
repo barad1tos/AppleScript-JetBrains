@@ -12,24 +12,19 @@ internal class DictionaryStartupPipeline(
 ) {
     suspend fun run() {
         withContext(ioDispatcher) {
-            val startupResult =
-                runCatching {
-                    actions.registerFileTypes()
-                    actions.loadCachedDictionaries()
-                    actions.initializeStandardDictionaries()
-                    readiness.completeStandardReady()
-                    actions.discoverInstalledApplicationNames()
-                    readiness.completeAppsReady()
-                    actions.restartOpenProjectDaemons()
-                }
-            val failure = startupResult.exceptionOrNull() ?: return@withContext
-
-            when (failure) {
-                is CancellationException -> throw failure
-                is RuntimeException -> {
-                    reportRuntimeFailure(failure)
-                    readiness.completeFailures()
-                }
+            try {
+                actions.registerFileTypes()
+                actions.loadCachedDictionaries()
+                actions.initializeStandardDictionaries()
+                readiness.completeStandardReady()
+                actions.discoverInstalledApplicationNames()
+                readiness.completeAppsReady()
+                actions.restartOpenProjectDaemons()
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: RuntimeException) {
+                reportRuntimeFailure(failure)
+                readiness.completeFailures()
             }
         }
     }
