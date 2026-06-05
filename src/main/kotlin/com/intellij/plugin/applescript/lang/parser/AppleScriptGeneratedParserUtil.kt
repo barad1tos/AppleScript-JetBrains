@@ -29,11 +29,6 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
         val TOLD_APPLICATION_NAME_STACK: Key<Stack<String>> =
             Key.create("applescript.parsing.current.dictionary.name.stack")
 
-        // Follow-up: wire application-id dictionary lookup after the lint cleanup pass.
-        @JvmField
-        val TOLD_APPLICATION_ID_STACK: Key<Stack<String>> =
-            Key.create("applescript.parsing.current.dictionary.id.stack")
-
         internal val PARSING_TELL_SIMPLE_STATEMENT: Key<Boolean> =
             Key.create("applescript.parsing.tell.simple.statement")
         internal val PARSING_TELL_SIMPLE_OBJECT_REF: Key<Boolean> =

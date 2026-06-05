@@ -267,7 +267,6 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
         private val FROZEN_FIELDS =
             listOf(
                 FrozenField("TOLD_APPLICATION_NAME_STACK", KEY),
-                FrozenField("TOLD_APPLICATION_ID_STACK", KEY),
             )
 
         private const val PSI_BUILDER = "com.intellij.lang.PsiBuilder"

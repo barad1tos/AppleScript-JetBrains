@@ -1,7 +1,6 @@
 package com.intellij.plugin.applescript.lang.parser
 
 import com.intellij.openapi.project.Project
-import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
@@ -21,9 +20,6 @@ object ParsableScriptSuiteRegistryHelper {
 
     private val index: SdefIndexService
         get() = SdefIndexService.getInstance()
-
-    private val dictionaryFiles: SdefFileProvider
-        get() = SdefFileProvider.getInstance()
 
     @JvmStatic
     fun ensureKnownApplicationInitialized(applicationName: String): Boolean =
@@ -48,7 +44,7 @@ object ParsableScriptSuiteRegistryHelper {
     ): Boolean = index.lookupApplicationClassPluralName(applicationName, pluralClassName)
 
     @JvmStatic
-    fun isStdClassWithPrefixExist(classNamePrefix: String): Boolean = index.lookupStdClassWithPrefixExist(classNamePrefix)
+    fun isStdClassWithPrefixExist(prefix: String): Boolean = index.lookupStdClassWithPrefixExist(prefix)
 
     @JvmStatic
     fun isClassWithPrefixExist(
@@ -131,10 +127,6 @@ object ParsableScriptSuiteRegistryHelper {
         applicationName: String,
         constantNamePrefix: String,
     ): Boolean = index.lookupConstantWithPrefixExist(applicationName, constantNamePrefix)
-
-    @Suppress("unused")
-    @JvmStatic
-    fun getScriptingAdditions(): HashSet<String> = dictionaryFiles.getScriptingAdditions()
 
     // D-01 / D-04 facade dispatchers — additive, no existing method touched (D-08 parser-util
     // contract preserved). The two new booleans live on the registry-service class, so these

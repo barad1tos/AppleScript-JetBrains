@@ -2,7 +2,7 @@
 // to ParsableScriptSuiteRegistryHelper. Phase 5 (v1.4 PSI work) is the next phase allowed to mutate
 // this list.
 //
-// Phase 4 SERVICE-07 (plan 04-01): reflection-based golden test of the 26 @JvmStatic proxies on
+// Phase 4 SERVICE-07 (plan 04-01): reflection-based golden test of the 25 @JvmStatic proxies on
 // ParsableScriptSuiteRegistryHelper consumed by the generated parser util
 // (AppleScriptGeneratedParserUtil) at ~30 call sites. Any signature drift causes the generated
 // parser to fail with NoSuchMethodError at runtime — this gate catches it at compile-against-the-
@@ -16,7 +16,6 @@ package com.intellij.plugin.applescript.test.parser
 import com.intellij.openapi.project.Project
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
 import java.lang.reflect.Modifier
 
@@ -45,14 +44,14 @@ class ParserUtilContractTest {
             val method =
                 try {
                     helper.getMethod(methodName, *params)
-                } catch (e: NoSuchMethodException) {
-                    fail<Unit>(
+                } catch (exception: NoSuchMethodException) {
+                    throw AssertionError(
                         "FROZEN CONTRACT VIOLATION: ParsableScriptSuiteRegistryHelper.$signature" +
                             " is no longer callable. Generated parser util WILL hit NoSuchMethodError. " +
                             "Restore the @JvmStatic method or coordinate the contract change via BNF + " +
                             "AppleScriptGeneratedParserUtil.java updates in the SAME commit.",
+                        exception,
                     )
-                    return
                 }
 
             val actualReturn = method.returnType.name
@@ -92,13 +91,13 @@ class ParserUtilContractTest {
 
     companion object {
         /**
-         * The 26 @JvmStatic methods on ParsableScriptSuiteRegistryHelper. Format:
+         * The 25 @JvmStatic methods on ParsableScriptSuiteRegistryHelper. Format:
          * `"methodName(parameterFqn,parameterFqn,...):returnFqn"`
          * Parameter and return types use FQN; primitives use the Java primitive name.
          *
          * This list was captured at Phase 4 Plan 04-01 land time and matches the source 1:1
          * (verified by `rg "^\s*@JvmStatic" src/main/kotlin/.../ParsableScriptSuiteRegistryHelper.kt
-         * | wc -l` = 26). Methods 25 and 26 (isInitialized + areAppDictionariesIndexed) were added
+         * | wc -l` = 25). Methods 24 and 25 (isInitialized + areAppDictionariesIndexed) were added
          * in Phase 3 (D-01 / D-04 additive facades).
          */
         private val FROZEN_CONTRACT =
@@ -117,7 +116,9 @@ class ParserUtilContractTest {
                 "isCommandWithPrefixExist(java.lang.String,java.lang.String):boolean",
                 "isStdCommandWithPrefixExist(java.lang.String):boolean",
                 "findStdCommands(com.intellij.openapi.project.Project,java.lang.String):java.util.Collection",
-                "findApplicationCommands(com.intellij.openapi.project.Project,java.lang.String,java.lang.String):java.util.List",
+                "findApplicationCommands(" +
+                    "com.intellij.openapi.project.Project,java.lang.String,java.lang.String" +
+                    "):java.util.List",
                 "isStdProperty(java.lang.String):boolean",
                 "isApplicationProperty(java.lang.String,java.lang.String):boolean",
                 "isStdPropertyWithPrefixExist(java.lang.String):boolean",
@@ -126,7 +127,6 @@ class ParserUtilContractTest {
                 "isApplicationConstant(java.lang.String,java.lang.String):boolean",
                 "isStdConstantWithPrefixExist(java.lang.String):boolean",
                 "isConstantWithPrefixExist(java.lang.String,java.lang.String):boolean",
-                "getScriptingAdditions():java.util.HashSet",
                 "isInitialized():boolean",
                 "areAppDictionariesIndexed():boolean",
             )
