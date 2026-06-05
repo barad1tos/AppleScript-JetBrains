@@ -174,8 +174,14 @@ tasks.withType<Detekt>().configureEach {
 // ktlint formatting uses the standard ruleset plus project policy from .editorconfig.
 // Do NOT run a tree-wide ktlintFormat (RESEARCH Pitfall 5 — would churn 100+ files);
 // existing violations are grandfathered via the ktlint baseline (config/ktlint/baseline.xml).
+// Keep ktlint-only keys in Gradle because IntelliJ flags them as unsupported in .editorconfig.
 ktlint {
-    // .editorconfig is the single source of truth for ktlint formatting policy.
+    additionalEditorconfig.set(
+        mapOf(
+            "ktlint_code_style" to "ktlint_official",
+            "ktlint_standard_function-expression-body" to "disabled",
+        ),
+    )
 }
 
 kover {
@@ -233,7 +239,7 @@ intellijPlatform {
 
     publishing {
         // Token from the JetBrains Marketplace dev hub (1Password) via PUBLISH_TOKEN env var.
-        // Stable channel only — preserves the auto-update path for existing 0.130 users.
+        // Stable channel only; the first Marketplace upload can still be hidden in the admin UI.
         token = providers.environmentVariable("PUBLISH_TOKEN")
         channels = listOf("default")
     }
@@ -253,18 +259,6 @@ intellijPlatform {
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.1.7.1")
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.2.6.2")
         }
-        // Legacy plugin ID `com.intellij.plugin.applescript` trips structure rules:
-        // `com.intellij` prefix and the word "intellij" in the id. Kept on purpose so
-        // existing 0.130 users on Marketplace get a normal auto-update path when 1.0.0
-        // ships — renaming would orphan them. The display name is intentionally not
-        // muted so Marketplace naming regressions stay visible in CI.
-        // Pass mute flags directly to Plugin Verifier CLI per the error
-        // message hint; compatibility / API / dependency checks still gate.
-        freeArgs =
-            listOf(
-                "-mute",
-                "ForbiddenPluginIdPrefix,TemplateWordInPluginId",
-            )
     }
 }
 
