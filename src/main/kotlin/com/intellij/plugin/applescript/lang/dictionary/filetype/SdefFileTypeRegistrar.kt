@@ -3,7 +3,6 @@ package com.intellij.plugin.applescript.lang.dictionary.filetype
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileTypes.FileTypeManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -69,9 +68,6 @@ class SdefFileTypeRegistrar
         }
 
         companion object {
-            @Suppress("unused")
-            private val LOG: Logger = Logger.getInstance("#${SdefFileTypeRegistrar::class.java.name}")
-
             @JvmStatic
             fun getInstance(): SdefFileTypeRegistrar =
                 ApplicationManager
