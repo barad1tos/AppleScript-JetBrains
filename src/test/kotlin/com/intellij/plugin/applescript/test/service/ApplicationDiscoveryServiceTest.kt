@@ -63,9 +63,13 @@ class ApplicationDiscoveryServiceTest : BasePlatformTestCase() {
         val first = service.getDiscoveredApplicationNames()
         val second = service.getDiscoveredApplicationNames()
         assertEquals("Two snapshots from independent calls must be equal sets", first, second)
-        // Mutating the returned reference must not affect subsequent reads.
-        @Suppress("USELESS_IS_CHECK")
-        assertTrue("Snapshot is a HashSet (defensive copy)", first is HashSet)
+
+        val snapshotOnlyName = "SnapshotOnly_${System.nanoTime()}"
+        first.add(snapshotOnlyName)
+        assertFalse(
+            "Mutating a returned snapshot must not update discovered applications",
+            snapshotOnlyName in service.getDiscoveredApplicationNames(),
+        )
     }
 
     /**

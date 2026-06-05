@@ -25,23 +25,45 @@ import java.io.File
  * `SdefFileTypeRegistrarTest` — Wave 1 deviation #4).
  */
 class SdefPersistenceServiceTest : BasePlatformTestCase() {
-    fun testReadDictionaryInfoSnapshotReturnsList() {
+    fun testReadDictionaryInfoSnapshotIsDefensiveCopy() {
         val service = SdefPersistenceService.getInstance()
-        val snapshot = service.readDictionaryInfoSnapshot()
-        // The typed-API contract: snapshot is a defensive List, NOT the live backing
-        // Collection view. Mutating the returned reference must not affect the facade.
-        assertNotNull("Snapshot is non-null", snapshot)
-        // `List<T>` is a Kotlin/Java collection type — verify type predicate at runtime.
-        @Suppress("USELESS_IS_CHECK")
-        assertTrue("Snapshot is a List", snapshot is List)
+        val dictionaryFile = File.createTempFile("dictionary-info-snapshot", ".sdef")
+        val applicationFile = File(dictionaryFile.parentFile, "SnapshotApp_${System.nanoTime()}.app")
+        val dictionaryInfo = DictionaryInfo("SnapshotApp_${System.nanoTime()}", dictionaryFile, applicationFile)
+        try {
+            service.addDictionaryInfo(dictionaryInfo)
+            val snapshot = service.readDictionaryInfoSnapshot()
+            (snapshot as? MutableList<*>)?.clear()
+
+            val serviceStillContainsDictionary =
+                service
+                    .readDictionaryInfoSnapshot()
+                    .any { it.getApplicationName() == dictionaryInfo.getApplicationName() }
+            assertTrue(
+                "Mutating a returned snapshot must not remove dictionary info from the service",
+                serviceStillContainsDictionary,
+            )
+        } finally {
+            service.removeDictionaryInfo(applicationFile.path)
+            dictionaryFile.delete()
+        }
     }
 
-    fun testReadNotScriptableSnapshotReturnsSet() {
+    fun testReadNotScriptableSnapshotIsDefensiveCopy() {
         val service = SdefPersistenceService.getInstance()
-        val snapshot = service.readNotScriptableSnapshot()
-        assertNotNull("Snapshot is non-null", snapshot)
-        @Suppress("USELESS_IS_CHECK")
-        assertTrue("Snapshot is a Set", snapshot is Set<*>)
+        val name = "SnapshotNotScriptable_${System.nanoTime()}"
+        try {
+            service.addNotScriptable(name)
+            val snapshot = service.readNotScriptableSnapshot()
+            (snapshot as? MutableSet<*>)?.clear()
+
+            assertTrue(
+                "Mutating a returned snapshot must not remove not-scriptable state from the service",
+                service.isNotScriptable(name),
+            )
+        } finally {
+            service.removeNotScriptable(name)
+        }
     }
 
     fun testAddNotScriptableIsIdempotent() {

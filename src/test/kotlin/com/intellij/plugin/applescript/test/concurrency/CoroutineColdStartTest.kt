@@ -249,6 +249,64 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         }
     }
 
+    fun testRuntimeStartupFailureCompletesPendingReadinessGatesAsFailures() {
+        var discoveryDispatchCalled = false
+        val scheduler = TestCoroutineScheduler()
+        val dispatcher = StandardTestDispatcher(scheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val failingDiscoveryDispatcher =
+            object : CoroutineDispatcher() {
+                override fun dispatch(
+                    context: CoroutineContext,
+                    block: Runnable,
+                ) {
+                    discoveryDispatchCalled = true
+                    error("Simulated discovery startup failure")
+                }
+            }
+
+        try {
+            ApplicationManager.getApplication().replaceService(
+                ApplicationDiscoveryService::class.java,
+                ApplicationDiscoveryService(scope, failingDiscoveryDispatcher),
+                testRootDisposable,
+            )
+            ApplicationManager.getApplication().replaceService(
+                SdefFileTypeRegistrar::class.java,
+                SdefFileTypeRegistrar(scope, dispatcher),
+                testRootDisposable,
+            )
+
+            val service = AppleScriptSystemDictionaryRegistryService(scope, dispatcher, noOpProgressTask)
+            repeat(5) {
+                scheduler.runCurrent()
+            }
+
+            assertTrue(
+                "startup must reach application discovery before the simulated runtime failure",
+                discoveryDispatchCalled,
+            )
+            assertTrue(
+                "standardReady should already be successful before discovery starts",
+                service.isInitialized(),
+            )
+            assertTrue(
+                "appsReady must complete after a runtime startup failure",
+                service.appsReady.isCompleted,
+            )
+            assertTrue(
+                "appsReady must store Result.failure rather than report ready",
+                service.appsReady.getCompleted().isFailure,
+            )
+            assertFalse(
+                "appsReady failure must not be reported as indexed",
+                service.areAppDictionariesIndexed(),
+            )
+        } finally {
+            scope.cancel()
+        }
+    }
+
     /**
      * NEVER HALF-BROKEN (Success Criterion #4 discriminator):
      * At every observation point, result must be deterministic — empty pre-init OR full
