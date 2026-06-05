@@ -7,13 +7,14 @@ import com.intellij.openapi.util.Ref
 import com.intellij.plugin.applescript.AppleScriptNames
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_COMMAND_NAME
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.ITEM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.REFERENCE_EXPRESSION
 import java.util.Stack
 
 class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
-    // Grammar-Kit calls this companion as a static parser-util facade; implementations live in focused helpers.
+    // Grammar-Kit generates Java code with a static import from this exact parserUtilClass.
+    // External BNF hooks therefore have to remain @JvmStatic here; moving them to focused
+    // Kotlin objects breaks the generated-parser ABI. Implementations delegate out where possible.
     @Suppress("TooManyFunctions")
     companion object {
         internal val PARSING_COMMAND_HANDLER_CALL_PARAMETERS: Key<Boolean> =
@@ -170,34 +171,6 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
         ): Boolean =
             recursion_guard_(builder, level, "isTellStatementStart") &&
                 TellStatementParser.isTellStatementStart(builder)
-
-        @JvmStatic
-        fun typeSpecifier(
-            builder: PsiBuilder,
-            level: Int,
-        ): Boolean {
-            if (!recursion_guard_(builder, level, "typeSpecifier")) return false
-            val marker = enter_section_(builder)
-            var result = singularClassName(builder, level + 1)
-            if (!result) result = AppleScriptParser.builtInClassIdentifierPlural(builder, level + 1)
-            if (!result) result = AppleScriptParser.dictionaryClassIdentifierPlural(builder, level + 1)
-            exit_section_(builder, marker, null, result)
-            return result
-        }
-
-        @JvmStatic
-        fun singularClassName(
-            builder: PsiBuilder,
-            level: Int,
-        ): Boolean {
-            if (!recursion_guard_(builder, level, "singularClassName")) return false
-            val marker = enter_section_(builder)
-            var result = AppleScriptParser.dictionaryClassName(builder, level + 1)
-            if (!result) result = AppleScriptParser.builtInClassIdentifier(builder, level + 1)
-            consumeToken(builder, ITEM)
-            exit_section_(builder, marker, null, result)
-            return result
-        }
 
         @JvmStatic
         fun parseCommandParameterSelector(
