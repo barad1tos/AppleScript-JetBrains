@@ -94,13 +94,24 @@ jobs:
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
           PUBLISH_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
         run: |
-          missing=()
-          [[ -n "$CERTIFICATE_CHAIN" ]] || missing+=("CERTIFICATE_CHAIN")
-          [[ -n "$PRIVATE_KEY" ]] || missing+=("PRIVATE_KEY")
-          [[ -n "$PRIVATE_KEY_PASSWORD" ]] || missing+=("PRIVATE_KEY_PASSWORD")
-          [[ -n "$PUBLISH_TOKEN" ]] || missing+=("JETBRAINS_MARKETPLACE_TOKEN")
-          if (( ${#missing[@]} > 0 )); then
-            echo "::error::Missing required release secret(s): ${missing[*]}"
+          if [[ -z "$PUBLISH_TOKEN" ]]; then
+            echo "::error::Missing required release secret: JETBRAINS_MARKETPLACE_TOKEN"
+            exit 1
+          fi
+
+          signing_secrets=0
+          [[ -n "$CERTIFICATE_CHAIN" ]] && (( signing_secrets += 1 ))
+          [[ -n "$PRIVATE_KEY" ]] && (( signing_secrets += 1 ))
+          [[ -n "$PRIVATE_KEY_PASSWORD" ]] && (( signing_secrets += 1 ))
+
+          if (( signing_secrets == 0 )); then
+            echo "SIGN_PLUGIN=false" >> "$GITHUB_ENV"
+            echo "::notice::Signing secrets are not configured; publishing unsigned plugin artifact."
+            exit 0
+          fi
+
+          if (( signing_secrets != 3 )); then
+            echo "::error::Signing secrets must be configured all together: CERTIFICATE_CHAIN PRIVATE_KEY PRIVATE_KEY_PASSWORD"
             exit 1
           fi
 
@@ -108,9 +119,16 @@ jobs:
           printf '%s' "$PRIVATE_KEY" > "$RUNNER_TEMP/private-key.pem"
           echo "CERTIFICATE_CHAIN_PATH=$RUNNER_TEMP/certificate-chain.crt" >> "$GITHUB_ENV"
           echo "PRIVATE_KEY_PATH=$RUNNER_TEMP/private-key.pem" >> "$GITHUB_ENV"
+          echo "SIGN_PLUGIN=true" >> "$GITHUB_ENV"
 
-      - name: Build, sign, and publish
-        run: ./gradlew buildPlugin signPlugin publishPlugin --stacktrace
+      - name: Build, optionally sign, and publish
+        shell: bash
+        run: |
+          if [[ "$SIGN_PLUGIN" == "true" ]]; then
+            ./gradlew buildPlugin signPlugin publishPlugin --stacktrace
+          else
+            ./gradlew buildPlugin publishPlugin --stacktrace
+          fi
         env:
           PUBLISH_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
