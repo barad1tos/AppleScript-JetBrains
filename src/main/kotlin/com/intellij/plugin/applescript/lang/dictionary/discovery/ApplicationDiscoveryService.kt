@@ -1,5 +1,3 @@
-@file:Suppress("SpellCheckingInspection")
-
 package com.intellij.plugin.applescript.lang.dictionary.discovery
 
 import com.intellij.openapi.application.ApplicationManager
