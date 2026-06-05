@@ -501,17 +501,21 @@ tasks {
         val snapshotFile = layout.projectDirectory.file("gradle/coroutinesBundledVersions.json")
         inputs.file(snapshotFile)
         doLast {
-            @Suppress("UNCHECKED_CAST")
+            val snapshotJson =
+                groovy.json
+                    .JsonSlurper()
+                    .parse(snapshotFile.asFile)
+            check(snapshotJson is Map<*, *>) {
+                "Bundled coroutines snapshot must be a JSON object: ${snapshotFile.asFile}"
+            }
+            val snapshotVersions = snapshotJson["versions"]
+            check(snapshotVersions is Map<*, *>) {
+                "Bundled coroutines snapshot must contain a 'versions' object: ${snapshotFile.asFile}"
+            }
             val expected: Map<String, String> =
-                (
-                    groovy.json
-                        .JsonSlurper()
-                        .parse(snapshotFile.asFile) as Map<String, Any?>
-                ).let { json ->
-                    (json["versions"] as Map<*, *>)
-                        .mapKeys { it.key.toString() }
-                        .mapValues { it.value.toString() }
-                }
+                snapshotVersions
+                    .mapKeys { it.key.toString() }
+                    .mapValues { it.value.toString() }
 
             // Access verifyPlugin's getIdes() ConfigurableFileCollection via
             // reflection — direct Kotlin property access conflicts with the
