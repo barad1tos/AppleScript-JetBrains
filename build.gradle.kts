@@ -174,8 +174,8 @@ tasks.withType<Detekt>().configureEach {
 // ktlint formatting uses the standard ruleset plus project policy from .editorconfig.
 // Do NOT run a tree-wide ktlintFormat (RESEARCH Pitfall 5 — would churn 100+ files);
 // existing violations are grandfathered via the ktlint baseline (config/ktlint/baseline.xml).
+// Keep ktlint-only keys in Gradle because IntelliJ flags them as unsupported in .editorconfig.
 ktlint {
-    // .editorconfig is the single source of truth for ktlint formatting policy.
     additionalEditorconfig.set(
         mapOf(
             "ktlint_code_style" to "ktlint_official",

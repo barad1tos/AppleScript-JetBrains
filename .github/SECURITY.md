@@ -2,7 +2,7 @@
 
 ## Scope
 
-Applescript Toolkit is a JetBrains IDE language plugin. Its relevant security surface includes:
+AppleScript Toolkit is a JetBrains IDE language plugin. Its relevant security surface includes:
 
 - AppleScript run configurations that execute scripts selected by the user.
 - SDEF/XML dictionary parsing and local dictionary cache handling.

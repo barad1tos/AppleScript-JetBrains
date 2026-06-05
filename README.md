@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="Applescript Toolkit" width="160">
+  <img src="assets/logo.svg" alt="AppleScript Toolkit" width="160">
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 <br>
 
-Applescript Toolkit brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a maintained revival of the original Apache-2.0 AppleScript plugin, with the handwritten IntelliJ Platform implementation modernized in Kotlin and the existing Grammar-Kit parser core preserved and hardened.
+AppleScript Toolkit brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a maintained revival of the original Apache-2.0 AppleScript plugin, with the handwritten IntelliJ Platform implementation modernized in Kotlin and the existing Grammar-Kit parser core preserved and hardened.
 
 The project is not affiliated with Apple, JetBrains, or the original maintainer.
 
@@ -76,7 +76,7 @@ Paid release metadata:
 - Reserved product code: `PAPPLESCRIPT`.
 - Paid major release line: `2.0`.
 
-Before publication, the Marketplace admin panel still needs final pricing, EULA, privacy-policy, and screenshot/media configuration.
+Before publication, the Marketplace admin panel still needs final pricing, EULA, privacy policy, and screenshot/media configuration.
 
 ### Local build
 

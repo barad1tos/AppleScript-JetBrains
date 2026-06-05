@@ -1,6 +1,6 @@
 <idea-plugin>
   <id>software.barad1tos.applescript.toolkit</id>
-  <name>Applescript Toolkit</name>
+  <name>AppleScript Toolkit</name>
   <product-descriptor
       code="PAPPLESCRIPT"
       release-date="20260605"
