@@ -7,12 +7,6 @@
 </p>
 
 <p align="center">
-  <a href="MARKETPLACE_READINESS.md">
-    <img src="https://img.shields.io/badge/Marketplace-readiness%20in%20progress-6CA8FF?style=for-the-badge&colorA=202431" alt="Marketplace readiness in progress">
-  </a>
-</p>
-
-<p align="center">
   <a href="https://github.com/barad1tos/AppleScript-JetBrains/actions/workflows/ci.yml">
     <img src="https://github.com/barad1tos/AppleScript-JetBrains/actions/workflows/ci.yml/badge.svg" alt="CI">
   </a>
@@ -39,7 +33,7 @@ The project is not affiliated with Apple, JetBrains, or the original maintainer.
 - **AppleScript language model** — syntax highlighting, parsing, structure view, navigation, find usages, documentation, and rename support where the current PSI/resolver model supports them.
 - **Dictionary-aware editing** — loads scriptable-application dictionaries and `.sdef` / `.xml` dictionary files to drive completion and documentation.
 - **macOS runtime integration** — run configurations execute AppleScript through the system runtime on macOS.
-- **Maintained fork hygiene** — Apache-2.0 attribution is preserved, and the Marketplace identity trade-off is documented before publication.
+- **Maintained fork hygiene** — Apache-2.0 attribution is preserved, and Marketplace identity trade-offs are documented before publication.
 
 ## Language Support
 
@@ -59,9 +53,7 @@ The current plugin version is `2.0.0`.
 
 Release coordinates are defined in [gradle.properties](gradle.properties);
 Plugin Verifier target IDEs are configured in [build.gradle.kts](build.gradle.kts).
-Update this section, [CHANGELOG.md](CHANGELOG.md), and
-[MARKETPLACE_READINESS.md](MARKETPLACE_READINESS.md) in the same change when
-those Gradle values move.
+Update this section and [CHANGELOG.md](CHANGELOG.md) in the same change when those Gradle values move.
 
 - Minimum supported IntelliJ Platform build: `251` (`pluginSinceBuild=251`), corresponding to JetBrains IDEs 2025.1 and newer.
 - Current verifier targets: IntelliJ IDEA Community 2025.1 and 2025.2.
@@ -74,7 +66,17 @@ Earlier 2024.x IDE releases are not supported by the current line because the pl
 
 ### JetBrains Marketplace
 
-A Marketplace listing is planned. Until the listing is published, install a local build from disk. Current Marketplace identity decisions are tracked in [MARKETPLACE_READINESS.md](MARKETPLACE_READINESS.md).
+A paid Marketplace listing is planned under the `barad1tos software` vendor profile.
+Until the listing is published, install a local build from disk.
+
+Paid release metadata:
+
+- Marketplace vendor: `barad1tos software`.
+- Plugin XML id: `software.barad1tos.applescript.toolkit`.
+- Reserved product code: `PAPPLESCRIPT`.
+- Paid major release line: `2.0`.
+
+Before publication, the Marketplace admin panel still needs final pricing, EULA, privacy-policy, and screenshot/media configuration.
 
 ### Local build
 
@@ -152,7 +154,7 @@ The parser and lexer remain based on the existing Grammar-Kit/JFlex core from th
 
 The current maintained fork and modifications are Copyright 2025-2026 Roman Borodavkin and contributors. That notice covers this repository's maintained derivative work and does not replace the original author attribution.
 
-The legacy plugin identity is currently preserved for upgrade-continuity analysis. A paid Marketplace publication may require a separate plugin id, display name, and vendor namespace if the existing listing cannot be controlled or transferred. See `MARKETPLACE_READINESS.md`.
+This paid Marketplace line uses a new plugin id, `software.barad1tos.applescript.toolkit`, under the `barad1tos software` vendor profile. That makes the listing independent from the original plugin id, `com.intellij.plugin.applescript`, and avoids relying on ownership or transfer of the legacy Marketplace listing. Existing users of the original listing will need to install this paid listing separately.
 
 ## Links
 

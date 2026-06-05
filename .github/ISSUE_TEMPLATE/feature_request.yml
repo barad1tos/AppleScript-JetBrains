@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Have an idea for AppleScript Support? Please describe the workflow it improves.
+        Have an idea for Applescript Toolkit? Please describe the workflow it improves.
 
   - type: dropdown
     id: category
