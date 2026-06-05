@@ -2,6 +2,12 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.2] - 2026-06-05
+
+### Fixed
+
+- Fixed Marketplace release notes so the listing shows only the current release's `What's New` content.
+
 ## [2.0.1] - 2026-06-05
 
 ### Fixed

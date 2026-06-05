@@ -25,6 +25,22 @@
       with Apple, JetBrains, or the original maintainer.
     </p>
   ]]></description>
+  <change-notes><![CDATA[
+    <h3>2.0.2</h3>
+    <ul>
+      <li>Fixed Marketplace release notes so the listing shows only the current release's What's New content.</li>
+    </ul>
+    <h3>2.0.1</h3>
+    <ul>
+      <li>Capped published Marketplace compatibility to IntelliJ Platform 2025.1 and 2025.2 while newer IDE lines are verified separately.</li>
+    </ul>
+    <h3>2.0.0</h3>
+    <ul>
+      <li>AppleScript Toolkit is now prepared as a separate paid Marketplace listing under a vendor-owned plugin id.</li>
+      <li>Standard Additions object tokens, application-specific object references, and non-ASCII operators are parsed more accurately.</li>
+      <li>Improved parsing for whose clauses, nested tell blocks, and on-error handlers.</li>
+    </ul>
+  ]]></change-notes>
   <depends>com.intellij.modules.lang</depends>
   <resource-bundle>messages.AppleScriptBundle</resource-bundle>
 
