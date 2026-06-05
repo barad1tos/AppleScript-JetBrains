@@ -19,8 +19,7 @@ class AppleScriptBlock(
     private val mySettings: CodeStyleSettings,
 ) : AbstractBlock(node, wrap, alignment),
     BlockWithParent {
-    private val myIndentProcessor: AppleScriptIndentProcessor =
-        AppleScriptIndentProcessor(mySettings.getCommonSettings(AppleScriptLanguage))
+    private val myIndentProcessor: AppleScriptIndentProcessor = AppleScriptIndentProcessor()
     private val myIndent: Indent = myIndentProcessor.getChildIndent(myNode)
     private val mySpacingProcessor: AppleScriptSpacingProcessor =
         AppleScriptSpacingProcessor(mySettings.getCommonSettings(AppleScriptLanguage))
