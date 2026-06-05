@@ -1,10 +1,10 @@
-@file:Suppress("DEPRECATION")
-
 package com.intellij.plugin.applescript.lang.ide.run
 
 import com.intellij.execution.configurations.ConfigurationFactory
 import com.intellij.execution.configurations.ConfigurationTypeBase
 import com.intellij.execution.configurations.RunConfiguration
+import com.intellij.execution.configurations.RunConfigurationSingletonPolicy
+import com.intellij.execution.configurations.RunConfigurationSingletonPolicy.SINGLE_INSTANCE_ONLY
 import com.intellij.openapi.project.Project
 import com.intellij.plugin.applescript.AppleScriptIcons
 
@@ -20,11 +20,7 @@ class AppleScriptConfigurationType :
             object : ConfigurationFactory(this) {
                 override fun getId(): String = "AppleScript"
 
-                @Suppress("OVERRIDE_DEPRECATION")
-                override fun isConfigurationSingletonByDefault(): Boolean = true
-
-                @Suppress("OVERRIDE_DEPRECATION")
-                override fun canConfigurationBeSingleton(): Boolean = false
+                override fun getSingletonPolicy(): RunConfigurationSingletonPolicy = SINGLE_INSTANCE_ONLY
 
                 override fun createTemplateConfiguration(project: Project): RunConfiguration =
                     AppleScriptRunConfiguration(project, this, " Template config")

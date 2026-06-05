@@ -1,17 +1,20 @@
-@file:Suppress("DEPRECATION")
-
 package com.intellij.plugin.applescript.lang.ide.run
 
 import com.intellij.execution.actions.ConfigurationContext
-import com.intellij.execution.actions.RunConfigurationProducer
+import com.intellij.execution.actions.LazyRunConfigurationProducer
+import com.intellij.execution.configurations.ConfigurationFactory
+import com.intellij.execution.configurations.ConfigurationTypeUtil
 import com.intellij.openapi.util.Ref
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.psi.PsiElement
 
-class AppleScriptConfigurationProducer :
-    RunConfigurationProducer<AppleScriptRunConfiguration>(
-        AppleScriptConfigurationType(),
-    ) {
+class AppleScriptConfigurationProducer : LazyRunConfigurationProducer<AppleScriptRunConfiguration>() {
+    override fun getConfigurationFactory(): ConfigurationFactory =
+        ConfigurationTypeUtil
+            .findConfigurationType(AppleScriptConfigurationType::class.java)
+            .configurationFactories
+            .single()
+
     override fun setupConfigurationFromContext(
         configuration: AppleScriptRunConfiguration,
         context: ConfigurationContext,
