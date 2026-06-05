@@ -171,11 +171,11 @@ tasks.withType<Detekt>().configureEach {
     exclude("**/gen/**")
 }
 
-// ktlint formatting (standard ruleset, no custom config). Do NOT run a tree-wide ktlintFormat
-// (RESEARCH Pitfall 5 — would churn 100+ files); existing violations are grandfathered via the
-// ktlint baseline (config/ktlint/baseline.xml); ktlintCheck is wired into `check` (plan 07-04).
+// ktlint formatting uses the standard ruleset plus project policy from .editorconfig.
+// Do NOT run a tree-wide ktlintFormat (RESEARCH Pitfall 5 — would churn 100+ files);
+// existing violations are grandfathered via the ktlint baseline (config/ktlint/baseline.xml).
 ktlint {
-    // Standard ruleset; no custom config surface (mirrors sibling project ayu-jetbrains).
+    // .editorconfig is the single source of truth for ktlint formatting policy.
 }
 
 kover {

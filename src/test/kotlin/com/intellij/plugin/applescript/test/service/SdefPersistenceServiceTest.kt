@@ -49,6 +49,41 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
         }
     }
 
+    fun testCachedApplicationNamesAndInitializedLookupUseRegistryState() {
+        val service = SdefPersistenceService.getInstance()
+        val dictionaryFile = File.createTempFile("dictionary-info-hot-path", ".sdef")
+        val applicationFile = File(dictionaryFile.parentFile, "HotPathApp_${System.nanoTime()}.app")
+        val applicationName = "HotPathApp_${System.nanoTime()}"
+        val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+        try {
+            assertFalse(
+                "Dictionary starts uninitialized before registration",
+                service.isDictionaryInitialized(applicationName),
+            )
+
+            service.addDictionaryInfo(dictionaryInfo)
+
+            assertTrue(
+                "Cached application names include registered dictionary info",
+                applicationName in service.cachedApplicationNamesSnapshot,
+            )
+            assertFalse(
+                "Registered dictionary info is not initialized until parsing completes",
+                service.isDictionaryInitialized(applicationName),
+            )
+
+            dictionaryInfo.setInitialized(true)
+
+            assertTrue(
+                "Initialized lookup reflects dictionary info state without scanning snapshots",
+                service.isDictionaryInitialized(applicationName),
+            )
+        } finally {
+            service.removeDictionaryInfo(applicationFile.path)
+            dictionaryFile.delete()
+        }
+    }
+
     fun testReadNotScriptableSnapshotIsDefensiveCopy() {
         val service = SdefPersistenceService.getInstance()
         val name = "SnapshotNotScriptable_${System.nanoTime()}"

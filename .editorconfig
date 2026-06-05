@@ -18,5 +18,5 @@ ktlint_standard_function-expression-body = disabled
 [*.java]
 ij_continuation_indent_size = 4
 
-[*.xml]
-ij_xml_keep_whitespaces = false
+[*.{yml,yaml}]
+indent_size = 2
