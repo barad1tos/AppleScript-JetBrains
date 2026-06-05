@@ -53,6 +53,9 @@ class AppleScriptSystemDictionaryRegistryService
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
         progressTaskCompat: ProgressTaskCompat = ProgressTaskCompatDefault(),
         daemonRestartScheduler: () -> Unit = DictionaryDaemonRestartScheduler::restartOpenProjectDaemons,
+        startupFailureReporter: (RuntimeException) -> Unit = { failure ->
+            LOG.warn("Dictionary startup failed; readiness gates will be completed as failed", failure)
+        },
     ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()) {
         private val dictionaryInfoRegistry = DictionaryInfoRegistry()
         private val notScriptableApplicationRegistry = NotScriptableApplicationRegistry()
@@ -96,6 +99,7 @@ class AppleScriptSystemDictionaryRegistryService
                         discoverInstalledApplicationNames = { discovery.discoverInstalledApplicationNames() },
                         restartOpenProjectDaemons = daemonRestartScheduler,
                     ),
+                reportRuntimeFailure = startupFailureReporter,
             )
 
         // Phase 4 SERVICE-03 (plan 04-03, Wave 3): the `notFoundApplicationList` and

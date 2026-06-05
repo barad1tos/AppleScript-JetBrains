@@ -250,6 +250,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
 
     fun testRuntimeStartupFailureCompletesPendingReadinessGatesAsFailures() {
         var discoveryDispatchCalled = false
+        val reportedFailures = mutableListOf<RuntimeException>()
         val scheduler = TestCoroutineScheduler()
         val dispatcher = StandardTestDispatcher(scheduler)
         val scope = CoroutineScope(SupervisorJob() + dispatcher)
@@ -276,7 +277,13 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                 testRootDisposable,
             )
 
-            val service = AppleScriptSystemDictionaryRegistryService(scope, dispatcher, noOpProgressTask)
+            val service =
+                AppleScriptSystemDictionaryRegistryService(
+                    scope,
+                    dispatcher,
+                    noOpProgressTask,
+                    startupFailureReporter = reportedFailures::add,
+                )
             repeat(5) {
                 scheduler.runCurrent()
             }
@@ -285,6 +292,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                 "startup must reach application discovery before the simulated runtime failure",
                 discoveryDispatchCalled,
             )
+            assertRuntimeStartupFailureReported(reportedFailures)
             assertTrue(
                 "standardReady should already be successful before discovery starts",
                 service.isInitialized(),
@@ -304,6 +312,18 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         } finally {
             scope.cancel()
         }
+    }
+
+    private fun assertRuntimeStartupFailureReported(reportedFailures: List<RuntimeException>) {
+        assertEquals(
+            "runtime startup failure must be reported exactly once",
+            1,
+            reportedFailures.size,
+        )
+        assertEquals(
+            "Simulated discovery startup failure",
+            reportedFailures.single().message,
+        )
     }
 
     /**
