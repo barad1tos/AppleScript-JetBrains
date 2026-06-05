@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package com.intellij.plugin.applescript.lang.formatter.settings
 
 import com.intellij.application.options.IndentOptionsEditor
@@ -15,14 +13,13 @@ class AppleScriptLanguageCodeStyleSettingsProvider : LanguageCodeStyleSettingsPr
 
     override fun getIndentOptionsEditor(): IndentOptionsEditor = SmartIndentOptionsEditor()
 
-    @Suppress("OVERRIDE_DEPRECATION")
-    override fun getDefaultCommonSettings(): CommonCodeStyleSettings {
-        val defaultSettings = CommonCodeStyleSettings(language)
-        val indentOptions = defaultSettings.initIndentOptions()
+    override fun customizeDefaults(
+        commonSettings: CommonCodeStyleSettings,
+        indentOptions: CommonCodeStyleSettings.IndentOptions,
+    ) {
         indentOptions.INDENT_SIZE = DEFAULT_INDENT_SIZE
         indentOptions.CONTINUATION_INDENT_SIZE = DEFAULT_CONTINUATION_INDENT_SIZE
         indentOptions.TAB_SIZE = DEFAULT_TAB_SIZE
-        return defaultSettings
     }
 
     override fun getCodeSample(settingsType: SettingsType): String = CODE_SAMPLE
