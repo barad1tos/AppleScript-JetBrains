@@ -3,7 +3,6 @@ package com.intellij.plugin.applescript.psi
 import com.intellij.openapi.project.Project
 import com.intellij.plugin.applescript.AppleScriptFile
 import com.intellij.plugin.applescript.AppleScriptFileType
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.util.PsiTreeUtil
 
@@ -56,7 +55,4 @@ object AppleScriptPsiElementFactory {
         val file = createFile(project, name)
         return PsiTreeUtil.findChildOfAnyType(file, AppleScriptIdentifier::class.java)
     }
-
-    @Suppress("unused")
-    private val placeholder: PsiElement? = null
 }

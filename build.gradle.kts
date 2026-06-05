@@ -171,11 +171,11 @@ tasks.withType<Detekt>().configureEach {
     exclude("**/gen/**")
 }
 
-// ktlint formatting (standard ruleset, no custom config). Do NOT run a tree-wide ktlintFormat
-// (RESEARCH Pitfall 5 — would churn 100+ files); existing violations are grandfathered via the
-// ktlint baseline (config/ktlint/baseline.xml); ktlintCheck is wired into `check` (plan 07-04).
+// ktlint formatting uses the standard ruleset plus project policy from .editorconfig.
+// Do NOT run a tree-wide ktlintFormat (RESEARCH Pitfall 5 — would churn 100+ files);
+// existing violations are grandfathered via the ktlint baseline (config/ktlint/baseline.xml).
 ktlint {
-    // Standard ruleset; no custom config surface (mirrors sibling project ayu-jetbrains).
+    // .editorconfig is the single source of truth for ktlint formatting policy.
 }
 
 kover {
@@ -336,17 +336,15 @@ tasks {
             // BasePlatformTestCase, no /Applications scan) — fast enough to run
             // unconditionally; gates PITFALLS §1.1-§1.4 against regression.
             includeTestsMatching("com.intellij.plugin.applescript.test.sdef.*")
-            // Phase 4 SERVICE-07 (plan 04-01): ParserUtilContractTest is a reflection-only
-            // golden test of the 26 @JvmStatic methods on ParsableScriptSuiteRegistryHelper
-            // consumed by the generated parser util. No BasePlatformTestCase, no fixture
-            // boot — runs in <100ms. Unconditional so contract drift trips on every CI run.
+            // Parser tests include the generated parser-util JVM signature guard. No
+            // BasePlatformTestCase, no fixture boot — fast enough to run on every CI build.
             includeTestsMatching("com.intellij.plugin.applescript.test.parser.*")
             // Phase 5 PSI-03 (plan 05-01): PsiGetterJvmSignatureTest is the reflection-only
-            // sibling of ParserUtilContractTest — it freezes the Java-visible getter names
-            // (getX/isX/setX) produced by converting GROUP A interface getters to Kotlin
-            // properties. No BasePlatformTestCase, no fixture boot — runs in <100ms.
-            // Unconditional so a property conversion that drops/renames a Java-reachable
-            // accessor trips on every CI run, not after a runtime NoSuchMethodError.
+            // guard for Java-visible getter names (getX/isX/setX) produced by converting
+            // GROUP A interface getters to Kotlin properties. No BasePlatformTestCase, no
+            // fixture boot — runs in <100ms. Unconditional so a property conversion that
+            // drops/renames a Java-reachable accessor trips on every CI run, not after a
+            // runtime NoSuchMethodError.
             includeTestsMatching("com.intellij.plugin.applescript.test.psi.*")
             if (!skipHeavy) {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.DictionariesRandomParsingTestCase")
@@ -503,17 +501,21 @@ tasks {
         val snapshotFile = layout.projectDirectory.file("gradle/coroutinesBundledVersions.json")
         inputs.file(snapshotFile)
         doLast {
-            @Suppress("UNCHECKED_CAST")
+            val snapshotJson =
+                groovy.json
+                    .JsonSlurper()
+                    .parse(snapshotFile.asFile)
+            check(snapshotJson is Map<*, *>) {
+                "Bundled coroutines snapshot must be a JSON object: ${snapshotFile.asFile}"
+            }
+            val snapshotVersions = snapshotJson["versions"]
+            check(snapshotVersions is Map<*, *>) {
+                "Bundled coroutines snapshot must contain a 'versions' object: ${snapshotFile.asFile}"
+            }
             val expected: Map<String, String> =
-                (
-                    groovy.json
-                        .JsonSlurper()
-                        .parse(snapshotFile.asFile) as Map<String, Any?>
-                ).let { json ->
-                    (json["versions"] as Map<*, *>)
-                        .mapKeys { it.key.toString() }
-                        .mapValues { it.value.toString() }
-                }
+                snapshotVersions
+                    .mapKeys { it.key.toString() }
+                    .mapValues { it.value.toString() }
 
             // Access verifyPlugin's getIdes() ConfigurableFileCollection via
             // reflection — direct Kotlin property access conflicts with the

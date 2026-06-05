@@ -1,5 +1,3 @@
-@file:Suppress("SpellCheckingInspection")
-
 package com.intellij.plugin.applescript.lang.dictionary.discovery
 
 import com.intellij.openapi.application.ApplicationManager
@@ -18,7 +16,6 @@ import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.extensionSupported
 import com.intellij.plugin.applescript.lang.util.MyStopVisitingException
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -139,7 +136,6 @@ private fun findApplicationFileRecursively(
 class ApplicationDiscoveryService
     @JvmOverloads
     constructor(
-        @Suppress("unused") private val serviceScope: CoroutineScope,
         private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     ) {
         // Migrated from facade (Wave 3): names found during the most-recent discovery sweep

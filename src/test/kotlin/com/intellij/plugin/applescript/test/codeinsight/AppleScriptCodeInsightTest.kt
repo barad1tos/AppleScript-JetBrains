@@ -106,11 +106,13 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             )
             assertTrue(
                 "Synthetic dictionary must be known through discovery",
-                registryService.isKnownApplication(applicationName),
+                ApplicationDiscoveryService.getInstance().isKnownApplication(applicationName),
             )
             assertFalse(
                 "Synthetic dictionary must stay uninitialized so the test covers the discovered-app branch",
-                registryService.isDictionaryInitialized(applicationName),
+                persistence
+                    .dictionaryInfoSnapshot
+                    .any { it.getApplicationName() == applicationName && it.initialized },
             )
             assertNull(projectDictionaries.getDictionary(applicationName))
 

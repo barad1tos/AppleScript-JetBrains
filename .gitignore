@@ -48,6 +48,7 @@ reports/
 .trunk/
 
 # Kotlin / Gradle convenience
+.kotlin/
 kotlin-js-store/
 hs_err_pid*.log
 .intellijPlatform/

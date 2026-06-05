@@ -192,20 +192,6 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                     PSI_BUILDER,
                     INT,
                 ),
-                // Kotlin cannot emit Java package-private @JvmStatic companion methods.
-                // These same-package generated-parser helpers must stay static and callable by name.
-                FrozenSignature.publicStatic(
-                    "typeSpecifier",
-                    "boolean",
-                    PSI_BUILDER,
-                    INT,
-                ),
-                FrozenSignature.publicStatic(
-                    "singularClassName",
-                    "boolean",
-                    PSI_BUILDER,
-                    INT,
-                ),
                 FrozenSignature.publicStatic(
                     "parseCommandParameterSelector",
                     "boolean",
@@ -267,7 +253,6 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
         private val FROZEN_FIELDS =
             listOf(
                 FrozenField("TOLD_APPLICATION_NAME_STACK", KEY),
-                FrozenField("TOLD_APPLICATION_ID_STACK", KEY),
             )
 
         private const val PSI_BUILDER = "com.intellij.lang.PsiBuilder"

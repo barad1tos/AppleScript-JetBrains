@@ -3,7 +3,6 @@ package com.intellij.plugin.applescript.test.service
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
-import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
 
@@ -13,7 +12,7 @@ import kotlinx.coroutines.runBlocking
  * Discovery walk against [com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary.APP_BUNDLE_DIRECTORIES]
  * is macOS-only (Linux / Windows have no `/Applications` directory tree); cross-platform
  * tests cover the notFound list semantics, the EDT guard on `findApplicationBundleFile`,
- * and the facade trampoline routing.
+ * and defensive snapshot semantics.
  *
  * Extends [BasePlatformTestCase] because [ApplicationDiscoveryService] uses
  * `LocalFileSystem.getInstance()` + `VfsUtilCore.visitChildrenRecursively`, which require
@@ -64,9 +63,13 @@ class ApplicationDiscoveryServiceTest : BasePlatformTestCase() {
         val first = service.getDiscoveredApplicationNames()
         val second = service.getDiscoveredApplicationNames()
         assertEquals("Two snapshots from independent calls must be equal sets", first, second)
-        // Mutating the returned reference must not affect subsequent reads.
-        @Suppress("USELESS_IS_CHECK")
-        assertTrue("Snapshot is a HashSet (defensive copy)", first is HashSet)
+
+        val snapshotOnlyName = "SnapshotOnly_${System.nanoTime()}"
+        first.add(snapshotOnlyName)
+        assertFalse(
+            "Mutating a returned snapshot must not update discovered applications",
+            snapshotOnlyName in service.getDiscoveredApplicationNames(),
+        )
     }
 
     /**
@@ -127,54 +130,5 @@ class ApplicationDiscoveryServiceTest : BasePlatformTestCase() {
             "Finder.app should resolve on macOS via APP_BUNDLE_DIRECTORIES walk",
             result,
         )
-    }
-
-    /**
-     * Phase 4 SERVICE-03 routing invariant: external callers of the facade's
-     * `getDiscoveredApplicationNames()` see the discovery service's state through the
-     * trampoline. Adds a name via the service, observes via the facade — proves the
-     * single-source-of-truth invariant on the in-memory discovered set.
-     */
-    fun testFacadeTrampolineRoutesThroughDiscoveryService() {
-        val service = ApplicationDiscoveryService.getInstance()
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        val name = "DiscoveryTrampolineTest_${System.nanoTime()}"
-        try {
-            assertFalse(
-                "Sentinel name absent before add",
-                facade.getDiscoveredApplicationNames().contains(name),
-            )
-            service.addDiscoveredApplicationName(name)
-            assertTrue(
-                "Facade.getDiscoveredApplicationNames trampoline sees the service-side write",
-                facade.getDiscoveredApplicationNames().contains(name),
-            )
-        } finally {
-            // No removeDiscoveredApplicationName surface (the production set is rebuilt per
-            // cold start). Leave the sentinel in — it does not interfere with other tests
-            // because the name is uniquely seeded with nanoTime.
-        }
-    }
-
-    /**
-     * Phase 4 SERVICE-03 Wave 3 re-route verification: the facade's `isInUnknownList`
-     * trampoline routes through ApplicationDiscoveryService (NOT SdefPersistenceService —
-     * Wave 2's temporary parking spot). Adds via the discovery service, observes via the
-     * facade — proves the single-source-of-truth invariant on the not-found list.
-     */
-    fun testFacadeIsInUnknownListRoutesThroughDiscoveryService() {
-        val service = ApplicationDiscoveryService.getInstance()
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        val name = "UnknownListTrampolineTest_${System.nanoTime()}"
-        try {
-            assertFalse("Sentinel name absent before add", facade.isInUnknownList(name))
-            service.addToNotFoundList(name)
-            assertTrue(
-                "Facade.isInUnknownList trampoline sees the discovery-service-side write",
-                facade.isInUnknownList(name),
-            )
-        } finally {
-            service.removeFromNotFoundList(name)
-        }
     }
 }

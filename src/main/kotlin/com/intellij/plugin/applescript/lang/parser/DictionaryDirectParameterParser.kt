@@ -53,7 +53,7 @@ internal object DictionaryDirectParameterParser {
         val marker = enter_section_(builder, level, _NONE_, "<parse Command Direct Parameter Value >")
         var result = false
         if (parameter.typeSpecifier == "type") {
-            result = AppleScriptGeneratedParserUtil.typeSpecifier(builder, level + 1)
+            result = TypeSpecifierParser.parseTypeSpecifier(builder, level + 1)
         }
         if (!result) {
             result = AppleScriptParser.expression(builder, level + 1)

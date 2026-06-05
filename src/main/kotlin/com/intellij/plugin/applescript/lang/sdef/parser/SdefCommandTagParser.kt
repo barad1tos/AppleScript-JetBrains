@@ -16,7 +16,14 @@ internal object SdefCommandTagParser {
         suite: Suite,
     ): AppleScriptCommand? {
         val identity = SdefTagReader.readRequiredIdentity(commandTag) ?: return null
-        val command: AppleScriptCommand = AppleScriptCommandImpl(suite, identity.name, identity.code, commandTag)
+        val command: AppleScriptCommand =
+            AppleScriptCommandImpl(
+                suite,
+                identity.name,
+                identity.code,
+                commandTag,
+                parseCocoaClassName(commandTag),
+            )
         command.description = commandTag.getAttributeValue(ATTRIBUTE_DESCRIPTION)
         command.setDictionaryDoc(commandTag.getSubTagText(TAG_DOCUMENTATION))
         commandTag.findFirstSubTag(TAG_RESULT)?.let(::parseResult)?.let(command::setResult)
@@ -24,6 +31,11 @@ internal object SdefCommandTagParser {
         command.parameters = parseParameters(command, commandTag.findSubTags(TAG_PARAMETER))
         return command
     }
+
+    private fun parseCocoaClassName(commandTag: XmlTag): String? =
+        commandTag
+            .findFirstSubTag(TAG_COCOA)
+            ?.getAttributeValue(ATTRIBUTE_CLASS)
 
     private fun parseResult(resultTag: XmlTag): CommandResult? {
         val resultType = resultTag.getAttributeValue(ATTRIBUTE_TYPE)

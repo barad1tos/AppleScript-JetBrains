@@ -98,12 +98,12 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
             }
         ApplicationManager.getApplication().replaceService(
             ApplicationDiscoveryService::class.java,
-            ApplicationDiscoveryService(testScope, discoveryDispatcher),
+            ApplicationDiscoveryService(discoveryDispatcher),
             testRootDisposable,
         )
         ApplicationManager.getApplication().replaceService(
             SdefFileTypeRegistrar::class.java,
-            SdefFileTypeRegistrar(testScope, testDispatcher),
+            SdefFileTypeRegistrar(testDispatcher),
             testRootDisposable,
         )
         Disposer.register(testRootDisposable) { testScope.cancel() }
@@ -175,9 +175,8 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                 testScope,
                 testDispatcher,
                 noOpProgressTask,
-            ) {
-                daemonRestartCount++
-            }
+                daemonRestartScheduler = { daemonRestartCount++ },
+            )
 
         advanceThroughFullInitialization()
 
@@ -218,7 +217,6 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         try {
             val registrar =
                 SdefFileTypeRegistrar(
-                    serviceScope = scope,
                     edtDispatcher = processCanceledDispatcher,
                 )
             ApplicationManager.getApplication().replaceService(
@@ -247,6 +245,84 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         } finally {
             scope.cancel()
         }
+    }
+
+    fun testRuntimeStartupFailureCompletesPendingReadinessGatesAsFailures() {
+        var discoveryDispatchCalled = false
+        val reportedFailures = mutableListOf<RuntimeException>()
+        val scheduler = TestCoroutineScheduler()
+        val dispatcher = StandardTestDispatcher(scheduler)
+        val scope = CoroutineScope(SupervisorJob() + dispatcher)
+        val failingDiscoveryDispatcher =
+            object : CoroutineDispatcher() {
+                override fun dispatch(
+                    context: CoroutineContext,
+                    block: Runnable,
+                ) {
+                    discoveryDispatchCalled = true
+                    error("Simulated discovery startup failure")
+                }
+            }
+
+        try {
+            ApplicationManager.getApplication().replaceService(
+                ApplicationDiscoveryService::class.java,
+                ApplicationDiscoveryService(failingDiscoveryDispatcher),
+                testRootDisposable,
+            )
+            ApplicationManager.getApplication().replaceService(
+                SdefFileTypeRegistrar::class.java,
+                SdefFileTypeRegistrar(dispatcher),
+                testRootDisposable,
+            )
+
+            val service =
+                AppleScriptSystemDictionaryRegistryService(
+                    scope,
+                    dispatcher,
+                    noOpProgressTask,
+                    startupFailureReporter = reportedFailures::add,
+                )
+            repeat(5) {
+                scheduler.runCurrent()
+            }
+
+            assertTrue(
+                "startup must reach application discovery before the simulated runtime failure",
+                discoveryDispatchCalled,
+            )
+            assertRuntimeStartupFailureReported(reportedFailures)
+            assertTrue(
+                "standardReady should already be successful before discovery starts",
+                service.isInitialized(),
+            )
+            assertTrue(
+                "appsReady must complete after a runtime startup failure",
+                service.appsReady.isCompleted,
+            )
+            assertTrue(
+                "appsReady must store Result.failure rather than report ready",
+                service.appsReady.getCompleted().isFailure,
+            )
+            assertFalse(
+                "appsReady failure must not be reported as indexed",
+                service.areAppDictionariesIndexed(),
+            )
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    private fun assertRuntimeStartupFailureReported(reportedFailures: List<RuntimeException>) {
+        assertEquals(
+            "runtime startup failure must be reported exactly once",
+            1,
+            reportedFailures.size,
+        )
+        assertEquals(
+            "Simulated discovery startup failure",
+            reportedFailures.single().message,
+        )
     }
 
     /**

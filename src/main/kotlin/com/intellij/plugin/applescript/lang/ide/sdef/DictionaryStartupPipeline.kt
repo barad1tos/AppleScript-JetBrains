@@ -1,7 +1,5 @@
 package com.intellij.plugin.applescript.lang.ide.sdef
 
-import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.ProcessCanceledException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
@@ -10,15 +8,10 @@ internal class DictionaryStartupPipeline(
     private val ioDispatcher: CoroutineDispatcher,
     private val readiness: DictionaryReadinessTracker,
     private val actions: DictionaryStartupActions,
+    private val reportRuntimeFailure: (RuntimeException) -> Unit,
 ) {
-    /*
-     * Startup is the application-service boundary: unexpected runtime failures must be logged
-     * and represented as failed readiness gates instead of escaping as successful initialization.
-     */
-    @Suppress("TooGenericExceptionCaught")
     suspend fun run() {
         withContext(ioDispatcher) {
-            var shouldCompleteFailures = true
             try {
                 actions.registerFileTypes()
                 actions.loadCachedDictionaries()
@@ -27,24 +20,13 @@ internal class DictionaryStartupPipeline(
                 actions.discoverInstalledApplicationNames()
                 readiness.completeAppsReady()
                 actions.restartOpenProjectDaemons()
-            } catch (e: CancellationException) {
-                shouldCompleteFailures = false
-                throw e
-            } catch (e: ProcessCanceledException) {
-                shouldCompleteFailures = false
-                throw e
-            } catch (e: RuntimeException) {
-                LOG.error("Error while initializing service", e)
-            } finally {
-                if (shouldCompleteFailures) {
-                    readiness.completeFailures()
-                }
+            } catch (failure: CancellationException) {
+                throw failure
+            } catch (failure: RuntimeException) {
+                reportRuntimeFailure(failure)
+                readiness.completeFailures()
             }
         }
-    }
-
-    private companion object {
-        val LOG: Logger = Logger.getInstance("#${DictionaryStartupPipeline::class.java.name}")
     }
 }
 

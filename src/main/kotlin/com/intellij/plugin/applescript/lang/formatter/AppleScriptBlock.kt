@@ -19,16 +19,11 @@ class AppleScriptBlock(
     private val mySettings: CodeStyleSettings,
 ) : AbstractBlock(node, wrap, alignment),
     BlockWithParent {
-    private val myIndentProcessor: AppleScriptIndentProcessor =
-        AppleScriptIndentProcessor(mySettings.getCommonSettings(AppleScriptLanguage))
+    private val myIndentProcessor: AppleScriptIndentProcessor = AppleScriptIndentProcessor()
     private val myIndent: Indent = myIndentProcessor.getChildIndent(myNode)
     private val mySpacingProcessor: AppleScriptSpacingProcessor =
         AppleScriptSpacingProcessor(mySettings.getCommonSettings(AppleScriptLanguage))
-    private val myWrappingProcessor: AppleScriptWrappingProcessor =
-        AppleScriptWrappingProcessor()
-
     private var myParent: BlockWithParent? = null
-    private val myChildWrap: Wrap? = null
 
     override fun buildChildren(): List<Block> {
         if (isLeaf) return EMPTY
@@ -39,7 +34,7 @@ class AppleScriptBlock(
                 val childBlock =
                     AppleScriptBlock(
                         childNode,
-                        createChildWrap(childNode),
+                        createChildWrap(),
                         Alignment.createAlignment(),
                         mySettings,
                     )
@@ -51,8 +46,7 @@ class AppleScriptBlock(
         return tlChildren
     }
 
-    private fun createChildWrap(childNode: ASTNode): Wrap =
-        myWrappingProcessor.createChildWrap(childNode, Wrap.createWrap(WrapType.NONE, false), myChildWrap)
+    private fun createChildWrap(): Wrap = Wrap.createWrap(WrapType.NONE, false)
 
     override fun getSpacing(
         child1: Block?,

@@ -156,7 +156,7 @@ internal object DictionaryCommandParameterParser {
 
         val parameterTypeSpecifier = parameterDefinition?.typeSpecifier
         if (parameterTypeSpecifier == "type") {
-            result = AppleScriptGeneratedParserUtil.typeSpecifier(builder, level + 1)
+            result = TypeSpecifierParser.parseTypeSpecifier(builder, level + 1)
         } else if (parameterTypeSpecifier == "text") {
             result = AppleScriptParser.stringLiteralExpression(builder, level + 1)
         }

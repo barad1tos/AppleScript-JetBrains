@@ -5,7 +5,10 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
@@ -22,6 +25,12 @@ class AppleScriptProjectDictionaryService(
 ) {
     private val dictionaryRegistryService: AppleScriptSystemDictionaryRegistryService =
         AppleScriptSystemDictionaryRegistryService.getInstance()
+    private val persistenceService: SdefPersistenceService =
+        SdefPersistenceService.getInstance()
+    private val discoveryService: ApplicationDiscoveryService =
+        ApplicationDiscoveryService.getInstance()
+    private val fileProvider: SdefFileProvider =
+        SdefFileProvider.getInstance()
 
     private val dictionaryMap: MutableMap<String, ApplicationDictionary> = HashMap()
 
@@ -96,12 +105,12 @@ class AppleScriptProjectDictionaryService(
 
     private fun isInIgnoreList(applicationName: String): Boolean =
         when {
-            dictionaryRegistryService.isNotScriptable(applicationName) -> {
+            persistenceService.isNotScriptable(applicationName) -> {
                 LOG.debug("Application $applicationName is not scriptable. Can not create dictionary for it.")
                 true
             }
 
-            dictionaryRegistryService.isInUnknownList(applicationName) -> {
+            discoveryService.isInNotFoundList(applicationName) -> {
                 LOG.debug(
                     "WARNING: Application $applicationName was added to unknown list. " +
                         "Can not create dictionary for it.",
@@ -122,7 +131,7 @@ class AppleScriptProjectDictionaryService(
         applicationFile: VirtualFile,
     ): ApplicationDictionary? {
         val appIoFile = File(applicationFile.path)
-        val info = dictionaryRegistryService.createAndInitializeInfo(appIoFile, applicationName)
+        val info = fileProvider.createAndInitializeInfo(appIoFile, applicationName)
         if (info != null) {
             return createDictionaryFromInfo(info)
         }

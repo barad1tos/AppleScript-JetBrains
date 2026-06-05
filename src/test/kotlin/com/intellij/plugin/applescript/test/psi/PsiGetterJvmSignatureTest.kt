@@ -1,8 +1,7 @@
 // FROZEN GETTER CONTRACT — Adding/removing any signature here MUST happen in the same commit as the
-// property conversion of the declaring interface. This is the Phase 5 (v1.4) PSI-03 sibling of
-// ParserUtilContractTest: where that test freezes the 26 @JvmStatic proxies on
-// ParsableScriptSuiteRegistryHelper, this one freezes the Java-visible getter names produced by
-// converting GROUP A interface getter functions to Kotlin properties (val x + @get:JvmName).
+// property conversion of the declaring interface. This freezes the Java-visible getter names
+// produced by converting GROUP A interface getter functions to Kotlin properties
+// (val x + @get:JvmName).
 //
 // Failure mode it catches: a property conversion that drops or renames a Java-visible accessor name
 // (e.g. `val classProperty` synthesizing getClassProperty() instead of the required isClassProperty(),
@@ -197,9 +196,8 @@ class PsiGetterJvmSignatureTest {
         /**
          * Allowlist of parameter types referenced by [FROZEN_GETTERS]. Resolving via a static Map
          * (instead of reflective class loading from an arbitrary FQN string) eliminates the CWE-470
-         * unsafe-reflection surface even though every FQN here is a hardcoded literal in the same file
-         * (mirrors `ParserUtilContractTest.PARAM_TYPE_ALLOWLIST`). Return types are compared by name
-         * and never resolved through this map.
+         * unsafe-reflection surface even though every FQN here is a hardcoded literal in the same
+         * file. Return types are compared by name and never resolved through this map.
          *
          * Adding a new entry here is a deliberate contract-extension act: it MUST be paired with a
          * corresponding FROZEN_GETTERS signature that uses it, in the same commit.

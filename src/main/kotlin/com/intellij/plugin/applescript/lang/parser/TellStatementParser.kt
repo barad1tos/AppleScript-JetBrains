@@ -128,7 +128,7 @@ internal object TellStatementParser {
                 isApplicationCommand(builder, level, requireNotNull(toldApplicationName))
         val isProperty =
             canCheckDictionary &&
-                ParsableScriptSuiteRegistryHelper.isPropertyWithPrefixExist(
+                DictionaryPropertyRegistry.isPropertyWithPrefixExist(
                     requireNotNull(toldApplicationName),
                     dictionaryTermToken,
                 )

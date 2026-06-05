@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package com.intellij.plugin.applescript.lang.ide.actions
 
 import com.intellij.ide.IdeView
@@ -12,6 +10,7 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
@@ -25,8 +24,18 @@ class LoadDictionaryAction : AnAction() {
         val currentDirectory = directories.firstOrNull()
         val project = e.getData(CommonDataKeys.PROJECT) ?: return
 
-        val directoryFile: VirtualFile? = currentDirectory?.virtualFile ?: project.baseDir
+        val directoryFile: VirtualFile? =
+            currentDirectory?.virtualFile ?: project.projectDirectory()
         openLoadDirectoryDialog(project, directoryFile, null)
+    }
+}
+
+private fun Project.projectDirectory(): VirtualFile? {
+    val path = basePath
+    return if (path == null) {
+        null
+    } else {
+        LocalFileSystem.getInstance().findFileByPath(path)
     }
 }
 

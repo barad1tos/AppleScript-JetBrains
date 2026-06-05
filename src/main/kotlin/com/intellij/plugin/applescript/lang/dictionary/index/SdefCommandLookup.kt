@@ -30,6 +30,30 @@ internal class SdefCommandLookup(
     private val serviceScope: CoroutineScope,
     private val indexStore: SdefIndexStore,
 ) {
+    fun lookupStdCommand(name: String): Boolean =
+        SdefIndexReadiness.isInitialized() &&
+            indexStore.stdCommandNameToApplicationNameSetMap.containsKey(name)
+
+    fun lookupApplicationCommand(
+        applicationName: String,
+        commandName: String,
+    ): Boolean {
+        if (!SdefIndexReadiness.isInitialized()) return false
+        val commandNameSet: Set<String>? = indexStore.applicationNameToCommandNameSetMap[applicationName]
+        return commandNameSet != null && commandNameSet.contains(commandName)
+    }
+
+    fun lookupCommandWithPrefixExist(
+        applicationName: String,
+        commandNamePrefix: String,
+    ): Boolean =
+        SdefIndexReadiness.isInitialized() &&
+            hasNameWithPrefix(commandNamePrefix, indexStore.applicationNameToCommandNameSetMap[applicationName])
+
+    fun lookupStdCommandWithPrefixExist(namePrefix: String): Boolean =
+        SdefIndexReadiness.isInitialized() &&
+            hasNameWithPrefix(namePrefix, indexStore.stdCommandNameToApplicationNameSetMap.keys)
+
     /**
      * Resolver for standard-suite commands.
      *

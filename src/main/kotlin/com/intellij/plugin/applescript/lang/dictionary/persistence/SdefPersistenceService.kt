@@ -53,13 +53,26 @@ class SdefPersistenceService {
      * (not the live backing `Collection`), so callers cannot accidentally mutate the
      * facade's registry through the returned reference.
      */
-    fun readDictionaryInfoSnapshot(): List<DictionaryInfo> = bridge.readDictionaryInfoSnapshot()
+    val dictionaryInfoSnapshot: List<DictionaryInfo>
+        get() = bridge.dictionaryInfoSnapshot
+
+    /**
+     * Defensive snapshot of cached application names backed by the dictionary registry keys.
+     */
+    val cachedApplicationNamesSnapshot: List<String>
+        get() = bridge.cachedApplicationNamesSnapshot
+
+    /**
+     * O(1) initialized-dictionary lookup for annotator and completion hot paths.
+     */
+    fun isDictionaryInitialized(applicationName: String): Boolean = bridge.isDictionaryInitialized(applicationName)
 
     /**
      * Defensive snapshot of the notScriptable application names. Returns a [Set]
      * (not the live backing `ConcurrentHashMap.KeySet`).
      */
-    fun readNotScriptableSnapshot(): Set<String> = bridge.readNotScriptableSnapshot()
+    val notScriptableSnapshot: Set<String>
+        get() = bridge.notScriptableSnapshot
 
     /**
      * O(1) membership test on the persisted notScriptable set.

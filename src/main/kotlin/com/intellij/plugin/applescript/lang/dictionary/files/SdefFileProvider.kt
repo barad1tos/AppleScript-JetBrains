@@ -172,7 +172,7 @@ class SdefFileProvider
         fun getDictionaryInfoByApplicationPath(applicationPath: String): DictionaryInfo? {
             val cachedInfo =
                 service<SdefPersistenceService>()
-                    .readDictionaryInfoSnapshot()
+                    .dictionaryInfoSnapshot
                     .firstOrNull { dInfo ->
                         dInfo.getApplicationFile()?.path == applicationPath
                     }

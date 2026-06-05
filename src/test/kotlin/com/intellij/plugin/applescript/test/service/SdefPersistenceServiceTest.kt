@@ -25,23 +25,80 @@ import java.io.File
  * `SdefFileTypeRegistrarTest` — Wave 1 deviation #4).
  */
 class SdefPersistenceServiceTest : BasePlatformTestCase() {
-    fun testReadDictionaryInfoSnapshotReturnsList() {
+    fun testReadDictionaryInfoSnapshotIsDefensiveCopy() {
         val service = SdefPersistenceService.getInstance()
-        val snapshot = service.readDictionaryInfoSnapshot()
-        // The typed-API contract: snapshot is a defensive List, NOT the live backing
-        // Collection view. Mutating the returned reference must not affect the facade.
-        assertNotNull("Snapshot is non-null", snapshot)
-        // `List<T>` is a Kotlin/Java collection type — verify type predicate at runtime.
-        @Suppress("USELESS_IS_CHECK")
-        assertTrue("Snapshot is a List", snapshot is List)
+        val dictionaryFile = File.createTempFile("dictionary-info-snapshot", ".sdef")
+        val applicationFile = File(dictionaryFile.parentFile, "SnapshotApp_${System.nanoTime()}.app")
+        val dictionaryInfo = DictionaryInfo("SnapshotApp_${System.nanoTime()}", dictionaryFile, applicationFile)
+        try {
+            service.addDictionaryInfo(dictionaryInfo)
+            val snapshot = service.dictionaryInfoSnapshot
+            (snapshot as? MutableList<*>)?.clear()
+
+            val serviceStillContainsDictionary =
+                service
+                    .dictionaryInfoSnapshot
+                    .any { it.getApplicationName() == dictionaryInfo.getApplicationName() }
+            assertTrue(
+                "Mutating a returned snapshot must not remove dictionary info from the service",
+                serviceStillContainsDictionary,
+            )
+        } finally {
+            service.removeDictionaryInfo(applicationFile.path)
+            dictionaryFile.delete()
+        }
     }
 
-    fun testReadNotScriptableSnapshotReturnsSet() {
+    fun testCachedApplicationNamesAndInitializedLookupUseRegistryState() {
         val service = SdefPersistenceService.getInstance()
-        val snapshot = service.readNotScriptableSnapshot()
-        assertNotNull("Snapshot is non-null", snapshot)
-        @Suppress("USELESS_IS_CHECK")
-        assertTrue("Snapshot is a Set", snapshot is Set<*>)
+        val dictionaryFile = File.createTempFile("dictionary-info-hot-path", ".sdef")
+        val applicationFile = File(dictionaryFile.parentFile, "HotPathApp_${System.nanoTime()}.app")
+        val applicationName = "HotPathApp_${System.nanoTime()}"
+        val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+        try {
+            assertFalse(
+                "Dictionary starts uninitialized before registration",
+                service.isDictionaryInitialized(applicationName),
+            )
+
+            service.addDictionaryInfo(dictionaryInfo)
+
+            assertTrue(
+                "Cached application names include registered dictionary info",
+                applicationName in service.cachedApplicationNamesSnapshot,
+            )
+            assertFalse(
+                "Registered dictionary info is not initialized until parsing completes",
+                service.isDictionaryInitialized(applicationName),
+            )
+
+            dictionaryInfo.setInitialized(true)
+
+            assertTrue(
+                "Initialized lookup reflects dictionary info state without scanning snapshots",
+                service.isDictionaryInitialized(applicationName),
+            )
+        } finally {
+            service.removeDictionaryInfo(applicationFile.path)
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testReadNotScriptableSnapshotIsDefensiveCopy() {
+        val service = SdefPersistenceService.getInstance()
+        val name = "SnapshotNotScriptable_${System.nanoTime()}"
+        try {
+            service.addNotScriptable(name)
+            val snapshot = service.notScriptableSnapshot
+            (snapshot as? MutableSet<*>)?.clear()
+
+            assertTrue(
+                "Mutating a returned snapshot must not remove not-scriptable state from the service",
+                service.isNotScriptable(name),
+            )
+        } finally {
+            service.removeNotScriptable(name)
+        }
     }
 
     fun testAddNotScriptableIsIdempotent() {
@@ -51,7 +108,7 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
         try {
             assertTrue("First add returns true (newly added)", service.addNotScriptable(name))
             assertFalse("Second add returns false (idempotent — already present)", service.addNotScriptable(name))
-            assertTrue("Name now appears in snapshot", name in service.readNotScriptableSnapshot())
+            assertTrue("Name now appears in snapshot", name in service.notScriptableSnapshot)
             assertTrue("isNotScriptable returns true for known name", service.isNotScriptable(name))
         } finally {
             // Clean up: test runs must be repeatable, and we share the facade with other tests.
@@ -74,28 +131,6 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
         // Random unique name — must NOT be in the notScriptable list.
         val randomName = "__random_not_scriptable_${System.nanoTime()}"
         assertFalse("Unknown name not in notScriptable list", service.isNotScriptable(randomName))
-    }
-
-    fun testFacadeTrampolineRoutesThroughService() {
-        // Verify the public facade trampolines actually reach the service. We add via the
-        // service and observe via the facade's public method — this proves the public surface
-        // (annotator + completion contributors) sees the same state the service writes.
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        val service = SdefPersistenceService.getInstance()
-        val name = "FacadeTrampolineTest_${System.nanoTime()}"
-        try {
-            service.addNotScriptable(name)
-            assertTrue(
-                "Facade.isNotScriptable trampoline sees the service-side write",
-                facade.isNotScriptable(name),
-            )
-            assertTrue(
-                "Facade.getNotScriptableApplicationList trampoline contains the name",
-                name in facade.getNotScriptableApplicationList(),
-            )
-        } finally {
-            service.removeNotScriptable(name)
-        }
     }
 
     fun testParseFailureDoesNotMarkApplicationAsNotScriptable() {
@@ -124,11 +159,10 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
 
     fun testWriteToStateThenLoadFromStateRoundTrips() {
         val service = SdefPersistenceService.getInstance()
-        val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-        // Add a marker into the facade's notScriptable in-memory set, write it into a fresh
-        // PersistedState via the service, then loadFromState into the SAME facade and confirm
-        // the marker survives the round-trip. This exercises the writeToState -> loadFromState
-        // path that the platform PSC machinery drives on save/load.
+        // Add a marker into the persistence bridge, write it into a fresh PersistedState,
+        // then load the state back and confirm the marker survives the round-trip. This
+        // exercises the writeToState -> loadFromState path that the platform PSC machinery
+        // drives on save/load.
         val marker = "RoundTripMarker_${System.nanoTime()}"
         service.addNotScriptable(marker)
         try {
@@ -145,8 +179,8 @@ class SdefPersistenceServiceTest : BasePlatformTestCase() {
             service.writeToState(secondState)
             service.loadFromState(secondState)
             assertTrue(
-                "After loadFromState, marker is restored in the facade's snapshot",
-                marker in facade.getNotScriptableApplicationList(),
+                "After loadFromState, marker is restored in the persistence snapshot",
+                marker in service.notScriptableSnapshot,
             )
         } finally {
             service.removeNotScriptable(marker)
