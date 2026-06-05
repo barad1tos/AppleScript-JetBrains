@@ -13,7 +13,7 @@ import java.util.Stack
 
 // Grammar-Kit generates Java code with a static import from this exact parserUtilClass.
 // The facade keeps parser-state keys and inherits @JvmStatic hooks from focused superclasses,
-// preserving the generated-parser ABI without suppressing per-class function-count checks.
+// preserving the generated-parser ABI without hiding per-class function-count checks.
 class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserDictionaryHooks() {
     companion object {
         internal val PARSING_COMMAND_HANDLER_CALL_PARAMETERS: Key<Boolean> =
