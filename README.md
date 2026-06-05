@@ -17,7 +17,7 @@
     <img src="https://img.shields.io/badge/license-Apache--2.0-23C284?colorA=202431" alt="Apache 2.0 license">
   </a>
   <a href="gradle.properties">
-    <img src="https://img.shields.io/badge/IntelliJ%20Platform-2025.1%2B-7C4DFF?colorA=202431" alt="IntelliJ Platform 2025.1+">
+    <img src="https://img.shields.io/badge/IntelliJ%20Platform-2025.1%20to%202025.2-7C4DFF?colorA=202431" alt="IntelliJ Platform 2025.1 to 2025.2">
   </a>
 </p>
 
@@ -29,7 +29,7 @@ The project is not affiliated with Apple, JetBrains, or the original maintainer.
 
 ## What sets it apart
 
-- **Modern compatibility** — targets IntelliJ Platform 2025.1+ with current Gradle, Kotlin, CI, and Plugin Verifier coverage.
+- **Modern compatibility** — targets IntelliJ Platform 2025.1 and 2025.2 with current Gradle, Kotlin, CI, and Plugin Verifier coverage.
 - **AppleScript language model** — syntax highlighting, parsing, structure view, navigation, find usages, documentation, and rename support where the current PSI/resolver model supports them.
 - **Dictionary-aware editing** — loads scriptable-application dictionaries and `.sdef` / `.xml` dictionary files to drive completion and documentation.
 - **macOS runtime integration** — run configurations execute AppleScript through the system runtime on macOS.
@@ -55,12 +55,13 @@ Release coordinates are defined in [gradle.properties](gradle.properties);
 Plugin Verifier target IDEs are configured in [build.gradle.kts](build.gradle.kts).
 Update this section and [CHANGELOG.md](CHANGELOG.md) in the same change when those Gradle values move.
 
-- Minimum supported IntelliJ Platform build: `251` (`pluginSinceBuild=251`), corresponding to JetBrains IDEs 2025.1 and newer.
+- Minimum supported IntelliJ Platform build: `251` (`pluginSinceBuild=251`), corresponding to JetBrains IDEs 2025.1.
+- Maximum supported IntelliJ Platform build: `252.*` (`pluginUntilBuild=252.*`), corresponding to JetBrains IDEs 2025.2.x.
 - Current verifier targets: IntelliJ IDEA Community 2025.1 and 2025.2.
 - JVM target: 17.
 - AppleScript execution and automatic application dictionary discovery require macOS.
 
-Earlier 2024.x IDE releases are not supported by the current line because the plugin relies on runtime support available in 2025.1+.
+Earlier 2024.x IDE releases are not supported by the current line because the plugin relies on runtime support available in 2025.1+. Later IDE lines are intentionally excluded until the 2025.3+ IntelliJ Platform API migration is complete and verifier-clean.
 
 ## Installation
 

@@ -208,7 +208,7 @@ intellijPlatform {
         name = providers.gradleProperty("pluginName")
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
-            untilBuild = provider { null }
+            untilBuild = providers.gradleProperty("pluginUntilBuild")
         }
         // Pull the 1.0.0 section out of CHANGELOG.md so the Marketplace listing stays in sync.
         // The plugin verifier expects HTML, so the conversion is intentionally minimal — Marketplace

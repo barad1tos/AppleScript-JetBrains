@@ -18,7 +18,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 ### Compatibility
 
-- Verified against IntelliJ IDEA Community 2025.1 and 2025.2. Minimum supported IDE remains 2025.1 (`sinceBuild = 251`); earlier 2024.x releases are not supported.
+- Verified against IntelliJ IDEA Community 2025.1 and 2025.2. Published compatibility is capped at 2025.2 (`sinceBuild = 251`, `untilBuild = 252.*`); earlier 2024.x releases are not supported.
 - Prepared as a separate paid Marketplace listing under the new plugin id `software.barad1tos.applescript.toolkit`.
 
 ## [1.6.0] - 2026-06-03
