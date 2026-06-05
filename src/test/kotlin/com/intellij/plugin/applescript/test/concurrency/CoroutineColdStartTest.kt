@@ -98,7 +98,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
             }
         ApplicationManager.getApplication().replaceService(
             ApplicationDiscoveryService::class.java,
-            ApplicationDiscoveryService(testScope, discoveryDispatcher),
+            ApplicationDiscoveryService(discoveryDispatcher),
             testRootDisposable,
         )
         ApplicationManager.getApplication().replaceService(
@@ -267,7 +267,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         try {
             ApplicationManager.getApplication().replaceService(
                 ApplicationDiscoveryService::class.java,
-                ApplicationDiscoveryService(scope, failingDiscoveryDispatcher),
+                ApplicationDiscoveryService(failingDiscoveryDispatcher),
                 testRootDisposable,
             )
             ApplicationManager.getApplication().replaceService(
