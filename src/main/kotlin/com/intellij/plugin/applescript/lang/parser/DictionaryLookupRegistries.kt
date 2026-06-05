@@ -8,52 +8,58 @@ internal object DictionaryClassRegistry {
     private val index: SdefIndexService
         get() = SdefIndexService.getInstance()
 
-    fun isStdLibClass(name: String): Boolean = index.lookupStdLibClass(name)
+    fun isStdLibClass(name: String): Boolean = index.classLookup.lookupStdLibClass(name)
 
     fun isApplicationClass(
         applicationName: String,
         className: String,
-    ): Boolean = index.lookupApplicationClass(applicationName, className)
+    ): Boolean = index.classLookup.lookupApplicationClass(applicationName, className)
 
-    fun isStdLibClassPluralName(pluralName: String): Boolean = index.lookupStdLibClassPluralName(pluralName)
+    fun isStdLibClassPluralName(pluralName: String): Boolean = index.classLookup.lookupStdLibClassPluralName(pluralName)
 
     fun isApplicationClassPluralName(
         applicationName: String,
         pluralClassName: String,
-    ): Boolean = index.lookupApplicationClassPluralName(applicationName, pluralClassName)
+    ): Boolean = index.classLookup.lookupApplicationClassPluralName(applicationName, pluralClassName)
 
-    fun isStdClassWithPrefixExist(prefix: String): Boolean = index.lookupStdClassWithPrefixExist(prefix)
+    fun isStdClassWithPrefixExist(prefix: String): Boolean = index.classLookup.lookupStdClassWithPrefixExist(prefix)
 
     fun isClassWithPrefixExist(
         applicationName: String,
         classNamePrefix: String,
-    ): Boolean = index.lookupClassWithPrefixExist(applicationName, classNamePrefix)
+    ): Boolean = index.classLookup.lookupClassWithPrefixExist(applicationName, classNamePrefix)
 
-    fun isStdClassPluralWithPrefixExist(prefix: String): Boolean = index.lookupStdClassPluralWithPrefixExist(prefix)
+    fun isStdClassPluralWithPrefixExist(prefix: String): Boolean =
+        index.classLookup.lookupStdClassPluralWithPrefixExist(
+            prefix,
+        )
 
     fun isClassPluralWithPrefixExist(
         applicationName: String,
         pluralClassNamePrefix: String,
-    ): Boolean = index.lookupClassPluralWithPrefixExist(applicationName, pluralClassNamePrefix)
+    ): Boolean = index.classLookup.lookupClassPluralWithPrefixExist(applicationName, pluralClassNamePrefix)
 }
 
 internal object DictionaryCommandRegistry {
     private val index: SdefIndexService
         get() = SdefIndexService.getInstance()
 
-    fun isStdCommand(name: String): Boolean = index.lookupStdCommand(name)
+    fun isStdCommand(name: String): Boolean = index.commandLookup.lookupStdCommand(name)
 
     fun isApplicationCommand(
         applicationName: String,
         commandName: String,
-    ): Boolean = index.lookupApplicationCommand(applicationName, commandName)
+    ): Boolean = index.commandLookup.lookupApplicationCommand(applicationName, commandName)
 
     fun isCommandWithPrefixExist(
         applicationName: String,
         commandNamePrefix: String,
-    ): Boolean = index.lookupCommandWithPrefixExist(applicationName, commandNamePrefix)
+    ): Boolean = index.commandLookup.lookupCommandWithPrefixExist(applicationName, commandNamePrefix)
 
-    fun isStdCommandWithPrefixExist(namePrefix: String): Boolean = index.lookupStdCommandWithPrefixExist(namePrefix)
+    fun isStdCommandWithPrefixExist(namePrefix: String): Boolean =
+        index.commandLookup.lookupStdCommandWithPrefixExist(
+            namePrefix,
+        )
 
     fun findStdCommands(
         project: Project,
@@ -71,36 +77,42 @@ internal object DictionaryPropertyRegistry {
     private val index: SdefIndexService
         get() = SdefIndexService.getInstance()
 
-    fun isStdProperty(name: String): Boolean = index.lookupStdProperty(name)
+    fun isStdProperty(name: String): Boolean = index.propertyLookup.lookupStdProperty(name)
 
     fun isApplicationProperty(
         applicationName: String,
         propertyName: String,
-    ): Boolean = index.lookupApplicationProperty(applicationName, propertyName)
+    ): Boolean = index.propertyLookup.lookupApplicationProperty(applicationName, propertyName)
 
-    fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean = index.lookupStdPropertyWithPrefixExist(namePrefix)
+    fun isStdPropertyWithPrefixExist(namePrefix: String): Boolean =
+        index.propertyLookup.lookupStdPropertyWithPrefixExist(
+            namePrefix,
+        )
 
     fun isPropertyWithPrefixExist(
         applicationName: String,
         propertyNamePrefix: String,
-    ): Boolean = index.lookupPropertyWithPrefixExist(applicationName, propertyNamePrefix)
+    ): Boolean = index.propertyLookup.lookupPropertyWithPrefixExist(applicationName, propertyNamePrefix)
 }
 
 internal object DictionaryConstantRegistry {
     private val index: SdefIndexService
         get() = SdefIndexService.getInstance()
 
-    fun isStdConstant(name: String): Boolean = index.lookupStdConstant(name)
+    fun isStdConstant(name: String): Boolean = index.constantLookup.lookupStdConstant(name)
 
     fun isApplicationConstant(
         applicationName: String,
         constantName: String,
-    ): Boolean = index.lookupApplicationConstant(applicationName, constantName)
+    ): Boolean = index.constantLookup.lookupApplicationConstant(applicationName, constantName)
 
-    fun isStdConstantWithPrefixExist(namePrefix: String): Boolean = index.lookupStdConstantWithPrefixExist(namePrefix)
+    fun isStdConstantWithPrefixExist(namePrefix: String): Boolean =
+        index.constantLookup.lookupStdConstantWithPrefixExist(
+            namePrefix,
+        )
 
     fun isConstantWithPrefixExist(
         applicationName: String,
         constantNamePrefix: String,
-    ): Boolean = index.lookupConstantWithPrefixExist(applicationName, constantNamePrefix)
+    ): Boolean = index.constantLookup.lookupConstantWithPrefixExist(applicationName, constantNamePrefix)
 }

@@ -4,7 +4,6 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -16,21 +15,16 @@ import java.io.IOException
 
 private val LOG: Logger = Logger.getInstance("#${SdefIndexService::class.java.name}")
 
-private fun startsWithWord(
-    string: String,
-    prefix: String,
-): Boolean = string.startsWith(prefix) && (prefix.length == string.length || ' ' == string[prefix.length])
-
 /**
- * SDEF dictionary index ownership.
+ * SDEF dictionary index write-path facade.
  *
  * CQRS:
  * - WRITE: `suspend fun ingest(applicationName, xmlFile): IngestResult` — IO-aware, hermetic-test seam.
- * - READ: sync `lookup*` methods — parser-util hot path; cannot suspend per FROZEN_CONTRACT.
+ * - READ: sync lookup collaborators — parser hot path; cannot suspend.
  *
  * Coordinates:
  * - 14 ConcurrentHashMap indexes delegated to [SdefIndexStore].
- * - 21 sync lookup methods (migrated 1:1 from facade `isXxx` bodies).
+ * - read-only lookup collaborators for class / command / property / constant terms.
  * - [findStdCommands] + [findApplicationCommands] (EDT-guarded + bounded-wait readiness
  *   bridges preserved per Phase 3 Review MEDIUM 1 + HIGH 5 / HIGH 1).
  * - XML parsing pipeline (`parseDictionaryFile` + 3 element handlers + 7 companion helpers).
@@ -49,7 +43,6 @@ private fun startsWithWord(
  *   resolve project-scoped dictionaries; same pattern as pre-Wave-5 facade.
  */
 @Service(Service.Level.APP)
-@Suppress("TooManyFunctions")
 class SdefIndexService
     @JvmOverloads
     constructor(
@@ -58,7 +51,10 @@ class SdefIndexService
     ) {
         private val indexStore = SdefIndexStore()
         private val indexIngestor = SdefIndexIngestor(indexStore, LOG)
-        private val commandLookup = SdefCommandLookup(serviceScope, indexStore)
+        internal val classLookup = SdefClassLookup(indexStore)
+        internal val commandLookup = SdefCommandLookup(serviceScope, indexStore)
+        internal val propertyLookup = SdefPropertyLookup(indexStore)
+        internal val constantLookup = SdefConstantLookup(indexStore)
 
         // CQRS write path.
 
@@ -104,157 +100,6 @@ class SdefIndexService
          */
         fun snapshot(): SdefIndexSnapshot = indexStore.snapshot()
 
-        // Sync lookup methods for the parser hot path. Each method preserves the readiness gate
-        // while avoiding a direct SdefIndexService -> registry-service edge.
-
-        fun lookupStdLibClass(name: String): Boolean {
-            if (!facadeInitialized()) return false
-            return indexStore.stdClassNameToApplicationNameSetMap.containsKey(name)
-        }
-
-        fun lookupApplicationClass(
-            applicationName: String,
-            className: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            val classNameSet: Set<String>? = indexStore.applicationNameToClassNameSetMap[applicationName]
-            return classNameSet != null && classNameSet.contains(className)
-        }
-
-        fun lookupStdLibClassPluralName(pluralName: String): Boolean {
-            if (!facadeInitialized()) return false
-            return indexStore.stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
-        }
-
-        fun lookupApplicationClassPluralName(
-            applicationName: String,
-            pluralClassName: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            val pluralClassNameSet: Set<String>? = indexStore.applicationNameToClassNamePluralSetMap[applicationName]
-            return pluralClassNameSet != null && pluralClassNameSet.contains(pluralClassName)
-        }
-
-        fun lookupStdClassWithPrefixExist(classNamePrefix: String): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(classNamePrefix, indexStore.stdClassNameToApplicationNameSetMap.keys)
-        }
-
-        fun lookupClassWithPrefixExist(
-            applicationName: String,
-            classNamePrefix: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(classNamePrefix, indexStore.applicationNameToClassNameSetMap[applicationName])
-        }
-
-        fun lookupStdClassPluralWithPrefixExist(namePrefix: String): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, indexStore.stdClassNamePluralToApplicationNameSetMap.keys)
-        }
-
-        fun lookupClassPluralWithPrefixExist(
-            applicationName: String,
-            pluralClassNamePrefix: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(
-                pluralClassNamePrefix,
-                indexStore.applicationNameToClassNamePluralSetMap[applicationName],
-            )
-        }
-
-        fun lookupStdCommand(name: String): Boolean {
-            if (!facadeInitialized()) return false
-            return indexStore.stdCommandNameToApplicationNameSetMap.containsKey(name)
-        }
-
-        fun lookupApplicationCommand(
-            applicationName: String,
-            commandName: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            val appCommands: Set<String>? = indexStore.applicationNameToCommandNameSetMap[applicationName]
-            return appCommands != null && appCommands.contains(commandName)
-        }
-
-        fun lookupCommandWithPrefixExist(
-            applicationName: String,
-            commandNamePrefix: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(
-                commandNamePrefix,
-                indexStore.applicationNameToCommandNameSetMap[applicationName],
-            )
-        }
-
-        fun lookupStdCommandWithPrefixExist(namePrefix: String): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, indexStore.stdCommandNameToApplicationNameSetMap.keys)
-        }
-
-        fun lookupStdProperty(name: String): Boolean {
-            if (!facadeInitialized()) return false
-            return indexStore.stdPropertyNameToDictionarySetMap.containsKey(name)
-        }
-
-        fun lookupStdPropertyWithPrefixExist(namePrefix: String): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, indexStore.stdPropertyNameToDictionarySetMap.keys)
-        }
-
-        fun lookupApplicationProperty(
-            applicationName: String,
-            propertyName: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            val propertySet: Set<String>? = indexStore.applicationNameToPropertySetMap[applicationName]
-            return propertySet != null && propertySet.contains(propertyName)
-        }
-
-        fun lookupPropertyWithPrefixExist(
-            applicationName: String,
-            propertyNamePrefix: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(
-                propertyNamePrefix,
-                indexStore.applicationNameToPropertySetMap[applicationName],
-            )
-        }
-
-        fun lookupStdConstant(name: String): Boolean {
-            if (!facadeInitialized()) return false
-            return indexStore.stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
-        }
-
-        fun lookupApplicationConstant(
-            applicationName: String,
-            constantName: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            val applicationConstantSet: Set<String>? =
-                indexStore.applicationNameToEnumeratorConstantNameSetMap[applicationName]
-            return applicationConstantSet != null && applicationConstantSet.contains(constantName)
-        }
-
-        fun lookupStdConstantWithPrefixExist(namePrefix: String): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(namePrefix, indexStore.stdEnumeratorConstantNameToApplicationNameListMap.keys)
-        }
-
-        fun lookupConstantWithPrefixExist(
-            applicationName: String,
-            namePrefix: String,
-        ): Boolean {
-            if (!facadeInitialized()) return false
-            return isNameWithPrefixExist(
-                namePrefix,
-                indexStore.applicationNameToEnumeratorConstantNameSetMap[applicationName],
-            )
-        }
-
         // EDT-guarded command lookup with bounded waits.
 
         /**
@@ -296,19 +141,6 @@ class SdefIndexService
             xmlFile: File,
             applicationName: String,
         ): Boolean = indexIngestor.parseDictionaryFile(xmlFile, applicationName)
-
-        // Helpers.
-
-        private fun isNameWithPrefixExist(
-            namePrefix: String,
-            nameSet: Set<String>?,
-        ): Boolean = nameSet?.any { objectName -> startsWithWord(objectName, namePrefix) } == true
-
-        /**
-         * Thin proxy to the registry readiness state through [ParsableScriptSuiteRegistryHelper].
-         * This keeps the service graph acyclic.
-         */
-        private fun facadeInitialized(): Boolean = SdefIndexReadiness.isInitialized()
 
         companion object {
             @JvmStatic

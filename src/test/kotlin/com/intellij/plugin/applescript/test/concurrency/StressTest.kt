@@ -57,10 +57,10 @@ class StressTest : BasePlatformTestCase() {
                     try {
                         startGate.await()
                         while (System.currentTimeMillis() < deadline && firstFailure.get() == null) {
-                            indexService.lookupStdCommand("set")
-                            indexService.lookupStdLibClass("application")
-                            indexService.lookupStdCommandWithPrefixExist("se")
-                            indexService.lookupStdLibClassPluralName("applications")
+                            indexService.commandLookup.lookupStdCommand("set")
+                            indexService.classLookup.lookupStdLibClass("application")
+                            indexService.commandLookup.lookupStdCommandWithPrefixExist("se")
+                            indexService.classLookup.lookupStdLibClassPluralName("applications")
                         }
                     } catch (throwable: Throwable) {
                         // Reader threads run outside the JUnit EDT; any escaped Throwable

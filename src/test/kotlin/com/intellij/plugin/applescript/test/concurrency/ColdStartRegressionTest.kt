@@ -44,7 +44,7 @@ class ColdStartRegressionTest : BasePlatformTestCase() {
         // `true` means init completed before this call; `false` means init still in flight
         // and the latch-gated reader returned the empty fallback. The fact that this line
         // executes without throwing is the assertion.
-        val predicate = indexService.lookupStdCommand("set")
+        val predicate = indexService.commandLookup.lookupStdCommand("set")
 
         // Resolver: must be a non-null Collection (possibly empty). The latch-gated reader
         // returns `emptyList()` while init is in flight; the populated reader returns the
