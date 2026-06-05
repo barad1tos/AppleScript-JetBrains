@@ -9,7 +9,7 @@ import java.io.File
 
 /**
  * Phase 8 (v2.0) PARSE-03: generic application-object references — `library playlist N`,
- * `current track`, `track N of library playlist M` — must parse as expressions with a
+ * `current track`, `track N of library playlist M`, `track id <expr>` — must parse as expressions with a
  * queryable PSI node for ANY scriptable app, with zero `PsiErrorElement` and WITHOUT a
  * loaded application dictionary (D-07: the generic rule is syntactic, not dictionary-resolved).
  *
@@ -33,6 +33,8 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
 
     fun testTrackOfPlaylist() = assertNoParserErrors()
 
+    fun testTrackByIdReference() = assertNoParserErrors()
+
     /** D-07: the generic rule parses with no app dictionary loaded (default fixture, cold cache). */
     fun testColdCacheNoDictionary() = assertNoParserErrors()
 
@@ -50,15 +52,15 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
         )
 
         val objectTermTexts = references.mapNotNull { it.varIdentifier?.text }
-        val integerLiteralTexts = references.mapNotNull { it.integerLiteralExpression?.text }
+        val selectorExpressionTexts = references.mapNotNull { it.expression?.text }
 
         assertTrue(
             "application object references should expose their object term token",
             objectTermTexts.isNotEmpty(),
         )
         assertTrue(
-            "application object reference integer terms should be valid when present",
-            integerLiteralTexts.all { it.isNotBlank() },
+            "application object reference selector expressions should be valid when present",
+            selectorExpressionTexts.all { it.isNotBlank() },
         )
     }
 

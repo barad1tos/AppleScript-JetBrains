@@ -28,8 +28,8 @@ public class AppleScriptApplicationObjectReferenceImpl extends AbstractApplicati
 
   @Override
   @Nullable
-  public AppleScriptIntegerLiteralExpression getIntegerLiteralExpression() {
-    return findChildByClass(AppleScriptIntegerLiteralExpression.class);
+  public AppleScriptExpression getExpression() {
+    return findChildByClass(AppleScriptExpression.class);
   }
 
   @Override
