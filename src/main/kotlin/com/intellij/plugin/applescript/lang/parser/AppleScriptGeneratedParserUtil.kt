@@ -30,7 +30,6 @@ class AppleScriptGeneratedParserUtil : GeneratedParserUtilBase() {
             Key.create("applescript.parsing.current.dictionary.name.stack")
 
         // Follow-up: wire application-id dictionary lookup after the lint cleanup pass.
-        @Suppress("unused")
         @JvmField
         val TOLD_APPLICATION_ID_STACK: Key<Stack<String>> =
             Key.create("applescript.parsing.current.dictionary.id.stack")
