@@ -6417,6 +6417,67 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // (on|to) <<parseSpecialHandlerSignature>> [varDeclarationList] sep
+  //                                        blockBody?
+  //                                      end (<<parseSpecialHandlerSignature>> | referenceExpression)?
+  static boolean specialHandlerDefinition(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition")) return false;
+    if (!nextTokenIs(builder_, "", ON, TO)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = specialHandlerDefinition_0(builder_, level_ + 1);
+    result_ = result_ && parseSpecialHandlerSignature(builder_, level_ + 1);
+    result_ = result_ && specialHandlerDefinition_2(builder_, level_ + 1);
+    result_ = result_ && sep(builder_, level_ + 1);
+    result_ = result_ && specialHandlerDefinition_4(builder_, level_ + 1);
+    result_ = result_ && consumeToken(builder_, END);
+    result_ = result_ && specialHandlerDefinition_6(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // on|to
+  private static boolean specialHandlerDefinition_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_0")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, ON);
+    if (!result_) result_ = consumeToken(builder_, TO);
+    return result_;
+  }
+
+  // [varDeclarationList]
+  private static boolean specialHandlerDefinition_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_2")) return false;
+    varDeclarationList(builder_, level_ + 1);
+    return true;
+  }
+
+  // blockBody?
+  private static boolean specialHandlerDefinition_4(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_4")) return false;
+    blockBody(builder_, level_ + 1);
+    return true;
+  }
+
+  // (<<parseSpecialHandlerSignature>> | referenceExpression)?
+  private static boolean specialHandlerDefinition_6(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_6")) return false;
+    specialHandlerDefinition_6_0(builder_, level_ + 1);
+    return true;
+  }
+
+  // <<parseSpecialHandlerSignature>> | referenceExpression
+  private static boolean specialHandlerDefinition_6_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_6_0")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = parseSpecialHandlerSignature(builder_, level_ + 1);
+    if (!result_) result_ = referenceExpression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  /* ********************************************************** */
   // integerLiteralExpression | (referenceExpression &(thru|through)) | expression
   static boolean startIndex(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "startIndex")) return false;
@@ -7463,12 +7524,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // handlerLabeledParametersDefinition | handlerPositionalParametersDefinition | handlerInterleavedParametersDefinition
+  // specialHandlerDefinition | handlerLabeledParametersDefinition | handlerPositionalParametersDefinition | handlerInterleavedParametersDefinition
   static boolean userHandlerDefinition(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "userHandlerDefinition")) return false;
     if (!nextTokenIs(builder_, "", ON, TO)) return false;
     boolean result_;
-    result_ = handlerLabeledParametersDefinition(builder_, level_ + 1);
+    result_ = specialHandlerDefinition(builder_, level_ + 1);
+    if (!result_) result_ = handlerLabeledParametersDefinition(builder_, level_ + 1);
     if (!result_) result_ = handlerPositionalParametersDefinition(builder_, level_ + 1);
     if (!result_) result_ = handlerInterleavedParametersDefinition(builder_, level_ + 1);
     return result_;

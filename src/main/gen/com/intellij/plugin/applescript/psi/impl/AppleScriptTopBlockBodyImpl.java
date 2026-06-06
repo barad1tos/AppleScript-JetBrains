@@ -34,6 +34,12 @@ public class AppleScriptTopBlockBodyImpl extends AppleScriptPsiElementImpl imple
 
   @Override
   @NotNull
+  public List<AppleScriptBlockBody> getBlockBodyList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptBlockBody.class);
+  }
+
+  @Override
+  @NotNull
   public List<AppleScriptConsideringStatement> getConsideringStatementList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptConsideringStatement.class);
   }

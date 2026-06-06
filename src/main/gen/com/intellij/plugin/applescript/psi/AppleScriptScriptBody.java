@@ -11,6 +11,9 @@ public interface AppleScriptScriptBody extends AppleScriptPsiElement {
   List<AppleScriptApplicationHandlerDefinition> getApplicationHandlerDefinitionList();
 
   @NotNull
+  List<AppleScriptBlockBody> getBlockBodyList();
+
+  @NotNull
   List<AppleScriptConsideringStatement> getConsideringStatementList();
 
   @NotNull

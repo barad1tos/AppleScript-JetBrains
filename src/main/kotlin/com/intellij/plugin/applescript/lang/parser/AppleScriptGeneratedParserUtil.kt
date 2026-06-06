@@ -238,6 +238,12 @@ open class AppleScriptGeneratedParserFlowHooks : AppleScriptGeneratedParserComma
         ): Boolean =
             recursion_guard_(builder, level, "isTellStatementStart") &&
                 TellStatementParser.isTellStatementStart(builder)
+
+        @JvmStatic
+        fun parseSpecialHandlerSignature(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean = SpecialHandlerSignatureParser.parse(builder, level)
     }
 }
 

@@ -214,7 +214,7 @@ private statement ::= controlStatement|scriptPropertyDeclaration|varDeclarationL
                       |parseAssignmentStatement
 
 
-private userHandlerDefinition ::= handlerLabeledParametersDefinition | handlerPositionalParametersDefinition | handlerInterleavedParametersDefinition
+private userHandlerDefinition ::= specialHandlerDefinition | handlerLabeledParametersDefinition | handlerPositionalParametersDefinition | handlerInterleavedParametersDefinition
 returnStatement ::= return [expression]
 
 private controlStatement ::= ifStatement | tryStatement | tellStatement | <<parseExpression '"repeat"' repeatStatement>>
@@ -651,6 +651,15 @@ applicationHandlerDefinition ::= (on|to) applicationHandlerDefinitionSignature
                                            blockBody?
                                   end [applicationHandlerDefinitionSignature]
 private applicationHandlerDefinitionSignature ::= <<parseApplicationHandlerDefinitionSignature>>
+
+// AppleScript built-in Folder Action handlers (adding/removing folder items, opening/closing/moving
+// folder window) have fixed multi-word signatures the generic grammar can't express. The shape words
+// (folder, items, receiving, …) are plain identifiers, so the signature is matched by token text in a
+// parser hook — used both after on/to and after end. Parser-level, no PSI node (mirrors PARSE-04).
+// Listed first in userHandlerDefinition so the generic handler defs don't mis-consume `on adding …`.
+private specialHandlerDefinition ::= (on|to) <<parseSpecialHandlerSignature>> [varDeclarationList] sep
+                                       blockBody?
+                                     end (<<parseSpecialHandlerSignature>> | referenceExpression)?
 
 handlerLabeledParametersDefinition ::= (on|to) identifier !LPAREN labeledParameterDeclarationList
                                          [given THE_KW? objectTargetPropertyDeclaration (COMMA THE_KW? objectTargetPropertyDeclaration)*]
