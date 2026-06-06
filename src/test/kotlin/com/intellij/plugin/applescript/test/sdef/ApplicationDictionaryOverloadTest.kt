@@ -17,8 +17,8 @@ private const val PLAY_COMMAND_NAME = "play"
 private const val EMPTY_DICTIONARY_XML = "<dictionary title=\"TestApp\"></dictionary>"
 
 /**
- * SDEF-02 regression fence for the D-02 TODO closure at
- * `ApplicationDictionaryImpl:177`.
+ * SDEF-02 regression fence for the now-closed D-02 overloaded-command
+ * equality contract.
  *
  * The pre-fix shape returned `0..1` from `findAllCommandsWithName` (HashMap-keyed
  * by name only — overloads collapsed). The fix at plan 02-04 introduces a
@@ -31,7 +31,7 @@ private const val EMPTY_DICTIONARY_XML = "<dictionary title=\"TestApp\"></dictio
  *  - Re-ingest of a structurally-equal command (same name + code + parameters
  *    + result + description) collapses to 1 entry — `testDuplicateInsertDedupes`.
  *  - First-insert addCommand still returns true (matches
- *    ApplicationDictionaryImpl.addCommand contract from line 191) —
+ *    the ApplicationDictionaryImpl.addCommand first-insert contract) —
  *    `testFirstInsertReturnsTrue`.
  *
  * Uses `BasePlatformTestCase` (slower than the pure-JUnit pattern in

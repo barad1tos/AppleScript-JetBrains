@@ -11,7 +11,7 @@ import org.junit.Test
  * SDEF-02 partial regression fence — `CommandData` structural equality and
  * builder freeze semantics.
  *
- * Closes (in spirit) the TODO at `ApplicationDictionaryImpl:177` ("redefine
+ * Fences the now-closed `AppleScriptCommand` equals/hashCode contract ("redefine
  * equals and hashCode for AppleScriptCommand"). The actual wiring of
  * `CommandData` into the PSI impl lives in plan 02-04; here we only assert
  * that the data class itself honours the structural contract and that
