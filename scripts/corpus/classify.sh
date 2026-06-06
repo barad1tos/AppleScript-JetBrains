@@ -46,6 +46,11 @@ classify_one() {
   if [ ! -s "$tmpsrc" ]; then
     printf 'DECOMP_FAIL\t%s\t%s\n' "$tmpsrc" "$f" >> "$MANIFEST"; decompfail=$((decompfail + 1)); return
   fi
+  # Normalize osadecompile's UTF-16 output to UTF-8 so the plugin parser (UTF-8) reads it correctly;
+  # otherwise the BOM/wide chars surface as a spurious line-1 error, not a real parser bug.
+  if file "$tmpsrc" | grep -q "UTF-16"; then
+    iconv -f UTF-16 -t UTF-8 "$tmpsrc" > "${tmpsrc}.u8" 2>/dev/null && mv "${tmpsrc}.u8" "$tmpsrc"
+  fi
   err="$(osacompile -o /dev/null "$tmpsrc" 2>&1)"
   if [ -z "$err" ]; then
     printf 'VALID_HERE\t%s\t%s\n' "$tmpsrc" "$f" >> "$MANIFEST"; validhere=$((validhere + 1))
