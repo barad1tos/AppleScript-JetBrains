@@ -344,6 +344,11 @@ tasks {
                 // a full fixture (~30s), so it belongs in the heavy-by-default gate
                 // next to ParserRegressionTest (Phase 7 CLEANUP-03 opt-OUT model).
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.RealWorldCorpusTest")
+                // Differential corpus scan tool: parses the osacompile-VALID_HERE corpus named by
+                // the APPLESCRIPT_CORPUS_DIR env var (or corpus.dir property) and reports
+                // false-positive coverage. Skips silently when unset, so the default run is a no-op;
+                // invoked explicitly for local/CI parser-robustness scans (scripts/corpus/classify.sh).
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.CorpusDifferentialTest")
                 // Phase 8 PARSE-04 (plan 08-05): StandardAdditionsTokensTest gates the
                 // explicit Standard Additions productions (current date / ASCII character /
                 // ASCII number / path to <constant>) to zero PsiErrorElement. Same
