@@ -71,6 +71,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testFolderActionHandlers() = assertNoParserErrors("folder_action_handlers.applescript")
 
+    fun testTypinatorRuleSet() = assertNoParserErrors("typinator_rule_set_min.applescript")
+
+    fun testKeystrokeReturn() = assertNoParserErrors("keystroke_return.applescript")
+
     private fun assertNoParserErrors(fileName: String) {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
@@ -97,6 +101,12 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
                 // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback (backlog: BL-A3)
                 // before the loaded dictionary-command path consumes only the direct parameter.
                 "testStandardAdditionsPaths",
+                // TODO(parser): re-enable when Step-1 (Bucket A) `set`-keyword class words parse in the
+                // object-reference `of`-operand (`rule set` / `containing set`). GREEN in Plan 10-01 Task 2.
+                "testTypinatorRuleSet",
+                // TODO(parser): re-enable when the `return` constant in a command tail parses. Folds to
+                // Plan 10-03 if the `keystroke` generic-head dependency dominates (decided from RED dump).
+                "testKeystrokeReturn",
             )
     }
 }

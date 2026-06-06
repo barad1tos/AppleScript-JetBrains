@@ -19,6 +19,7 @@ import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommandImpl
 import com.intellij.plugin.applescript.lang.sdef.Suite
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_CLASS_NAME
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DIRECT_PARAMETER_VAL
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
@@ -40,6 +41,22 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
 
         assertEquals(listOf("default answer"), psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR))
         assertEquals(listOf("\"Hello\""), psiFile.node.textsOf(DIRECT_PARAMETER_VAL))
+    }
+
+    fun testContainingSetOperandEmitsDictionaryClassName() {
+        // Step-1 (Bucket A) RED: the `of containing set` operand must parse `containing set` as a
+        // DICTIONARY_CLASS_NAME (NLS-terminated, minimal `set`-keyword class case). Today the operand
+        // parses `containing` as a bare REFERENCE_EXPRESSION and the `set` keyword dangles as a
+        // PsiErrorElement (10-RESEARCH §"PSI evidence for the `set` collision"). This assertion flips
+        // to GREEN in Plan 10-01 Task 2 once FallbackDictionaryClassParser accepts SET as a 2nd class word.
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "tell application \"Typinator\"\nset containerid to unique id of containing set\nend tell",
+            )
+
+        assertEquals(listOf("containing set"), psiFile.node.textsOf(DICTIONARY_CLASS_NAME))
+        assertNoParserErrors(psiFile)
     }
 
     fun testFallbackParametersExposeSelectorAndDirectParameterNodes() {
