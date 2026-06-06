@@ -93,9 +93,6 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
                 // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback (backlog: BL-A3)
                 // before the loaded dictionary-command path consumes only the direct parameter.
                 "testStandardAdditionsPaths",
-                // TODO(parser): re-enable once the structural command-gate refactor lands: (backlog: BL-C7)
-                // `sort by <ref> direction <value>` needs `by`/bare-label params, not a name list.
-                "testSortCommandDirection",
             )
     }
 }

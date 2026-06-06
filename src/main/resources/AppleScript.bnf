@@ -692,7 +692,7 @@ left handlerLabeledParametersCallExpression ::=
    )
    )|
    (
-   (handlerParameterLabel parameterVal)+ //&(with|without|given)
+   handlerParameterLabel parameterVal ((handlerParameterLabel | bareCommandParameterLabel) parameterVal)* //&(with|without|given) — keyword-first; trailing bare labels close BL-C7
        ( (with labelForTrueParam (COMMA labelForTrueParam)* [(LAND|LOR|COMMA) labelForTrueParam])
        | (without labelForFalseParam (COMMA labelForFalseParam)* [(LAND|LOR|COMMA) labelForFalseParam])
        | (given userLabelReference COLON userParameterVal (COMMA userLabelReference COLON userParameterVal)*)
@@ -701,6 +701,12 @@ left handlerLabeledParametersCallExpression ::=
 
 private parameterValue ::= expression
 commandParameterSelector ::= <<parseCommandParameterSelector>>
+
+// BL-C7: bare-identifier command parameter label (e.g. `direction` in
+// `sort by column 1 direction ascending`) for dictionary commands parsed without the defining
+// dictionary. Parser-level, no PSI node (mirrors PARSE-04). The hook consumes a VAR_IDENTIFIER
+// only when a parameter value clearly follows, so a trailing identifier is never eaten as a label.
+private bareCommandParameterLabel ::= <<parseBareCommandParameterLabel>>
 //see
 commandParameter ::= given? commandParameterSelector parameterValue
 {mixin="com.intellij.plugin.applescript.psi.sdef.impl.AbstractAppleScriptCommandParameter"

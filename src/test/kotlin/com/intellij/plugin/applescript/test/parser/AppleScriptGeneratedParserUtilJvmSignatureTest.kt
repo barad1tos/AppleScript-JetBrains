@@ -199,6 +199,12 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                     INT,
                 ),
                 FrozenSignature.publicStatic(
+                    "parseBareCommandParameterLabel",
+                    "boolean",
+                    PSI_BUILDER,
+                    INT,
+                ),
+                FrozenSignature.publicStatic(
                     "isPossessivePronoun",
                     "boolean",
                     PSI_BUILDER,

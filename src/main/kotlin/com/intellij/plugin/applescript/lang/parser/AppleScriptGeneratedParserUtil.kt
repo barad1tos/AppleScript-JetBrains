@@ -136,6 +136,12 @@ open class AppleScriptGeneratedParserCommandHooks : GeneratedParserUtilBase() {
                 FallbackCommandParameterParser.parseSelectorTokens(builder)
 
         @JvmStatic
+        fun parseBareCommandParameterLabel(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean = CommandParameterLabelParser.parseBareLabel(builder, level)
+
+        @JvmStatic
         fun isPossessivePronoun(
             builder: PsiBuilder,
             level: Int,
