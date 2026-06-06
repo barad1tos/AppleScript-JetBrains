@@ -236,9 +236,8 @@ intellijPlatform {
     pluginVerification {
         // Restrict to current stable releases. recommended() pulls EAPs
         // (e.g. 262.x) where Java code still relies on API that's been
-        // moved/removed (PsiTreeElementBase out of structureView.impl.common).
-        // The structure view layer is one of the things being rewritten in
-        // Phase 6, after which we can re-broaden verification.
+        // moved/removed (PsiTreeElementBase out of structureView.impl.common),
+        // so EAP branches stay out of the matrix until verified clean.
         ides {
             // Plan 03-12 dropped 2024.3.7.1: ships Kotlin 2.0.21 in the Kotlin plugin
             // (no kotlin/coroutines/jvm/internal/SpillingKt), which our K2 2.3.21 compiler
@@ -247,6 +246,11 @@ intellijPlatform {
             // in gradle.properties; minimum supported IDE raised in CHANGELOG v1.2.0.
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.1.7.1")
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.2.6.2")
+            // 2026.1 (build 261) is the current stable top of the matrix; pluginUntilBuild
+            // tracks it. Verifies the compatibility advertised to users dogfooding on 2026.1.
+            // Uses the unified `IntellijIdea` (maven `idea`) type: Community (`ideaIC`) is no
+            // longer published since 2025.3 (253) — the distribution merged into one product.
+            create(IntelliJPlatformType.IntellijIdea, "2026.1.3")
         }
     }
 }

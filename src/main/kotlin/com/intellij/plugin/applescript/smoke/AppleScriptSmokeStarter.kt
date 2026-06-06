@@ -18,6 +18,14 @@ internal val SMOKE_LOG: Logger = Logger.getInstance("#${AppleScriptSmokeStarter:
  * `src/test/resources/testData/runIde`).
  */
 class AppleScriptSmokeStarter : ApplicationStarter {
+    // ApplicationStarter.getCommandName() is a deprecated default that 2026.1 (build 261) removed;
+    // the command name now comes from the `id` attribute of the <appStarter> registration. An
+    // explicit value here stops Kotlin from emitting a super-delegating bridge to the removed
+    // default method, which would otherwise throw NoSuchMethodError on 261.
+    @Suppress("OVERRIDE_DEPRECATION")
+    override val commandName: String
+        get() = "applescript-smoke"
+
     override fun main(args: List<String>) {
         val fixtureRoot = System.getProperty(FIXTURE_ROOT_PROP)
         val fixtureDir = fixtureDirectoryOrExit(fixtureRoot) ?: return
