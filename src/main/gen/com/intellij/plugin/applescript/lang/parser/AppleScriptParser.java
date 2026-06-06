@@ -1551,9 +1551,10 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // ('.'DIGITS)|(DIGITS'.'DIGITS*)
+  // (DOT DIGITS)|(DIGITS DOT DIGITS*)
   static boolean dec_significand(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "dec_significand")) return false;
+    if (!nextTokenIs(builder_, "", DIGITS, DOT)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = dec_significand_0(builder_, level_ + 1);
@@ -1562,24 +1563,22 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // '.'DIGITS
+  // DOT DIGITS
   private static boolean dec_significand_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "dec_significand_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = consumeToken(builder_, ".");
-    result_ = result_ && consumeToken(builder_, DIGITS);
+    result_ = consumeTokens(builder_, 0, DOT, DIGITS);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
-  // DIGITS'.'DIGITS*
+  // DIGITS DOT DIGITS*
   private static boolean dec_significand_1(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "dec_significand_1")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = consumeToken(builder_, DIGITS);
-    result_ = result_ && consumeToken(builder_, ".");
+    result_ = consumeTokens(builder_, 0, DIGITS, DOT);
     result_ = result_ && dec_significand_1_2(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
@@ -5184,9 +5183,10 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // ('.'(DIGITS)(DEC_EXPONENT))|(dec_significand DEC_EXPONENT?)
+  // (DOT (DIGITS)(DEC_EXPONENT))|(dec_significand DEC_EXPONENT?)
   public static boolean realLiteralExpression(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "realLiteralExpression")) return false;
+    if (!nextTokenIsFast(builder_, DIGITS, DOT)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_, level_, _NONE_, REAL_LITERAL_EXPRESSION, "<real literal expression>");
     result_ = realLiteralExpression_0(builder_, level_ + 1);
@@ -5195,12 +5195,12 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // '.'(DIGITS)(DEC_EXPONENT)
+  // DOT (DIGITS)(DEC_EXPONENT)
   private static boolean realLiteralExpression_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "realLiteralExpression_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = consumeTokenFast(builder_, ".");
+    result_ = consumeTokenFast(builder_, DOT);
     result_ = result_ && realLiteralExpression_0_1(builder_, level_ + 1);
     result_ = result_ && realLiteralExpression_0_2(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);

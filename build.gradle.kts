@@ -344,6 +344,10 @@ tasks {
                 // a full fixture (~30s), so it belongs in the heavy-by-default gate
                 // next to ParserRegressionTest (Phase 7 CLEANUP-03 opt-OUT model).
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.RealWorldCorpusTest")
+                // Decimal real-literal regression guard (DOT token). BasePlatformTestCase
+                // configureByText asserting zero PsiErrorElement / zero BAD_CHARACTER on
+                // `0.3` / `0.04` / `3.14E5` / `2.5e-3` — same zero-error contract as RealWorldCorpusTest.
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.RealLiteralParsingTest")
                 // Differential corpus scan tool: parses the osacompile-VALID_HERE corpus named by
                 // the APPLESCRIPT_CORPUS_DIR env var (or corpus.dir property) and reports
                 // false-positive coverage. Skips silently when unset, so the default run is a no-op;

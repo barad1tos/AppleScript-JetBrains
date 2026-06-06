@@ -163,6 +163,7 @@ COMMENT=(("#".*)|("--".*)|(("(*"[^"*"](([^"*"]*("*"+[^"*"")"])?)*("*"+")")?))|"(
   "{"                              { return LCURLY; }
   "}"                              { return RCURLY; }
   ":"                              { return COLON; }
+  "."                              { return DOT; }
   "tell"                           { return TELL; }
   "set"                            { return SET; }
   "copy"                           { return COPY; }

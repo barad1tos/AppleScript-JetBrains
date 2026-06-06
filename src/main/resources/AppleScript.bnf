@@ -179,6 +179,7 @@
     LCURLY='{'
     RCURLY='}'
     COLON=':'
+    DOT='.'
 
 
   ]
@@ -433,8 +434,8 @@ dictionaryClassIdentifierPlural ::= <<parseDictionaryClassName 'true' useStateme
  implements="com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeElement"}
 
 //>>Real class<<
-realLiteralExpression ::= ('.'(DIGITS)(DEC_EXPONENT))|(dec_significand DEC_EXPONENT?)
-private dec_significand ::= ('.'DIGITS)|(DIGITS'.'DIGITS*)
+realLiteralExpression ::= (DOT (DIGITS)(DEC_EXPONENT))|(dec_significand DEC_EXPONENT?)
+private dec_significand ::= (DOT DIGITS)|(DIGITS DOT DIGITS*)
 
 // >>Date class<<
 dateLiteralExpression ::= date (stringLiteralExpression|expression)

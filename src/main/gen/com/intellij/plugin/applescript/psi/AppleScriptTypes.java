@@ -194,6 +194,7 @@ public interface AppleScriptTypes {
   IElementType DIV = new AppleScriptTokenType("DIV");
   IElementType DOES = new AppleScriptTokenType("does");
   IElementType DOES_NOT_CONTAIN = new AppleScriptTokenType("DOES_NOT_CONTAIN");
+  IElementType DOT = new AppleScriptTokenType(".");
   IElementType EACH = new AppleScriptTokenType("each");
   IElementType EIGHTH = new AppleScriptTokenType("eighth");
   IElementType ELSE = new AppleScriptTokenType("else");
