@@ -59,6 +59,14 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testShortcutsInvoke() = assertNoParserErrors("shortcuts_invoke.applescript")
 
+    fun testEveryClassReference() = assertNoParserErrors("every_class_reference.applescript")
+
+    fun testRecordKeywordLabels() = assertNoParserErrors("record_keyword_labels.applescript")
+
+    fun testDisplayAlertCommand() = assertNoParserErrors("display_alert_command.applescript")
+
+    fun testSortCommandDirection() = assertNoParserErrors("sort_command_direction.applescript")
+
     private fun assertNoParserErrors(fileName: String) {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
@@ -84,6 +92,9 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
                 // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback
                 // before the loaded dictionary-command path consumes only the direct parameter.
                 "testStandardAdditionsPaths",
+                // TODO(parser): re-enable once the structural command-gate refactor lands:
+                // `sort by <ref> direction <value>` needs `by`/bare-label params, not a name list.
+                "testSortCommandDirection",
             )
     }
 }

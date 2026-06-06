@@ -3,23 +3,15 @@ package com.intellij.plugin.applescript.lang.parser
 import com.intellij.lang.PsiBuilder
 import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.CURRENT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.DATE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DIGITS
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.EVENT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.FILE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ID
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.LIST
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.SCRIPT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.TAB
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
-import com.intellij.psi.tree.IElementType
 
 internal object ApplicationObjectReferenceParser {
     fun parse(
@@ -74,21 +66,12 @@ internal object ApplicationObjectReferenceParser {
 
     private fun parseTerm(builder: PsiBuilder): Int {
         var termWordCount = 0
-        while (isTermWord(builder.tokenType)) {
+        while (FallbackDictionaryAnchorPredicates.isMultiWordNounWord(builder.tokenType)) {
             builder.advanceLexer()
             termWordCount += 1
         }
         return termWordCount
     }
-
-    private fun isTermWord(tokenType: IElementType?): Boolean =
-        tokenType === VAR_IDENTIFIER ||
-            tokenType === EVENT ||
-            tokenType === TAB ||
-            tokenType === FILE ||
-            tokenType === DATE ||
-            tokenType === LIST ||
-            tokenType === SCRIPT
 
     private fun isBareMultiWordReferenceBoundary(
         builder: PsiBuilder,

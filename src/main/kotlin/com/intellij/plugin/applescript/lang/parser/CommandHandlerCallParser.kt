@@ -151,6 +151,10 @@ internal object CommandHandlerCallParser {
             parseDictionaryCommandParameters(builder, level, allCommandsWithName)
         }
 
+    // `make` routes through the fallback parameter parser even when a loaded standard dictionary
+    // defines it: the dictionary command consumes app-specific multi-word noun phrases (e.g.
+    // `make new lock screen task`) too narrowly and drops the trailing nouns. Promote to a
+    // Set<String> if a second command ever needs the same fallback-first treatment.
     private fun isFallbackFirstCommand(commandName: String): Boolean = commandName.equals("make", ignoreCase = true)
 
     private fun parseDictionaryCommandParameters(

@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.test.parsing
 
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationObjectReference
+import com.intellij.plugin.applescript.psi.AppleScriptExpression
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
@@ -54,6 +55,14 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
         assertTrue(
             "application object references should retain id-selector text: $objectReferenceTexts",
             objectReferenceTexts.any { it == "track id trackIdentifier" },
+        )
+
+        val trackIdReference = references.first { it.text == "track id trackIdentifier" }
+        val structuredSelectorExpressions =
+            PsiTreeUtil.findChildrenOfType(trackIdReference, AppleScriptExpression::class.java)
+        assertTrue(
+            "id-selector reference must expose a structured expression child: $objectReferenceTexts",
+            structuredSelectorExpressions.isNotEmpty(),
         )
     }
 

@@ -15,13 +15,16 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.IS_CONTAIN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IS_IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IS_NOT_IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LE
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.LIST
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.SCRIPT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STARTS_BEGINS_WITH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TAB
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
 internal object FallbackDictionaryAnchorPredicates {
@@ -49,4 +52,13 @@ internal object FallbackDictionaryAnchorPredicates {
 
     fun isSpecifierTerm(tokenType: IElementType?): Boolean =
         tokenType === EVENT || tokenType === TAB || tokenType === FILE || tokenType === DATE
+
+    // Words that can compose a multi-word, dictionary-style noun phrase: generic
+    // application-object terms (`computer list`, `lock screen task`) and multi-word record
+    // labels (`showing output`). LIST/SCRIPT are keywords that double as plain nouns here.
+    fun isMultiWordNounWord(tokenType: IElementType?): Boolean =
+        isSpecifierTerm(tokenType) ||
+            tokenType === VAR_IDENTIFIER ||
+            tokenType === LIST ||
+            tokenType === SCRIPT
 }
