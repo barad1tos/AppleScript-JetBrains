@@ -51,6 +51,8 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testApplicationIdReferences() = assertNoParserErrors("application_id_reference_min.applescript")
 
+    fun testRemoteDesktopTasks() = assertNoParserErrors("remote_desktop_task_min.applescript")
+
     fun testTryOnError() = assertNoParserErrors("try_on_error.applescript")
 
     fun testNonAsciiMath() = assertNoParserErrors("non_ascii_math.applescript")

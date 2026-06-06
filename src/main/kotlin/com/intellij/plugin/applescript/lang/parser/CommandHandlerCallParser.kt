@@ -145,11 +145,13 @@ internal object CommandHandlerCallParser {
         parsedCommandName: String,
         allCommandsWithName: List<AppleScriptCommand>,
     ): Boolean =
-        if (allCommandsWithName.isEmpty()) {
+        if (allCommandsWithName.isEmpty() || isFallbackFirstCommand(parsedCommandName)) {
             FallbackCommandParameterParser.parseParameters(builder, level + 1, parsedCommandName)
         } else {
             parseDictionaryCommandParameters(builder, level, allCommandsWithName)
         }
+
+    private fun isFallbackFirstCommand(commandName: String): Boolean = commandName.equals("make", ignoreCase = true)
 
     private fun parseDictionaryCommandParameters(
         builder: PsiBuilder,

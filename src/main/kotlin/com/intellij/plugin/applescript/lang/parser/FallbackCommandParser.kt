@@ -77,5 +77,6 @@ internal object FallbackCommandParser {
             commandName == "exists" ||
             commandName == "run" ||
             commandName == "delete" ||
-            commandName == "make"
+            commandName == "make" ||
+            commandName == "execute"
 }

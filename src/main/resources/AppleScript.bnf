@@ -498,7 +498,7 @@ private builtInClassProperty ::= stringProperty | BUILT_IN_PROPERTY |
 
 private stringProperty ::= QUOTED_FORM
 
-private propertyLabelIdentifier ::= propertyReference|identifier
+private propertyLabelIdentifier ::= propertyReference | <<parsePropertyLabelIdentifier>> | identifier
 
 arbitraryReference ::= some typeSpecifier {pin=1}
 
@@ -542,14 +542,8 @@ implements="com.intellij.plugin.applescript.psi.AppleScriptReferenceElement"}
 // (Pitfall 1: do not shadow the D-15 dictionary-class path). Navigation hook only (D-09 —
 // no resolver wiring). Single-bareword whose-context index (`folder 1`) is deferred to 08-07.
 application_object_reference ::=
-    CURRENT applicationObjectTerm
-  | applicationObjectTerm integerLiteralExpression
-  | applicationObjectTerm applicationObjectIdSelector
+    <<parseApplicationObjectReference>>
 {mixin="com.intellij.plugin.applescript.psi.impl.AbstractApplicationObjectReference"}
-
-private applicationObjectIdSelector ::= id expression
-
-private applicationObjectTerm ::= var_identifier | EVENT | TAB | FILE | DATE
 
 middleElemReference ::= middle typeSpecifier {pin=1}
 

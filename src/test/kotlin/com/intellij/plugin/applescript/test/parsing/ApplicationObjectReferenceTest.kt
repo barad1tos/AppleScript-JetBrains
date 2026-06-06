@@ -8,21 +8,15 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.io.File
 
 /**
- * Phase 8 (v2.0) PARSE-03: generic application-object references — `library playlist N`,
- * `current track`, `track N of library playlist M`, `track id <expr>` — must parse as expressions with a
- * queryable PSI node for ANY scriptable app, with zero `PsiErrorElement` and WITHOUT a
- * loaded application dictionary (D-07: the generic rule is syntactic, not dictionary-resolved).
+ * Phase 8 (v2.0) PARSE-03: generic application-object references should parse common
+ * application-object forms with zero `PsiErrorElement` and without a loaded application dictionary.
+ *
+ * Specific dictionary-like references such as `library playlist N` may be owned by the richer
+ * referenceForm path. The generic `application_object_reference` rule is reserved for fallback
+ * syntactic forms that do not have a better PSI shape, such as `current track` and `track id <expr>`.
  *
  * All assertions run against `app_object_ref_min.applescript`, a minimal top-level fixture
- * (no tell block, no dictionary). RED before the 08-06 `application_object_reference` rule
- * lands; GREEN after the rule + PSI mixin + gen regen.
- *
- * Per the 08-06 single-bareword checkpoint (defer-folder-half), the standalone `folder 1`
- * index case is owned by 08-07 and is intentionally NOT covered here; `testTracksWhose`
- * therefore stays partially red until 08-07.
- *
- * Heavy-by-default suite (BasePlatformTestCase boots a ~30s fixture); opt OUT with
- * `-PskipHeavyTests=true`. Mirrors the RealWorldCorpusTest error-count harness verbatim.
+ * (no tell block, no dictionary).
  */
 class ApplicationObjectReferenceTest : BasePlatformTestCase() {
     override fun getTestDataPath(): String = File(CORPUS_DIR).absolutePath
@@ -38,7 +32,7 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
     /** D-07: the generic rule parses with no app dictionary loaded (default fixture, cold cache). */
     fun testColdCacheNoDictionary() = assertNoParserErrors()
 
-    fun testGeneratedAccessorsExposeApplicationObjectReferenceTerms() {
+    fun testGenericApplicationObjectReferencesKeepFallbackTerms() {
         val psiFile = myFixture.configureByFile(APP_OBJECT_REF_FIXTURE)
         val references =
             PsiTreeUtil.findChildrenOfType(
@@ -51,16 +45,15 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
             references.isNotEmpty(),
         )
 
-        val objectTermTexts = references.mapNotNull { it.varIdentifier?.text }
-        val selectorExpressionTexts = references.mapNotNull { it.expression?.text }
+        val objectReferenceTexts = references.map { it.text }
 
         assertTrue(
-            "application object references should expose their object term token",
-            objectTermTexts.isNotEmpty(),
+            "application object references should retain current-object text: $objectReferenceTexts",
+            objectReferenceTexts.any { it == "current track" },
         )
         assertTrue(
-            "application object reference selector expressions should be valid when present",
-            selectorExpressionTexts.all { it.isNotBlank() },
+            "application object references should retain id-selector text: $objectReferenceTexts",
+            objectReferenceTexts.any { it == "track id trackIdentifier" },
         )
     }
 

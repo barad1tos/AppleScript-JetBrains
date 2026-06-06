@@ -51,6 +51,18 @@ class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserDictionaryHooks
             builder: PsiBuilder,
             level: Int,
         ): Boolean = AppleScriptGeneratedParserCommandHooks.parseCommandParametersExpression(builder, level)
+
+        @JvmStatic
+        fun parseApplicationObjectReference(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean = ApplicationObjectReferenceParser.parse(builder, level)
+
+        @JvmStatic
+        fun parsePropertyLabelIdentifier(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean = PropertyLabelParser.parse(builder, level)
     }
 }
 

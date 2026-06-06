@@ -349,32 +349,6 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // id expression
-  static boolean applicationObjectIdSelector(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "applicationObjectIdSelector")) return false;
-    if (!nextTokenIs(builder_, ID)) return false;
-    boolean result_;
-    Marker marker_ = enter_section_(builder_);
-    result_ = consumeToken(builder_, ID);
-    result_ = result_ && expression(builder_, level_ + 1);
-    exit_section_(builder_, marker_, null, result_);
-    return result_;
-  }
-
-  /* ********************************************************** */
-  // var_identifier | EVENT | TAB | FILE | DATE
-  static boolean applicationObjectTerm(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "applicationObjectTerm")) return false;
-    boolean result_;
-    result_ = consumeToken(builder_, VAR_IDENTIFIER);
-    if (!result_) result_ = consumeToken(builder_, EVENT);
-    if (!result_) result_ = consumeToken(builder_, TAB);
-    if (!result_) result_ = consumeToken(builder_, FILE);
-    if (!result_) result_ = consumeToken(builder_, DATE);
-    return result_;
-  }
-
-  /* ********************************************************** */
   // applicationName [of THE_KW? machine machineName (of THE_KW? zone appleTalkZoneName)?] | THE_KW? currentApplicationConstant
   public static boolean applicationReference(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "applicationReference")) return false;
@@ -471,50 +445,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // CURRENT applicationObjectTerm
-  //   | applicationObjectTerm integerLiteralExpression
-  //   | applicationObjectTerm applicationObjectIdSelector
+  // <<parseApplicationObjectReference>>
   public static boolean application_object_reference(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "application_object_reference")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_, level_, _NONE_, APPLICATION_OBJECT_REFERENCE, "<application object reference>");
-    result_ = application_object_reference_0(builder_, level_ + 1);
-    if (!result_) result_ = application_object_reference_1(builder_, level_ + 1);
-    if (!result_) result_ = application_object_reference_2(builder_, level_ + 1);
+    result_ = parseApplicationObjectReference(builder_, level_ + 1);
     exit_section_(builder_, level_, marker_, result_, false, null);
-    return result_;
-  }
-
-  // CURRENT applicationObjectTerm
-  private static boolean application_object_reference_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "application_object_reference_0")) return false;
-    boolean result_;
-    Marker marker_ = enter_section_(builder_);
-    result_ = consumeToken(builder_, CURRENT);
-    result_ = result_ && applicationObjectTerm(builder_, level_ + 1);
-    exit_section_(builder_, marker_, null, result_);
-    return result_;
-  }
-
-  // applicationObjectTerm integerLiteralExpression
-  private static boolean application_object_reference_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "application_object_reference_1")) return false;
-    boolean result_;
-    Marker marker_ = enter_section_(builder_);
-    result_ = applicationObjectTerm(builder_, level_ + 1);
-    result_ = result_ && integerLiteralExpression(builder_, level_ + 1);
-    exit_section_(builder_, marker_, null, result_);
-    return result_;
-  }
-
-  // applicationObjectTerm applicationObjectIdSelector
-  private static boolean application_object_reference_2(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "application_object_reference_2")) return false;
-    boolean result_;
-    Marker marker_ = enter_section_(builder_);
-    result_ = applicationObjectTerm(builder_, level_ + 1);
-    result_ = result_ && applicationObjectIdSelector(builder_, level_ + 1);
-    exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
@@ -5050,12 +4987,15 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // propertyReference|identifier
+  // propertyReference | <<parsePropertyLabelIdentifier>> | identifier
   static boolean propertyLabelIdentifier(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "propertyLabelIdentifier")) return false;
     boolean result_;
+    Marker marker_ = enter_section_(builder_);
     result_ = propertyReference(builder_, level_ + 1);
+    if (!result_) result_ = parsePropertyLabelIdentifier(builder_, level_ + 1);
     if (!result_) result_ = identifier(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 

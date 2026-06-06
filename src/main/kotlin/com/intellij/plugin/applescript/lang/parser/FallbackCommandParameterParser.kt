@@ -15,6 +15,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
@@ -62,6 +63,7 @@ internal object FallbackCommandParameterParser {
             "exists",
             "run",
             "delete",
+            "execute",
             -> ParameterMode.OptionalDirectParameter
             else -> {
                 if (commandName.contains(" ")) ParameterMode.OptionalDirectParameter else null
@@ -149,6 +151,7 @@ internal object FallbackCommandParameterParser {
         tokenType === TO ||
             tokenType === INTO ||
             tokenType === FROM ||
+            tokenType === ON ||
             tokenType === WITH ||
             tokenType === WITHOUT ||
             tokenType === GIVEN

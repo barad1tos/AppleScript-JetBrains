@@ -26,16 +26,4 @@ public class AppleScriptApplicationObjectReferenceImpl extends AbstractApplicati
     else super.accept(visitor);
   }
 
-  @Override
-  @Nullable
-  public AppleScriptExpression getExpression() {
-    return findChildByClass(AppleScriptExpression.class);
-  }
-
-  @Override
-  @Nullable
-  public PsiElement getVarIdentifier() {
-    return findChildByType(VAR_IDENTIFIER);
-  }
-
 }

@@ -7,10 +7,4 @@ import com.intellij.psi.PsiElement;
 
 public interface AppleScriptApplicationObjectReference extends AppleScriptPsiElement {
 
-  @Nullable
-  AppleScriptExpression getExpression();
-
-  @Nullable
-  PsiElement getVarIdentifier();
-
 }
