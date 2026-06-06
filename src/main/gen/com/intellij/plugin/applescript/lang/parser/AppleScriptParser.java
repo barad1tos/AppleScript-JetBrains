@@ -1083,12 +1083,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // CONSIDER_IGNORE_ATTRIBUTE|C_WHITE_SPACE|expression
+  // CONSIDER_IGNORE_ATTRIBUTE|C_WHITE_SPACE|APP_RESPONSES|expression
   static boolean considerOrIgnoreAttr(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "considerOrIgnoreAttr")) return false;
     boolean result_;
     result_ = consumeToken(builder_, CONSIDER_IGNORE_ATTRIBUTE);
     if (!result_) result_ = consumeToken(builder_, C_WHITE_SPACE);
+    if (!result_) result_ = consumeToken(builder_, APP_RESPONSES);
     if (!result_) result_ = expression(builder_, level_ + 1);
     return result_;
   }

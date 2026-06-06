@@ -67,6 +67,8 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testSortCommandDirection() = assertNoParserErrors("sort_command_direction.applescript")
 
+    fun testConsideringIgnoringResponses() = assertNoParserErrors("considering_ignoring.applescript")
+
     private fun assertNoParserErrors(fileName: String) {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)

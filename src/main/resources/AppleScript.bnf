@@ -316,7 +316,7 @@ ignoringStatement ::= ignoring considerOrIgnoreAttr ((COMMA considerOrIgnoreAttr
                         [but considering considerOrIgnoreAttr ((COMMA considerOrIgnoreAttr)* (LAND considerOrIgnoreAttr)?)? ] sep
                            blockBody?
                       end ignoring {pin=2}
-private considerOrIgnoreAttr ::= CONSIDER_IGNORE_ATTRIBUTE|C_WHITE_SPACE|expression
+private considerOrIgnoreAttr ::= CONSIDER_IGNORE_ATTRIBUTE|C_WHITE_SPACE|APP_RESPONSES|expression
 
 withTimeoutStatement ::= with timeout [of] timeoutIntegerExpression (seconds|second) sep
                            blockBody?
