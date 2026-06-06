@@ -142,6 +142,7 @@ class ApplicationDiscoveryService
         // plus names added by `addDictionaryInfo` for cached / persisted entries. NOT
         // persisted across IDE restarts — rebuilt on every cold start.
         private val discoveredApplications: MutableSet<String> = ConcurrentHashMap.newKeySet()
+        private val applicationNamesByBundleIdentifier: MutableMap<String, String> = ConcurrentHashMap()
 
         // Migrated from facade (Wave 3): names that the discovery walk + parser-util fallback
         // tried to resolve but failed. NOT persisted — purely a per-session memo so repeated
@@ -193,7 +194,18 @@ class ApplicationDiscoveryService
          * to register cached / persisted dictionary entries on the discovered set even when
          * the disk walk has not (yet) seen them.
          */
-        fun addDiscoveredApplicationName(applicationName: String): Boolean = discoveredApplications.add(applicationName)
+        fun addDiscoveredApplicationName(
+            applicationName: String,
+            bundleIdentifier: String? = null,
+        ): Boolean {
+            bundleIdentifier?.takeIf { it.isNotBlank() }?.let { knownBundleIdentifier ->
+                applicationNamesByBundleIdentifier[knownBundleIdentifier] = applicationName
+            }
+            return discoveredApplications.add(applicationName)
+        }
+
+        fun findKnownApplicationNameByBundleIdentifier(bundleIdentifier: String): String? =
+            applicationNamesByBundleIdentifier[bundleIdentifier]
 
         /**
          * O(1) membership test on [notFoundApplicationList]. The "not found" list is a
@@ -299,7 +311,11 @@ class ApplicationDiscoveryService
                                 // failure, so the early filter cannot exclude apps that the
                                 // pre-Wave-3 facade would have included).
                                 if (!service<SdefPersistenceService>().isNotScriptable(appName)) {
-                                    discoveredApplications.add(appName)
+                                    addDiscoveredApplicationName(
+                                        appName,
+                                        ApplicationBundleInfoReader
+                                            .readBundleIdentifier(VfsUtilCore.virtualToIoFile(file)),
+                                    )
                                 }
                             }
                             return false

@@ -72,6 +72,33 @@ class ApplicationDiscoveryServiceTest : BasePlatformTestCase() {
         )
     }
 
+    fun testAddDiscoveredApplicationNameIndexesBundleIdentifier() {
+        val service = ApplicationDiscoveryService.getInstance()
+        val applicationName = "BundleIndexedApp_${System.nanoTime()}"
+        val bundleIdentifier = "com.example.bundleindexedapp.${System.nanoTime()}"
+
+        service.addDiscoveredApplicationName(applicationName, bundleIdentifier)
+
+        assertEquals(
+            "Bundle identifier lookup should return the registered application name",
+            applicationName,
+            service.findKnownApplicationNameByBundleIdentifier(bundleIdentifier),
+        )
+    }
+
+    fun testDiscoverInstalledApplicationNamesIndexesSystemEventsBundleIdentifierOnMac() {
+        if (!SystemInfo.isMac) return
+
+        val service = ApplicationDiscoveryService.getInstance()
+        runBlocking { service.discoverInstalledApplicationNames() }
+
+        assertEquals(
+            "System Events bundle identifier should resolve to the discovered application name",
+            "System Events",
+            service.findKnownApplicationNameByBundleIdentifier("com.apple.systemevents"),
+        )
+    }
+
     /**
      * `addToNotFoundList` is idempotent and the membership predicate is consistent across
      * calls. Cross-platform — does not touch the filesystem.

@@ -3,6 +3,7 @@
 
 package com.intellij.plugin.applescript.psi.impl
 
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
 import com.intellij.plugin.applescript.psi.AppleScriptTellCompoundStatement
@@ -17,10 +18,18 @@ fun getNameFromApplicationReference(appRef: AppleScriptApplicationReference?): S
     val text = appRef.text
     val from = text.indexOf('"') + 1
     val to = text.indexOf('"', from)
-    return if (from in 0..text.length && to in 0..text.length && from <= to) {
-        text.substring(from, to)
-    } else {
-        null
+    val applicationName =
+        if (from in 0..text.length && to in 0..text.length && from <= to) {
+            text.substring(from, to)
+        } else {
+            null
+        }
+    return applicationName?.let {
+        if (appRef.node.findChildByType(AppleScriptTypes.ID) != null) {
+            ApplicationDiscoveryService.getInstance().findKnownApplicationNameByBundleIdentifier(it) ?: it
+        } else {
+            it
+        }
     }
 }
 

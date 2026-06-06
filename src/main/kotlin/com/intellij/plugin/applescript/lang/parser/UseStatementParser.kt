@@ -9,6 +9,7 @@ import com.intellij.lang.parser.GeneratedParserUtilBase.exit_section_
 import com.intellij.lang.parser.GeneratedParserUtilBase.nextTokenIs
 import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.APP
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.APPLICATION
@@ -102,17 +103,7 @@ internal object UseStatementParser {
     private fun parseReferencedApplicationName(
         builder: PsiBuilder,
         hasApplicationToken: Boolean,
-    ): String? {
-        var applicationName: String? = null
-        if (hasApplicationToken) {
-            val applicationNameString = builder.tokenText
-            val result = consumeToken(builder, STRING_LITERAL)
-            if (result && !StringUtil.isEmpty(applicationNameString)) {
-                applicationName = applicationNameString?.replace("\"", "")
-            }
-        }
-        return applicationName
-    }
+    ): String? = if (hasApplicationToken) parseApplicationNameToken(builder) else null
 
     private fun registerUsedApplicationName(
         builder: PsiBuilder,
@@ -145,9 +136,8 @@ internal object UseStatementParser {
     ): Boolean {
         var result = false
         if (nextTokenIs(builder, "", STRING_LITERAL, ID)) {
-            val applicationNameString = builder.tokenText?.replace("\"", "")
-            result = consumeToken(builder, STRING_LITERAL)
-            if (!result) result = consumeToken(builder, ID)
+            val applicationNameString = parseApplicationNameToken(builder)
+            result = applicationNameString != null
             if (result &&
                 !StringUtil.isEmptyOrSpaces(applicationNameString) &&
                 tellStatementStartCondition.parse(builder, level + 1)
@@ -156,5 +146,22 @@ internal object UseStatementParser {
             }
         }
         return result
+    }
+
+    private fun parseApplicationNameToken(builder: PsiBuilder): String? {
+        val isApplicationIdReference = consumeToken(builder, ID)
+        val applicationNameString = builder.tokenText?.replace("\"", "")
+        val result = consumeToken(builder, STRING_LITERAL) || (!isApplicationIdReference && consumeToken(builder, ID))
+        return applicationNameString
+            ?.takeIf { result && !StringUtil.isEmptyOrSpaces(it) }
+            ?.let { applicationName ->
+                if (isApplicationIdReference) {
+                    ApplicationDiscoveryService
+                        .getInstance()
+                        .findKnownApplicationNameByBundleIdentifier(applicationName) ?: applicationName
+                } else {
+                    applicationName
+                }
+            }
     }
 }

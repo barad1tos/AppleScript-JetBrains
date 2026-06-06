@@ -49,6 +49,8 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testNestedTellRun() = assertNoParserErrors("nested_tell_run.applescript")
 
+    fun testApplicationIdReferences() = assertNoParserErrors("application_id_reference_min.applescript")
+
     fun testTryOnError() = assertNoParserErrors("try_on_error.applescript")
 
     fun testNonAsciiMath() = assertNoParserErrors("non_ascii_math.applescript")
