@@ -22,7 +22,7 @@ internal object SdefComponentParser {
         suiteTag: XmlTag,
         dictionary: ApplicationDictionary,
     ): Suite? {
-        // KEEP (Phase 8 / v2.0 backlog): consolidating subtag attachment into the suite here
+        // KEEP (Phase 8 / v2.0 backlog: BL-F2): consolidating subtag attachment into the suite here
         // (instead of the caller wiring them) is a legacy-of-the-Java-port reshape of the
         // frozen parser surface. Deferred to the grammar-hardening milestone.
         val identity = SdefTagReader.readRequiredIdentity(suiteTag) ?: return null

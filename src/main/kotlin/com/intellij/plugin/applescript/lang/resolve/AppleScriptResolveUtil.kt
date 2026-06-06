@@ -20,7 +20,7 @@ object AppleScriptResolveUtil {
         return Array(filtered.size) { i -> PsiElementResolveResult(filtered[i]) }
     }
 
-    // KEEP (Phase 8 / v2.0 backlog): relocating this to AppleScriptScriptObject and
+    // KEEP (Phase 8 / v2.0 backlog: BL-F3): relocating this to AppleScriptScriptObject and
     // simplifying the three-way variable extraction is a real refactor that touches the
     // PSI-adjacent resolve surface, not a one-liner. Deferred — out of the v1.x cleanup
     // scope (behaviour-preserving only).

@@ -108,7 +108,7 @@ open class AppleScriptCommandImpl :
     }
 
     override val mandatoryParameters: List<CommandParameter>
-        // Workaround for "in" / "of" being detected as object references rather than parameters.
+        // Workaround for "in" / "of" being detected as object references rather than parameters. (backlog: BL-C6)
         get() =
             data.parameters
                 .filter { !it.optional && it.name != "in" && it.name != "of" }

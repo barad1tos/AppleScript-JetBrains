@@ -125,7 +125,7 @@
     YARDS='yards'
 
     BUILT_IN_TYPE_S='regexp:(string|integer|real|boolean|class|constant|list|record|data|date|number|reference|[Ss]tyled [Tt]ext|text item|text|item|character|paragraph|word)s'
-    //todo not only for literals
+    //todo not only for literals (backlog: BL-K1)
     //==>built in properties==>
     BUILT_IN_PROPERTY='regexp:("class"|day|weekday|month|year|time|date string|short date string|time string|(quoted[\ \t\f]+form)|length|rest|reverse|contents)'
     //properties of standard classes
@@ -168,7 +168,7 @@
 
     DEC_EXPONENT='regexp:[Ee][+-]?[0-9]+'
     var_identifier='regexp:([_a-zA-Z][a-zA-Z0-9_]*)|(\|(([^\|])|(\\\|))*[^\\]\|)'
-  //todo nested comments (lexer states...)
+  //todo nested comments (lexer states...) (backlog: BL-D1)
     COMMENT='regexp:((#.*)|(--.*)|((\(\*[^\*](([^\*]*(\*+[^\*\)])?)*(\*+\))?))|\(\*))'
     RAW_LBR='«'
     RAW_RBR='»'
@@ -337,7 +337,7 @@ private useAppleScriptStatement ::= use 'AppleScript' [version expression] {pin=
 private useScriptingAdditionsStatement ::= use SCRIPTING_ADDITIONS
                                    [((with importing)|(without importing)|importing) expression ] {pin=2}
 
-//todo handle application id "stringWithId"
+//todo handle application id "stringWithId" (backlog: BL-B1)
 //use application "com.microsoft.Word" i.e. should not find application with such name -> create new map for app id
 //see <<parseUseApplicationOrScriptStatementInner>>
 private useApplicationOrScriptStatement ::= use [directParameterDeclaration COLON]
@@ -446,7 +446,7 @@ recordLiteralExpression ::= LCURLY[objectPropertyDeclaration] (COMMA objectPrope
 
 targetRecordLiteral ::= LCURLY[objectTargetPropertyDeclaration] (COMMA objectTargetPropertyDeclaration)* RCURLY
 { methods=[getTargets] }
-//todo inspection for only unique property label names
+//todo inspection for only unique property label names (backlog: BL-K2)
 
 //>>String class<<
 stringLiteralExpression ::= STRING_LITERAL
@@ -488,7 +488,7 @@ propertyReference | (referenceExpression handlerPositionalParametersCallExpressi
 //text itemS of item => could be plural class names here also
 propertyReference ::=  dictionaryPropertyName|literalExpression|appleScriptProperty|builtInClassProperty
 
-//todo do not check here for application classes! do it (if necessary) where the rule is used
+//todo do not check here for application classes! do it (if necessary) where the rule is used (backlog: BL-C1)
 dictionaryPropertyName ::=  (<<parseDictionaryPropertyName>> &(of|in|COLON)) | (!dictionaryClassName <<parseDictionaryPropertyName>>)
 {mixin="com.intellij.plugin.applescript.psi.sdef.impl.AbstractDictionaryPropertySpecifier"
 implements="com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeElement"}
@@ -509,7 +509,7 @@ left filterReference ::=  (whose|where) expression
 //The ID reference form specifies an object by the value of its ID property
 left idReference ::= id expression
 
-//todo change to expression
+//todo change to expression (backlog: BL-C5)
 private indexValueExpression ::= referenceExpression|integerLiteralExpression|parenthesizedExpression
 
 indexReference ::=  (integerLiteralExpression('st'|'rd'|'th') (typeSpecifier|userClassName))
@@ -518,7 +518,7 @@ indexReference ::=  (integerLiteralExpression('st'|'rd'|'th') (typeSpecifier|use
 //first need to check that this is not a property name
 //things like: "message id of message" and "item i of EmailAddresses" _property_(1st) vs _index_(2nd) forms
 // mailbox "Name string" detected as a 'mailbox' propertyReference
-//todo: custom parsing. To think how more efficient handle propertyName vs className detection
+//todo: custom parsing. To think how more efficient handle propertyName vs className detection (backlog: BL-C2)
 //add predicate check to all dictionary terms parsing rules:
 //if toldApplicationName is not empty - check all terms from there first(property,class,constant,command)
 private classNamePrimaryExpression ::= typeSpecifier
@@ -579,7 +579,7 @@ scriptPropertyDeclaration ::= (property|prop) propertyLabelIdentifier [COLON pro
 implements="com.intellij.plugin.applescript.psi.AppleScriptComponent"}
 
 //Object (AppleScript record or application object) propertyDeclaration
-//todo implement getIdentifier() method
+//todo implement getIdentifier() method (backlog: BL-E1)
 objectPropertyDeclaration ::= propertyLabelIdentifier COLON propertyInitializerExpression
 
 //identifier could consist from several identifiers (in case of dictionary property)
@@ -622,14 +622,14 @@ private resultProperty ::= result
 private parentProperty ::= parent
 private versionProperty ::= version
 
-//todo redefine necessary methods (is property, getName etc.)
+//todo redefine necessary methods (is property, getName etc.) (backlog: BL-E2)
 appleScriptProperty ::= BUILT_IN_PROPERTY|resultProperty|versionProperty|anythingProperty
 |textItemDelimitersProperty|parentProperty|endDateProperty//|itMeProperty//|text_constant /*?? */
 
 private endDateProperty ::= END DATE
 
 private itMeProperty ::= it|me|ITS //see https://bitbucket.org/adernov/applescript-internal/issues/16/parsing-its-possessive-form-of-it
-//todo add via regexp (spaces)
+//todo add via regexp (spaces) (backlog: BL-E3)
 handlerParameterLabel ::= about|above|against|'apart from'|around|'aside from'|at|below|beneath|beside|between|by|for
 |from|'instead of'|into|on|onto|'out of'|over|since|thru|through|under|to //there is no 'to' label in documentation but it works!
 
@@ -666,11 +666,11 @@ methods=[getParameterComponentList]}
 labeledParameterDeclarationList ::= ((of|in)? directParameterDeclaration | targetVariablePattern )? labeledParameterDeclarationPart*
 {methods=[getComponentList]}
 
-directParameterDeclaration ::= THE_KW? identifier //todo change to simpleFormalParameter
+directParameterDeclaration ::= THE_KW? identifier //todo change to simpleFormalParameter (backlog: BL-E4)
 {mixin="com.intellij.plugin.applescript.psi.impl.AbstractAppleScriptComponent"
 implements="com.intellij.plugin.applescript.psi.AppleScriptComponent"}
 
-labeledParameterDeclarationPart ::= handlerParameterLabel THE_KW? identifier //userParameterVar //todo implement targetVariablePattern here !!!
+labeledParameterDeclarationPart ::= handlerParameterLabel THE_KW? identifier //userParameterVar //todo implement targetVariablePattern here !!! (backlog: BL-E5)
 {mixin="com.intellij.plugin.applescript.psi.impl.AbstractAppleScriptComponent"
 implements="com.intellij.plugin.applescript.psi.AppleScriptComponent"}
 
@@ -716,7 +716,7 @@ private referenceIdBeforeParamLabel ::= referenceExpression &handlerParameterLab
 
 private userParameterVal ::= expression
 
-//todo replace to just expression, add custom parsing ?
+//todo replace to just expression, add custom parsing ? (backlog: BL-C4)
 directParameterVal ::=  referenceIdBeforeParamLabel | expression
 
 private parseTellSimpleStatement ::= <<parseTellSimpleStatementInner>>
@@ -814,7 +814,7 @@ private pluralClassName ::= builtInClassIdentifierPlural | dictionaryClassIdenti
 private singularClassName ::= (dictionaryClassName | builtInClassIdentifier | rawClassExpression) ITEM?
 private composite_value ::= expression
 rawClassExpression ::= RAW_LBR CLASS identifier RAW_RBR
-//todo add parsing of raw parameters (and in usual handler call also)
+//todo add parsing of raw parameters (and in usual handler call also) (backlog: BL-K3)
 rawDictionaryCommandHandlerCallExpression ::= RAW_LBR EVENT identifier RAW_RBR commandRawParameters?
 private commandRawParameters ::= expression? (rawParameterExpression | givenRawParameterExpression)*
 givenRawParameterExpression ::= given rawClassExpression COLON expression (COMMA rawClassExpression COLON expression)*
@@ -926,7 +926,7 @@ incompleteCommandHandlerCall ::= <<parseIncompleteCommandCall>>
 {mixin="com.intellij.plugin.applescript.psi.sdef.impl.DictionaryCompositeNameImpl"
 implements="com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeName"}
 
-// todo: left associate to class name (range, name, relative, index) ! checking that this is not a property first.. !
+// todo: left associate to class name (range, name, relative, index) ! checking that this is not a property first.. ! (backlog: BL-C3)
 private primaryReferenceExpression ::= applicationReference | referenceForm | application_object_reference | referenceExpression
 
 private referenceForm ::=

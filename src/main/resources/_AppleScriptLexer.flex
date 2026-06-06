@@ -31,7 +31,7 @@ IS_IN=("is in"|"is contained by")
 IS_NOT_IN=("is not in"|"is not contained by"|"isn't contained by")
 IS_CONTAIN=("contain"|"contains")
 
-//todo duplicate variants with and without to/is parts otherwise it is not parsed correctly
+//todo duplicate variants with and without to/is parts otherwise it is not parsed correctly (backlog: BL-D2)
 GT=(">"|"is greater than"|"greater than"|"comes after"|"is not less than or equal to"|"is not less than or equal"|"isn't less than or equal to"|"isn't less than or equal")
 LE=("≤"|"<="|"is less than or equal to"|"less than or equal to"|"is less than or equal"|"less than or equal"|"is not greater than"|"isn't greater than"|"does not come after"|"doesn't come after")
 GE=("≥"|">="|"is greater than or equal to"|"greater than or equal to"|"is greater than or equal"|"greater than or equal"|"is not less than"|"isn't less than"|"does not come before"|"doesn't come before")

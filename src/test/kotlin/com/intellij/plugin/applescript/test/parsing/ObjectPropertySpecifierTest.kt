@@ -39,7 +39,7 @@ class ObjectPropertySpecifierTest : BasePlatformTestCase() {
 
         private val PARSER_DEBT_METHODS =
             setOf(
-                // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback
+                // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback (backlog: BL-A4)
                 // before the loaded dictionary-command path consumes only the direct parameter.
                 "testObjectPropertySpecifiers",
             )

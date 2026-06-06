@@ -131,7 +131,7 @@ private class SdefRootParser(
                 parsedDictionary.addEnumeration(enumeration)
                 suite.addEnumeration(enumeration)
             }
-        // KEEP (Phase 8 / v2.0 backlog): the dual registration (components added directly to the
+        // KEEP (Phase 8 / v2.0 backlog: BL-F1): the dual registration (components added directly to the
         // dictionary above AND to the suite) is a legacy of the Java port. Removing it changes
         // dictionary-population ordering on the frozen parser surface — a behavioural change
         // deferred to the grammar-hardening milestone.
