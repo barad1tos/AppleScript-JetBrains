@@ -34,53 +34,109 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     override fun shouldRunTest(): Boolean = name !in PARSER_DEBT_METHODS && super.shouldRunTest()
 
-    fun testMusicLibrary() = assertNoParserErrors("music_library.applescript")
+    fun testMusicLibrary() {
+        assertNoParserErrors("music_library.applescript")
+    }
 
-    fun testFetchTracks() = assertNoParserErrors("fetch_tracks_sanitized.applescript")
+    fun testFetchTracks() {
+        assertNoParserErrors("fetch_tracks_sanitized.applescript")
+    }
 
-    fun testMailArchive() = assertNoParserErrors("mail_archive.applescript")
+    fun testMailArchive() {
+        assertNoParserErrors("mail_archive.applescript")
+    }
 
-    fun testFinderSelect() = assertNoParserErrors("finder_select.applescript")
+    fun testFinderSelect() {
+        assertNoParserErrors("finder_select.applescript")
+    }
 
-    fun testSystemEventsProcesses() = assertNoParserErrors("system_events_processes.applescript")
+    fun testSystemEventsProcesses() {
+        assertNoParserErrors("system_events_processes.applescript")
+    }
 
-    fun testCalendarEvents() = assertNoParserErrors("calendar_events.applescript")
+    fun testCalendarEvents() {
+        assertNoParserErrors("calendar_events.applescript")
+    }
 
-    fun testSafariTabs() = assertNoParserErrors("safari_tabs.applescript")
+    fun testSafariTabs() {
+        assertNoParserErrors("safari_tabs.applescript")
+    }
 
-    fun testStandardSuiteText() = assertNoParserErrors("standard_suite_text.applescript")
+    fun testStandardSuiteText() {
+        assertNoParserErrors("standard_suite_text.applescript")
+    }
 
-    fun testStandardAdditionsPaths() = assertNoParserErrors("standard_additions_paths.applescript")
+    fun testStandardAdditionsPaths() {
+        assertNoParserErrors("standard_additions_paths.applescript")
+    }
 
-    fun testNestedTellRun() = assertNoParserErrors("nested_tell_run.applescript")
+    fun testNestedTellRun() {
+        assertNoParserErrors("nested_tell_run.applescript")
+    }
 
-    fun testApplicationIdReferences() = assertNoParserErrors("application_id_reference_min.applescript")
+    fun testApplicationIdReferences() {
+        assertNoParserErrors("application_id_reference_min.applescript")
+    }
 
-    fun testRemoteDesktopTasks() = assertNoParserErrors("remote_desktop_task_min.applescript")
+    fun testRemoteDesktopTasks() {
+        assertNoParserErrors("remote_desktop_task_min.applescript")
+    }
 
-    fun testTryOnError() = assertNoParserErrors("try_on_error.applescript")
+    fun testTryOnError() {
+        assertNoParserErrors("try_on_error.applescript")
+    }
 
-    fun testNonAsciiMath() = assertNoParserErrors("non_ascii_math.applescript")
+    fun testNonAsciiMath() {
+        assertNoParserErrors("non_ascii_math.applescript")
+    }
 
-    fun testShortcutsInvoke() = assertNoParserErrors("shortcuts_invoke.applescript")
+    fun testShortcutsInvoke() {
+        assertNoParserErrors("shortcuts_invoke.applescript")
+    }
 
-    fun testEveryClassReference() = assertNoParserErrors("every_class_reference.applescript")
+    fun testEveryClassReference() {
+        assertNoParserErrors("every_class_reference.applescript")
+    }
 
-    fun testRecordKeywordLabels() = assertNoParserErrors("record_keyword_labels.applescript")
+    fun testRecordKeywordLabels() {
+        assertNoParserErrors("record_keyword_labels.applescript")
+    }
 
-    fun testDisplayAlertCommand() = assertNoParserErrors("display_alert_command.applescript")
+    fun testDisplayAlertCommand() {
+        assertNoParserErrors("display_alert_command.applescript")
+    }
 
-    fun testSortCommandDirection() = assertNoParserErrors("sort_command_direction.applescript")
+    fun testSortCommandDirection() {
+        assertNoParserErrors("sort_command_direction.applescript")
+    }
 
-    fun testConsideringIgnoringResponses() = assertNoParserErrors("considering_ignoring.applescript")
+    fun testConsideringIgnoringResponses() {
+        assertNoParserErrors("considering_ignoring.applescript")
+    }
 
-    fun testFolderActionHandlers() = assertNoParserErrors("folder_action_handlers.applescript")
+    fun testFolderActionHandlers() {
+        assertNoParserErrors("folder_action_handlers.applescript")
+    }
 
-    fun testTypinatorRuleSet() = assertNoParserErrors("typinator_rule_set_min.applescript")
+    fun testDateComponentAssignment() {
+        assertNoParserErrors("date_component_assignment.applescript")
+    }
 
-    fun testTypinatorRuleSetNoOf() = assertNoParserErrors("typinator_rule_set_nofof.applescript")
+    fun testTypinatorRuleSet() {
+        assertNoParserErrors("typinator_rule_set_min.applescript")
+    }
 
-    fun testKeystrokeReturn() = assertNoParserErrors("keystroke_return.applescript")
+    fun testTypinatorRuleSetNoOf() {
+        assertNoParserErrors("typinator_rule_set_nofof.applescript")
+    }
+
+    fun testTypinatorEditRuleFlow() {
+        assertNoParserErrors("typinator_edit_rule_flow.applescript")
+    }
+
+    fun testKeystrokeReturn() {
+        assertNoParserErrors("keystroke_return.applescript")
+    }
 
     fun testDisplayNotificationLabeled() {
         val psiFile = assertNoParserErrors("display_notification_labeled.applescript")
@@ -96,11 +152,21 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertTrue(psiFile.node.textsOf(ASSIGNMENT_STATEMENT).contains("set done to true"))
     }
 
-    fun testDialogToolkitCommands() = assertNoParserErrors("dialog_toolkit_commands.applescript")
+    fun testStandardAdditionsFileAndListCommands() {
+        assertNoParserErrors("standard_additions_file_and_list_commands.applescript")
+    }
 
-    fun testTellToUnknownCommand() = assertNoParserErrors("tell_to_unknown_command.applescript")
+    fun testDialogToolkitCommands() {
+        assertNoParserErrors("dialog_toolkit_commands.applescript")
+    }
 
-    fun testPermissiveHeadNegative() = assertNoParserErrors("permissive_head_negative.applescript")
+    fun testTellToUnknownCommand() {
+        assertNoParserErrors("tell_to_unknown_command.applescript")
+    }
+
+    fun testPermissiveHeadNegative() {
+        assertNoParserErrors("permissive_head_negative.applescript")
+    }
 
     private fun assertNoParserErrors(fileName: String): PsiFile {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)
@@ -129,10 +195,6 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
                 // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback (backlog: BL-A3)
                 // before the loaded dictionary-command path consumes only the direct parameter.
                 "testStandardAdditionsPaths",
-                // TODO(parser): re-enable once leading `first rule set whose ...` object references
-                // parse multi-word dictionary class names without a preceding OF/IN operand. That path
-                // goes through INDEX_REFERENCE / USER_CLASS_NAME and needs a dedicated BNF + regen fix.
-                "testTypinatorRuleSetNoOf",
             )
     }
 }

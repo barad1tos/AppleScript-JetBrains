@@ -90,6 +90,20 @@ internal class SdefCommandLookup(
         return result
     }
 
+    fun findStdCommandsIfReady(
+        project: Project,
+        commandName: String,
+    ): Collection<AppleScriptCommand> {
+        if (!SdefIndexReadiness.isInitialized()) return emptyList()
+
+        val appNameList = indexStore.stdCommandNameToApplicationNameSetMap[commandName] ?: emptySet()
+        val result = HashSet<AppleScriptCommand>()
+        for (applicationName in appNameList) {
+            result.addAll(findApplicationCommandsIfReady(project, applicationName, commandName))
+        }
+        return result
+    }
+
     /**
      * Resolver for app-scoped commands.
      *
@@ -119,11 +133,16 @@ internal class SdefCommandLookup(
             return emptyList()
         }
 
-        val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val dictionary =
-            projectDictionaryRegistry.getDictionary(applicationName)
-                ?: projectDictionaryRegistry.createDictionary(applicationName)
-        return dictionary?.findAllCommandsWithName(commandName) ?: emptyList()
+        return findApplicationCommandsInReadyProjectDictionary(project, applicationName, commandName)
+    }
+
+    fun findApplicationCommandsIfReady(
+        project: Project,
+        applicationName: String,
+        commandName: String,
+    ): List<AppleScriptCommand> {
+        if (!SdefIndexReadiness.areAppDictionariesIndexed()) return emptyList()
+        return findApplicationCommandsInCachedProjectDictionary(project, applicationName, commandName)
     }
 
     private fun isStandardReady(): Boolean =
@@ -159,5 +178,27 @@ internal class SdefCommandLookup(
                 Result.failure(e.cause ?: e)
             }
         return gate?.isSuccess == true
+    }
+
+    private fun findApplicationCommandsInCachedProjectDictionary(
+        project: Project,
+        applicationName: String,
+        commandName: String,
+    ): List<AppleScriptCommand> {
+        val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val dictionary = projectDictionaryRegistry.getDictionary(applicationName)
+        return dictionary?.findAllCommandsWithName(commandName) ?: emptyList()
+    }
+
+    private fun findApplicationCommandsInReadyProjectDictionary(
+        project: Project,
+        applicationName: String,
+        commandName: String,
+    ): List<AppleScriptCommand> {
+        val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val dictionary =
+            projectDictionaryRegistry.getDictionary(applicationName)
+                ?: projectDictionaryRegistry.createDictionary(applicationName)
+        return dictionary?.findAllCommandsWithName(commandName) ?: emptyList()
     }
 }

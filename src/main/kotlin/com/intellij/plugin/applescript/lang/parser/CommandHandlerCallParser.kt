@@ -9,11 +9,25 @@ import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.openapi.util.Ref
 import com.intellij.plugin.applescript.AppleScriptNames
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_PROPERTY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COUNT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_COMMAND_NAME
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.SET
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
+import com.intellij.psi.tree.IElementType
 
 internal object CommandHandlerCallParser {
+    private val FALLBACK_FIRST_COMMAND_NAMES: Set<String> =
+        setOf(
+            "choose from list",
+            "make",
+            "write",
+        )
+
     fun parseCallExpression(
         builder: PsiBuilder,
         level: Int,
@@ -76,9 +90,44 @@ internal object CommandHandlerCallParser {
         val tokenText = builder.tokenText
         return !nextTokenIs(builder, NLS) &&
             builder.tokenType !== COUNT &&
+            !isAssignmentObjectOperandBeforeTerminator(builder) &&
+            !isAssignmentTargetPhraseBeforeTerminator(builder) &&
             !tokenText.isNullOrEmpty() &&
             AppleScriptNames.isIdentifierStart(tokenText[0])
     }
+
+    private fun isAssignmentObjectOperandBeforeTerminator(builder: PsiBuilder): Boolean =
+        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            builder.lookAhead(1) === TO &&
+            isObjectPointer(AppleScriptParserTrivia.previousNonSpaceToken(builder))
+
+    private fun isAssignmentTargetPhraseBeforeTerminator(builder: PsiBuilder): Boolean =
+        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            isAssignmentTargetIntroducer(AppleScriptParserTrivia.previousNonSpaceToken(builder)) &&
+            hasAssignmentTerminatorAfterTargetPhrase(builder)
+
+    private fun isAssignmentTargetIntroducer(tokenType: IElementType?): Boolean =
+        tokenType === SET || isObjectPointer(tokenType)
+
+    private fun hasAssignmentTerminatorAfterTargetPhrase(builder: PsiBuilder): Boolean {
+        var offset = 0
+        var tokenType = builder.tokenType
+        var consumedTargetWord = false
+        while (isAssignmentTargetWord(tokenType)) {
+            consumedTargetWord = true
+            offset += 1
+            tokenType = builder.lookAhead(offset)
+        }
+        return consumedTargetWord && tokenType === TO
+    }
+
+    private fun isAssignmentTargetWord(tokenType: IElementType?): Boolean =
+        tokenType === VAR_IDENTIFIER ||
+            tokenType === BUILT_IN_PROPERTY ||
+            tokenType === SET ||
+            FallbackDictionaryTermPredicates.isContextualPropertyTerm(tokenType)
+
+    private fun isObjectPointer(tokenType: IElementType?): Boolean = tokenType === OF || tokenType === IN
 
     private fun commandLookupScope(builder: PsiBuilder): DictionaryCommandLookupScope {
         val areThereUseStatements =
@@ -151,11 +200,11 @@ internal object CommandHandlerCallParser {
             parseDictionaryCommandParameters(builder, level, allCommandsWithName)
         }
 
-    // `make` routes through the fallback parameter parser even when a loaded standard dictionary
-    // defines it: the dictionary command consumes app-specific multi-word noun phrases (e.g.
-    // `make new lock screen task`) too narrowly and drops the trailing nouns. Promote to a
-    // Set<String> if a second command ever needs the same fallback-first treatment.
-    private fun isFallbackFirstCommand(commandName: String): Boolean = commandName.equals("make", ignoreCase = true)
+    // These commands route through the fallback parameter parser even when a loaded standard
+    // dictionary defines them: their real-world parameter syntax uses multi-word labels and
+    // valueless boolean tails that the strict dictionary parser still models too narrowly.
+    private fun isFallbackFirstCommand(commandName: String): Boolean =
+        commandName.lowercase() in FALLBACK_FIRST_COMMAND_NAMES
 
     private fun parseDictionaryCommandParameters(
         builder: PsiBuilder,

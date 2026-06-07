@@ -218,6 +218,40 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testWriteStartingAtEofHighlightsSelectorAndConstant() {
+        val script =
+            """
+            on appendLine(logFilePosix, lineText)
+                set logAlias to POSIX file logFilePosix
+                set fh to open for access logAlias with write permission
+                write (lineText & linefeed) to fh starting at eof
+                close access fh
+            end appendLine
+            """.trimIndent()
+
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Standard dictionaries were not initialized",
+            { registryService.isInitialized() },
+            10,
+        )
+        myFixture.configureByText(AppleScriptFileType, script)
+        val highlights = myFixture.doHighlighting()
+        val document = myFixture.editor.document
+
+        val selectorKeys = highlightingKeysFor(highlights, textRangeFor(document, "starting at"))
+        assertTrue(
+            "starting at must use command-parameter selector highlighting; keys=$selectorKeys",
+            selectorKeys.contains(AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR),
+        )
+
+        val constantKeys = highlightingKeysFor(highlights, textRangeFor(document, "eof"))
+        assertTrue(
+            "eof must use dictionary constant highlighting; keys=$constantKeys",
+            constantKeys.contains(AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR),
+        )
+    }
+
     fun testMyHandlerCallUsesFunctionHighlighting() {
         val script =
             """
