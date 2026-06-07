@@ -11,6 +11,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.WHERE
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.WHOSE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
 
 internal object ApplicationObjectReferenceParser {
@@ -84,6 +86,8 @@ internal object ApplicationObjectReferenceParser {
                     builder.tokenType === OF ||
                     builder.tokenType === IN ||
                     builder.tokenType === ON ||
+                    builder.tokenType === WHOSE ||
+                    builder.tokenType === WHERE ||
                     builder.tokenType === RPAREN ||
                     builder.tokenType === NLS
             )

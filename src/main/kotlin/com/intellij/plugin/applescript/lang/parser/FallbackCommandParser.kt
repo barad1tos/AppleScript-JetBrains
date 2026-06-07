@@ -49,6 +49,7 @@ internal object FallbackCommandParser {
             listOf("choose", "from", "list"),
             listOf("display", "dialog"),
             listOf("display", "alert"),
+            listOf("display", "notification"),
             listOf("do", "shell", "script"),
             listOf("run", "script"),
         )

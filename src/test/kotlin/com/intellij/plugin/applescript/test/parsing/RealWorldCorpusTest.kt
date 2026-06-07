@@ -76,6 +76,8 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testFolderActionHandlers() = assertNoParserErrors("folder_action_handlers.applescript")
 
+    fun testDateComponentAssignment() = assertNoParserErrors("date_component_assignment.applescript")
+
     fun testTypinatorRuleSet() = assertNoParserErrors("typinator_rule_set_min.applescript")
 
     fun testTypinatorRuleSetNoOf() = assertNoParserErrors("typinator_rule_set_nofof.applescript")
@@ -129,10 +131,6 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
                 // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback (backlog: BL-A3)
                 // before the loaded dictionary-command path consumes only the direct parameter.
                 "testStandardAdditionsPaths",
-                // TODO(parser): re-enable once leading `first rule set whose ...` object references
-                // parse multi-word dictionary class names without a preceding OF/IN operand. That path
-                // goes through INDEX_REFERENCE / USER_CLASS_NAME and needs a dedicated BNF + regen fix.
-                "testTypinatorRuleSetNoOf",
             )
     }
 }
