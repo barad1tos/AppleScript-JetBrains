@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from .paths import CHANGELOG
 
 _VERSION_HEADER = re.compile(
-    r"^## \[(?P<version>[^\]]+)] - (?P<date>\d{4}-\d{2}-\d{2})\s*$",
+    r"^## \[(?P<version>[^]]+)] - (?P<date>\d{4}-\d{2}-\d{2})\s*$",
     re.MULTILINE,
 )
 
