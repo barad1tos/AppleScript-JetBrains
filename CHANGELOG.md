@@ -2,6 +2,18 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.4] - 2026-06-07
+
+### Fixed
+
+- Fixed parser freezes and blocking dictionary lookups when AppleScript dictionaries are still loading.
+- Improved parsing for Standard Additions command parameters such as `display notification`, `write ... starting at eof`, and `choose from list`.
+- Fixed Typinator-style dictionary class references such as `rule set` and `containing set`.
+
+### Tests
+
+- Added regression coverage for real-world AppleScript parser edge cases.
+
 ## [2.0.3] - 2026-06-07
 
 ### Fixed

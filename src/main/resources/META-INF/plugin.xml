@@ -27,6 +27,13 @@
     </p>
   ]]></description>
   <change-notes><![CDATA[
+    <h3>2.0.4</h3>
+    <ul>
+      <li>Fixed parser freezes and blocking dictionary lookups when AppleScript dictionaries are still loading.</li>
+      <li>Improved parsing for Standard Additions command parameters such as <code>display notification</code>, <code>write ... starting at eof</code>, and <code>choose from list</code>.</li>
+      <li>Fixed Typinator-style dictionary class references such as <code>rule set</code> and <code>containing set</code>.</li>
+      <li>Added regression coverage for real-world AppleScript parser edge cases.</li>
+    </ul>
     <h3>2.0.3</h3>
     <ul>
       <li>Improved parsing for real-world AppleScript command phrases that use dictionary-style labeled arguments.</li>
