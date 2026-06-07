@@ -2,7 +2,11 @@ package com.intellij.plugin.applescript.lang.parser
 
 import com.intellij.lang.PsiBuilder
 import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.SET
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
+import com.intellij.psi.TokenType
+import com.intellij.psi.tree.IElementType
 
 internal object FallbackDictionaryPropertyParser {
     fun parseKeywordAsProperty(
@@ -26,7 +30,7 @@ internal object FallbackDictionaryPropertyParser {
     private fun parseContextualProperty(builder: PsiBuilder): Boolean {
         val result =
             FallbackDictionaryTermPredicates.isContextualPropertyTerm(builder.tokenType) &&
-                FallbackDictionaryTermPredicates.isFallbackAnchorForProperty(builder.lookAhead(1))
+                isPropertyAnchor(builder, builder.lookAhead(1))
         if (result) {
             builder.advanceLexer()
         }
@@ -37,7 +41,7 @@ internal object FallbackDictionaryPropertyParser {
         val result =
             builder.tokenType === VAR_IDENTIFIER &&
                 FallbackDictionaryTermPredicates.isContextualPropertyTerm(builder.lookAhead(1)) &&
-                FallbackDictionaryTermPredicates.isFallbackAnchorForProperty(builder.lookAhead(2))
+                isPropertyAnchor(builder, builder.lookAhead(2))
         if (result) {
             builder.advanceLexer()
             builder.advanceLexer()
@@ -49,7 +53,7 @@ internal object FallbackDictionaryPropertyParser {
         val result =
             FallbackDictionaryTermPredicates.isContextualPropertyTerm(builder.tokenType) &&
                 builder.lookAhead(1) === VAR_IDENTIFIER &&
-                FallbackDictionaryTermPredicates.isFallbackAnchorForProperty(builder.lookAhead(2))
+                isPropertyAnchor(builder, builder.lookAhead(2))
         if (result) {
             builder.advanceLexer()
             builder.advanceLexer()
@@ -58,7 +62,7 @@ internal object FallbackDictionaryPropertyParser {
     }
 
     private fun parseAnchoredOrPropertyIdentifier(builder: PsiBuilder): Boolean =
-        if (FallbackDictionaryTermPredicates.isFallbackAnchorForProperty(builder.lookAhead(1))) {
+        if (isPropertyAnchor(builder, builder.lookAhead(1))) {
             FallbackDictionaryTermActions.advanceTerm(builder)
         } else {
             parsePropertyIdentifier(builder)
@@ -76,10 +80,36 @@ internal object FallbackDictionaryPropertyParser {
         }
 
     private fun parseTwoWordIdentifier(builder: PsiBuilder): Boolean {
-        val result = FallbackDictionaryPropertyPatterns.isTwoWordIdentifierWithAnchor(builder)
+        val result =
+            builder.lookAhead(1) === VAR_IDENTIFIER &&
+                isPropertyAnchor(builder, builder.lookAhead(2))
         if (result) {
             FallbackDictionaryTermActions.advanceTermPair(builder)
         }
         return result
+    }
+
+    private fun isPropertyAnchor(
+        builder: PsiBuilder,
+        tokenType: IElementType?,
+    ): Boolean =
+        FallbackDictionaryTermPredicates.isFallbackAnchorForProperty(tokenType) ||
+            isAssignmentTargetTerminator(builder, tokenType)
+
+    private fun isAssignmentTargetTerminator(
+        builder: PsiBuilder,
+        tokenType: IElementType?,
+    ): Boolean =
+        tokenType === TO &&
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            previousNonSpaceToken(builder) === SET
+
+    private fun previousNonSpaceToken(builder: PsiBuilder): IElementType? {
+        var index = -1
+        var tokenType = builder.rawLookup(index)
+        while (tokenType === TokenType.WHITE_SPACE) {
+            tokenType = builder.rawLookup(--index)
+        }
+        return tokenType
     }
 }

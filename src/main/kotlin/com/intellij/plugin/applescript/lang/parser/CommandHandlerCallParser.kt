@@ -9,12 +9,15 @@ import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.openapi.util.Ref
 import com.intellij.plugin.applescript.AppleScriptNames
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_PROPERTY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COUNT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_COMMAND_NAME
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.SET
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
@@ -82,6 +85,7 @@ internal object CommandHandlerCallParser {
         return !nextTokenIs(builder, NLS) &&
             builder.tokenType !== COUNT &&
             !isAssignmentObjectOperandBeforeTerminator(builder) &&
+            !isAssignmentTargetPhraseBeforeTerminator(builder) &&
             !tokenText.isNullOrEmpty() &&
             AppleScriptNames.isIdentifierStart(tokenText[0])
     }
@@ -90,6 +94,32 @@ internal object CommandHandlerCallParser {
         builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
             builder.lookAhead(1) === TO &&
             isObjectPointer(previousNonSpaceToken(builder))
+
+    private fun isAssignmentTargetPhraseBeforeTerminator(builder: PsiBuilder): Boolean =
+        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            isAssignmentTargetIntroducer(previousNonSpaceToken(builder)) &&
+            hasAssignmentTerminatorAfterTargetPhrase(builder)
+
+    private fun isAssignmentTargetIntroducer(tokenType: IElementType?): Boolean =
+        tokenType === SET || isObjectPointer(tokenType)
+
+    private fun hasAssignmentTerminatorAfterTargetPhrase(builder: PsiBuilder): Boolean {
+        var offset = 0
+        var tokenType = builder.tokenType
+        var consumedTargetWord = false
+        while (isAssignmentTargetWord(tokenType)) {
+            consumedTargetWord = true
+            offset += 1
+            tokenType = builder.lookAhead(offset)
+        }
+        return consumedTargetWord && tokenType === TO
+    }
+
+    private fun isAssignmentTargetWord(tokenType: IElementType?): Boolean =
+        tokenType === VAR_IDENTIFIER ||
+            tokenType === BUILT_IN_PROPERTY ||
+            tokenType === SET ||
+            FallbackDictionaryTermPredicates.isContextualPropertyTerm(tokenType)
 
     private fun previousNonSpaceToken(builder: PsiBuilder): IElementType? {
         var index = -1

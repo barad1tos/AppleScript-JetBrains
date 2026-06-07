@@ -130,6 +130,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertNoParserErrors("typinator_rule_set_nofof.applescript")
     }
 
+    fun testTypinatorEditRuleFlow() {
+        assertNoParserErrors("typinator_edit_rule_flow.applescript")
+    }
+
     fun testKeystrokeReturn() {
         assertNoParserErrors("keystroke_return.applescript")
     }
