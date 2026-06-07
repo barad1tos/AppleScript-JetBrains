@@ -18,7 +18,6 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SET
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
-import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
 internal object CommandHandlerCallParser {
@@ -100,11 +99,11 @@ internal object CommandHandlerCallParser {
     private fun isAssignmentObjectOperandBeforeTerminator(builder: PsiBuilder): Boolean =
         builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
             builder.lookAhead(1) === TO &&
-            isObjectPointer(previousNonSpaceToken(builder))
+            isObjectPointer(AppleScriptParserTrivia.previousNonSpaceToken(builder))
 
     private fun isAssignmentTargetPhraseBeforeTerminator(builder: PsiBuilder): Boolean =
         builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
-            isAssignmentTargetIntroducer(previousNonSpaceToken(builder)) &&
+            isAssignmentTargetIntroducer(AppleScriptParserTrivia.previousNonSpaceToken(builder)) &&
             hasAssignmentTerminatorAfterTargetPhrase(builder)
 
     private fun isAssignmentTargetIntroducer(tokenType: IElementType?): Boolean =
@@ -127,15 +126,6 @@ internal object CommandHandlerCallParser {
             tokenType === BUILT_IN_PROPERTY ||
             tokenType === SET ||
             FallbackDictionaryTermPredicates.isContextualPropertyTerm(tokenType)
-
-    private fun previousNonSpaceToken(builder: PsiBuilder): IElementType? {
-        var index = -1
-        var tokenType = builder.rawLookup(index)
-        while (tokenType === TokenType.WHITE_SPACE) {
-            tokenType = builder.rawLookup(--index)
-        }
-        return tokenType
-    }
 
     private fun isObjectPointer(tokenType: IElementType?): Boolean = tokenType === OF || tokenType === IN
 

@@ -10,7 +10,6 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.ABOUT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AFTER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AGAINST
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.AT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_TYPE_S
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
@@ -292,25 +291,7 @@ internal object FallbackCommandParameterParser {
         val marker = builder.mark()
         builder.advanceLexer()
         val isBoundedValue =
-            builder.tokenType === VAR_IDENTIFIER &&
-                (
-                    (
-                        builder.tokenText.equals("default", ignoreCase = true) &&
-                            (builder.lookAhead(1) === VAR_IDENTIFIER || builder.lookAhead(1) === BUILT_IN_TYPE_S)
-                    ) ||
-                        (
-                            builder.tokenText.equals("starting", ignoreCase = true) &&
-                                builder.lookAhead(1) === AT
-                        ) ||
-                        (
-                            builder.tokenText.equals("sound", ignoreCase = true) &&
-                                builder.lookAhead(1) === VAR_IDENTIFIER
-                        ) ||
-                        (
-                            builder.tokenText.equals("giving", ignoreCase = true) &&
-                                builder.lookAhead(2) === AFTER
-                        )
-                )
+            builder.tokenType === VAR_IDENTIFIER && isKnownBareSelectorStart(builder)
         if (isBoundedValue) {
             marker.drop()
         } else {
@@ -348,29 +329,57 @@ internal object FallbackCommandParameterParser {
         }
 
     private fun parseBareParameterSelector(builder: PsiBuilder) {
-        val firstWord = builder.tokenText.orEmpty()
+        if (builder.tokenText.equals("default", ignoreCase = true) &&
+            (builder.lookAhead(1) === VAR_IDENTIFIER || builder.lookAhead(1) === BUILT_IN_TYPE_S)
+        ) {
+            builder.advanceLexer()
+            builder.advanceLexer()
+            return
+        }
+        if (consumeBareSelectorPhrase(builder, "starting", "at")) return
+        if (consumeBareSelectorPhrase(builder, "sound", "name")) return
+        if (consumeBareSelectorPhrase(builder, "giving", "up", "after")) return
+
         builder.advanceLexer()
-        if (firstWord.equals("default", ignoreCase = true) &&
-            (builder.tokenType === VAR_IDENTIFIER || builder.tokenType === BUILT_IN_TYPE_S)
-        ) {
-            builder.advanceLexer()
-            return
+    }
+
+    private fun isKnownBareSelectorStart(builder: PsiBuilder): Boolean =
+        when {
+            builder.tokenText.equals("default", ignoreCase = true) ->
+                builder.lookAhead(1) === VAR_IDENTIFIER || builder.lookAhead(1) === BUILT_IN_TYPE_S
+            hasBareSelectorPhrase(builder, "starting", "at") -> true
+            hasBareSelectorPhrase(builder, "sound", "name") -> true
+            hasBareSelectorPhrase(builder, "giving", "up", "after") -> true
+            hasBareSelectorPhrase(builder, "subtitle") -> true
+            else -> false
         }
-        if (firstWord.equals("starting", ignoreCase = true) && builder.tokenType === AT) {
-            builder.advanceLexer()
-            return
-        }
-        if (firstWord.equals("sound", ignoreCase = true) && builder.tokenText.equals("name", ignoreCase = true)) {
-            builder.advanceLexer()
-            return
-        }
-        if (firstWord.equals("giving", ignoreCase = true) &&
-            builder.tokenText.equals("up", ignoreCase = true) &&
-            builder.lookAhead(1).hasText("after")
-        ) {
-            builder.advanceLexer()
+
+    private fun consumeBareSelectorPhrase(
+        builder: PsiBuilder,
+        vararg words: String,
+    ): Boolean {
+        if (!hasBareSelectorPhrase(builder, *words)) return false
+        repeat(words.size) {
             builder.advanceLexer()
         }
+        return true
+    }
+
+    private fun hasBareSelectorPhrase(
+        builder: PsiBuilder,
+        vararg words: String,
+    ): Boolean {
+        val marker = builder.mark()
+        var matches = true
+        for (word in words) {
+            if (!builder.tokenText.equals(word, ignoreCase = true)) {
+                matches = false
+                break
+            }
+            builder.advanceLexer()
+        }
+        marker.rollbackTo()
+        return matches
     }
 
     private fun isDirectParameterStart(tokenType: IElementType?): Boolean =
@@ -394,6 +403,4 @@ internal object FallbackCommandParameterParser {
             tokenType === BY ||
             tokenType === OVER ||
             tokenType === UNDER
-
-    private fun IElementType?.hasText(text: String) = this != null && toString().equals(text, ignoreCase = true)
 }

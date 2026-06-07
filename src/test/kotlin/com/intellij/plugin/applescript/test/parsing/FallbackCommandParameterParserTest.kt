@@ -97,6 +97,21 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertEquals(listOf("\"No id\""), ast.textsOf(DIRECT_PARAMETER_VAL))
     }
 
+    fun testLabeledNotificationTailStopsVariableValuesBeforeNextSelector() {
+        val builder = createBuilder("messageText with title titleText subtitle subtitleText sound name soundName")
+
+        val ast =
+            parseWithRootSection(builder) {
+                FallbackCommandParameterParser.parseParameters(builder, 0, "display notification")
+            }
+
+        assertEquals(
+            listOf("with title", "subtitle", "sound name"),
+            ast.textsOf(COMMAND_PARAMETER_SELECTOR),
+        )
+        assertEquals(listOf("messageText"), ast.textsOf(DIRECT_PARAMETER_VAL))
+    }
+
     fun testGenericSingleWordHeadProducesParameters() {
         // A generic single-word command head accepted by the permissive command-name fallback gets
         // the unknown-command tail consumer. Without the parser-state flag, a bare unknown single

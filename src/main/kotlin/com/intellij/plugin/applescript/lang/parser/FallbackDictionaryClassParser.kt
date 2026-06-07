@@ -20,7 +20,6 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.SOME
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TENTH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THIRD
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
-import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
 internal object FallbackDictionaryClassParser {
@@ -34,7 +33,7 @@ internal object FallbackDictionaryClassParser {
         // dictionary-style noun even when it is not followed by a class anchor, e.g. `every row to 24`,
         // `the name of every group` at line end. The generic anchor rules below only need to fire in
         // ambiguous class-vs-variable positions where no class-introducing keyword precedes the term.
-        if (isUnambiguousClassIntroducer(previousNonSpaceToken(builder))) {
+        if (isUnambiguousClassIntroducer(AppleScriptParserTrivia.previousNonSpaceToken(builder))) {
             return parseIntroducedClassWords(builder)
         }
         return parseAnchoredOrClassIdentifier(builder)
@@ -51,15 +50,6 @@ internal object FallbackDictionaryClassParser {
 
     private fun isUnambiguousClassIntroducer(tokenType: IElementType?): Boolean =
         tokenType === EVERY || tokenType === SOME
-
-    private fun previousNonSpaceToken(builder: PsiBuilder): IElementType? {
-        var index = -1
-        var tokenType = builder.rawLookup(index)
-        while (tokenType === TokenType.WHITE_SPACE) {
-            tokenType = builder.rawLookup(--index)
-        }
-        return tokenType
-    }
 
     private fun parseAnchoredOrClassIdentifier(builder: PsiBuilder): Boolean =
         if (FallbackDictionaryTermPredicates.isFallbackAnchorForClass(builder.lookAhead(1))) {
@@ -86,7 +76,7 @@ internal object FallbackDictionaryClassParser {
     // (`containing set\n`), or a trailing VAR_IDENTIFIER by-name selector (`rule set theSet`).
     private fun parsesSetContinuationIdentifier(builder: PsiBuilder): Boolean =
         FallbackDictionaryTermPredicates.isClassContinuationKeyword(builder.lookAhead(1)) &&
-            isSafeSetContinuationPosition(previousNonSpaceToken(builder)) &&
+            isSafeSetContinuationPosition(AppleScriptParserTrivia.previousNonSpaceToken(builder)) &&
             isClassWordAfterContinuation(builder.lookAhead(2))
 
     private fun isSafeSetContinuationPosition(tokenType: IElementType?): Boolean =

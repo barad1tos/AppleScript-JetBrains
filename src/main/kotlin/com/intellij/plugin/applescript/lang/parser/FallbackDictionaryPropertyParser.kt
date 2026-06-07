@@ -5,7 +5,6 @@ import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SET
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
-import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
 internal object FallbackDictionaryPropertyParser {
@@ -102,14 +101,5 @@ internal object FallbackDictionaryPropertyParser {
     ): Boolean =
         tokenType === TO &&
             builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
-            previousNonSpaceToken(builder) === SET
-
-    private fun previousNonSpaceToken(builder: PsiBuilder): IElementType? {
-        var index = -1
-        var tokenType = builder.rawLookup(index)
-        while (tokenType === TokenType.WHITE_SPACE) {
-            tokenType = builder.rawLookup(--index)
-        }
-        return tokenType
-    }
+            AppleScriptParserTrivia.previousNonSpaceToken(builder) === SET
 }

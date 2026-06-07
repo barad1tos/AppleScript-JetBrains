@@ -142,7 +142,7 @@ internal class SdefCommandLookup(
         commandName: String,
     ): List<AppleScriptCommand> {
         if (!SdefIndexReadiness.areAppDictionariesIndexed()) return emptyList()
-        return findApplicationCommandsInReadyProjectDictionary(project, applicationName, commandName)
+        return findApplicationCommandsInCachedProjectDictionary(project, applicationName, commandName)
     }
 
     private fun isStandardReady(): Boolean =
@@ -178,6 +178,16 @@ internal class SdefCommandLookup(
                 Result.failure(e.cause ?: e)
             }
         return gate?.isSuccess == true
+    }
+
+    private fun findApplicationCommandsInCachedProjectDictionary(
+        project: Project,
+        applicationName: String,
+        commandName: String,
+    ): List<AppleScriptCommand> {
+        val projectDictionaryRegistry = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val dictionary = projectDictionaryRegistry.getDictionary(applicationName)
+        return dictionary?.findAllCommandsWithName(commandName) ?: emptyList()
     }
 
     private fun findApplicationCommandsInReadyProjectDictionary(
