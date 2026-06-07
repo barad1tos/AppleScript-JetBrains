@@ -2,7 +2,7 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
-## [2.0.4] - 2026-06-07
+## [2.0.5] - 2026-06-08
 
 ### Fixed
 
@@ -38,7 +38,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - Verified against IntelliJ IDEA Community 2025.1 and 2025.2 (`sinceBuild = 251`, `untilBuild = 252.*`).
 
-## [2.0.0] - 2026-06-03
+## [2.0.0] - 2026-06-05
 
 ### Added
 

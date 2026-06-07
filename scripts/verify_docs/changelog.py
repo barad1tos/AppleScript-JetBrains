@@ -21,16 +21,25 @@ class ChangelogEntry:
 
 
 def parse_latest_changelog_entry() -> ChangelogEntry | None:
-    text = CHANGELOG.read_text(encoding="utf-8")
-    entries = list(_VERSION_HEADER.finditer(text))
-    if not entries:
-        return None
+    entries = parse_changelog_entries()
+    return entries[0] if entries else None
 
-    first = entries[0]
-    body_start = first.end()
-    body_end = entries[1].start() if len(entries) > 1 else len(text)
-    return ChangelogEntry(
-        version=first.group("version"),
-        date=first.group("date"),
-        body=text[body_start:body_end],
-    )
+
+def parse_changelog_entries() -> list[ChangelogEntry]:
+    text = CHANGELOG.read_text(encoding="utf-8")
+    headings = list(_VERSION_HEADER.finditer(text))
+    if not headings:
+        return []
+
+    entries: list[ChangelogEntry] = []
+    for index, heading in enumerate(headings):
+        body_start = heading.end()
+        body_end = headings[index + 1].start() if index + 1 < len(headings) else len(text)
+        entries.append(
+            ChangelogEntry(
+                version=heading.group("version"),
+                date=heading.group("date"),
+                body=text[body_start:body_end],
+            ),
+        )
+    return entries

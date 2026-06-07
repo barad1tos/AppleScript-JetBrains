@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .changelog import parse_latest_changelog_entry
+from .changelog import ChangelogEntry, parse_changelog_entries, parse_latest_changelog_entry
 from .gradle_properties import load_gradle_properties
 from .normalization import html_bullets, markdown_bullets
 from .plugin_xml import load_plugin_xml_metadata
@@ -37,14 +37,20 @@ def check_release_metadata(report: Report) -> None:
             f"latest version {latest_changelog.version} does not match pluginVersion {plugin_version}",
         )
 
-    expected_release_date = latest_changelog.date.replace("-", "")
-    if plugin_xml.release_date != expected_release_date:
+    expected_release_version = expected_marketplace_release_version(plugin_version)
+    expected_release_date = expected_marketplace_release_date(plugin_version, parse_changelog_entries())
+    if expected_release_date is None:
+        report.error(
+            CHANGELOG_FILE,
+            f"missing initial changelog entry for Marketplace release-version {expected_release_version}",
+        )
+    elif plugin_xml.release_date != expected_release_date:
         report.error(
             PLUGIN_XML_FILE,
-            f"release-date {plugin_xml.release_date} does not match CHANGELOG date {expected_release_date}",
+            f"release-date {plugin_xml.release_date} does not match Marketplace major release date "
+            f"{expected_release_date}",
         )
 
-    expected_release_version = expected_marketplace_release_version(plugin_version)
     if plugin_xml.release_version != expected_release_version:
         report.error(
             PLUGIN_XML_FILE,
@@ -76,3 +82,15 @@ def expected_marketplace_release_version(plugin_version: str) -> str:
     if len(parts) < 2 or not all(part.isdigit() for part in parts[:2]):
         raise ValueError(f"Unsupported pluginVersion format: {plugin_version}")
     return f"{int(parts[0])}{int(parts[1])}"
+
+
+def expected_marketplace_release_date(plugin_version: str, changelog_entries: list[ChangelogEntry]) -> str | None:
+    release_version = expected_marketplace_release_version(plugin_version)
+    matching_entries = [
+        entry
+        for entry in changelog_entries
+        if expected_marketplace_release_version(entry.version) == release_version
+    ]
+    if not matching_entries:
+        return None
+    return matching_entries[-1].date.replace("-", "")
