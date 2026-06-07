@@ -11,7 +11,12 @@ import com.intellij.plugin.applescript.AppleScriptNames
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COUNT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_COMMAND_NAME
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
+import com.intellij.psi.TokenType
+import com.intellij.psi.tree.IElementType
 
 internal object CommandHandlerCallParser {
     fun parseCallExpression(
@@ -76,9 +81,26 @@ internal object CommandHandlerCallParser {
         val tokenText = builder.tokenText
         return !nextTokenIs(builder, NLS) &&
             builder.tokenType !== COUNT &&
+            !isAssignmentObjectOperandBeforeTerminator(builder) &&
             !tokenText.isNullOrEmpty() &&
             AppleScriptNames.isIdentifierStart(tokenText[0])
     }
+
+    private fun isAssignmentObjectOperandBeforeTerminator(builder: PsiBuilder): Boolean =
+        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            builder.lookAhead(1) === TO &&
+            isObjectPointer(previousNonSpaceToken(builder))
+
+    private fun previousNonSpaceToken(builder: PsiBuilder): IElementType? {
+        var index = -1
+        var tokenType = builder.rawLookup(index)
+        while (tokenType === TokenType.WHITE_SPACE) {
+            tokenType = builder.rawLookup(--index)
+        }
+        return tokenType
+    }
+
+    private fun isObjectPointer(tokenType: IElementType?): Boolean = tokenType === OF || tokenType === IN
 
     private fun commandLookupScope(builder: PsiBuilder): DictionaryCommandLookupScope {
         val areThereUseStatements =

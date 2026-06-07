@@ -10,10 +10,12 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.SET
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WHERE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WHOSE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
+import com.intellij.psi.tree.IElementType
 
 internal object ApplicationObjectReferenceParser {
     fun parse(
@@ -68,12 +70,36 @@ internal object ApplicationObjectReferenceParser {
 
     private fun parseTerm(builder: PsiBuilder): Int {
         var termWordCount = 0
-        while (FallbackDictionaryAnchorPredicates.isMultiWordNounWord(builder.tokenType)) {
+        while (isTermWord(builder, termWordCount)) {
             builder.advanceLexer()
             termWordCount += 1
         }
         return termWordCount
     }
+
+    private fun isTermWord(
+        builder: PsiBuilder,
+        termWordCount: Int,
+    ): Boolean =
+        FallbackDictionaryAnchorPredicates.isMultiWordNounWord(builder.tokenType) ||
+            (
+                termWordCount > 0 &&
+                    builder.tokenType === SET &&
+                    isSetContinuationBoundary(builder.lookAhead(1))
+            )
+
+    private fun isSetContinuationBoundary(tokenType: IElementType?): Boolean =
+        tokenType === STRING_LITERAL ||
+            tokenType === ID ||
+            tokenType === DIGITS ||
+            tokenType === WITH ||
+            tokenType === OF ||
+            tokenType === IN ||
+            tokenType === ON ||
+            tokenType === WHOSE ||
+            tokenType === WHERE ||
+            tokenType === RPAREN ||
+            tokenType === NLS
 
     private fun isBareMultiWordReferenceBoundary(
         builder: PsiBuilder,
