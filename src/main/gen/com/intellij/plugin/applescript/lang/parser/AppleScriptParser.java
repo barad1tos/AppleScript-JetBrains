@@ -6420,11 +6420,11 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // (on|to) <<parseSpecialHandlerSignature>> [varDeclarationList] sep
   //                                        blockBody?
   //                                      end (<<parseSpecialHandlerSignature>> | referenceExpression)?
-  static boolean specialHandlerDefinition(PsiBuilder builder_, int level_) {
+  public static boolean specialHandlerDefinition(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "specialHandlerDefinition")) return false;
-    if (!nextTokenIs(builder_, "", ON, TO)) return false;
+    if (!nextTokenIs(builder_, "<special handler definition>", ON, TO)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, SPECIAL_HANDLER_DEFINITION, "<special handler definition>");
     result_ = specialHandlerDefinition_0(builder_, level_ + 1);
     result_ = result_ && parseSpecialHandlerSignature(builder_, level_ + 1);
     result_ = result_ && specialHandlerDefinition_2(builder_, level_ + 1);
@@ -6432,7 +6432,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     result_ = result_ && specialHandlerDefinition_4(builder_, level_ + 1);
     result_ = result_ && consumeToken(builder_, END);
     result_ = result_ && specialHandlerDefinition_6(builder_, level_ + 1);
-    exit_section_(builder_, marker_, null, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 

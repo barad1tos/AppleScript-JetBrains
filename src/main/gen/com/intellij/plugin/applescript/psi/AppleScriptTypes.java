@@ -117,6 +117,7 @@ public interface AppleScriptTypes {
   IElementType SCRIPT_PROPERTY_DECLARATION = new AppleScriptElementType("SCRIPT_PROPERTY_DECLARATION");
   IElementType SELECTOR_ID = new AppleScriptElementType("SELECTOR_ID");
   IElementType SIMPLE_FORMAL_PARAMETER = new AppleScriptElementType("SIMPLE_FORMAL_PARAMETER");
+  IElementType SPECIAL_HANDLER_DEFINITION = new AppleScriptElementType("SPECIAL_HANDLER_DEFINITION");
   IElementType STRING_LITERAL_EXPRESSION = new AppleScriptElementType("STRING_LITERAL_EXPRESSION");
   IElementType TARGET_LIST_LITERAL = new AppleScriptElementType("TARGET_LIST_LITERAL");
   IElementType TARGET_RECORD_LITERAL = new AppleScriptElementType("TARGET_RECORD_LITERAL");
@@ -694,6 +695,9 @@ public interface AppleScriptTypes {
       }
       else if (type == SIMPLE_FORMAL_PARAMETER) {
         return new AppleScriptSimpleFormalParameterImpl(node);
+      }
+      else if (type == SPECIAL_HANDLER_DEFINITION) {
+        return new AppleScriptSpecialHandlerDefinitionImpl(node);
       }
       else if (type == STRING_LITERAL_EXPRESSION) {
         return new AppleScriptStringLiteralExpressionImpl(node);

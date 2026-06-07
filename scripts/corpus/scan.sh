@@ -11,6 +11,7 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 OUT="${CORPUS_OUT:-/tmp/applescript-corpus}"
+VALID_DIR="$OUT/valid"
 export CORPUS_OUT="$OUT"
 
 DIRS=("$@")
@@ -22,14 +23,20 @@ bash "$HERE/classify.sh" "${DIRS[@]}" || exit $?
 
 echo ""
 echo "=== running plugin parser over VALID_HERE corpus (boots a test fixture) ==="
-(
-  cd "$ROOT" && APPLESCRIPT_CORPUS_DIR="$OUT/src" ./gradlew test \
+if ! (
+  cd "$ROOT" && APPLESCRIPT_CORPUS_DIR="$VALID_DIR" ./gradlew test \
     --tests "com.intellij.plugin.applescript.test.parsing.CorpusDifferentialTest" \
     --rerun-tasks --console=plain > "$OUT/gradle.log" 2>&1
-)
+); then
+  echo "parser scan failed; see $OUT/gradle.log" >&2
+  tail -n 80 "$OUT/gradle.log" >&2 || true
+  exit 1
+fi
 echo ""
 if [ -f "$OUT/differential-report.txt" ]; then
   cat "$OUT/differential-report.txt"
 else
-  echo "(no report produced — see $OUT/gradle.log)"
+  echo "parser scan completed without differential report; see $OUT/gradle.log" >&2
+  tail -n 80 "$OUT/gradle.log" >&2 || true
+  exit 1
 fi

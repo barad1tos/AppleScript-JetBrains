@@ -34,12 +34,6 @@ public class AppleScriptScriptBodyImpl extends AppleScriptPsiElementImpl impleme
 
   @Override
   @NotNull
-  public List<AppleScriptBlockBody> getBlockBodyList() {
-    return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptBlockBody.class);
-  }
-
-  @Override
-  @NotNull
   public List<AppleScriptConsideringStatement> getConsideringStatementList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptConsideringStatement.class);
   }
@@ -108,6 +102,12 @@ public class AppleScriptScriptBodyImpl extends AppleScriptPsiElementImpl impleme
   @NotNull
   public List<AppleScriptScriptPropertyDeclaration> getScriptPropertyDeclarationList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptScriptPropertyDeclaration.class);
+  }
+
+  @Override
+  @NotNull
+  public List<AppleScriptSpecialHandlerDefinition> getSpecialHandlerDefinitionList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptSpecialHandlerDefinition.class);
   }
 
   @Override

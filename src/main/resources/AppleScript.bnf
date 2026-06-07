@@ -655,10 +655,11 @@ private applicationHandlerDefinitionSignature ::= <<parseApplicationHandlerDefin
 
 // AppleScript built-in Folder Action handlers (adding/removing folder items, opening/closing/moving
 // folder window) have fixed multi-word signatures the generic grammar can't express. The shape words
-// (folder, items, receiving, …) are plain identifiers, so the signature is matched by token text in a
-// parser hook — used both after on/to and after end. Parser-level, no PSI node (mirrors PARSE-04).
-// Listed first in userHandlerDefinition so the generic handler defs don't mis-consume `on adding …`.
-private specialHandlerDefinition ::= (on|to) <<parseSpecialHandlerSignature>> [varDeclarationList] sep
+// (folder, items, receiving, ...) are plain identifiers, so the signature is matched by token text in a
+// parser hook used both after on/to and after end. A dedicated PSI node owns the block body so it does
+// not bubble into parent PSI contracts.
+// Listed first in userHandlerDefinition so the generic handler defs don't mis-consume `on adding ...`.
+specialHandlerDefinition ::= (on|to) <<parseSpecialHandlerSignature>> [varDeclarationList] sep
                                        blockBody?
                                      end (<<parseSpecialHandlerSignature>> | referenceExpression)?
 

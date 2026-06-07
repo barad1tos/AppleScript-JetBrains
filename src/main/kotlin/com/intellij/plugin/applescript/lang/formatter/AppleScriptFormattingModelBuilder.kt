@@ -49,9 +49,10 @@ class AppleScriptFormattingModelBuilder : FormattingModelBuilder {
             whiteSpace: String,
             leafElement: ASTNode,
         ): String? {
-            if (!myCanModifyAllWhiteSpaces && isWhiteSpaceOrNls(leafElement)) return null
+            if (!myCanModifyAllWhiteSpaces && leafElement.elementType === TokenType.WHITE_SPACE) return null
 
-            var elementTypeToUse: IElementType = TokenType.WHITE_SPACE
+            var elementTypeToUse: IElementType =
+                if (isWhiteSpaceOrNls(leafElement)) leafElement.elementType else TokenType.WHITE_SPACE
             val prevNode = TreeUtil.prevLeaf(leafElement)
             if (prevNode != null && isWhiteSpaceOrNls(prevNode)) {
                 elementTypeToUse = prevNode.elementType

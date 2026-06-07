@@ -22,13 +22,38 @@ if [ "$#" -eq 0 ]; then
   echo "usage: $0 <dir> [<dir> ...]" >&2
   exit 2
 fi
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+DEFAULT_OUT="/tmp/applescript-corpus"
+OUT="${CORPUS_OUT:-$DEFAULT_OUT}"
+VALID_DIR="$OUT/valid"
+
+case "$OUT" in
+  ""|"/"|"$HOME"|"$ROOT"|"$ROOT"/*)
+    echo "refusing unsafe CORPUS_OUT: $OUT" >&2
+    exit 4
+    ;;
+esac
+
+case "$OUT" in
+  /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*)
+    ;;
+  *)
+    if [ "${CORPUS_OUT_FORCE:-}" != "1" ]; then
+      echo "refusing CORPUS_OUT outside temp space without CORPUS_OUT_FORCE=1: $OUT" >&2
+      exit 4
+    fi
+    ;;
+esac
+
 if ! command -v osacompile >/dev/null 2>&1; then
   echo "error: osacompile not found — this harness requires macOS." >&2
   exit 3
 fi
 
-OUT="${CORPUS_OUT:-/tmp/applescript-corpus}"
-rm -rf "$OUT"; mkdir -p "$OUT/src"
+rm -rf "$OUT"
+mkdir -p "$OUT/src" "$VALID_DIR"
 MANIFEST="$OUT/manifest.tsv"
 : > "$MANIFEST"
 total=0; validhere=0; needsdeps=0; syntaxerr=0; decompfail=0
@@ -36,7 +61,7 @@ total=0; validhere=0; needsdeps=0; syntaxerr=0; decompfail=0
 classify_one() {
   local f="$1"
   total=$((total + 1))
-  local key tmpsrc err
+  local key tmpsrc err validsrc
   key="$(printf '%s' "$f" | md5 -q)"
   tmpsrc="$OUT/src/${key}.applescript"
   case "$f" in
@@ -53,7 +78,9 @@ classify_one() {
   fi
   err="$(osacompile -o /dev/null "$tmpsrc" 2>&1)"
   if [ -z "$err" ]; then
-    printf 'VALID_HERE\t%s\t%s\n' "$tmpsrc" "$f" >> "$MANIFEST"; validhere=$((validhere + 1))
+    validsrc="$VALID_DIR/${key}.applescript"
+    cp "$tmpsrc" "$validsrc"
+    printf 'VALID_HERE\t%s\t%s\n' "$validsrc" "$f" >> "$MANIFEST"; validhere=$((validhere + 1))
   elif printf '%s' "$err" | grep -qiE "\-1728|-1708|can.t get|can.t find|isn.t running|doesn.t understand|where is|no user interaction"; then
     printf 'NEEDS_DEPS\t%s\t%s\t%s\n' "$tmpsrc" "$f" "$(printf '%s' "$err" | tr '\n' ' ')" >> "$MANIFEST"; needsdeps=$((needsdeps + 1))
   else
@@ -68,4 +95,5 @@ while IFS= read -r -d '' f; do classify_one "$f"; done < <(
 echo "=== corpus classification ==="
 echo "total=$total  VALID_HERE=$validhere  NEEDS_DEPS=$needsdeps  SYNTAX_ERR=$syntaxerr  DECOMP_FAIL=$decompfail"
 echo "manifest : $MANIFEST"
-echo "sources  : $OUT/src  (point CorpusDifferentialTest at this via APPLESCRIPT_CORPUS_DIR)"
+echo "sources  : $OUT/src"
+echo "valid    : $VALID_DIR  (point CorpusDifferentialTest at this via APPLESCRIPT_CORPUS_DIR)"

@@ -147,6 +147,60 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertEquals("width", builder.tokenText)
     }
 
+    fun testFullParserGenericHeadSplitsSelectorTailAtPreposition() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "set maxLabelWidth to max width for labels theLabelStrings",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("width for labels theLabelStrings"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testFullParserGenericHeadAcceptsKeywordLabels() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                subscribe to someTarget
+                sign using someKey
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("to someTarget", "using someKey"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testFullParserGenericHeadDoesNotHijackAsCoercion() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "set tidNum to tid as integer",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(emptyList<String>(), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testUnterminatedPermissiveBracketReportsErrorWithoutSwallowingNextStatement() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                quick search {"x"
+                set done to true
+                """.trimIndent(),
+            )
+
+        val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
+        assertTrue("unterminated bracket should stay visible as a parser error", errors.isNotEmpty())
+        assertFalse(
+            "unterminated command tail must not swallow the following statement",
+            psiFile.node.textsOf(COMMAND_PARAMETER).any { parameterText -> "set done" in parameterText },
+        )
+    }
+
     fun testFallbackBooleanParameterConsumesOnlyBooleanSelector() {
         val builder = createBuilder("\"printf test\" without confirmation")
 

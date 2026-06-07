@@ -3,11 +3,15 @@ package com.intellij.plugin.applescript.lang.parser
 import com.intellij.lang.PsiBuilder
 import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.openapi.util.Ref
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FILE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.USING
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITHOUT
@@ -55,12 +59,13 @@ internal object FallbackCommandParser {
 
         val marker = builder.mark()
         val words = mutableListOf<String>()
-        // Head = the maximal run of leading VAR_IDENTIFIER words (`display enhanced alert`,
+        // Head = the leading VAR_IDENTIFIER words (`display enhanced alert`,
         // `quick search`, `display notification`, `create rule`, `max width`, `keystroke`). The
         // trailing value/label words that are ALSO VAR_IDENTIFIER (e.g. `theStrings`) are
         // indistinguishable without a loaded dictionary, so they are drained generously by the
         // permissive tail consumer rather than split out here.
         while (builder.tokenType === VAR_IDENTIFIER) {
+            if (words.isNotEmpty() && isIdentifierBeforeSelectorStart(builder)) break
             words += builder.tokenText.orEmpty()
             builder.advanceLexer()
         }
@@ -69,7 +74,7 @@ internal object FallbackCommandParser {
         // A head with no tail (NLS, operator, EOF) is NOT a command: roll back so the head falls
         // through to the object-reference / reference path exactly as before, and a genuine error
         // still surfaces.
-        if (words.isEmpty() || !isCommandTailStart(builder.tokenType)) {
+        if (words.isEmpty() || isSingleWordCoercionCandidate(words, builder) || !isCommandTailStart(builder)) {
             marker.rollbackTo()
             return false
         }
@@ -102,17 +107,38 @@ internal object FallbackCommandParser {
     // Require a clear command tail after the candidate head: a parameter preposition,
     // `for`, or a value start. A bare identifier before NLS, EOF, or an operator is not
     // treated as a command head, so genuine syntax errors and plain variables still surface.
-    private fun isCommandTailStart(tokenType: IElementType?): Boolean =
-        tokenType != null &&
-            (isPrepositionOrForStart(tokenType) || FallbackCommandParameterParser.isValueLiteralStart(tokenType))
+    private fun isCommandTailStart(builder: PsiBuilder): Boolean {
+        val tokenType = builder.tokenType
+        return tokenType != null &&
+            (
+                isPrepositionOrForStart(tokenType) ||
+                    FallbackCommandParameterParser.isValueLiteralStart(tokenType) ||
+                    isIdentifierBeforeSelectorStart(builder)
+            )
+    }
+
+    private fun isIdentifierBeforeSelectorStart(builder: PsiBuilder): Boolean =
+        builder.tokenType === VAR_IDENTIFIER && isPrepositionOrForStart(builder.lookAhead(1))
+
+    private fun isSingleWordCoercionCandidate(
+        words: List<String>,
+        builder: PsiBuilder,
+    ): Boolean = words.size == 1 && builder.tokenType === AS
 
     private fun isPrepositionOrForStart(tokenType: IElementType?): Boolean =
-        tokenType === WITH ||
-            tokenType === WITHOUT ||
-            tokenType === GIVEN ||
-            tokenType === INTO ||
-            tokenType === FROM ||
-            tokenType === FOR
+        tokenType != null &&
+            (
+                tokenType === WITH ||
+                    tokenType === WITHOUT ||
+                    tokenType === GIVEN ||
+                    tokenType === INTO ||
+                    tokenType === FROM ||
+                    tokenType === FOR ||
+                    tokenType === TO ||
+                    tokenType === ON ||
+                    tokenType === AS ||
+                    tokenType === USING
+            )
 
     private fun parseKnownCommandPhrase(
         builder: PsiBuilder,

@@ -2,6 +2,14 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.3] - 2026-06-07
+
+### Fixed
+
+- Improved parsing for real-world AppleScript command phrases that use dictionary-style labeled arguments.
+- Accepted additional folder-action and system handler signatures without surfacing spurious parse errors.
+- Preserved parser diagnostics for malformed bracketed command arguments instead of swallowing following statements.
+
 ## [2.0.2] - 2026-06-05
 
 ### Fixed

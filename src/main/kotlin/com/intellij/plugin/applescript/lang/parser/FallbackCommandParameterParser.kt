@@ -114,7 +114,7 @@ internal object FallbackCommandParameterParser {
         // parser for `{command down}`-style modifier lists, which it does not consume cleanly here.
         when {
             builder.tokenType === LCURLY || builder.tokenType === LPAREN -> {
-                consumeBracketedValue(builder)
+                if (!consumeBracketedValue(builder)) return false
                 advanced = true
             }
             isValueLiteralStart(builder.tokenType) || builder.tokenType === VAR_IDENTIFIER -> {
@@ -133,21 +133,27 @@ internal object FallbackCommandParameterParser {
         return advanced
     }
 
-    // Depth-matched consumption of a `{…}` list or `(…)` group value: raw-advances tokens tracking
-    // bracket depth so any nesting balances and the matching close bracket is consumed. Guarantees the
-    // permissive drain never dangles on a bracketed modifier list (`using {command down}`).
-    private fun consumeBracketedValue(builder: PsiBuilder) {
-        var depth = 0
+    // Depth-matched consumption of a `{...}` list or `(...)` group value. Returning false on an
+    // unterminated bracket keeps the parser diagnostic visible and prevents the fallback from
+    // swallowing following statements as command-tail text.
+    private fun consumeBracketedValue(builder: PsiBuilder): Boolean {
+        val expectedClosers = mutableListOf<IElementType>()
         while (!builder.eof()) {
             val token = builder.tokenType
             when (token) {
-                LCURLY, LPAREN -> depth += 1
-                RCURLY, RPAREN -> depth -= 1
-                NLS -> if (depth == 0) return
+                LCURLY -> expectedClosers += RCURLY
+                LPAREN -> expectedClosers += RPAREN
+                RCURLY, RPAREN -> {
+                    if (expectedClosers.isEmpty()) return false
+                    val expectedCloser = expectedClosers.removeAt(expectedClosers.lastIndex)
+                    if (expectedCloser !== token) return false
+                }
+                NLS -> if (expectedClosers.isNotEmpty()) return false
             }
             builder.advanceLexer()
-            if (depth == 0) return
+            if (expectedClosers.isEmpty()) return true
         }
+        return false
     }
 
     private fun isPermissiveSelectorWord(tokenType: IElementType?): Boolean =

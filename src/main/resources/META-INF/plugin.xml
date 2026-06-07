@@ -3,7 +3,7 @@
   <name>AppleScript Toolkit</name>
   <product-descriptor
       code="PAPPLESCRIPT"
-      release-date="20260605"
+      release-date="20260607"
       release-version="20"
       optional="true"/>
   <vendor email="roman.borodavkin@gmail.com"
@@ -27,6 +27,12 @@
     </p>
   ]]></description>
   <change-notes><![CDATA[
+    <h3>2.0.3</h3>
+    <ul>
+      <li>Improved parsing for real-world AppleScript command phrases that use dictionary-style labeled arguments.</li>
+      <li>Accepted additional folder-action and system handler signatures without surfacing spurious parse errors.</li>
+      <li>Preserved parser diagnostics for malformed bracketed command arguments instead of swallowing following statements.</li>
+    </ul>
     <h3>2.0.2</h3>
     <ul>
       <li>Fixed Marketplace release notes so the listing shows only the current release's What's New content.</li>

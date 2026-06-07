@@ -11,9 +11,6 @@ public interface AppleScriptScriptBody extends AppleScriptPsiElement {
   List<AppleScriptApplicationHandlerDefinition> getApplicationHandlerDefinitionList();
 
   @NotNull
-  List<AppleScriptBlockBody> getBlockBodyList();
-
-  @NotNull
   List<AppleScriptConsideringStatement> getConsideringStatementList();
 
   @NotNull
@@ -48,6 +45,9 @@ public interface AppleScriptScriptBody extends AppleScriptPsiElement {
 
   @NotNull
   List<AppleScriptScriptPropertyDeclaration> getScriptPropertyDeclarationList();
+
+  @NotNull
+  List<AppleScriptSpecialHandlerDefinition> getSpecialHandlerDefinitionList();
 
   @NotNull
   List<AppleScriptTryStatement> getTryStatementList();

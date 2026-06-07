@@ -53,7 +53,7 @@ class AppleScriptBlock(
         child2: Block,
     ): Spacing? = mySpacingProcessor.getSpacing(child1 as? AppleScriptBlock, child2 as AppleScriptBlock)
 
-    override fun isLeaf(): Boolean = false
+    override fun isLeaf(): Boolean = node.firstChildNode == null
 
     override fun getIndent(): Indent = myIndent
 
