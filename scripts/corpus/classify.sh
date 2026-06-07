@@ -36,6 +36,13 @@ case "$OUT" in
     ;;
 esac
 
+case "/$OUT/" in
+  *"/../"*)
+    echo "refusing CORPUS_OUT with parent-directory traversal: $OUT" >&2
+    exit 4
+    ;;
+esac
+
 case "$OUT" in
   /tmp/*|/private/tmp/*|/var/folders/*|/private/var/folders/*)
     ;;

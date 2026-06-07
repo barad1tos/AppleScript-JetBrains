@@ -183,6 +183,58 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertEquals(emptyList<String>(), psiFile.node.textsOf(COMMAND_PARAMETER))
     }
 
+    fun testFullParserGenericHeadAcceptsObjectReferenceValue() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "quick search name of front window",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("name of front window"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testPermissiveParameterAcceptsObjectReferenceValueAfterSelector() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "notify with message name of front window",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("with message name of front window"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testFullParserGenericHeadAcceptsAdditionalSelectorKeywords() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "sort by column 1 over itemsList",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("by column 1", "over itemsList"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testPermissiveParameterAcceptsConstantValues() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "configure with enabled true without waiting false given missing value using current date",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(
+            listOf(
+                "with enabled true",
+                "without waiting false",
+                "given missing value",
+                "using current date",
+            ),
+            psiFile.node.textsOf(COMMAND_PARAMETER),
+        )
+    }
+
     fun testUnterminatedPermissiveBracketReportsErrorWithoutSwallowingNextStatement() {
         val psiFile =
             myFixture.configureByText(

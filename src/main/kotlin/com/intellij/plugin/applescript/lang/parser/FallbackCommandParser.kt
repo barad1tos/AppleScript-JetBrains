@@ -3,21 +3,47 @@ package com.intellij.plugin.applescript.lang.parser
 import com.intellij.lang.PsiBuilder
 import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.openapi.util.Ref
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.ABOUT
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.AGAINST
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.BY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FILE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OVER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.UNDER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.USING
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITHOUT
 import com.intellij.psi.tree.IElementType
+import com.intellij.psi.tree.TokenSet
 
 internal object FallbackCommandParser {
+    private val commandSelectorStarts =
+        TokenSet.create(
+            WITH,
+            WITHOUT,
+            GIVEN,
+            INTO,
+            FROM,
+            FOR,
+            TO,
+            ON,
+            AS,
+            USING,
+            ABOUT,
+            AGAINST,
+            BY,
+            OVER,
+            UNDER,
+        )
+
     private val commandPhrases =
         listOf(
             listOf("choose", "from", "list"),
@@ -65,7 +91,12 @@ internal object FallbackCommandParser {
         // indistinguishable without a loaded dictionary, so they are drained generously by the
         // permissive tail consumer rather than split out here.
         while (builder.tokenType === VAR_IDENTIFIER) {
-            if (words.isNotEmpty() && isIdentifierBeforeSelectorStart(builder)) break
+            val shouldStartTail =
+                isIdentifierBeforeSelectorStart(builder) ||
+                    isObjectReferenceValueStart(builder)
+            if (words.isNotEmpty() && shouldStartTail) {
+                break
+            }
             words += builder.tokenText.orEmpty()
             builder.advanceLexer()
         }
@@ -113,12 +144,16 @@ internal object FallbackCommandParser {
             (
                 isPrepositionOrForStart(tokenType) ||
                     FallbackCommandParameterParser.isValueLiteralStart(tokenType) ||
-                    isIdentifierBeforeSelectorStart(builder)
+                    isIdentifierBeforeSelectorStart(builder) ||
+                    isObjectReferenceValueStart(builder)
             )
     }
 
     private fun isIdentifierBeforeSelectorStart(builder: PsiBuilder): Boolean =
         builder.tokenType === VAR_IDENTIFIER && isPrepositionOrForStart(builder.lookAhead(1))
+
+    private fun isObjectReferenceValueStart(builder: PsiBuilder): Boolean =
+        builder.tokenType === VAR_IDENTIFIER && builder.lookAhead(1) === OF
 
     private fun isSingleWordCoercionCandidate(
         words: List<String>,
@@ -126,19 +161,7 @@ internal object FallbackCommandParser {
     ): Boolean = words.size == 1 && builder.tokenType === AS
 
     private fun isPrepositionOrForStart(tokenType: IElementType?): Boolean =
-        tokenType != null &&
-            (
-                tokenType === WITH ||
-                    tokenType === WITHOUT ||
-                    tokenType === GIVEN ||
-                    tokenType === INTO ||
-                    tokenType === FROM ||
-                    tokenType === FOR ||
-                    tokenType === TO ||
-                    tokenType === ON ||
-                    tokenType === AS ||
-                    tokenType === USING
-            )
+        tokenType != null && commandSelectorStarts.contains(tokenType)
 
     private fun parseKnownCommandPhrase(
         builder: PsiBuilder,

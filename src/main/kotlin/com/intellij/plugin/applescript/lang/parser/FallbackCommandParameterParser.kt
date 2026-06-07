@@ -6,29 +6,38 @@ import com.intellij.lang.parser.GeneratedParserUtilBase.consumeToken
 import com.intellij.lang.parser.GeneratedParserUtilBase.enter_section_
 import com.intellij.lang.parser.GeneratedParserUtilBase.exit_section_
 import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.ABOUT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AFTER
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.AGAINST
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.BY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMENT
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.CURRENT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DIGITS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DIRECT_PARAMETER_VAL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DOT
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.FALSE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LCURLY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.MISSING_VALUE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OVER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RCURLY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RETURN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TEXT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.TRUE
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.UNDER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.USING
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
@@ -105,7 +114,7 @@ internal object FallbackCommandParameterParser {
         // Selector words: a preposition, the FOR/AS/USING keyword glue, or a bare VAR_IDENTIFIER /
         // keyword-noun label run (`rule width`, `width for labels`, `placeholder text`, `sound name`).
         // Stop before a bracket so a `{…}` / `(…)` value is consumed as the chunk's value, not a label.
-        while (isPermissiveSelectorWord(builder.tokenType)) {
+        while (isPermissiveSelectorWord(builder.tokenType) && !isObjectReferenceValueStart(builder)) {
             builder.advanceLexer()
             advanced = true
         }
@@ -169,6 +178,9 @@ internal object FallbackCommandParameterParser {
         // because this predicate is used only after an unknown command head has already been accepted.
         tokenType === AFTER || tokenType === TEXT
 
+    private fun isObjectReferenceValueStart(builder: PsiBuilder): Boolean =
+        builder.tokenType === VAR_IDENTIFIER && builder.lookAhead(1) === OF
+
     // Tokens that can continue an unknown-command tail. Statement terminators and object-reference
     // continuations stay excluded so the drain stops at the correct boundary.
     private fun isPermissiveTailStart(tokenType: IElementType?): Boolean =
@@ -218,7 +230,11 @@ internal object FallbackCommandParameterParser {
             tokenType === DOT ||
             tokenType === LCURLY ||
             tokenType === LPAREN ||
-            tokenType === RETURN
+            tokenType === RETURN ||
+            tokenType === TRUE ||
+            tokenType === FALSE ||
+            tokenType === MISSING_VALUE ||
+            tokenType === CURRENT
 
     private fun parseOptionalDirectParameter(
         builder: PsiBuilder,
@@ -308,7 +324,14 @@ internal object FallbackCommandParameterParser {
             tokenType === ON ||
             tokenType === WITH ||
             tokenType === WITHOUT ||
-            tokenType === GIVEN
+            tokenType === GIVEN ||
+            tokenType === AS ||
+            tokenType === USING ||
+            tokenType === ABOUT ||
+            tokenType === AGAINST ||
+            tokenType === BY ||
+            tokenType === OVER ||
+            tokenType === UNDER
 
     private fun IElementType?.hasText(text: String) = this != null && toString().equals(text, ignoreCase = true)
 }

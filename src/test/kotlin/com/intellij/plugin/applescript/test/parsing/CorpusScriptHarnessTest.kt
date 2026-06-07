@@ -24,6 +24,24 @@ class CorpusScriptHarnessTest : TestCase() {
         assertTrue("unsafe output directory must not be deleted", Files.exists(marker))
     }
 
+    fun testClassifyRejectsTempTraversalBeforeDeleting() {
+        val unsafeOutput = Files.createTempDirectory(root.resolve("build"), "unsafe-corpus-traversal")
+        val marker = unsafeOutput.resolve("marker.txt")
+        Files.writeString(marker, "keep")
+        val input = Files.createTempDirectory("applescript-corpus-input")
+        val traversalOutput = "/tmp/../${unsafeOutput.toString().removePrefix("/")}"
+
+        val result =
+            runScript(
+                script = "scripts/corpus/classify.sh",
+                args = listOf(input),
+                env = mapOf("CORPUS_OUT" to traversalOutput),
+            )
+
+        assertEquals(result.output, 4, result.exitCode)
+        assertTrue("traversal output directory must not be deleted", Files.exists(marker))
+    }
+
     fun testClassifyCopiesOnlyCompilerValidSourcesToValidDirectory() {
         val workspace = Files.createTempDirectory("applescript-corpus-script-test")
         val input = Files.createDirectory(workspace.resolve("input"))
