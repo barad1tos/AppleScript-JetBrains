@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.test.concurrency
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
@@ -138,13 +139,89 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
         }
     }
 
+    fun testParserRegistryReturnsCommandsFromAlreadyCachedReadyProjectDictionaries() {
+        val applicationName = "SyntheticCachedParserLookupApp_${System.nanoTime()}"
+        val applicationDictionaryFile =
+            writeDictionaryXmlToTempFile(
+                "parser-cached-app",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val standardDictionaryFile =
+            writeDictionaryXmlToTempFile(
+                "parser-cached-standard-additions",
+                SyntheticSuiteFixtures.standardAdditionsMinimalXml(),
+            )
+        val applicationInfo = initializedDictionaryInfo(applicationName, applicationDictionaryFile)
+        val standardInfo =
+            initializedDictionaryInfo(
+                ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY,
+                standardDictionaryFile,
+            )
+        val persistence = SdefPersistenceService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            persistence.addDictionaryInfo(applicationInfo)
+            persistence.addDictionaryInfo(standardInfo)
+            runBlocking {
+                SdefIndexService.getInstance().ingest(applicationName, applicationDictionaryFile)
+                SdefIndexService
+                    .getInstance()
+                    .ingest(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY, standardDictionaryFile)
+            }
+            registryService.standardReady.complete(Result.success(Unit))
+            registryService.appsReady.complete(Result.success(Unit))
+
+            val applicationDictionary = projectDictionaries.createDictionary(applicationName)
+            val standardDictionary =
+                projectDictionaries.createDictionary(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY)
+            assertNotNull("Regression setup must cache the synthetic app dictionary", applicationDictionary)
+            assertNotNull("Regression setup must cache the synthetic standard dictionary", standardDictionary)
+
+            assertTrue(
+                "Parser-facing app lookup must return commands from an already cached dictionary",
+                DictionaryCommandRegistry.findApplicationCommands(project, applicationName, "play").isNotEmpty(),
+            )
+            assertTrue(
+                "Parser-facing standard lookup must return commands from an already cached dictionary",
+                DictionaryCommandRegistry.findStdCommands(project, "do shell script").isNotEmpty(),
+            )
+            assertSame(
+                "App parser lookup must reuse the existing project dictionary cache entry",
+                applicationDictionary,
+                projectDictionaries.getDictionary(applicationName),
+            )
+            assertSame(
+                "Std parser lookup must reuse the existing project dictionary cache entry",
+                standardDictionary,
+                projectDictionaries.getDictionary(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY),
+            )
+        } finally {
+            applicationInfo.getApplicationFile()?.path?.let(persistence::removeDictionaryInfo)
+            standardInfo.getApplicationFile()?.path?.let(persistence::removeDictionaryInfo)
+        }
+    }
+
+    private fun writeDictionaryXmlToTempFile(
+        name: String,
+        xml: String,
+    ): File {
+        val file = File.createTempFile("synthetic-$name-", ".xml")
+        file.deleteOnExit()
+        file.writeText(xml)
+        return file
+    }
+
     private fun initializedDictionaryInfo(
         applicationName: String,
         dictionaryFile: File,
     ): DictionaryInfo {
-        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(dictionaryFile)
-        val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
-        return DictionaryInfo(applicationName, dictionaryFile, applicationFile).also {
+        val canonicalDictionaryFile = dictionaryFile.canonicalFile
+        VfsRootAccess.allowRootAccess(testRootDisposable, canonicalDictionaryFile.parentFile.path)
+        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(canonicalDictionaryFile)
+        val applicationFile = File(canonicalDictionaryFile.parentFile, "$applicationName.app")
+        return DictionaryInfo(applicationName, canonicalDictionaryFile, applicationFile).also {
             it.setInitialized(true)
         }
     }

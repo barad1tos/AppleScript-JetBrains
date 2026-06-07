@@ -1,5 +1,16 @@
 package com.intellij.plugin.applescript.test.parsing
 
+import com.intellij.lang.ASTNode
+import com.intellij.lang.PsiBuilderFactory
+import com.intellij.lang.parser.GeneratedParserUtilBase.TRUE_CONDITION
+import com.intellij.lang.parser.GeneratedParserUtilBase._COLLAPSE_
+import com.intellij.lang.parser.GeneratedParserUtilBase.adapt_builder_
+import com.intellij.lang.parser.GeneratedParserUtilBase.enter_section_
+import com.intellij.lang.parser.GeneratedParserUtilBase.exit_section_
+import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.AppleScriptLanguage
+import com.intellij.plugin.applescript.lang.parser.AppleScriptParser
+import com.intellij.plugin.applescript.lang.parser.AppleScriptParserDefinition
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationObjectReference
 import com.intellij.plugin.applescript.psi.AppleScriptExpression
 import com.intellij.psi.PsiErrorElement
@@ -32,6 +43,56 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
 
     /** D-07: the generic rule parses with no app dictionary loaded (default fixture, cold cache). */
     fun testColdCacheNoDictionary() = assertNoParserErrors()
+
+    fun testCurrentAndLiteralSelectorReferencesKeepApplicationObjectReferences() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set currentTrack to current track
+                set indexedTrack to track 4
+                set namedTrack to track "Night Shift"
+                set identifiedTrack to track id trackIdentifier
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile, "inline application-object selector fixture")
+
+        val objectReferenceTexts = applicationObjectReferenceTexts(psiFile)
+        assertTrue(
+            "current-object fallback must retain `current track`: $objectReferenceTexts",
+            objectReferenceTexts.contains("current track"),
+        )
+        assertEquals("track 4", parseApplicationObjectReference("track 4").text)
+        assertEquals("track \"Night Shift\"", parseApplicationObjectReference("track \"Night Shift\"").text)
+        assertTrue(
+            "id selector fallback must retain variable-valued identifiers: $objectReferenceTexts",
+            objectReferenceTexts.contains("track id trackIdentifier"),
+        )
+    }
+
+    fun testBareMultiWordReferenceStopsAtStatementBoundary() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set selectedRuleSet to rule set
+                set done to true
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile, "inline multi-word reference boundary fixture")
+
+        val objectReferenceTexts = applicationObjectReferenceTexts(psiFile)
+        assertTrue(
+            "bare multi-word object references should stop before the next statement: $objectReferenceTexts",
+            objectReferenceTexts.contains("rule set"),
+        )
+        assertFalse(
+            "application object reference must not swallow the next assignment: $objectReferenceTexts",
+            objectReferenceTexts.any { referenceText -> "set done" in referenceText },
+        )
+    }
 
     fun testGenericApplicationObjectReferencesKeepFallbackTerms() {
         val psiFile = myFixture.configureByFile(APP_OBJECT_REF_FIXTURE)
@@ -67,7 +128,13 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
     }
 
     private fun assertNoParserErrors() {
-        val psiFile: PsiFile = myFixture.configureByFile(APP_OBJECT_REF_FIXTURE)
+        assertNoParserErrors(myFixture.configureByFile(APP_OBJECT_REF_FIXTURE), APP_OBJECT_REF_FIXTURE)
+    }
+
+    private fun assertNoParserErrors(
+        psiFile: PsiFile,
+        fixtureName: String,
+    ) {
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
         if (errors.isEmpty()) return
         val text = psiFile.text
@@ -78,7 +145,50 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
                 val snippet = err.text.replace("\n", "\\n").take(40)
                 "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
             }
-        fail("$APP_OBJECT_REF_FIXTURE has ${errors.size} parser error(s):\n$report")
+        fail("$fixtureName has ${errors.size} parser error(s):\n$report")
+    }
+
+    private fun applicationObjectReferenceTexts(psiFile: PsiFile): List<String> {
+        val references =
+            PsiTreeUtil.findChildrenOfType(
+                psiFile,
+                AppleScriptApplicationObjectReference::class.java,
+            )
+        return references.map { it.text }
+    }
+
+    private fun parseApplicationObjectReference(text: String): ASTNode {
+        val parserDefinition = AppleScriptParserDefinition()
+        val anchorFile = myFixture.configureByText(AppleScriptFileType, "")
+        val builder =
+            PsiBuilderFactory.getInstance().createBuilder(
+                project,
+                anchorFile.node,
+                parserDefinition.createLexer(project),
+                AppleScriptLanguage,
+                text,
+            )
+        val adaptedBuilder =
+            adapt_builder_(
+                parserDefinition.fileNodeType,
+                builder,
+                AppleScriptParser(),
+                AppleScriptParser.EXTENDS_SETS_,
+            )
+        val marker = enter_section_(adaptedBuilder, 0, _COLLAPSE_, null)
+        val result = AppleScriptParser.application_object_reference(adaptedBuilder, 0)
+        assertTrue("application object reference parser should consume `$text`", adaptedBuilder.eof())
+        exit_section_(
+            adaptedBuilder,
+            0,
+            marker,
+            parserDefinition.fileNodeType,
+            result,
+            true,
+            TRUE_CONDITION,
+        )
+        assertTrue("application object reference parser should accept `$text`", result)
+        return adaptedBuilder.treeBuilt
     }
 
     companion object {

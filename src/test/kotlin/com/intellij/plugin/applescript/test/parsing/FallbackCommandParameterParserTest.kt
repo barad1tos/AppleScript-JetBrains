@@ -63,6 +63,31 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertNoParserErrors(psiFile)
     }
 
+    fun testIntroducedAndIndexedRuleSetOperandsEmitDictionaryClassNames() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "Typinator"
+                    set ruleNames to name of every rule set
+                    set matchingRule to first rule set whose unique id is containerId
+                    set parentId to unique id in containing set
+                end tell
+                """.trimIndent(),
+            )
+
+        val dictionaryClassNames = psiFile.node.textsOf(DICTIONARY_CLASS_IDENTIFIER_PLURAL)
+        assertTrue(
+            "introduced class fallback must preserve the two-word `rule set` class: $dictionaryClassNames",
+            dictionaryClassNames.contains("rule set"),
+        )
+        assertTrue(
+            "IN operands must accept `containing set` without treating SET as assignment: $dictionaryClassNames",
+            dictionaryClassNames.contains("containing set"),
+        )
+        assertNoParserErrors(psiFile)
+    }
+
     fun testFallbackParametersExposeSelectorAndDirectParameterNodes() {
         val builder = createBuilder("\"Hello\" default answer \"Name\" with title \"Prompt\" giving up after 3")
 

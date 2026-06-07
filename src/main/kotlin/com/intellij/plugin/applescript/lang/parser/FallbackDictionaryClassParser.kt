@@ -41,12 +41,23 @@ internal object FallbackDictionaryClassParser {
 
     private fun parseIntroducedClassWords(builder: PsiBuilder): Boolean {
         var consumed = 0
-        while (FallbackDictionaryTermPredicates.isClassTermToken(builder.tokenType)) {
+        while (isIntroducedClassWord(builder, consumed)) {
             builder.advanceLexer()
             consumed += 1
         }
         return consumed > 0
     }
+
+    private fun isIntroducedClassWord(
+        builder: PsiBuilder,
+        consumed: Int,
+    ): Boolean =
+        FallbackDictionaryTermPredicates.isClassTermToken(builder.tokenType) ||
+            (
+                consumed > 0 &&
+                    FallbackDictionaryTermPredicates.isClassContinuationKeyword(builder.tokenType) &&
+                    isClassWordAfterContinuation(builder.lookAhead(1))
+            )
 
     private fun isUnambiguousClassIntroducer(tokenType: IElementType?): Boolean =
         tokenType === EVERY || tokenType === SOME
