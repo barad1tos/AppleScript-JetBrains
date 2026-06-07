@@ -64,13 +64,14 @@ internal object DictionaryCommandRegistry {
     fun findStdCommands(
         project: Project,
         commandName: String,
-    ): Collection<AppleScriptCommand> = index.findStdCommands(project, commandName)
+    ): Collection<AppleScriptCommand> = index.commandLookup.findStdCommandsIfReady(project, commandName)
 
     fun findApplicationCommands(
         project: Project,
         applicationName: String,
         commandName: String,
-    ): List<AppleScriptCommand> = index.findApplicationCommands(project, applicationName, commandName)
+    ): List<AppleScriptCommand> =
+        index.commandLookup.findApplicationCommandsIfReady(project, applicationName, commandName)
 }
 
 internal object DictionaryPropertyRegistry {
