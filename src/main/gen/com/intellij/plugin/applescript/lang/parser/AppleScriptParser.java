@@ -611,6 +611,12 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // <<parseBareCommandParameterLabel>>
+  static boolean bareCommandParameterLabel(PsiBuilder builder_, int level_) {
+    return parseBareCommandParameterLabel(builder_, level_ + 1);
+  }
+
+  /* ********************************************************** */
   // blockBodyPart sep ( blockBodyPart sep)*
   public static boolean blockBody(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "blockBody")) return false;
@@ -1077,12 +1083,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // CONSIDER_IGNORE_ATTRIBUTE|C_WHITE_SPACE|expression
+  // CONSIDER_IGNORE_ATTRIBUTE|C_WHITE_SPACE|APP_RESPONSES|expression
   static boolean considerOrIgnoreAttr(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "considerOrIgnoreAttr")) return false;
     boolean result_;
     result_ = consumeToken(builder_, CONSIDER_IGNORE_ATTRIBUTE);
     if (!result_) result_ = consumeToken(builder_, C_WHITE_SPACE);
+    if (!result_) result_ = consumeToken(builder_, APP_RESPONSES);
     if (!result_) result_ = expression(builder_, level_ + 1);
     return result_;
   }
@@ -1544,9 +1551,10 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // ('.'DIGITS)|(DIGITS'.'DIGITS*)
+  // (DOT DIGITS)|(DIGITS DOT DIGITS*)
   static boolean dec_significand(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "dec_significand")) return false;
+    if (!nextTokenIs(builder_, "", DIGITS, DOT)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = dec_significand_0(builder_, level_ + 1);
@@ -1555,24 +1563,22 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // '.'DIGITS
+  // DOT DIGITS
   private static boolean dec_significand_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "dec_significand_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = consumeToken(builder_, ".");
-    result_ = result_ && consumeToken(builder_, DIGITS);
+    result_ = consumeTokens(builder_, 0, DOT, DIGITS);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
-  // DIGITS'.'DIGITS*
+  // DIGITS DOT DIGITS*
   private static boolean dec_significand_1(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "dec_significand_1")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = consumeToken(builder_, DIGITS);
-    result_ = result_ && consumeToken(builder_, ".");
+    result_ = consumeTokens(builder_, 0, DIGITS, DOT);
     result_ = result_ && dec_significand_1_2(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
@@ -2335,7 +2341,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   //    )
   //    )|
   //    (
-  //    (handlerParameterLabel parameterVal)+ //&(with|without|given)
+  //    handlerParameterLabel parameterVal ((handlerParameterLabel | bareCommandParameterLabel) parameterVal)* //&(with|without|given) — keyword-first; trailing bare labels close BL-C7
   //        ( (with labelForTrueParam (COMMA labelForTrueParam)* [(LAND|LOR|COMMA) labelForTrueParam])
   //        | (without labelForFalseParam (COMMA labelForFalseParam)* [(LAND|LOR|COMMA) labelForFalseParam])
   //        | (given userLabelReference COLON userParameterVal (COMMA userLabelReference COLON userParameterVal)*)
@@ -2835,7 +2841,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // (handlerParameterLabel parameterVal)+ //&(with|without|given)
+  // handlerParameterLabel parameterVal ((handlerParameterLabel | bareCommandParameterLabel) parameterVal)* //&(with|without|given) — keyword-first; trailing bare labels close BL-C7
   //        ( (with labelForTrueParam (COMMA labelForTrueParam)* [(LAND|LOR|COMMA) labelForTrueParam])
   //        | (without labelForFalseParam (COMMA labelForFalseParam)* [(LAND|LOR|COMMA) labelForFalseParam])
   //        | (given userLabelReference COLON userParameterVal (COMMA userLabelReference COLON userParameterVal)*)
@@ -2844,35 +2850,42 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = handlerLabeledParametersCallExpression_1_0(builder_, level_ + 1);
-    result_ = result_ && handlerLabeledParametersCallExpression_1_1(builder_, level_ + 1);
-    exit_section_(builder_, marker_, null, result_);
-    return result_;
-  }
-
-  // (handlerParameterLabel parameterVal)+
-  private static boolean handlerLabeledParametersCallExpression_1_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_0")) return false;
-    boolean result_;
-    Marker marker_ = enter_section_(builder_);
-    result_ = handlerLabeledParametersCallExpression_1_0_0(builder_, level_ + 1);
-    while (result_) {
-      int pos_ = current_position_(builder_);
-      if (!handlerLabeledParametersCallExpression_1_0_0(builder_, level_ + 1)) break;
-      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_0", pos_)) break;
-    }
-    exit_section_(builder_, marker_, null, result_);
-    return result_;
-  }
-
-  // handlerParameterLabel parameterVal
-  private static boolean handlerLabeledParametersCallExpression_1_0_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_0_0")) return false;
-    boolean result_;
-    Marker marker_ = enter_section_(builder_);
     result_ = handlerParameterLabel(builder_, level_ + 1);
     result_ = result_ && parameterVal(builder_, level_ + 1);
+    result_ = result_ && handlerLabeledParametersCallExpression_1_2(builder_, level_ + 1);
+    result_ = result_ && handlerLabeledParametersCallExpression_1_3(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // ((handlerParameterLabel | bareCommandParameterLabel) parameterVal)*
+  private static boolean handlerLabeledParametersCallExpression_1_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_2")) return false;
+    while (true) {
+      int pos_ = current_position_(builder_);
+      if (!handlerLabeledParametersCallExpression_1_2_0(builder_, level_ + 1)) break;
+      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_2", pos_)) break;
+    }
+    return true;
+  }
+
+  // (handlerParameterLabel | bareCommandParameterLabel) parameterVal
+  private static boolean handlerLabeledParametersCallExpression_1_2_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_2_0")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = handlerLabeledParametersCallExpression_1_2_0_0(builder_, level_ + 1);
+    result_ = result_ && parameterVal(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // handlerParameterLabel | bareCommandParameterLabel
+  private static boolean handlerLabeledParametersCallExpression_1_2_0_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_2_0_0")) return false;
+    boolean result_;
+    result_ = handlerParameterLabel(builder_, level_ + 1);
+    if (!result_) result_ = bareCommandParameterLabel(builder_, level_ + 1);
     return result_;
   }
 
@@ -2880,12 +2893,12 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   //        | (without labelForFalseParam (COMMA labelForFalseParam)* [(LAND|LOR|COMMA) labelForFalseParam])
   //        | (given userLabelReference COLON userParameterVal (COMMA userLabelReference COLON userParameterVal)*)
   //        )*
-  private static boolean handlerLabeledParametersCallExpression_1_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3")) return false;
     while (true) {
       int pos_ = current_position_(builder_);
-      if (!handlerLabeledParametersCallExpression_1_1_0(builder_, level_ + 1)) break;
-      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_1", pos_)) break;
+      if (!handlerLabeledParametersCallExpression_1_3_0(builder_, level_ + 1)) break;
+      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_3", pos_)) break;
     }
     return true;
   }
@@ -2893,44 +2906,44 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // (with labelForTrueParam (COMMA labelForTrueParam)* [(LAND|LOR|COMMA) labelForTrueParam])
   //        | (without labelForFalseParam (COMMA labelForFalseParam)* [(LAND|LOR|COMMA) labelForFalseParam])
   //        | (given userLabelReference COLON userParameterVal (COMMA userLabelReference COLON userParameterVal)*)
-  private static boolean handlerLabeledParametersCallExpression_1_1_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = handlerLabeledParametersCallExpression_1_1_0_0(builder_, level_ + 1);
-    if (!result_) result_ = handlerLabeledParametersCallExpression_1_1_0_1(builder_, level_ + 1);
-    if (!result_) result_ = handlerLabeledParametersCallExpression_1_1_0_2(builder_, level_ + 1);
+    result_ = handlerLabeledParametersCallExpression_1_3_0_0(builder_, level_ + 1);
+    if (!result_) result_ = handlerLabeledParametersCallExpression_1_3_0_1(builder_, level_ + 1);
+    if (!result_) result_ = handlerLabeledParametersCallExpression_1_3_0_2(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // with labelForTrueParam (COMMA labelForTrueParam)* [(LAND|LOR|COMMA) labelForTrueParam]
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokenFast(builder_, WITH);
     result_ = result_ && labelForTrueParam(builder_, level_ + 1);
-    result_ = result_ && handlerLabeledParametersCallExpression_1_1_0_0_2(builder_, level_ + 1);
-    result_ = result_ && handlerLabeledParametersCallExpression_1_1_0_0_3(builder_, level_ + 1);
+    result_ = result_ && handlerLabeledParametersCallExpression_1_3_0_0_2(builder_, level_ + 1);
+    result_ = result_ && handlerLabeledParametersCallExpression_1_3_0_0_3(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // (COMMA labelForTrueParam)*
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_0_2(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_0_2")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_0_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_0_2")) return false;
     while (true) {
       int pos_ = current_position_(builder_);
-      if (!handlerLabeledParametersCallExpression_1_1_0_0_2_0(builder_, level_ + 1)) break;
-      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_1_0_0_2", pos_)) break;
+      if (!handlerLabeledParametersCallExpression_1_3_0_0_2_0(builder_, level_ + 1)) break;
+      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_3_0_0_2", pos_)) break;
     }
     return true;
   }
 
   // COMMA labelForTrueParam
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_0_2_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_0_2_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_0_2_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_0_2_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokenFast(builder_, COMMA);
@@ -2940,26 +2953,26 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   // [(LAND|LOR|COMMA) labelForTrueParam]
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_0_3(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_0_3")) return false;
-    handlerLabeledParametersCallExpression_1_1_0_0_3_0(builder_, level_ + 1);
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_0_3(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_0_3")) return false;
+    handlerLabeledParametersCallExpression_1_3_0_0_3_0(builder_, level_ + 1);
     return true;
   }
 
   // (LAND|LOR|COMMA) labelForTrueParam
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_0_3_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_0_3_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_0_3_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_0_3_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = handlerLabeledParametersCallExpression_1_1_0_0_3_0_0(builder_, level_ + 1);
+    result_ = handlerLabeledParametersCallExpression_1_3_0_0_3_0_0(builder_, level_ + 1);
     result_ = result_ && labelForTrueParam(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // LAND|LOR|COMMA
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_0_3_0_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_0_3_0_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_0_3_0_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_0_3_0_0")) return false;
     boolean result_;
     result_ = consumeTokenFast(builder_, LAND);
     if (!result_) result_ = consumeTokenFast(builder_, LOR);
@@ -2968,32 +2981,32 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   // without labelForFalseParam (COMMA labelForFalseParam)* [(LAND|LOR|COMMA) labelForFalseParam]
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_1(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_1")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_1")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokenFast(builder_, WITHOUT);
     result_ = result_ && labelForFalseParam(builder_, level_ + 1);
-    result_ = result_ && handlerLabeledParametersCallExpression_1_1_0_1_2(builder_, level_ + 1);
-    result_ = result_ && handlerLabeledParametersCallExpression_1_1_0_1_3(builder_, level_ + 1);
+    result_ = result_ && handlerLabeledParametersCallExpression_1_3_0_1_2(builder_, level_ + 1);
+    result_ = result_ && handlerLabeledParametersCallExpression_1_3_0_1_3(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // (COMMA labelForFalseParam)*
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_1_2(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_1_2")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_1_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_1_2")) return false;
     while (true) {
       int pos_ = current_position_(builder_);
-      if (!handlerLabeledParametersCallExpression_1_1_0_1_2_0(builder_, level_ + 1)) break;
-      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_1_0_1_2", pos_)) break;
+      if (!handlerLabeledParametersCallExpression_1_3_0_1_2_0(builder_, level_ + 1)) break;
+      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_3_0_1_2", pos_)) break;
     }
     return true;
   }
 
   // COMMA labelForFalseParam
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_1_2_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_1_2_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_1_2_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_1_2_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokenFast(builder_, COMMA);
@@ -3003,26 +3016,26 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   // [(LAND|LOR|COMMA) labelForFalseParam]
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_1_3(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_1_3")) return false;
-    handlerLabeledParametersCallExpression_1_1_0_1_3_0(builder_, level_ + 1);
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_1_3(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_1_3")) return false;
+    handlerLabeledParametersCallExpression_1_3_0_1_3_0(builder_, level_ + 1);
     return true;
   }
 
   // (LAND|LOR|COMMA) labelForFalseParam
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_1_3_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_1_3_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_1_3_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_1_3_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = handlerLabeledParametersCallExpression_1_1_0_1_3_0_0(builder_, level_ + 1);
+    result_ = handlerLabeledParametersCallExpression_1_3_0_1_3_0_0(builder_, level_ + 1);
     result_ = result_ && labelForFalseParam(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // LAND|LOR|COMMA
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_1_3_0_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_1_3_0_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_1_3_0_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_1_3_0_0")) return false;
     boolean result_;
     result_ = consumeTokenFast(builder_, LAND);
     if (!result_) result_ = consumeTokenFast(builder_, LOR);
@@ -3031,33 +3044,33 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   // given userLabelReference COLON userParameterVal (COMMA userLabelReference COLON userParameterVal)*
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_2(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_2")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_2")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokenFast(builder_, GIVEN);
     result_ = result_ && userLabelReference(builder_, level_ + 1);
     result_ = result_ && consumeToken(builder_, COLON);
     result_ = result_ && userParameterVal(builder_, level_ + 1);
-    result_ = result_ && handlerLabeledParametersCallExpression_1_1_0_2_4(builder_, level_ + 1);
+    result_ = result_ && handlerLabeledParametersCallExpression_1_3_0_2_4(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
   }
 
   // (COMMA userLabelReference COLON userParameterVal)*
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_2_4(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_2_4")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_2_4(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_2_4")) return false;
     while (true) {
       int pos_ = current_position_(builder_);
-      if (!handlerLabeledParametersCallExpression_1_1_0_2_4_0(builder_, level_ + 1)) break;
-      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_1_0_2_4", pos_)) break;
+      if (!handlerLabeledParametersCallExpression_1_3_0_2_4_0(builder_, level_ + 1)) break;
+      if (!empty_element_parsed_guard_(builder_, "handlerLabeledParametersCallExpression_1_3_0_2_4", pos_)) break;
     }
     return true;
   }
 
   // COMMA userLabelReference COLON userParameterVal
-  private static boolean handlerLabeledParametersCallExpression_1_1_0_2_4_0(PsiBuilder builder_, int level_) {
-    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_1_0_2_4_0")) return false;
+  private static boolean handlerLabeledParametersCallExpression_1_3_0_2_4_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "handlerLabeledParametersCallExpression_1_3_0_2_4_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = consumeTokenFast(builder_, COMMA);
@@ -5170,9 +5183,10 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // ('.'(DIGITS)(DEC_EXPONENT))|(dec_significand DEC_EXPONENT?)
+  // (DOT (DIGITS)(DEC_EXPONENT))|(dec_significand DEC_EXPONENT?)
   public static boolean realLiteralExpression(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "realLiteralExpression")) return false;
+    if (!nextTokenIsFast(builder_, DIGITS, DOT)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_, level_, _NONE_, REAL_LITERAL_EXPRESSION, "<real literal expression>");
     result_ = realLiteralExpression_0(builder_, level_ + 1);
@@ -5181,12 +5195,12 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // '.'(DIGITS)(DEC_EXPONENT)
+  // DOT (DIGITS)(DEC_EXPONENT)
   private static boolean realLiteralExpression_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "realLiteralExpression_0")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = consumeTokenFast(builder_, ".");
+    result_ = consumeTokenFast(builder_, DOT);
     result_ = result_ && realLiteralExpression_0_1(builder_, level_ + 1);
     result_ = result_ && realLiteralExpression_0_2(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
@@ -6403,6 +6417,67 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // (on|to) <<parseSpecialHandlerSignature>> [varDeclarationList] sep
+  //                                        blockBody?
+  //                                      end (<<parseSpecialHandlerSignature>> | referenceExpression)?
+  public static boolean specialHandlerDefinition(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition")) return false;
+    if (!nextTokenIs(builder_, "<special handler definition>", ON, TO)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, SPECIAL_HANDLER_DEFINITION, "<special handler definition>");
+    result_ = specialHandlerDefinition_0(builder_, level_ + 1);
+    result_ = result_ && parseSpecialHandlerSignature(builder_, level_ + 1);
+    result_ = result_ && specialHandlerDefinition_2(builder_, level_ + 1);
+    result_ = result_ && sep(builder_, level_ + 1);
+    result_ = result_ && specialHandlerDefinition_4(builder_, level_ + 1);
+    result_ = result_ && consumeToken(builder_, END);
+    result_ = result_ && specialHandlerDefinition_6(builder_, level_ + 1);
+    exit_section_(builder_, level_, marker_, result_, false, null);
+    return result_;
+  }
+
+  // on|to
+  private static boolean specialHandlerDefinition_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_0")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, ON);
+    if (!result_) result_ = consumeToken(builder_, TO);
+    return result_;
+  }
+
+  // [varDeclarationList]
+  private static boolean specialHandlerDefinition_2(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_2")) return false;
+    varDeclarationList(builder_, level_ + 1);
+    return true;
+  }
+
+  // blockBody?
+  private static boolean specialHandlerDefinition_4(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_4")) return false;
+    blockBody(builder_, level_ + 1);
+    return true;
+  }
+
+  // (<<parseSpecialHandlerSignature>> | referenceExpression)?
+  private static boolean specialHandlerDefinition_6(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_6")) return false;
+    specialHandlerDefinition_6_0(builder_, level_ + 1);
+    return true;
+  }
+
+  // <<parseSpecialHandlerSignature>> | referenceExpression
+  private static boolean specialHandlerDefinition_6_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "specialHandlerDefinition_6_0")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = parseSpecialHandlerSignature(builder_, level_ + 1);
+    if (!result_) result_ = referenceExpression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  /* ********************************************************** */
   // integerLiteralExpression | (referenceExpression &(thru|through)) | expression
   static boolean startIndex(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "startIndex")) return false;
@@ -7449,12 +7524,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // handlerLabeledParametersDefinition | handlerPositionalParametersDefinition | handlerInterleavedParametersDefinition
+  // specialHandlerDefinition | handlerLabeledParametersDefinition | handlerPositionalParametersDefinition | handlerInterleavedParametersDefinition
   static boolean userHandlerDefinition(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "userHandlerDefinition")) return false;
     if (!nextTokenIs(builder_, "", ON, TO)) return false;
     boolean result_;
-    result_ = handlerLabeledParametersDefinition(builder_, level_ + 1);
+    result_ = specialHandlerDefinition(builder_, level_ + 1);
+    if (!result_) result_ = handlerLabeledParametersDefinition(builder_, level_ + 1);
     if (!result_) result_ = handlerPositionalParametersDefinition(builder_, level_ + 1);
     if (!result_) result_ = handlerInterleavedParametersDefinition(builder_, level_ + 1);
     return result_;

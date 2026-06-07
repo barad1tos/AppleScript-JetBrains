@@ -4,7 +4,11 @@ import com.intellij.lang.PsiBuilder
 import com.intellij.lang.parser.GeneratedParserUtilBase
 import com.intellij.openapi.util.Key
 import com.intellij.plugin.applescript.lang.parser.AppleScriptGeneratedParserUtil
+import com.intellij.plugin.applescript.psi.AppleScriptScriptBody
+import com.intellij.plugin.applescript.psi.AppleScriptSpecialHandlerDefinition
+import com.intellij.plugin.applescript.psi.AppleScriptTopBlockBody
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Test
@@ -65,6 +69,30 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                     "Generated parser state is stored through this static parser-util key.",
             )
         }
+    }
+
+    @Test
+    fun specialHandlerBodyIsOwnedByDedicatedPsiNode() {
+        assertFalse(
+            AppleScriptScriptBody::class.java.hasMethod("getBlockBodyList"),
+            "FROZEN PSI CONTRACT VIOLATION: special handler block bodies leaked into AppleScriptScriptBody.",
+        )
+        assertFalse(
+            AppleScriptTopBlockBody::class.java.hasMethod("getBlockBodyList"),
+            "FROZEN PSI CONTRACT VIOLATION: special handler block bodies leaked into AppleScriptTopBlockBody.",
+        )
+        assertTrue(
+            AppleScriptScriptBody::class.java.hasMethod("getSpecialHandlerDefinitionList"),
+            "FROZEN PSI CONTRACT VIOLATION: AppleScriptScriptBody must expose special handler definitions.",
+        )
+        assertTrue(
+            AppleScriptTopBlockBody::class.java.hasMethod("getSpecialHandlerDefinitionList"),
+            "FROZEN PSI CONTRACT VIOLATION: AppleScriptTopBlockBody must expose special handler definitions.",
+        )
+        assertTrue(
+            AppleScriptSpecialHandlerDefinition::class.java.hasMethod("getBlockBody"),
+            "FROZEN PSI CONTRACT VIOLATION: AppleScriptSpecialHandlerDefinition must own its block body.",
+        )
     }
 
     private fun findMethod(
@@ -199,6 +227,18 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                     INT,
                 ),
                 FrozenSignature.publicStatic(
+                    "parseBareCommandParameterLabel",
+                    "boolean",
+                    PSI_BUILDER,
+                    INT,
+                ),
+                FrozenSignature.publicStatic(
+                    "parseSpecialHandlerSignature",
+                    "boolean",
+                    PSI_BUILDER,
+                    INT,
+                ),
+                FrozenSignature.publicStatic(
                     "isPossessivePronoun",
                     "boolean",
                     PSI_BUILDER,
@@ -277,6 +317,8 @@ class AppleScriptGeneratedParserUtilJvmSignatureTest {
                 "Parameter type '$typeName' is not in PARAM_TYPE_ALLOWLIST. Add it explicitly " +
                     "with the frozen parser-util signature that uses it to keep reflection review safe.",
             )
+
+        private fun Class<*>.hasMethod(name: String): Boolean = methods.any { method -> method.name == name }
     }
 
     private data class FrozenSignature(

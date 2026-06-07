@@ -25,6 +25,13 @@ class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserDictionaryHooks
         internal val PARSING_COMMAND_HANDLER_BOOLEAN_PARAMETER: Key<Boolean> =
             Key.create("applescript.parsing.command.handler.boolean.parameter")
 
+        // Set by FallbackCommandParser when a dictionary-independent fallback accepts an unknown
+        // command head in a command-legal context. This parser-state flag lets parameter parsing
+        // switch to the permissive tail consumer without introducing any new PSI node type. The
+        // parameter parser consumes the flag immediately so it cannot leak into sibling parses.
+        internal val PARSING_PERMISSIVE_COMMAND_ALLOWED: Key<Boolean> =
+            Key.create("applescript.parsing.permissive.command.allowed")
+
         @JvmField
         val TOLD_APPLICATION_NAME_STACK: Key<Stack<String>> =
             Key.create("applescript.parsing.current.dictionary.name.stack")
@@ -136,6 +143,12 @@ open class AppleScriptGeneratedParserCommandHooks : GeneratedParserUtilBase() {
                 FallbackCommandParameterParser.parseSelectorTokens(builder)
 
         @JvmStatic
+        fun parseBareCommandParameterLabel(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean = CommandParameterLabelParser.parseBareLabel(builder, level)
+
+        @JvmStatic
         fun isPossessivePronoun(
             builder: PsiBuilder,
             level: Int,
@@ -232,6 +245,12 @@ open class AppleScriptGeneratedParserFlowHooks : AppleScriptGeneratedParserComma
         ): Boolean =
             recursion_guard_(builder, level, "isTellStatementStart") &&
                 TellStatementParser.isTellStatementStart(builder)
+
+        @JvmStatic
+        fun parseSpecialHandlerSignature(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean = SpecialHandlerSignatureParser.parse(builder, level)
     }
 }
 

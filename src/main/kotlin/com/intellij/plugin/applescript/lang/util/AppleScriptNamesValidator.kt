@@ -36,7 +36,7 @@ class AppleScriptNamesValidator : NamesValidator {
         name: String,
         project: Project?,
     ): Boolean =
-        // KEEP (Phase 8 / v2.0 backlog): the rename-handler probe below is a workaround for
+        // KEEP (Phase 8 / v2.0 backlog: BL-E6): the rename-handler probe below is a workaround for
         // multi-part handler names; removing it cleanly needs a dedicated rename handler plus
         // change-signature support, which alters refactoring behaviour. Out of the v1.x
         // cleanup scope (behaviour-preserving only).

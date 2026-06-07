@@ -1,7 +1,12 @@
 package com.intellij.plugin.applescript.test.parsing
 
+import com.intellij.lang.ASTNode
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.ASSIGNMENT_STATEMENT
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
+import com.intellij.psi.tree.IElementType
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.io.File
@@ -67,10 +72,40 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testSortCommandDirection() = assertNoParserErrors("sort_command_direction.applescript")
 
-    private fun assertNoParserErrors(fileName: String) {
+    fun testConsideringIgnoringResponses() = assertNoParserErrors("considering_ignoring.applescript")
+
+    fun testFolderActionHandlers() = assertNoParserErrors("folder_action_handlers.applescript")
+
+    fun testTypinatorRuleSet() = assertNoParserErrors("typinator_rule_set_min.applescript")
+
+    fun testTypinatorRuleSetNoOf() = assertNoParserErrors("typinator_rule_set_nofof.applescript")
+
+    fun testKeystrokeReturn() = assertNoParserErrors("keystroke_return.applescript")
+
+    fun testDisplayNotificationLabeled() {
+        val psiFile = assertNoParserErrors("display_notification_labeled.applescript")
+
+        assertEquals(
+            listOf("with title", "subtitle", "sound name"),
+            psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR),
+        )
+        assertFalse(
+            "display notification tail must stop before the next assignment",
+            psiFile.node.textsOf(COMMAND_PARAMETER).any { parameterText -> "set done" in parameterText },
+        )
+        assertTrue(psiFile.node.textsOf(ASSIGNMENT_STATEMENT).contains("set done to true"))
+    }
+
+    fun testDialogToolkitCommands() = assertNoParserErrors("dialog_toolkit_commands.applescript")
+
+    fun testTellToUnknownCommand() = assertNoParserErrors("tell_to_unknown_command.applescript")
+
+    fun testPermissiveHeadNegative() = assertNoParserErrors("permissive_head_negative.applescript")
+
+    private fun assertNoParserErrors(fileName: String): PsiFile {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)
         val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
-        if (errors.isEmpty()) return
+        if (errors.isEmpty()) return psiFile
         val text = psiFile.text
         val report =
             errors.joinToString("\n") { err ->
@@ -80,6 +115,7 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
                 "  line $line offset $offset: '$snippet' — ${err.errorDescription}"
             }
         fail("$fileName has ${errors.size} parser error(s):\n$report")
+        return psiFile
     }
 
     companion object {
@@ -88,13 +124,29 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         private val PARSER_DEBT_METHODS =
             setOf(
                 // TODO(parser): re-enable once `move eachMessage to archive` command destination parsing is fixed.
+                // (backlog: BL-A2)
                 "testMailArchive",
-                // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback
+                // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback (backlog: BL-A3)
                 // before the loaded dictionary-command path consumes only the direct parameter.
                 "testStandardAdditionsPaths",
-                // TODO(parser): re-enable once the structural command-gate refactor lands:
-                // `sort by <ref> direction <value>` needs `by`/bare-label params, not a name list.
-                "testSortCommandDirection",
+                // TODO(parser): re-enable once leading `first rule set whose ...` object references
+                // parse multi-word dictionary class names without a preceding OF/IN operand. That path
+                // goes through INDEX_REFERENCE / USER_CLASS_NAME and needs a dedicated BNF + regen fix.
+                "testTypinatorRuleSetNoOf",
             )
     }
+}
+
+private fun ASTNode.textsOf(elementType: IElementType): List<String> {
+    val texts = mutableListOf<String>()
+
+    fun visit(node: ASTNode) {
+        if (node.elementType === elementType) {
+            texts += node.text
+        }
+        node.getChildren(null).forEach(::visit)
+    }
+
+    visit(this)
+    return texts
 }

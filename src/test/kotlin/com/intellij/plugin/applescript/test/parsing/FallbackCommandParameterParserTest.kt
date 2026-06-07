@@ -18,7 +18,9 @@ import com.intellij.plugin.applescript.lang.parser.FallbackCommandParameterParse
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommandImpl
 import com.intellij.plugin.applescript.lang.sdef.Suite
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_CLASS_IDENTIFIER_PLURAL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DIRECT_PARAMETER_VAL
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
@@ -42,6 +44,21 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertEquals(listOf("\"Hello\""), psiFile.node.textsOf(DIRECT_PARAMETER_VAL))
     }
 
+    fun testContainingSetOperandEmitsDictionaryClassName() {
+        // The `of containing set` operand parses `containing set` as a plural dictionary class
+        // identifier. Before this fallback, `containing` parsed as a bare reference and the `set`
+        // keyword dangled as a parser error. Keep SET accepted only as a second class word in OF/IN
+        // operand position so the assignment statement keeps its normal parse path.
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "tell application \"Typinator\"\nset containerid to unique id of containing set\nend tell",
+            )
+
+        assertEquals(listOf("containing set"), psiFile.node.textsOf(DICTIONARY_CLASS_IDENTIFIER_PLURAL))
+        assertNoParserErrors(psiFile)
+    }
+
     fun testFallbackParametersExposeSelectorAndDirectParameterNodes() {
         val builder = createBuilder("\"Hello\" default answer \"Name\" with title \"Prompt\" giving up after 3")
 
@@ -55,6 +72,185 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
             ast.textsOf(COMMAND_PARAMETER_SELECTOR),
         )
         assertEquals(listOf("\"Hello\""), ast.textsOf(DIRECT_PARAMETER_VAL))
+    }
+
+    fun testLabeledNotificationTailExposesSelectors() {
+        // The `display notification` labeled tail must expose precise selector nodes even when the
+        // dictionary is unavailable. `with title` is a WITH + identifier selector; `subtitle` and
+        // `sound name` are bare-label selectors. The direct parameter is the leading string literal.
+        val builder =
+            createBuilder("\"No id\" with title \"Edit Snippet\" subtitle \"Error:\" sound name \"Basso\"")
+
+        val ast =
+            parseWithRootSection(builder) {
+                FallbackCommandParameterParser.parseParameters(builder, 0, "display notification")
+            }
+
+        assertEquals(
+            listOf("with title", "subtitle", "sound name"),
+            ast.textsOf(COMMAND_PARAMETER_SELECTOR),
+        )
+        assertEquals(listOf("\"No id\""), ast.textsOf(DIRECT_PARAMETER_VAL))
+    }
+
+    fun testGenericSingleWordHeadProducesParameters() {
+        // A generic single-word command head accepted by the permissive command-name fallback gets
+        // the unknown-command tail consumer. Without the parser-state flag, a bare unknown single
+        // word still declines and falls through to the normal expression/error path.
+        val builder = createBuilder("width for labels theStrings")
+        builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_PERMISSIVE_COMMAND_ALLOWED, true)
+
+        val ast =
+            parseWithRootSection(builder) {
+                FallbackCommandParameterParser.parseParameters(builder, 0, "max")
+            }
+
+        assertEquals(
+            listOf(
+                "width for labels theStrings",
+            ),
+            ast.textsOf(COMMAND_PARAMETER),
+        )
+    }
+
+    fun testPermissiveKeywordSelectorTailProducesParameterChunks() {
+        val builder =
+            createBuilder(
+                "rule width 400 placeholder text \"x\" left inset 8 total width 400 field left 100",
+            )
+        builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_PERMISSIVE_COMMAND_ALLOWED, true)
+
+        val ast =
+            parseWithRootSection(builder) {
+                FallbackCommandParameterParser.parseParameters(builder, 0, "create side labeled field")
+            }
+
+        assertEquals(
+            listOf(
+                "rule width 400",
+                "placeholder text \"x\"",
+                "left inset 8",
+                "total width 400",
+                "field left 100",
+            ),
+            ast.textsOf(COMMAND_PARAMETER),
+        )
+    }
+
+    fun testBareUnknownSingleWordWithoutAcceptorFlagReturnsNoParameters() {
+        // Pitfall 1/2 guard: WITHOUT the acceptor flag, a bare unknown single word must NOT be granted
+        // OptionalDirectParameter — parameterMode returns null so the fallback declines (no consumption,
+        // letting a genuine error / plain-variable position fall through unharmed).
+        val builder = createBuilder("width for labels theStrings")
+
+        assertFalse(FallbackCommandParameterParser.parseParameters(builder, 0, "max"))
+        assertEquals("width", builder.tokenText)
+    }
+
+    fun testFullParserGenericHeadSplitsSelectorTailAtPreposition() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "set maxLabelWidth to max width for labels theLabelStrings",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("width for labels theLabelStrings"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testFullParserGenericHeadAcceptsKeywordLabels() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                subscribe to someTarget
+                sign using someKey
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("to someTarget", "using someKey"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testFullParserGenericHeadDoesNotHijackAsCoercion() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "set tidNum to tid as integer",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(emptyList<String>(), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testFullParserGenericHeadAcceptsObjectReferenceValue() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "quick search name of front window",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("name of front window"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testPermissiveParameterAcceptsObjectReferenceValueAfterSelector() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "notify with message name of front window",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("with message name of front window"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testFullParserGenericHeadAcceptsAdditionalSelectorKeywords() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "sort by column 1 over itemsList",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("by column 1", "over itemsList"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testPermissiveParameterAcceptsConstantValues() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "configure with enabled true without waiting false given missing value using current date",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(
+            listOf(
+                "with enabled true",
+                "without waiting false",
+                "given missing value",
+                "using current date",
+            ),
+            psiFile.node.textsOf(COMMAND_PARAMETER),
+        )
+    }
+
+    fun testUnterminatedPermissiveBracketReportsErrorWithoutSwallowingNextStatement() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                quick search {"x"
+                set done to true
+                """.trimIndent(),
+            )
+
+        val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
+        assertTrue("unterminated bracket should stay visible as a parser error", errors.isNotEmpty())
+        assertFalse(
+            "unterminated command tail must not swallow the following statement",
+            psiFile.node.textsOf(COMMAND_PARAMETER).any { parameterText -> "set done" in parameterText },
+        )
     }
 
     fun testFallbackBooleanParameterConsumesOnlyBooleanSelector() {

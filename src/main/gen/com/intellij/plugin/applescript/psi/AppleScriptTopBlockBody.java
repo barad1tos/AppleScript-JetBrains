@@ -47,6 +47,9 @@ public interface AppleScriptTopBlockBody extends AppleScriptPsiElement {
   List<AppleScriptScriptPropertyDeclaration> getScriptPropertyDeclarationList();
 
   @NotNull
+  List<AppleScriptSpecialHandlerDefinition> getSpecialHandlerDefinitionList();
+
+  @NotNull
   List<AppleScriptTryStatement> getTryStatementList();
 
   @NotNull

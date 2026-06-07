@@ -12,7 +12,7 @@ import java.util.concurrent.atomic.AtomicReference
  * Production: [ProgressTaskCompatDefault] wraps [Task.Backgroundable] with a `null`
  * project for application-scope progress.
  *
- * Follow-up: re-check this when bumping the IntelliJ Platform SDK. If
+ * Follow-up: re-check this when bumping the IntelliJ Platform SDK (backlog: BL-K4). If
  * `withBackgroundProgress` gains application-scope or nullable-project support,
  * this compatibility wrapper can move back to the coroutine progress API.
  *

@@ -3,7 +3,7 @@ package com.intellij.plugin.applescript.test.parsing
 class DictionariesRandomParsingTestCase : AbstractParsingFixtureTestCase() {
     override fun getMyTargetDirectoryPath(): String = "dictionaries_random"
 
-    // TODO(parser): re-enable after refreshing/fixing the dictionary-random PSI snapshot drift.
+    // TODO(parser): re-enable after refreshing/fixing the dictionary-random PSI snapshot drift. (backlog: BL-A1)
     override fun shouldRunTest(): Boolean = name !in DRIFTED_METHODS && super.shouldRunTest()
 
     fun testWrongDictionary() = doParseScriptInPackageTest("wrong_dictionary")

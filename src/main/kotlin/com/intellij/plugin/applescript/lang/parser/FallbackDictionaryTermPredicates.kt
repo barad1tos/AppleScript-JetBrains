@@ -15,6 +15,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SECONDS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.SET
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THROUGH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THRU
@@ -34,6 +35,12 @@ internal object FallbackDictionaryTermPredicates {
             tokenType === DIGITS ||
             tokenType === WHOSE ||
             tokenType === WHERE
+
+    // A keyword that may legitimately appear as the SECOND word of a dictionary class noun phrase
+    // (`rule set`, `containing set`). `set` lexes as the SET keyword, not VAR_IDENTIFIER, so the
+    // generic two-word path rejects it. Kept narrow (SET only) and consumed only in operand position
+    // — never widen `isFallbackAnchorForClass` with SET, which would break the `set` assignment statement.
+    fun isClassContinuationKeyword(tokenType: IElementType?): Boolean = tokenType === SET
 
     fun isClassTermToken(type: IElementType?): Boolean =
         isVariableIdentifier(type) || FallbackDictionaryAnchorPredicates.isSpecifierTerm(type)

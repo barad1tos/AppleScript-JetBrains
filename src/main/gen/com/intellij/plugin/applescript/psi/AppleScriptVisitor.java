@@ -442,6 +442,10 @@ public class AppleScriptVisitor extends PsiElementVisitor {
     visitComponent(o);
   }
 
+  public void visitSpecialHandlerDefinition(@NotNull AppleScriptSpecialHandlerDefinition o) {
+    visitPsiElement(o);
+  }
+
   public void visitStringLiteralExpression(@NotNull AppleScriptStringLiteralExpression o) {
     visitExpression(o);
     // visitPsiLanguageInjectionHost(o);

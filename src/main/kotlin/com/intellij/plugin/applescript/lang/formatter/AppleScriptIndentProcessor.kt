@@ -6,10 +6,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes
 
 internal class AppleScriptIndentProcessor {
     fun getChildIndent(node: ASTNode): Indent {
-        val elementType = node.elementType
-        return if (elementType === AppleScriptTypes.BLOCK_BODY ||
-            elementType === AppleScriptTypes.TOP_BLOCK_BODY ||
-            elementType === AppleScriptTypes.SCRIPT_BODY
+        val parentElementType = node.treeParent?.elementType
+        return if (parentElementType === AppleScriptTypes.BLOCK_BODY
         ) {
             Indent.getNormalIndent()
         } else {

@@ -1,0 +1,68 @@
+package com.intellij.plugin.applescript.lang.parser
+
+import com.intellij.lang.PsiBuilder
+import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
+
+/**
+ * Parses the AppleScript built-in Folder Action handler signatures, which have fixed multi-word
+ * shapes the generic user-handler grammar cannot express:
+ *
+ *   adding folder items to <var> after receiving <var>
+ *   removing folder items from <var> after losing <var>
+ *   opening folder <var>
+ *   closing folder window for <var>
+ *   moving folder window for <var> from <var>
+ *
+ * The shape words (`folder`, `items`, `receiving`, …) are ordinary identifiers in the lexer — making
+ * them keywords would break their use as variable names — so the signature is matched by token text.
+ * Used after both `on`/`to` and `end`. Dictionary-independent; parser-level only, no PSI node
+ * (mirrors PARSE-04): the goal is a clean parse, not handler/parameter resolution.
+ */
+internal object SpecialHandlerSignatureParser {
+    private const val VARIABLE_SLOT = "<variable>" // marks a variable-identifier slot
+
+    private val SIGNATURES: List<List<String>> =
+        listOf(
+            listOf("adding", "folder", "items", "to", VARIABLE_SLOT, "after", "receiving", VARIABLE_SLOT),
+            listOf("removing", "folder", "items", "from", VARIABLE_SLOT, "after", "losing", VARIABLE_SLOT),
+            listOf("opening", "folder", VARIABLE_SLOT),
+            listOf("closing", "folder", "window", "for", VARIABLE_SLOT),
+            listOf("moving", "folder", "window", "for", VARIABLE_SLOT, "from", VARIABLE_SLOT),
+        )
+
+    fun parse(
+        builder: PsiBuilder,
+        level: Int,
+    ): Boolean {
+        if (!recursion_guard_(builder, level, "parseSpecialHandlerSignature")) return false
+        for (signature in SIGNATURES) {
+            val marker = builder.mark()
+            if (consume(builder, signature)) {
+                marker.drop()
+                return true
+            }
+            marker.rollbackTo()
+        }
+        return false
+    }
+
+    private fun consume(
+        builder: PsiBuilder,
+        signature: List<String>,
+    ): Boolean {
+        for (word in signature) {
+            if (builder.eof() || builder.tokenType === NLS) return false
+            if (word == VARIABLE_SLOT) {
+                if (builder.tokenType !== VAR_IDENTIFIER) return false
+                builder.advanceLexer()
+            } else {
+                val text = builder.tokenText ?: return false
+                if (!text.equals(word, ignoreCase = true)) return false
+                builder.advanceLexer()
+            }
+        }
+        return true
+    }
+}

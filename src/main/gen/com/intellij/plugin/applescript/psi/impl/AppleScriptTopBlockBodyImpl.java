@@ -106,6 +106,12 @@ public class AppleScriptTopBlockBodyImpl extends AppleScriptPsiElementImpl imple
 
   @Override
   @NotNull
+  public List<AppleScriptSpecialHandlerDefinition> getSpecialHandlerDefinitionList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptSpecialHandlerDefinition.class);
+  }
+
+  @Override
+  @NotNull
   public List<AppleScriptTryStatement> getTryStatementList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, AppleScriptTryStatement.class);
   }
