@@ -152,6 +152,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertTrue(psiFile.node.textsOf(ASSIGNMENT_STATEMENT).contains("set done to true"))
     }
 
+    fun testStandardAdditionsFileAndListCommands() {
+        assertNoParserErrors("standard_additions_file_and_list_commands.applescript")
+    }
+
     fun testDialogToolkitCommands() {
         assertNoParserErrors("dialog_toolkit_commands.applescript")
     }

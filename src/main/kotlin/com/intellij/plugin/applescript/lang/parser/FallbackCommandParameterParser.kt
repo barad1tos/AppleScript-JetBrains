@@ -10,6 +10,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.ABOUT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AFTER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AGAINST
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.AT
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_TYPE_S
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
@@ -45,6 +47,22 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITHOUT
 import com.intellij.psi.tree.IElementType
 
 internal object FallbackCommandParameterParser {
+    private val KNOWN_FALLBACK_COMMAND_NAMES: Set<String> =
+        setOf(
+            "choose from list",
+            "delete",
+            "display dialog",
+            "do shell script",
+            "execute",
+            "exists",
+            "make",
+            "move",
+            "read",
+            "run",
+            "run script",
+            "write",
+        )
+
     private enum class ParameterMode {
         OptionalDirectParameter,
         ParametersOnly,
@@ -59,7 +77,8 @@ internal object FallbackCommandParameterParser {
         // The generic-head coupling flag is single-use: capture then consume it here so it never leaks
         // into the direct-parameter expression parse or a sibling command on the same line.
         val isPermissiveHead =
-            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_PERMISSIVE_COMMAND_ALLOWED) == true
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_PERMISSIVE_COMMAND_ALLOWED) == true &&
+                commandName.lowercase() !in KNOWN_FALLBACK_COMMAND_NAMES
         builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_PERMISSIVE_COMMAND_ALLOWED, null)
         val previousFallbackContext =
             builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS)
@@ -209,6 +228,7 @@ internal object FallbackCommandParameterParser {
             "run",
             "delete",
             "execute",
+            "write",
             -> ParameterMode.OptionalDirectParameter
             else -> {
                 // Multi-word names always take an optional direct parameter. A single-word unknown
@@ -257,10 +277,46 @@ internal object FallbackCommandParameterParser {
             val marker = enter_section_(builder, level, _NONE_, "<fallback command parameter>")
             val result =
                 parseParameterSelector(builder, level + 1) &&
-                    AppleScriptParser.expression(builder, level + 1)
+                    (
+                        parseSingleIdentifierValueBeforeBareSelector(builder) ||
+                            AppleScriptParser.expression(builder, level + 1)
+                    )
             exit_section_(builder, level, marker, COMMAND_PARAMETER, result, false, null)
             if (!result) return
         }
+    }
+
+    private fun parseSingleIdentifierValueBeforeBareSelector(builder: PsiBuilder): Boolean {
+        if (builder.tokenType !== VAR_IDENTIFIER) return false
+
+        val marker = builder.mark()
+        builder.advanceLexer()
+        val isBoundedValue =
+            builder.tokenType === VAR_IDENTIFIER &&
+                (
+                    (
+                        builder.tokenText.equals("default", ignoreCase = true) &&
+                            (builder.lookAhead(1) === VAR_IDENTIFIER || builder.lookAhead(1) === BUILT_IN_TYPE_S)
+                    ) ||
+                        (
+                            builder.tokenText.equals("starting", ignoreCase = true) &&
+                                builder.lookAhead(1) === AT
+                        ) ||
+                        (
+                            builder.tokenText.equals("sound", ignoreCase = true) &&
+                                builder.lookAhead(1) === VAR_IDENTIFIER
+                        ) ||
+                        (
+                            builder.tokenText.equals("giving", ignoreCase = true) &&
+                                builder.lookAhead(2) === AFTER
+                        )
+                )
+        if (isBoundedValue) {
+            marker.drop()
+        } else {
+            marker.rollbackTo()
+        }
+        return isBoundedValue
     }
 
     fun parseParameterSelector(
@@ -294,7 +350,13 @@ internal object FallbackCommandParameterParser {
     private fun parseBareParameterSelector(builder: PsiBuilder) {
         val firstWord = builder.tokenText.orEmpty()
         builder.advanceLexer()
-        if (firstWord.equals("default", ignoreCase = true) && builder.tokenType === VAR_IDENTIFIER) {
+        if (firstWord.equals("default", ignoreCase = true) &&
+            (builder.tokenType === VAR_IDENTIFIER || builder.tokenType === BUILT_IN_TYPE_S)
+        ) {
+            builder.advanceLexer()
+            return
+        }
+        if (firstWord.equals("starting", ignoreCase = true) && builder.tokenType === AT) {
             builder.advanceLexer()
             return
         }

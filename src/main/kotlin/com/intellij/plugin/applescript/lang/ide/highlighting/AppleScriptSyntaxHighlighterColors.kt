@@ -90,7 +90,7 @@ object AppleScriptSyntaxHighlighterColors {
 
     @JvmField
     val DICTIONARY_COMMAND_SELECTOR_ATTR: TextAttributesKey =
-        createTextAttributesKey(DICTIONARY_COMMAND_SELECTOR, DefaultLanguageHighlighterColors.PARAMETER)
+        createTextAttributesKey(DICTIONARY_COMMAND_SELECTOR, DefaultLanguageHighlighterColors.KEYWORD)
 
     @JvmField
     val DICTIONARY_CLASS_ATTR: TextAttributesKey =

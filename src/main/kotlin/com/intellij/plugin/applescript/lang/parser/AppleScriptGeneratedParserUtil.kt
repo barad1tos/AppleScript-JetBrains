@@ -372,6 +372,8 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
                 val insideExpression =
                     builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS) ==
                         true ||
+                        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS) ==
+                        true ||
                         builder.getUserData(
                             AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT,
                         ) == true ||

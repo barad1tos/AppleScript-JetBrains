@@ -17,6 +17,10 @@ import com.intellij.plugin.applescript.lang.parser.DictionaryCommandParameterPar
 import com.intellij.plugin.applescript.lang.parser.FallbackCommandParameterParser
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommandImpl
+import com.intellij.plugin.applescript.lang.sdef.CommandDirectParameter
+import com.intellij.plugin.applescript.lang.sdef.CommandParameter
+import com.intellij.plugin.applescript.lang.sdef.CommandParameterData
+import com.intellij.plugin.applescript.lang.sdef.CommandParameterImpl
 import com.intellij.plugin.applescript.lang.sdef.Suite
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
@@ -216,6 +220,30 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertEquals(listOf("by column 1", "over itemsList"), psiFile.node.textsOf(COMMAND_PARAMETER))
     }
 
+    fun testStandardAdditionsWriteStartingAtSelector() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "write (lineText & linefeed) to fh starting at eof",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("starting at"))
+    }
+
+    fun testChooseFromListDefaultItemsAndMultipleSelectionsSelector() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set choice to choose from list opts with prompt "Choose:" default items {"Path+Size"} without multiple selections allowed
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("default items"))
+    }
+
     fun testPermissiveParameterAcceptsConstantValues() {
         val psiFile =
             myFixture.configureByText(
@@ -309,6 +337,23 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         }
     }
 
+    fun testDictionaryCommandValueStopsBeforeNextSelector() {
+        val builder = createBuilder("(lineText & linefeed) to fh starting at eof")
+        val command =
+            dictionaryCommand(
+                name = "write",
+                directParameterType = "anything",
+                parameters = listOf("to", "starting at"),
+            )
+
+        val ast =
+            parseWithRootSection(builder) {
+                DictionaryCommandParameterParser.parseParametersForCommand(builder, 0, command)
+            }
+
+        assertEquals(listOf("to", "starting at"), ast.textsOf(COMMAND_PARAMETER_SELECTOR))
+    }
+
     private fun createBuilder(text: String): PsiBuilder {
         val parserDefinition = AppleScriptParserDefinition()
         val anchorFile = myFixture.configureByText(AppleScriptFileType, "")
@@ -361,6 +406,27 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
                 "  line $line offset $offset: '$snippet' - ${error.errorDescription}"
             }
         fail("fallback command parameter fixture has ${errors.size} parser error(s):\n$report")
+    }
+
+    private fun dictionaryCommand(
+        name: String,
+        directParameterType: String,
+        parameters: List<String>,
+    ): AppleScriptCommandImpl {
+        val suite = stubSuite()
+        val xmlTag = stubXmlTag()
+        val command = AppleScriptCommandImpl(suite, name, name, xmlTag)
+        command.directParameter = CommandDirectParameter(command, directParameterType, null)
+        val commandParameters: List<CommandParameter> =
+            parameters.map { parameterName ->
+                CommandParameterImpl(
+                    command,
+                    CommandParameterData(name = parameterName, code = "----", type = "anything", optional = true),
+                    xmlTag,
+                )
+            }
+        command.parameters = commandParameters
+        return command
     }
 
     private fun emptyDictionaryCommand(): AppleScriptCommand {

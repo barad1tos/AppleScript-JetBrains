@@ -22,6 +22,13 @@ import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 
 internal object CommandHandlerCallParser {
+    private val FALLBACK_FIRST_COMMAND_NAMES: Set<String> =
+        setOf(
+            "choose from list",
+            "make",
+            "write",
+        )
+
     fun parseCallExpression(
         builder: PsiBuilder,
         level: Int,
@@ -203,11 +210,11 @@ internal object CommandHandlerCallParser {
             parseDictionaryCommandParameters(builder, level, allCommandsWithName)
         }
 
-    // `make` routes through the fallback parameter parser even when a loaded standard dictionary
-    // defines it: the dictionary command consumes app-specific multi-word noun phrases (e.g.
-    // `make new lock screen task`) too narrowly and drops the trailing nouns. Promote to a
-    // Set<String> if a second command ever needs the same fallback-first treatment.
-    private fun isFallbackFirstCommand(commandName: String): Boolean = commandName.equals("make", ignoreCase = true)
+    // These commands route through the fallback parameter parser even when a loaded standard
+    // dictionary defines them: their real-world parameter syntax uses multi-word labels and
+    // valueless boolean tails that the strict dictionary parser still models too narrowly.
+    private fun isFallbackFirstCommand(commandName: String): Boolean =
+        commandName.lowercase() in FALLBACK_FIRST_COMMAND_NAMES
 
     private fun parseDictionaryCommandParameters(
         builder: PsiBuilder,

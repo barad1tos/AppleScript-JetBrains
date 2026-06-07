@@ -19,6 +19,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LAND
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITHOUT
 
@@ -140,7 +141,7 @@ internal object DictionaryCommandParameterParser {
         result = result && parseCommandParameterSelector(builder, level + 1, state.command, state.parsedSelector)
         val parameterDefinition = state.command.getParameterByName(state.parsedSelector.get())
         if (state.isGivenForm) result = consumeToken(builder, COLON)
-        result = result && parseCommandParameterValue(builder, level + 1, parameterDefinition)
+        result = result && parseCommandParameterValue(builder, level + 1, parameterDefinition, state.command)
         exit_section_(builder, level, marker, null, result, false, null)
         return result
     }
@@ -149,6 +150,7 @@ internal object DictionaryCommandParameterParser {
         builder: PsiBuilder,
         level: Int,
         parameterDefinition: CommandParameter?,
+        commandDefinition: AppleScriptCommand,
     ): Boolean {
         if (!recursion_guard_(builder, level, "parseCommandParameterValue")) return false
         var result = false
@@ -160,8 +162,47 @@ internal object DictionaryCommandParameterParser {
         } else if (parameterTypeSpecifier == "text") {
             result = AppleScriptParser.stringLiteralExpression(builder, level + 1)
         }
+        if (!result) result = parseSingleIdentifierValueBeforeNextSelector(builder, commandDefinition)
         if (!result) result = AppleScriptParser.expression(builder, level + 1)
         exit_section_(builder, level, marker, null, result, false, null)
+        return result
+    }
+
+    private fun parseSingleIdentifierValueBeforeNextSelector(
+        builder: PsiBuilder,
+        commandDefinition: AppleScriptCommand,
+    ): Boolean {
+        if (builder.tokenType !== VAR_IDENTIFIER) return false
+
+        val marker = builder.mark()
+        builder.advanceLexer()
+        val isBoundedValue = isCommandParameterSelectorStart(builder, commandDefinition)
+        if (isBoundedValue) {
+            marker.drop()
+        } else {
+            marker.rollbackTo()
+        }
+        return isBoundedValue
+    }
+
+    private fun isCommandParameterSelectorStart(
+        builder: PsiBuilder,
+        commandDefinition: AppleScriptCommand,
+    ): Boolean {
+        val marker = builder.mark()
+        var parsedParameterSelector = builder.tokenText ?: ""
+        var result = false
+
+        while (!builder.eof() && builder.tokenType !== NLS && builder.tokenType !== COMMENT) {
+            builder.advanceLexer()
+            if (commandDefinition.getParameterByName(parsedParameterSelector) != null) {
+                result = true
+                break
+            }
+            parsedParameterSelector += " " + builder.tokenText
+        }
+
+        marker.rollbackTo()
         return result
     }
 
