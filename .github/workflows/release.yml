@@ -58,6 +58,9 @@ jobs:
       - name: Verify bundled coroutines versions
         run: ./gradlew verifyBundledCoroutinesVersions --stacktrace
 
+      - name: Verify docs metadata
+        run: python3 scripts/verify-docs.py
+
       - name: Fail on internal API verifier findings
         run: python3 scripts/verify-plugin-verifier.py
 
