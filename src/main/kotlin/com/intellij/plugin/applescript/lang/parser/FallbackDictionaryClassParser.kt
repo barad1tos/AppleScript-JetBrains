@@ -3,6 +3,8 @@ package com.intellij.plugin.applescript.lang.parser
 import com.intellij.lang.PsiBuilder
 import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.EVERY
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SOME
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.TokenType
@@ -59,8 +61,27 @@ internal object FallbackDictionaryClassParser {
             builder.lookAhead(1) === VAR_IDENTIFIER &&
                 FallbackDictionaryTermPredicates.isClassRangeAnchor(builder.lookAhead(2)) -> advanceTerm(builder)
             FallbackDictionaryTermPredicates.isProcessClassDirectReference(builder) -> advanceTerm(builder)
+            parsesSetContinuationIdentifier(builder) -> advanceTermPair(builder).let { true }
             else -> parseTwoWordIdentifier(builder)
         }
+
+    // `rule set` / `containing set`: SET is the SECOND word of a dictionary class noun phrase. The
+    // generic two-word path rejects it because `set` lexes as SET, not VAR_IDENTIFIER. Accept it ONLY
+    // when (a) operand position is safe — the previous non-space token is OF/IN (so the `set`
+    // assignment statement, which begins a statement, is structurally unreachable here); AND (b) the
+    // token after `set` is a valid class terminator/selector: WHOSE/WHERE (filter), a line/paren end
+    // (`containing set\n`), or a trailing VAR_IDENTIFIER by-name selector (`rule set theSet`).
+    private fun parsesSetContinuationIdentifier(builder: PsiBuilder): Boolean =
+        FallbackDictionaryTermPredicates.isClassContinuationKeyword(builder.lookAhead(1)) &&
+            isOperandPosition(previousNonSpaceToken(builder)) &&
+            isClassWordAfterContinuation(builder.lookAhead(2))
+
+    private fun isOperandPosition(tokenType: IElementType?): Boolean = tokenType === OF || tokenType === IN
+
+    private fun isClassWordAfterContinuation(tokenType: IElementType?): Boolean =
+        tokenType === VAR_IDENTIFIER ||
+            FallbackDictionaryTermPredicates.isFallbackAnchorForClass(tokenType) ||
+            FallbackDictionaryAnchorPredicates.isClassDirectReferenceAnchor(tokenType)
 
     private fun parseTwoWordIdentifier(builder: PsiBuilder): Boolean {
         val result =

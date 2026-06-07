@@ -73,7 +73,17 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
 
     fun testTypinatorRuleSet() = assertNoParserErrors("typinator_rule_set_min.applescript")
 
+    fun testTypinatorRuleSetNoOf() = assertNoParserErrors("typinator_rule_set_nofof.applescript")
+
     fun testKeystrokeReturn() = assertNoParserErrors("keystroke_return.applescript")
+
+    fun testDisplayNotificationLabeled() = assertNoParserErrors("display_notification_labeled.applescript")
+
+    fun testDialogToolkitCommands() = assertNoParserErrors("dialog_toolkit_commands.applescript")
+
+    fun testTellToUnknownCommand() = assertNoParserErrors("tell_to_unknown_command.applescript")
+
+    fun testPermissiveHeadNegative() = assertNoParserErrors("permissive_head_negative.applescript")
 
     private fun assertNoParserErrors(fileName: String) {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)
@@ -101,12 +111,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
                 // TODO(parser): re-enable once `path to ... from ...` uses the SA fallback (backlog: BL-A3)
                 // before the loaded dictionary-command path consumes only the direct parameter.
                 "testStandardAdditionsPaths",
-                // TODO(parser): re-enable when Step-1 (Bucket A) `set`-keyword class words parse in the
-                // object-reference `of`-operand (`rule set` / `containing set`). GREEN in Plan 10-01 Task 2.
-                "testTypinatorRuleSet",
-                // TODO(parser): re-enable when the `return` constant in a command tail parses. Folds to
-                // Plan 10-03 if the `keystroke` generic-head dependency dominates (decided from RED dump).
-                "testKeystrokeReturn",
+                // TODO(parser): re-enable once leading `first rule set whose ...` object references
+                // parse multi-word dictionary class names without a preceding OF/IN operand. That path
+                // goes through INDEX_REFERENCE / USER_CLASS_NAME and needs a dedicated BNF + regen fix.
+                "testTypinatorRuleSetNoOf",
             )
     }
 }

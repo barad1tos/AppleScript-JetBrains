@@ -1,4 +1,4 @@
 tell application "Finder"
-  adding folder items to
-  set eof "" to 123
+adding folder items to theFolder
+set eof "" to 123
 end tell
