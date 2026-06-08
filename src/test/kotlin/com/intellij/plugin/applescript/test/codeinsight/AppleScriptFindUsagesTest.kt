@@ -95,8 +95,7 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
 
     fun testFindUsagesReturnsDictionaryCommandCallSites() {
         val applicationName = "SyntheticFindUsagesMusic_${System.nanoTime()}"
-        val dictionaryFile =
-            writeFindUsagesMusicDictionaryXml(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        val dictionaryFile = writeFindUsagesMusicDictionaryXml()
         val dictionaryInfo = initializedDictionaryInfo(applicationName, dictionaryFile)
         val persistence = SdefPersistenceService.getInstance()
         val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
@@ -149,10 +148,10 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
         }
     }
 
-    private fun writeFindUsagesMusicDictionaryXml(xml: String): File {
+    private fun writeFindUsagesMusicDictionaryXml(): File {
         val file = File.createTempFile("synthetic-find-usages-music-", ".xml")
         file.deleteOnExit()
-        file.writeText(xml)
+        file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
         return file
     }
 
