@@ -12,6 +12,7 @@ import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjec
 import com.intellij.plugin.applescript.lang.ide.AppleScriptDocumentationProvider
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
+import com.intellij.psi.PsiElement
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -95,24 +96,49 @@ class AppleScriptDocumentationProviderTest : BasePlatformTestCase() {
         }
     }
 
-    fun testQuickDocumentationShowsLocalVariableContent() {
-        myFixture.configureByText(
-            AppleScriptFileType,
+    fun testQuickDocumentationShowsLocalVariableContentInTellCondition() {
+        assertLocalVariableDocumentation(
             """
-            on run(argv)
+            on run argv
                 set minDateAdded to missing value
-                if minDateAdded<caret> is not missing value then
-                    set trackRef to a reference to (every track of library playlist 1 whose date added > minDateAdded)
-                end if
+
+                tell application "Music"
+                    if minDateAdded<caret> is not missing value then
+                        set trackRef to a reference to (every track of library playlist 1 whose date added > minDateAdded)
+                    end if
+                end tell
             end run
-            """.trimIndent(),
+            """,
         )
+    }
+
+    fun testQuickDocumentationShowsLocalVariableContentInTellFilter() {
+        assertLocalVariableDocumentation(
+            """
+            on run argv
+                set minDateAdded to missing value
+
+                tell application "Music"
+                    if minDateAdded is not missing value then
+                        set trackRef to a reference to (every track of library playlist 1 whose date added > minDateAdded<caret>)
+                    end if
+                end tell
+            end run
+            """,
+        )
+    }
+
+    private fun assertLocalVariableDocumentation(script: String) {
+        myFixture.configureByText(AppleScriptFileType, script.trimIndent())
 
         val element =
             requireNotNull(myFixture.file.findElementAt(myFixture.caretOffset - 1)) {
                 "Regression setup must place the caret on the local variable reference"
             }
-        val resolvedElement = element.reference?.resolve()
+        val resolvedElement =
+            requireNotNull(resolveFromElementOrParent(element)) {
+                "Local variable reference must resolve to its declaration"
+            }
         val provider = AppleScriptDocumentationProvider()
 
         val quickNavigateInfo = provider.getQuickNavigateInfo(element, element)
@@ -122,18 +148,22 @@ class AppleScriptDocumentationProviderTest : BasePlatformTestCase() {
         assertNotNull("Local variable documentation must not be blank", documentation)
         requireNotNull(documentation)
         assertTrue(documentation, documentation.contains("<b>Variable</b> minDateAdded"))
+        assertTrue(resolvedElement.text, resolvedElement.text.contains("minDateAdded"))
 
-        if (resolvedElement != null) {
-            assertEquals(
-                "variable \"minDateAdded\"",
-                provider.getQuickNavigateInfo(resolvedElement, element),
-            )
-            val resolvedDocumentation = provider.generateDoc(resolvedElement, element)
-            assertNotNull("Resolved local variable documentation must not be blank", resolvedDocumentation)
-            requireNotNull(resolvedDocumentation)
-            assertTrue(resolvedDocumentation, resolvedDocumentation.contains("<b>Variable</b> minDateAdded"))
-        }
+        assertEquals(
+            "variable \"minDateAdded\"",
+            provider.getQuickNavigateInfo(resolvedElement, element),
+        )
+        val resolvedDocumentation = provider.generateDoc(resolvedElement, element)
+        assertNotNull("Resolved local variable documentation must not be blank", resolvedDocumentation)
+        requireNotNull(resolvedDocumentation)
+        assertTrue(resolvedDocumentation, resolvedDocumentation.contains("<b>Variable</b> minDateAdded"))
     }
+
+    private fun resolveFromElementOrParent(element: PsiElement): PsiElement? =
+        generateSequence(element as PsiElement?) { candidate -> candidate.parent }
+            .mapNotNull { candidate -> candidate.reference?.resolve() }
+            .firstOrNull()
 
     private fun initializedDictionaryInfo(
         applicationName: String,

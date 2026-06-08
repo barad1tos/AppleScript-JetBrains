@@ -38,6 +38,7 @@ class AppleScriptStructureViewElement :
 
         if (currentElement is AppleScriptFile && !isRoot) {
             result.add(AppleScriptStructureViewElement(currentElement, true))
+            return result
         }
 
         collectComponents(currentElement)

@@ -12,6 +12,7 @@ import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjec
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptHandler
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
+import com.intellij.plugin.applescript.psi.AppleScriptScriptObject
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
@@ -137,8 +138,48 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
 
     fun testFindUsagesReturnsLocalVariableReferencesInsideTellFilter() {
         val usageInfos = myFixture.testFindUsages("codeinsight/fetch_tracks_min_date_usages.scpt")
+        val usageLines =
+            usageInfos
+                .map { usageInfo ->
+                    val element = requireNotNull(usageInfo.element) { "Usage info must have a PSI element" }
+                    myFixture.editor.document.getLineNumber(element.textRange.startOffset) + 1
+                }.sorted()
 
         assertEquals("Find Usages must include local variable references inside tell filters", 3, usageInfos.size)
+        assertEquals(
+            "Find Usages must include declaration, condition, and tell-filter references",
+            listOf(2, 5, 6),
+            usageLines,
+        )
+    }
+
+    fun testFindUsagesDoesNotResolveDictionaryTermToSameNamedScriptObject() {
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            script bogusTerm
+                property title : "local script object"
+            end script
+
+            tell application "Music"
+                set trackRef to a reference to (every bogusTerm of library playlist 1)
+            end tell
+            """.trimIndent(),
+        )
+        val scriptObject =
+            findChildrenOfType(myFixture.file, AppleScriptScriptObject::class.java)
+                .single { it.name == "bogusTerm" }
+
+        val usages =
+            ReferencesSearch
+                .search(scriptObject, GlobalSearchScope.fileScope(myFixture.file))
+                .findAll()
+
+        assertEquals(
+            "Unresolved dictionary-shaped terms must not resolve to same-named script objects",
+            0,
+            usages.size,
+        )
     }
 
     private fun initializedDictionaryInfo(

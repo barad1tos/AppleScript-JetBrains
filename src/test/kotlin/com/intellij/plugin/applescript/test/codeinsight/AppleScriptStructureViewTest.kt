@@ -22,13 +22,28 @@ class AppleScriptStructureViewTest : BasePlatformTestCase() {
         )
 
         val model = AppleScriptStructureViewModel(myFixture.file, myFixture.editor)
-        val childNames = model.root.children.mapNotNull { child -> child.presentation.presentableText }
+        val rootChildren = model.root.children
+        assertEquals("Structure View root must contain one file wrapper", 1, rootChildren.size)
+        val childNames =
+            rootChildren
+                .single()
+                .children
+                .mapNotNull { child -> child.presentation.presentableText }
 
-        assertTrue(
-            "Structure View must expose top-level declarations, got $childNames",
-            childNames.any { childName -> childName.startsWith("scriptName") } &&
-                childNames.any { childName -> childName.startsWith("run") } &&
-                childNames.contains("Worker"),
+        assertEquals(
+            "Structure View must expose each top-level declaration once, got $childNames",
+            1,
+            childNames.count { childName -> childName.startsWith("scriptName") },
+        )
+        assertEquals(
+            "Structure View must expose each top-level declaration once, got $childNames",
+            1,
+            childNames.count { childName -> childName.startsWith("run") },
+        )
+        assertEquals(
+            "Structure View must expose each top-level declaration once, got $childNames",
+            1,
+            childNames.count { childName -> childName == "Worker" },
         )
     }
 }

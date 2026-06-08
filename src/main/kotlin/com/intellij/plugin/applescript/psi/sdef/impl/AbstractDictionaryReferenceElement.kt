@@ -5,6 +5,7 @@ import com.intellij.plugin.applescript.lang.resolve.AppleScriptDictionaryResolve
 import com.intellij.plugin.applescript.lang.resolve.AppleScriptResolveProcessor
 import com.intellij.plugin.applescript.lang.resolve.AppleScriptResolveUtil
 import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
+import com.intellij.plugin.applescript.psi.AppleScriptComponent
 import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeElement
 import com.intellij.plugin.applescript.psi.sdef.DictionaryReference
 import com.intellij.psi.PsiElement
@@ -66,7 +67,8 @@ abstract class AbstractDictionaryReferenceElement :
         if (getElement().getCompositeNameElement().getIdentifiers().size != 1) return null
         val resolveProcessor = AppleScriptResolveProcessor(canonicalText)
         PsiTreeUtil.treeWalkUp(resolveProcessor, getElement(), null, ResolveState.initial())
-        return resolveProcessor.getResult()
+        val resolved = resolveProcessor.getResult()
+        return if (resolved is AppleScriptComponent && resolved.isVariable()) resolved else null
     }
 
     override fun isReferenceTo(element: PsiElement): Boolean {
