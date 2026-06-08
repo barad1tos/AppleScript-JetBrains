@@ -7,8 +7,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptBlockBody
 import com.intellij.plugin.applescript.psi.AppleScriptComponent
 import com.intellij.plugin.applescript.psi.AppleScriptFormalParameterList
 import com.intellij.plugin.applescript.psi.AppleScriptHandler
-import com.intellij.plugin.applescript.psi.AppleScriptHandlerLabeledParametersDefinition
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
+import com.intellij.plugin.applescript.psi.AppleScriptHandlerLabeledParametersDefinition
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerPositionalParametersCallExpression
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerSelectorPart
 import com.intellij.plugin.applescript.psi.AppleScriptLabeledParameterDeclarationList

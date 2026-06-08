@@ -326,6 +326,29 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertEquals(expected, myFixture.editor.document.text)
     }
 
+    fun testRenameLocalVariableDoesNotRewriteUnresolvedDictionaryPropertySelector() {
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            set name<caret> to "local"
+
+            tell application "Music"
+                set trackRef to a reference to (every track of library playlist 1 whose name is "target")
+            end tell
+            """.trimIndent(),
+        )
+        myFixture.renameElementAtCaret("localName")
+        val expected =
+            """
+            set localName to "local"
+
+            tell application "Music"
+                set trackRef to a reference to (every track of library playlist 1 whose name is "target")
+            end tell
+            """.trimIndent()
+        assertEquals(expected, myFixture.editor.document.text)
+    }
+
     fun testUsages() {
         val usageInfos = myFixture.testFindUsages("codeinsight/set_var.scpt")
         assertEquals(2, usageInfos.size)

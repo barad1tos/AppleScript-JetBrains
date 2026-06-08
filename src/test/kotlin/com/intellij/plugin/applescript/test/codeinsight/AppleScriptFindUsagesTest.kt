@@ -188,6 +188,38 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
         )
     }
 
+    fun testFindUsagesDoesNotResolveUnloadedDictionaryPropertySelectorToSameNamedVariable() {
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            set name to "local"
+            set output to name
+
+            tell application "Music"
+                set trackRef to a reference to (every track of library playlist 1 whose name is "target")
+            end tell
+            """.trimIndent(),
+        )
+        val variable =
+            findChildrenOfType(myFixture.file, AppleScriptTargetVariable::class.java)
+                .single { it.name == "name" }
+
+        val usages =
+            ReferencesSearch
+                .search(variable, GlobalSearchScope.fileScope(myFixture.file))
+                .findAll()
+        val usageLines =
+            usages
+                .map { usage -> myFixture.editor.document.getLineNumber(usage.element.textRange.startOffset) + 1 }
+                .sorted()
+
+        assertEquals(
+            "Find Usages must not include unloaded dictionary property selectors",
+            listOf(1, 2),
+            usageLines,
+        )
+    }
+
     fun testFindUsagesDoesNotResolveDictionaryPropertyTermToSameNamedVariable() {
         val applicationName = "SyntheticFindUsagesMusic_${System.nanoTime()}"
         val dictionaryFile = writeFindUsagesMusicDictionaryXml()
@@ -296,7 +328,7 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
 
         assertEquals(
             "Unresolved dictionary class terms must not resolve to same-named variables; " +
-                usages.joinToString { usage -> "${usage.element?.javaClass?.simpleName}:${usage.element?.text}" },
+                usages.joinToString { usage -> "${usage.element.javaClass.simpleName}:${usage.element.text}" },
             listOf(1),
             usageLines,
         )

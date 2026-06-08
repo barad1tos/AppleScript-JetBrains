@@ -6,6 +6,7 @@ import com.intellij.plugin.applescript.lang.resolve.AppleScriptResolveProcessor
 import com.intellij.plugin.applescript.lang.resolve.AppleScriptResolveUtil
 import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
 import com.intellij.plugin.applescript.psi.AppleScriptArbitraryReference
+import com.intellij.plugin.applescript.psi.AppleScriptCompareExpression
 import com.intellij.plugin.applescript.psi.AppleScriptComponent
 import com.intellij.plugin.applescript.psi.AppleScriptCountCommandExpression
 import com.intellij.plugin.applescript.psi.AppleScriptDictionaryClassIdentifierPlural
@@ -13,12 +14,16 @@ import com.intellij.plugin.applescript.psi.AppleScriptDictionaryClassName
 import com.intellij.plugin.applescript.psi.AppleScriptDictionaryPropertyName
 import com.intellij.plugin.applescript.psi.AppleScriptDirectParameterDeclaration
 import com.intellij.plugin.applescript.psi.AppleScriptEveryElemReference
+import com.intellij.plugin.applescript.psi.AppleScriptFilterReference
 import com.intellij.plugin.applescript.psi.AppleScriptIndexReference
 import com.intellij.plugin.applescript.psi.AppleScriptIndexReferenceClassForm
 import com.intellij.plugin.applescript.psi.AppleScriptLabeledParameterDeclarationPart
 import com.intellij.plugin.applescript.psi.AppleScriptMiddleElemReference
+import com.intellij.plugin.applescript.psi.AppleScriptPropertyReference
 import com.intellij.plugin.applescript.psi.AppleScriptPsiElementFactory
 import com.intellij.plugin.applescript.psi.AppleScriptSimpleFormalParameter
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeElement
 import com.intellij.plugin.applescript.psi.sdef.DictionaryReference
 import com.intellij.psi.PsiElement
@@ -131,12 +136,36 @@ private fun DictionaryCompositeElement.resolveLocalFallback(canonicalText: Strin
 
 private fun DictionaryCompositeElement.canResolveLocalFallback(): Boolean =
     when (this) {
-        is AppleScriptDictionaryPropertyName -> true
+        is AppleScriptDictionaryPropertyName -> !isDictionaryPropertySelectorPosition()
         is AppleScriptDictionaryClassName,
         is AppleScriptDictionaryClassIdentifierPlural,
         -> !isObjectReferenceTypePosition()
         else -> false
     }
+
+private fun DictionaryCompositeElement.isDictionaryPropertySelectorPosition(): Boolean =
+    isPropertyReferenceOperatorPosition() || isFilterReferenceSelectorPosition()
+
+private fun DictionaryCompositeElement.isPropertyReferenceOperatorPosition(): Boolean =
+    PsiTreeUtil.nextVisibleLeaf(this)?.node?.elementType.let { elementType ->
+        elementType === OF || elementType === IN
+    }
+
+private fun DictionaryCompositeElement.isFilterReferenceSelectorPosition(): Boolean {
+    val propertyReference =
+        PsiTreeUtil.getParentOfType(this, AppleScriptPropertyReference::class.java, false)
+            ?: return false
+    val filterReference =
+        PsiTreeUtil.getParentOfType(propertyReference, AppleScriptFilterReference::class.java, false)
+            ?: return false
+    val compareExpression =
+        PsiTreeUtil.getParentOfType(propertyReference, AppleScriptCompareExpression::class.java, false)
+            ?: return false
+    val filterCompareExpression =
+        PsiTreeUtil.getParentOfType(compareExpression, AppleScriptFilterReference::class.java, false)
+    return filterCompareExpression === filterReference &&
+        compareExpression.propertyReferenceList.firstOrNull() === propertyReference
+}
 
 private fun DictionaryCompositeElement.isObjectReferenceTypePosition(): Boolean =
     PsiTreeUtil.getParentOfType(this, AppleScriptArbitraryReference::class.java, false) != null ||
