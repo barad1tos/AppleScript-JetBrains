@@ -20,33 +20,38 @@ public final class AppleScriptSmokeStarter implements ApplicationStarter {
   @SuppressWarnings("java:S1147") // ApplicationStarter callback is named main by platform contract.
   public void main(@NotNull List<String> args) {
     String fixtureRoot = System.getProperty(FIXTURE_ROOT_PROPERTY);
-    File fixtureDirectory = fixtureDirectoryOrExit(fixtureRoot);
-    if (fixtureDirectory == null) {
+    SmokeLaunchPlan launchPlan = createLaunchPlan(fixtureRoot);
+    String failureMessage = launchPlan.failureMessage();
+    if (failureMessage != null) {
+      LOG.error("[applescript-smoke] FAIL: " + failureMessage);
+      exitSmoke(1);
       return;
     }
 
+    String validatedFixtureRoot = launchPlan.requireFixtureRoot();
+    File fixtureDirectory = launchPlan.requireFixtureDirectory();
     ApplicationManager.getApplication().executeOnPooledThread(
         () -> {
-          AppleScriptSmokeRunner runner = new AppleScriptSmokeRunner(fixtureRoot, fixtureDirectory);
+          AppleScriptSmokeRunner runner = new AppleScriptSmokeRunner(validatedFixtureRoot, fixtureDirectory);
           exitSmoke(runner.run());
         });
   }
 
-  private static @Nullable File fixtureDirectoryOrExit(@Nullable String fixtureRoot) {
+  static @NotNull SmokeLaunchPlan createLaunchPlan(@Nullable String fixtureRoot) {
     if (fixtureRoot == null || fixtureRoot.isBlank()) {
-      LOG.error("[applescript-smoke] FAIL: -D" + FIXTURE_ROOT_PROPERTY + " not set");
-      exitSmoke(1);
-      return null;
+      return new SmokeLaunchPlan(null, null, "-D" + FIXTURE_ROOT_PROPERTY + " not set");
     }
 
     File fixtureDirectory = new File(fixtureRoot);
     if (!fixtureDirectory.isDirectory()) {
-      LOG.error("[applescript-smoke] FAIL: fixture root is not a directory: " + fixtureRoot);
-      exitSmoke(1);
-      return null;
+      return new SmokeLaunchPlan(null, null, "fixture root is not a directory: " + fixtureRoot);
     }
 
-    return fixtureDirectory;
+    return new SmokeLaunchPlan(fixtureRoot, fixtureDirectory, null);
+  }
+
+  static @Nullable String fixtureRootFailure(@Nullable String fixtureRoot) {
+    return createLaunchPlan(fixtureRoot).failureMessage();
   }
 
   private static void exitSmoke(int code) {
@@ -56,6 +61,25 @@ public final class AppleScriptSmokeStarter implements ApplicationStarter {
       throw exception;
     } catch (IllegalStateException | IllegalArgumentException exception) {
       LOG.warn("ApplicationManager.exit threw", exception);
+    }
+  }
+
+  record SmokeLaunchPlan(
+      @Nullable String fixtureRoot,
+      @Nullable File fixtureDirectory,
+      @Nullable String failureMessage) {
+    @NotNull String requireFixtureRoot() {
+      if (fixtureRoot == null) {
+        throw new IllegalStateException("fixtureRoot is required for a valid smoke launch plan");
+      }
+      return fixtureRoot;
+    }
+
+    @NotNull File requireFixtureDirectory() {
+      if (fixtureDirectory == null) {
+        throw new IllegalStateException("fixtureDirectory is required for a valid smoke launch plan");
+      }
+      return fixtureDirectory;
     }
   }
 }

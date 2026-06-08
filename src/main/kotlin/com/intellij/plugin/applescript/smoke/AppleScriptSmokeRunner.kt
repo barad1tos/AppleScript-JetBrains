@@ -19,7 +19,9 @@ import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 
-internal val SMOKE_LOG: Logger = Logger.getInstance("#${AppleScriptSmokeRunner::class.java.name}")
+private const val SMOKE_LOG_CATEGORY = "#com.intellij.plugin.applescript.smoke.AppleScriptSmokeStarter"
+
+internal val SMOKE_LOG: Logger = Logger.getInstance(SMOKE_LOG_CATEGORY)
 
 /**
  * Opens the smoke fixture project, waits for dictionary indexing, runs assertions, and
@@ -30,7 +32,7 @@ internal val SMOKE_LOG: Logger = Logger.getInstance("#${AppleScriptSmokeRunner::
  * null on a platform version, the fallback uses [ProjectManagerEx.openProject] with
  * [OpenProjectTask.build], the public no-argument factory.
  */
-class AppleScriptSmokeRunner(
+internal class AppleScriptSmokeRunner(
     private val fixtureRoot: String,
     private val fixtureDir: File,
 ) {

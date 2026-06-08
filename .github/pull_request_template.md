@@ -11,6 +11,7 @@
 - [ ] `./gradlew build --stacktrace`
 - [ ] `./gradlew test --stacktrace`
 - [ ] `./gradlew verifyPlugin --stacktrace`
+- [ ] `python3 scripts/tests/test_verify_plugin_verifier.py`
 - [ ] `python3 scripts/verify-plugin-verifier.py --fail-on-api-warnings`
 
 ## Related Issues

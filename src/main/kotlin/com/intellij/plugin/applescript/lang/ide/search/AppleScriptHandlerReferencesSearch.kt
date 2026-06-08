@@ -10,6 +10,7 @@ import com.intellij.psi.search.PsiSearchHelper
 import com.intellij.psi.search.TextOccurenceProcessor
 import com.intellij.psi.search.UsageSearchContext
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.util.Processor
 import com.intellij.util.QueryExecutor
 
@@ -61,9 +62,10 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
             element: PsiElement,
             offsetInElement: Int,
         ): Boolean {
+            val handlerCall = PsiTreeUtil.getParentOfType(element, AppleScriptHandlerCall::class.java, false)
             val reference =
-                if (element is AppleScriptHandlerCall && handlerSelector == element.getHandlerSelector()) {
-                    element.references.firstOrNull { it.isReferenceTo(handler) }
+                if (handlerCall != null && handlerSelector == handlerCall.getHandlerSelector()) {
+                    handlerCall.references.firstOrNull { it.isReferenceTo(handler) }
                 } else {
                     null
                 }

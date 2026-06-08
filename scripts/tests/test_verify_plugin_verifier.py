@@ -71,11 +71,11 @@ class VerifyPluginVerifierTest(unittest.TestCase):
         self.assertIn("Deprecated API method", result.stderr)
         self.assertIn("Experimental API method", result.stderr)
 
-    def test_strict_mode_fails_unapproved_api_warnings(self) -> None:
+    def test_strict_mode_fails_deprecated_api_warnings(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             reports_dir = Path(temporary_directory)
 
-            result = run_gate_with_api_warnings(
+            result = run_gate_with_deprecated_warning(
                 reports_dir,
                 "--fail-on-api-warnings",
             )
@@ -83,6 +83,19 @@ class VerifyPluginVerifierTest(unittest.TestCase):
         self.assert_gate_failed(
             result,
             "Deprecated API usage",
+        )
+
+    def test_strict_mode_fails_experimental_api_warnings(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            reports_dir = Path(temporary_directory)
+
+            result = run_gate_with_experimental_warning(
+                reports_dir,
+                "--fail-on-api-warnings",
+            )
+
+        self.assert_gate_failed(
+            result,
             "Experimental API usage",
         )
 
@@ -113,10 +126,18 @@ def make_target(reports_dir: Path) -> Path:
 
 
 def write_api_warning_files(target: Path) -> None:
+    write_deprecated_warning_file(target)
+    write_experimental_warning_file(target)
+
+
+def write_deprecated_warning_file(target: Path) -> None:
     (target / "deprecated-usages.txt").write_text(
         "Deprecated API method com.intellij.Old.call() invocation\n",
         encoding="utf-8",
     )
+
+
+def write_experimental_warning_file(target: Path) -> None:
     (target / "experimental-api-usages.txt").write_text(
         "Experimental API method com.intellij.New.call() invocation\n",
         encoding="utf-8",
@@ -128,6 +149,22 @@ def run_gate_with_api_warnings(
     *extra_arguments: str,
 ) -> subprocess.CompletedProcess[str]:
     write_api_warning_files(make_target(reports_dir))
+    return run_gate(reports_dir, *extra_arguments)
+
+
+def run_gate_with_deprecated_warning(
+    reports_dir: Path,
+    *extra_arguments: str,
+) -> subprocess.CompletedProcess[str]:
+    write_deprecated_warning_file(make_target(reports_dir))
+    return run_gate(reports_dir, *extra_arguments)
+
+
+def run_gate_with_experimental_warning(
+    reports_dir: Path,
+    *extra_arguments: str,
+) -> subprocess.CompletedProcess[str]:
+    write_experimental_warning_file(make_target(reports_dir))
     return run_gate(reports_dir, *extra_arguments)
 
 
