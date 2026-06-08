@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.test.codeinsight
 
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewFactory
 import com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewModel
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.io.File
@@ -58,6 +59,24 @@ class AppleScriptStructureViewTest : BasePlatformTestCase() {
         assertTrue(
             "Structure View must expose the top-level run handler for realistic Music scripts, got $childNames",
             childNames.any { childName -> childName.startsWith("run") },
+        )
+    }
+
+    fun testStructureViewFactoryIsRegisteredInPluginDescriptor() {
+        val factoryElement =
+            requireNotNull(
+                PluginDescriptorTestSupport.findElement(
+                    tagName = "lang.psiStructureViewFactory",
+                    implementationClass = AppleScriptStructureViewFactory::class.java.name,
+                ),
+            ) {
+                "Structure View factory registration must be present"
+            }
+
+        assertEquals("AppleScript", factoryElement.getAttribute("language"))
+        assertEquals(
+            AppleScriptStructureViewFactory::class.java.name,
+            factoryElement.getAttribute("implementationClass"),
         )
     }
 

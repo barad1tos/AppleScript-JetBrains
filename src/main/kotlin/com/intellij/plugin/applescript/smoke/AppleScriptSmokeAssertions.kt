@@ -4,6 +4,7 @@ import com.intellij.codeInsight.completion.CodeCompletionHandlerBase
 import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.lookup.LookupManager
+import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.impl.DocumentMarkupModel
@@ -14,7 +15,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewModel
+import com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewFactory
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
@@ -26,8 +27,8 @@ import java.io.File
 private const val DAEMON_DRAIN_ITERATIONS: Int = 50
 
 /**
- * Runs end-to-end smoke assertions for parser fallback, completion, and unresolved
- * application diagnostics. PSI and daemon interactions run inside
+ * Runs end-to-end smoke assertions for parser fallback, Structure View, completion,
+ * and unresolved application diagnostics. PSI and daemon interactions run inside
  * `ApplicationManager.invokeAndWait { ... }` to keep the EDT contract explicit.
  *
  * The unresolved-application assertion uses [DocumentMarkupModel.forDocument] and
@@ -89,7 +90,10 @@ internal class AppleScriptSmokeAssertions {
             return
         }
 
-        val model = AppleScriptStructureViewModel(context.psiFile, editor)
+        val builder =
+            AppleScriptStructureViewFactory()
+                .getStructureViewBuilder(context.psiFile) as TreeBasedStructureViewBuilder
+        val model = builder.createStructureViewModel(editor)
         val childNames =
             model.root.children
                 .mapNotNull { child -> child.presentation.presentableText }
