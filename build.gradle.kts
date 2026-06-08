@@ -256,9 +256,10 @@ intellijPlatform {
 }
 
 // SDEF-14 (D-13/D-14): runIdeHeadlessSmoke boots IDEA in headless mode against the
-// AppleScript fixtures under src/test/resources/testData/runIde and asserts three
-// Phase 8 invariants (composite 2-token fallback, BASIC completion non-empty on
-// `play `, WEAK_WARNING annotator severity on unresolved app refs). Registered via
+// AppleScript fixtures under src/test/resources/testData/runIde and asserts runtime
+// invariants (composite 2-token fallback, Structure View declarations, BASIC
+// completion non-empty on `play `, WEAK_WARNING annotator severity on unresolved app
+// refs). Registered via
 // the v2.16.0 `intellijPlatformTesting.runIde.registering { task { ... } }` DSL so the
 // Platform plugin wires the IDE classpath + sandbox automatically.
 val runIdeHeadlessSmoke by intellijPlatformTesting.runIde.registering {
