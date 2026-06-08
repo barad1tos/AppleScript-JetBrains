@@ -35,6 +35,8 @@ gradle/wrapper/dists/
 .LSOverride
 
 # Manual test scripts (working artifacts)
+fetch_tracks.applescript
+test.scpt
 test_*.applescript
 update_test_data*.py
 

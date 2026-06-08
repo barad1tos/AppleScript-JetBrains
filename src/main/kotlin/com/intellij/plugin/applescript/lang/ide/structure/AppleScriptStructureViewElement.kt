@@ -61,7 +61,7 @@ class AppleScriptStructureViewElement :
                     AppleScriptComponentScopeProcessor(components),
                     ResolveState.initial(),
                     null,
-                    element,
+                    null,
                 )
             is AppleScriptScriptObject ->
                 components.addAll(AppleScriptResolveUtil.getNamedSubComponentsFor(element))

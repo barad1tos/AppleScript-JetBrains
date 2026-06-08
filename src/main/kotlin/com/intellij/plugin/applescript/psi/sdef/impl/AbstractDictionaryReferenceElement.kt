@@ -2,6 +2,7 @@ package com.intellij.plugin.applescript.psi.sdef.impl
 
 import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.lang.resolve.AppleScriptDictionaryResolveProcessor
+import com.intellij.plugin.applescript.lang.resolve.AppleScriptResolveProcessor
 import com.intellij.plugin.applescript.lang.resolve.AppleScriptResolveUtil
 import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
 import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeElement
@@ -55,7 +56,17 @@ abstract class AbstractDictionaryReferenceElement :
                 res.add(resolveResult)
             }
         }
+        if (res.isEmpty()) {
+            resolveLocalFallback()?.let(res::add)
+        }
         return AppleScriptResolveUtil.toCandidateInfoArray(res)
+    }
+
+    private fun resolveLocalFallback(): PsiElement? {
+        if (getElement().getCompositeNameElement().getIdentifiers().size != 1) return null
+        val resolveProcessor = AppleScriptResolveProcessor(canonicalText)
+        PsiTreeUtil.treeWalkUp(resolveProcessor, getElement(), null, ResolveState.initial())
+        return resolveProcessor.getResult()
     }
 
     override fun isReferenceTo(element: PsiElement): Boolean {

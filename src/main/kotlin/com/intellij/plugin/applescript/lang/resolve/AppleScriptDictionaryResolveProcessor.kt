@@ -140,6 +140,7 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
                 is AbstractDictionaryConstantSpecifier -> importedDictionary.findEnumerator(myElementName)
                 is AppleScriptDictionaryClassIdentifierPlural ->
                     importedDictionary.findClassByPluralName(myElementName)
+                        ?: importedDictionary.findClass(myElementName)
                 else -> {
                     LOG.warn("WARNING: unknown dictionary reference element: ${element.javaClass.name}")
                     null
