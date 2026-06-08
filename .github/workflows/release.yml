@@ -61,8 +61,11 @@ jobs:
       - name: Verify docs metadata
         run: python3 scripts/verify-docs.py
 
-      - name: Fail on internal API verifier findings
-        run: python3 scripts/verify-plugin-verifier.py
+      - name: Verify release helper scripts
+        run: python3 scripts/tests/test_verify_plugin_verifier.py
+
+      - name: Fail on unapproved verifier API findings
+        run: python3 scripts/verify-plugin-verifier.py --fail-on-api-warnings
 
   publish:
     name: Publish

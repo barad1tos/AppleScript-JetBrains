@@ -14,7 +14,7 @@ internal object DictionaryDaemonRestartScheduler {
         application.invokeLater {
             for (project in ProjectManager.getInstance().openProjects) {
                 if (!project.isDisposed) {
-                    DaemonCodeAnalyzer.getInstance(project).restart()
+                    DaemonCodeAnalyzer.getInstance(project).settingsChanged()
                 }
             }
         }

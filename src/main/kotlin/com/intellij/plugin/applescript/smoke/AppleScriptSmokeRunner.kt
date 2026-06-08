@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.smoke
 import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
@@ -17,6 +18,10 @@ import java.io.File
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
+
+private const val SMOKE_LOG_CATEGORY = "#com.intellij.plugin.applescript.smoke.AppleScriptSmokeStarter"
+
+internal val SMOKE_LOG: Logger = Logger.getInstance(SMOKE_LOG_CATEGORY)
 
 /**
  * Opens the smoke fixture project, waits for dictionary indexing, runs assertions, and

@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.lang.ide.search
 
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.util.Computable
 import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
 import com.intellij.plugin.applescript.psi.sdef.AppleScriptCommandHandlerCall
 import com.intellij.plugin.applescript.psi.sdef.DictionaryCompositeElement
@@ -17,7 +18,10 @@ class AppleScriptDictionaryComponentReferencesSearch : QueryExecutor<PsiReferenc
     override fun execute(
         queryParameters: ReferencesSearch.SearchParameters,
         consumer: Processor<in PsiReference>,
-    ): Boolean = ReadAction.compute<Boolean, RuntimeException> { doExecute(queryParameters, consumer) }
+    ): Boolean =
+        ApplicationManager.getApplication().runReadAction(
+            Computable { doExecute(queryParameters, consumer) },
+        )
 
     private fun doExecute(
         queryParameters: ReferencesSearch.SearchParameters,
@@ -36,7 +40,7 @@ class AppleScriptDictionaryComponentReferencesSearch : QueryExecutor<PsiReferenc
             val searchWord = parts[0]
             searchWord.isEmpty() ||
                 helper.processElementsWithWord(
-                    MyOccurrenceProcessor(dictionaryComponent, componentName, consumer),
+                    DictionaryComponentOccurrenceProcessor(dictionaryComponent, componentName, consumer),
                     queryParameters.scopeDeterminedByUser,
                     searchWord,
                     UsageSearchContext.IN_CODE,
@@ -45,10 +49,10 @@ class AppleScriptDictionaryComponentReferencesSearch : QueryExecutor<PsiReferenc
         }
     }
 
-    private class MyOccurrenceProcessor(
-        private val myDictionaryComponent: DictionaryComponent,
-        private val myComponentName: String,
-        private val myConsumer: Processor<in PsiReference>,
+    private class DictionaryComponentOccurrenceProcessor(
+        private val dictionaryComponent: DictionaryComponent,
+        private val componentName: String,
+        private val consumer: Processor<in PsiReference>,
     ) : TextOccurenceProcessor {
         override fun execute(
             element: PsiElement,
@@ -60,10 +64,10 @@ class AppleScriptDictionaryComponentReferencesSearch : QueryExecutor<PsiReferenc
                     is DictionaryCompositeElement -> element.getCompositeNameElement().getCompositeName()
                     else -> null
                 }
-            if (selector != null && myComponentName == selector) {
-                for (ref in element.references) {
-                    if (ref.isReferenceTo(myDictionaryComponent)) {
-                        return myConsumer.process(ref)
+            if (selector != null && componentName == selector) {
+                for (reference in element.references) {
+                    if (reference.isReferenceTo(dictionaryComponent)) {
+                        return consumer.process(reference)
                     }
                 }
             }
