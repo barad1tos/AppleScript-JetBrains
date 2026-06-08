@@ -10,4 +10,6 @@ To provide dictionary support, the plugin may store local IDE cache data on the 
 
 The plugin does not operate external analytics, telemetry, advertising, or tracking services.
 
+Plugin installation, updates, purchases, subscriptions, license checks, and Marketplace account data are handled by JetBrains IDEs and JetBrains Marketplace and are governed by JetBrains' own privacy policies.
+
 Issue reports, support requests, Marketplace reviews, and other user-submitted messages are handled through GitHub and JetBrains Marketplace. Those services are governed by their own privacy policies.

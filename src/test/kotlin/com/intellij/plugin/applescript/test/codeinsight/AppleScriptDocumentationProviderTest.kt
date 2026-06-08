@@ -97,7 +97,7 @@ class AppleScriptDocumentationProviderTest : BasePlatformTestCase() {
     }
 
     fun testQuickDocumentationShowsLocalVariableContentInTellCondition() {
-        assertLocalVariableDocumentation(
+        assertLocalSymbolDocumentation(
             """
             on run argv
                 set minDateAdded to missing value
@@ -109,11 +109,13 @@ class AppleScriptDocumentationProviderTest : BasePlatformTestCase() {
                 end tell
             end run
             """,
+            expectedKind = "variable",
+            expectedName = "minDateAdded",
         )
     }
 
     fun testQuickDocumentationShowsLocalVariableContentInTellFilter() {
-        assertLocalVariableDocumentation(
+        assertLocalSymbolDocumentation(
             """
             on run argv
                 set minDateAdded to missing value
@@ -125,6 +127,36 @@ class AppleScriptDocumentationProviderTest : BasePlatformTestCase() {
                 end tell
             end run
             """,
+            expectedKind = "variable",
+            expectedName = "minDateAdded",
+        )
+    }
+
+    fun testQuickDocumentationShowsHandlerParameterContentInTellFilter() {
+        assertLocalSymbolDocumentation(
+            """
+            on run argv
+                tell application "Music"
+                    if argv is not "" then
+                        set trackRef to a reference to (every track of library playlist 1 whose comment is argv<caret>)
+                    end if
+                end tell
+            end run
+            """,
+            expectedKind = "parameter",
+            expectedName = "argv",
+        )
+    }
+
+    fun testQuickDocumentationEscapesLocalVariableName() {
+        assertLocalSymbolDocumentation(
+            """
+            set |a<b&c| to 1
+            set output to |a<b&c|<caret>
+            """,
+            expectedKind = "variable",
+            expectedName = "|a<b&c|",
+            expectedDocumentationName = "|a&lt;b&amp;c|",
         )
     }
 
@@ -169,36 +201,45 @@ class AppleScriptDocumentationProviderTest : BasePlatformTestCase() {
         )
     }
 
-    private fun assertLocalVariableDocumentation(script: String) {
+    private fun assertLocalSymbolDocumentation(
+        script: String,
+        expectedKind: String,
+        expectedName: String,
+        expectedDocumentationName: String = expectedName,
+    ) {
         myFixture.configureByText(AppleScriptFileType, script.trimIndent())
 
         val element =
             requireNotNull(myFixture.file.findElementAt(myFixture.caretOffset - 1)) {
-                "Regression setup must place the caret on the local variable reference"
+                "Regression setup must place the caret on the local symbol reference"
             }
         val resolvedElement =
             requireNotNull(resolveFromElementOrParent(element)) {
-                "Local variable reference must resolve to its declaration"
+                "Local symbol reference must resolve to its declaration"
             }
         val provider = AppleScriptDocumentationProvider()
 
         val quickNavigateInfo = provider.getQuickNavigateInfo(element, element)
         val documentation = provider.generateDoc(element, element)
 
-        assertEquals("variable \"minDateAdded\"", quickNavigateInfo)
-        assertNotNull("Local variable documentation must not be blank", documentation)
+        assertEquals("$expectedKind \"$expectedName\"", quickNavigateInfo)
+        assertNotNull("Local symbol documentation must not be blank", documentation)
         requireNotNull(documentation)
-        assertTrue(documentation, documentation.contains("<b>Variable</b> minDateAdded"))
-        assertTrue(resolvedElement.text, resolvedElement.text.contains("minDateAdded"))
+        val expectedTitle = expectedKind.replaceFirstChar { it.uppercaseChar() }
+        assertTrue(documentation, documentation.contains("<b>$expectedTitle</b> $expectedDocumentationName"))
+        assertTrue(resolvedElement.text, resolvedElement.text.contains(expectedName))
 
         assertEquals(
-            "variable \"minDateAdded\"",
+            "$expectedKind \"$expectedName\"",
             provider.getQuickNavigateInfo(resolvedElement, element),
         )
         val resolvedDocumentation = provider.generateDoc(resolvedElement, element)
-        assertNotNull("Resolved local variable documentation must not be blank", resolvedDocumentation)
+        assertNotNull("Resolved local symbol documentation must not be blank", resolvedDocumentation)
         requireNotNull(resolvedDocumentation)
-        assertTrue(resolvedDocumentation, resolvedDocumentation.contains("<b>Variable</b> minDateAdded"))
+        assertTrue(
+            resolvedDocumentation,
+            resolvedDocumentation.contains("<b>$expectedTitle</b> $expectedDocumentationName"),
+        )
     }
 
     private fun resolveFromElementOrParent(element: PsiElement): PsiElement? =

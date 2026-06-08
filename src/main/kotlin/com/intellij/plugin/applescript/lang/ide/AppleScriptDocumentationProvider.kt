@@ -1,9 +1,13 @@
 package com.intellij.plugin.applescript.lang.ide
 
 import com.intellij.lang.documentation.AbstractDocumentationProvider
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
 import com.intellij.plugin.applescript.psi.AppleScriptComponent
+import com.intellij.plugin.applescript.psi.AppleScriptDirectParameterDeclaration
+import com.intellij.plugin.applescript.psi.AppleScriptLabeledParameterDeclarationPart
 import com.intellij.plugin.applescript.psi.AppleScriptPsiElement
+import com.intellij.plugin.applescript.psi.AppleScriptSimpleFormalParameter
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiManager
 
@@ -14,8 +18,8 @@ class AppleScriptDocumentationProvider : AbstractDocumentationProvider() {
     ): String? =
         findDictionaryTarget(element)?.let { dictionaryTarget ->
             "${dictionaryTarget.type} \"${dictionaryTarget.getName()}\" [ ${dictionaryTarget.dictionary.getName()} ]"
-        } ?: findLocalVariableTarget(element)?.let { variableTarget ->
-            "variable \"${variableTarget.getName()}\""
+        } ?: findLocalDataSymbolTarget(element)?.let { localTarget ->
+            "${localTarget.localSymbolKind()} \"${localTarget.getName()}\""
         }
 
     override fun generateDoc(
@@ -23,7 +27,7 @@ class AppleScriptDocumentationProvider : AbstractDocumentationProvider() {
         originalElement: PsiElement?,
     ): String? =
         findDictionaryTarget(element)?.documentation
-            ?: findLocalVariableTarget(element)?.let(::localVariableDocumentation)
+            ?: findLocalDataSymbolTarget(element)?.let(::localSymbolDocumentation)
 
     override fun getDocumentationElementForLink(
         psiManager: PsiManager,
@@ -45,20 +49,35 @@ class AppleScriptDocumentationProvider : AbstractDocumentationProvider() {
         return null
     }
 
-    private fun findLocalVariableTarget(element: PsiElement): AppleScriptComponent? {
+    private fun findLocalDataSymbolTarget(element: PsiElement): AppleScriptComponent? {
         var candidate: PsiElement? = element
         while (candidate != null) {
-            if (candidate is AppleScriptComponent && candidate.isVariable()) return candidate
+            if (candidate is AppleScriptComponent && candidate.isLocalDataSymbol()) return candidate
             val resolved = candidate.reference?.resolve()
-            if (resolved is AppleScriptComponent && resolved.isVariable()) return resolved
+            if (resolved is AppleScriptComponent && resolved.isLocalDataSymbol()) return resolved
             candidate = candidate.parent
         }
         return null
     }
 
-    private fun localVariableDocumentation(variableTarget: AppleScriptComponent): String =
+    private fun localSymbolDocumentation(localTarget: AppleScriptComponent): String =
         buildString {
-            append("<b>Variable</b> ")
-            append(variableTarget.getName())
+            append("<b>")
+            append(localTarget.localSymbolKind().replaceFirstChar { it.uppercaseChar() })
+            append("</b> ")
+            append(StringUtil.escapeXmlEntities(localTarget.getName().orEmpty()))
         }
 }
+
+private fun AppleScriptComponent.isLocalDataSymbol(): Boolean =
+    isVariable() ||
+        this is AppleScriptSimpleFormalParameter ||
+        this is AppleScriptDirectParameterDeclaration ||
+        this is AppleScriptLabeledParameterDeclarationPart
+
+private fun AppleScriptComponent.localSymbolKind(): String = if (isParameter()) "parameter" else "variable"
+
+private fun AppleScriptComponent.isParameter(): Boolean =
+    this is AppleScriptSimpleFormalParameter ||
+        this is AppleScriptDirectParameterDeclaration ||
+        this is AppleScriptLabeledParameterDeclarationPart
