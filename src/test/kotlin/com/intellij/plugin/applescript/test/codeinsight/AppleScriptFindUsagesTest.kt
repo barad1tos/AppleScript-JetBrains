@@ -188,6 +188,59 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
         )
     }
 
+    fun testFindUsagesDoesNotResolveDictionaryPropertyTermToSameNamedVariable() {
+        val applicationName = "SyntheticFindUsagesMusic_${System.nanoTime()}"
+        val dictionaryFile = writeFindUsagesMusicDictionaryXml()
+        val dictionaryInfo = initializedDictionaryInfo(applicationName, dictionaryFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            runBlocking {
+                SdefIndexService.getInstance().ingest(applicationName, dictionaryFile)
+            }
+            registryService.standardReady.complete(Result.success(Unit))
+            registryService.appsReady.complete(Result.success(Unit))
+            requireNotNull(projectDictionaries.createDictionary(applicationName)) {
+                "Regression setup must create the synthetic project dictionary"
+            }
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set name to "local"
+                set output to name
+
+                tell application "$applicationName"
+                    set trackRef to a reference to (every track of library playlist 1 whose name is "target")
+                end tell
+                """.trimIndent(),
+            )
+            val variable =
+                findChildrenOfType(myFixture.file, AppleScriptTargetVariable::class.java)
+                    .single { it.name == "name" }
+
+            val usages =
+                ReferencesSearch
+                    .search(variable, GlobalSearchScope.fileScope(myFixture.file))
+                    .findAll()
+            val usageLines =
+                usages
+                    .map { usage -> myFixture.editor.document.getLineNumber(usage.element.textRange.startOffset) + 1 }
+                    .sorted()
+
+            assertEquals(
+                "Find Usages must not include same-named dictionary property references",
+                listOf(1, 2),
+                usageLines,
+            )
+        } finally {
+            dictionaryInfo.getApplicationFile()?.path?.let(persistence::removeDictionaryInfo)
+        }
+    }
+
     fun testFindUsagesDoesNotResolveDictionaryTermToSameNamedScriptObject() {
         myFixture.configureByText(
             AppleScriptFileType,

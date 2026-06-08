@@ -71,46 +71,19 @@ abstract class AbstractDictionaryReferenceElement :
             }
         }
         if (res.isEmpty()) {
-            resolveLocalFallback()?.let(res::add)
+            getElement().resolveLocalFallback(canonicalText)?.let(res::add)
         }
         return AppleScriptResolveUtil.toCandidateInfoArray(res)
     }
 
-    private fun resolveLocalFallback(): PsiElement? {
-        if (!canResolveLocalFallback()) return null
-        if (getElement().getCompositeNameElement().getIdentifiers().size != 1) return null
-        val resolveProcessor = AppleScriptResolveProcessor(canonicalText)
-        PsiTreeUtil.treeWalkUp(resolveProcessor, getElement(), null, ResolveState.initial())
-        val resolved = resolveProcessor.getResult()
-        return if (resolved is AppleScriptComponent && resolved.isLocalDataSymbol()) resolved else null
-    }
-
-    private fun canResolveLocalFallback(): Boolean =
-        when (getElement()) {
-            is AppleScriptDictionaryPropertyName -> true
-            is AppleScriptDictionaryClassName,
-            is AppleScriptDictionaryClassIdentifierPlural,
-            -> !isObjectReferenceTypePosition()
-            else -> false
-        }
-
-    private fun isObjectReferenceTypePosition(): Boolean =
-        PsiTreeUtil.getParentOfType(getElement(), AppleScriptArbitraryReference::class.java, false) != null ||
-            PsiTreeUtil.getParentOfType(getElement(), AppleScriptCountCommandExpression::class.java, false) != null ||
-            PsiTreeUtil.getParentOfType(getElement(), AppleScriptEveryElemReference::class.java, false) != null ||
-            PsiTreeUtil.getParentOfType(getElement(), AppleScriptIndexReference::class.java, false) != null ||
-            PsiTreeUtil.getParentOfType(getElement(), AppleScriptIndexReferenceClassForm::class.java, false) != null ||
-            PsiTreeUtil.getParentOfType(getElement(), AppleScriptMiddleElemReference::class.java, false) != null
-
     override fun isReferenceTo(element: PsiElement): Boolean {
-        val localTarget = resolveLocalFallback()
-        if (localTarget === element) return true
-        if (element is DictionaryComponent &&
-            element.getName() == getElement().getCompositeNameElement().getCompositeName()
-        ) {
-            return resolve() === element
+        val target = resolve()
+        return when {
+            target === element -> true
+            element is DictionaryComponent &&
+                element.getName() == getElement().getCompositeNameElement().getCompositeName() -> false
+            else -> super.isReferenceTo(element)
         }
-        return super.isReferenceTo(element)
     }
 
     override fun getElement(): DictionaryCompositeElement = getMyElement()
@@ -123,25 +96,60 @@ abstract class AbstractDictionaryReferenceElement :
 
     @Throws(IncorrectOperationException::class)
     override fun handleElementRename(newElementName: String): PsiElement {
-        if (!canRenameLocalFallbackReference()) return getElement()
-        val identifier = getElement().getCompositeNameElement().getIdentifiers().singleOrNull() ?: return getElement()
-        val newIdentifier = AppleScriptPsiElementFactory.createIdentifierFromText(getElement().project, newElementName)
-        if (newIdentifier != null) {
+        val identifier =
+            getElement()
+                .getCompositeNameElement()
+                .getIdentifiers()
+                .singleOrNull()
+                ?.takeIf { getElement().canRenameLocalFallbackReference(resolve()) }
+        val newIdentifier =
+            identifier?.let {
+                AppleScriptPsiElementFactory.createIdentifierFromText(getElement().project, newElementName)
+            }
+        if (identifier != null && newIdentifier != null) {
             identifier.parent.node.replaceChild(identifier.node, newIdentifier.node)
         }
         return getElement()
     }
-
-    private fun canRenameLocalFallbackReference(): Boolean =
-        canResolveLocalFallback() &&
-            getElement().getCompositeNameElement().getIdentifiers().size == 1 &&
-            resolve() !is DictionaryComponent
 
     @Throws(IncorrectOperationException::class)
     override fun bindToElement(element: PsiElement): PsiElement? = null
 
     override fun getVariants(): Array<Any> = emptyArray()
 }
+
+private fun DictionaryCompositeElement.resolveLocalFallback(canonicalText: String): PsiElement? {
+    val identifiers = getCompositeNameElement().getIdentifiers()
+    return if (canResolveLocalFallback() && identifiers.size == 1) {
+        val resolveProcessor = AppleScriptResolveProcessor(canonicalText)
+        PsiTreeUtil.treeWalkUp(resolveProcessor, this, null, ResolveState.initial())
+        (resolveProcessor.getResult() as? AppleScriptComponent)?.takeIf { it.isLocalDataSymbol() }
+    } else {
+        null
+    }
+}
+
+private fun DictionaryCompositeElement.canResolveLocalFallback(): Boolean =
+    when (this) {
+        is AppleScriptDictionaryPropertyName -> true
+        is AppleScriptDictionaryClassName,
+        is AppleScriptDictionaryClassIdentifierPlural,
+        -> !isObjectReferenceTypePosition()
+        else -> false
+    }
+
+private fun DictionaryCompositeElement.isObjectReferenceTypePosition(): Boolean =
+    PsiTreeUtil.getParentOfType(this, AppleScriptArbitraryReference::class.java, false) != null ||
+        PsiTreeUtil.getParentOfType(this, AppleScriptCountCommandExpression::class.java, false) != null ||
+        PsiTreeUtil.getParentOfType(this, AppleScriptEveryElemReference::class.java, false) != null ||
+        PsiTreeUtil.getParentOfType(this, AppleScriptIndexReference::class.java, false) != null ||
+        PsiTreeUtil.getParentOfType(this, AppleScriptIndexReferenceClassForm::class.java, false) != null ||
+        PsiTreeUtil.getParentOfType(this, AppleScriptMiddleElemReference::class.java, false) != null
+
+private fun DictionaryCompositeElement.canRenameLocalFallbackReference(resolvedTarget: PsiElement?): Boolean =
+    canResolveLocalFallback() &&
+        getCompositeNameElement().getIdentifiers().size == 1 &&
+        resolvedTarget !is DictionaryComponent
 
 private fun AppleScriptComponent.isLocalDataSymbol(): Boolean =
     isVariable() ||
