@@ -128,6 +128,47 @@ class AppleScriptDocumentationProviderTest : BasePlatformTestCase() {
         )
     }
 
+    fun testQuickDocumentationReturnsNullForUnresolvedAppleScriptElement() {
+        myFixture.configureByText(AppleScriptFileType, "set answer to 42<caret>")
+        val element =
+            requireNotNull(myFixture.file.findElementAt(myFixture.caretOffset - 1)) {
+                "Regression setup must place the caret on an unresolved AppleScript element"
+            }
+        val provider = AppleScriptDocumentationProvider()
+
+        assertNull(provider.getQuickNavigateInfo(element, element))
+        assertNull(provider.generateDoc(element, element))
+    }
+
+    fun testDocumentationLinkReturnsNullOutsideAppleScriptContext() {
+        val plainFile = myFixture.configureByText("note.txt", "plain context")
+        val context =
+            requireNotNull(plainFile.findElementAt(0)) {
+                "Regression setup must create a non-AppleScript context element"
+            }
+
+        assertNull(
+            AppleScriptDocumentationProvider().getDocumentationElementForLink(
+                context.manager,
+                "dictionary://missing",
+                context,
+            ),
+        )
+    }
+
+    fun testDocumentationLinkDelegatesForAppleScriptContext() {
+        myFixture.configureByText(AppleScriptFileType, "set answer to 1")
+        val context = myFixture.file
+
+        assertNull(
+            AppleScriptDocumentationProvider().getDocumentationElementForLink(
+                context.manager,
+                "dictionary#Finder.xml",
+                context,
+            ),
+        )
+    }
+
     private fun assertLocalVariableDocumentation(script: String) {
         myFixture.configureByText(AppleScriptFileType, script.trimIndent())
 
