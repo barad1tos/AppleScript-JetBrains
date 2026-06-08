@@ -14,6 +14,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewModel
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
@@ -40,10 +41,12 @@ internal class AppleScriptSmokeAssertions {
         failures: MutableList<String>,
     ) {
         val playFile = File(fixtureDir, "play.applescript")
+        val structureFile = File(fixtureDir, "structure.applescript")
         val unresolvedFile = File(fixtureDir, "unresolved-app.applescript")
 
         ApplicationManager.getApplication().invokeAndWait {
             assertComposite2TokenFallback(project, playFile, failures)
+            assertStructureView(project, structureFile, failures)
             assertCompletionOnPlay(project, playFile, failures)
             assertWeakWarningOnUnresolvedApp(project, unresolvedFile, failures)
         }
@@ -68,7 +71,41 @@ internal class AppleScriptSmokeAssertions {
         }
     }
 
-    // Assertion 2: BASIC completion is non-empty on `play `.
+    // Assertion 2: Structure View exposes top-level script declarations.
+
+    private fun assertStructureView(
+        project: Project,
+        file: File,
+        failures: MutableList<String>,
+    ) {
+        val context = loadEditorContext(project, file, failures, "structure") ?: return
+        val editor =
+            FileEditorManager.getInstance(project).openTextEditor(
+                OpenFileDescriptor(project, context.virtualFile, 0),
+                true,
+            )
+        if (editor == null) {
+            failures.add("structure: editor could not be opened for ${file.name}")
+            return
+        }
+
+        val model = AppleScriptStructureViewModel(context.psiFile, editor)
+        val childNames =
+            model.root.children
+                .mapNotNull { child -> child.presentation.presentableText }
+
+        if (
+            childNames.none { childName -> childName.startsWith("scriptName") } ||
+            childNames.none { childName -> childName.startsWith("run") } ||
+            childNames.none { childName -> childName == "Worker" }
+        ) {
+            failures.add(
+                "structure: expected scriptName, run, and Worker in ${file.name}; got $childNames",
+            )
+        }
+    }
+
+    // Assertion 3: BASIC completion is non-empty on `play `.
 
     private fun assertCompletionOnPlay(
         project: Project,
@@ -100,7 +137,7 @@ internal class AppleScriptSmokeAssertions {
         }
     }
 
-    // Assertion 3: unresolved application references stay below WARNING severity.
+    // Assertion 4: unresolved application references stay below WARNING severity.
 
     private fun assertWeakWarningOnUnresolvedApp(
         project: Project,

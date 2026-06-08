@@ -3,8 +3,11 @@ package com.intellij.plugin.applescript.test.codeinsight
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewModel
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.io.File
 
 class AppleScriptStructureViewTest : BasePlatformTestCase() {
+    override fun getTestDataPath(): String = File(TEST_DATA_DIR).absolutePath
+
     fun testStructureViewShowsTopLevelScriptDeclarations() {
         myFixture.configureByText(
             AppleScriptFileType,
@@ -23,11 +26,8 @@ class AppleScriptStructureViewTest : BasePlatformTestCase() {
 
         val model = AppleScriptStructureViewModel(myFixture.file, myFixture.editor)
         val rootChildren = model.root.children
-        assertEquals("Structure View root must contain one file wrapper", 1, rootChildren.size)
         val childNames =
             rootChildren
-                .single()
-                .children
                 .mapNotNull { child -> child.presentation.presentableText }
 
         assertEquals(
@@ -45,5 +45,23 @@ class AppleScriptStructureViewTest : BasePlatformTestCase() {
             1,
             childNames.count { childName -> childName == "Worker" },
         )
+    }
+
+    fun testStructureViewShowsRunHandlerForRealWorldFetchTracksFixture() {
+        myFixture.configureByFile("parse/realWorld/fetch_tracks_sanitized.applescript")
+
+        val model = AppleScriptStructureViewModel(myFixture.file, myFixture.editor)
+        val childNames =
+            model.root.children
+                .mapNotNull { child -> child.presentation.presentableText }
+
+        assertTrue(
+            "Structure View must expose the top-level run handler for realistic Music scripts, got $childNames",
+            childNames.any { childName -> childName.startsWith("run") },
+        )
+    }
+
+    companion object {
+        private const val TEST_DATA_DIR = "src/test/resources/testData/"
     }
 }

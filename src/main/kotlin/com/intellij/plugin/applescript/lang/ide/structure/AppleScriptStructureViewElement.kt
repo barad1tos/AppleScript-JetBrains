@@ -22,24 +22,11 @@ class AppleScriptStructureViewElement :
     PsiTreeElementBase<NavigatablePsiElement>,
     ItemPresentation,
     StructureViewTreeElement {
-    private var isRoot: Boolean = false
-
-    internal constructor(element: NavigatablePsiElement) : super(element) {
-        isRoot = false
-    }
-
-    private constructor(element: NavigatablePsiElement, isRootElement: Boolean) : super(element) {
-        this.isRoot = isRootElement
-    }
+    internal constructor(element: NavigatablePsiElement) : super(element)
 
     override fun getChildrenBase(): Collection<StructureViewTreeElement> {
         val currentElement: NavigatablePsiElement? = element
         val result = mutableListOf<StructureViewTreeElement>()
-
-        if (currentElement is AppleScriptFile && !isRoot) {
-            result.add(AppleScriptStructureViewElement(currentElement, true))
-            return result
-        }
 
         collectComponents(currentElement)
             .mapNotNull { component -> component.toStructureViewElement(currentElement) }
@@ -79,7 +66,7 @@ class AppleScriptStructureViewElement :
             this is AppleScriptVarAccessDeclaration || this is AppleScriptVarDeclarationListPart ->
                 AppleScriptStructureViewElement(this as NavigatablePsiElement)
             this is AppleScriptScriptObject && this !== owner ->
-                AppleScriptStructureViewElement(this, true)
+                AppleScriptStructureViewElement(this)
             this is AppleScriptHandler ->
                 AppleScriptStructureViewElement(this)
             shouldShowNamedComponent(owner) ->

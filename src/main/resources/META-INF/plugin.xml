@@ -96,7 +96,6 @@
                                 implementationClass="com.intellij.plugin.applescript.lang.ide.AppleScriptDocumentationProvider"/>
     <lang.psiStructureViewFactory language="AppleScript"
                                   implementationClass="com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewFactory"/>
-    <lang.structureViewExtension implementation="com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewExtension"/>
     <annotator language="AppleScript"
                implementationClass="com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptColorAnnotator"/>
     <multiHostInjector implementation="com.intellij.plugin.applescript.lang.AppleScriptJSInjector"/>
