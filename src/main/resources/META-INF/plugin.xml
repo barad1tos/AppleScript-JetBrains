@@ -26,6 +26,12 @@
     </p>
   ]]></description>
   <change-notes><![CDATA[
+    <h3>2.0.6</h3>
+    <ul>
+      <li>Replaced deprecated IntelliJ Platform APIs so AppleScript Toolkit verifies cleanly on the supported IDE versions.</li>
+      <li>Improved Find Usages accuracy for AppleScript handler calls and dictionary commands.</li>
+      <li>Verified against IntelliJ IDEA 2025.1, 2025.2, and 2026.1 without deprecated, internal, or experimental API warnings.</li>
+    </ul>
     <h3>2.0.5</h3>
     <ul>
       <li>Fixed parser freezes and blocking dictionary lookups when AppleScript dictionaries are still loading.</li>

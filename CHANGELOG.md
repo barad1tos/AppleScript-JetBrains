@@ -2,6 +2,17 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.6] - 2026-06-08
+
+### Fixed
+
+- Replaced deprecated IntelliJ Platform APIs so AppleScript Toolkit verifies cleanly on the supported IDE versions.
+- Improved Find Usages accuracy for AppleScript handler calls and dictionary commands.
+
+### Compatibility
+
+- Verified against IntelliJ IDEA 2025.1, 2025.2, and 2026.1 without deprecated, internal, or experimental API warnings.
+
 ## [2.0.5] - 2026-06-08
 
 ### Fixed
