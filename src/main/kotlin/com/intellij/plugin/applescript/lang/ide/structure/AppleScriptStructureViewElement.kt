@@ -38,6 +38,7 @@ class AppleScriptStructureViewElement :
 
         if (currentElement is AppleScriptFile && !isRoot) {
             result.add(AppleScriptStructureViewElement(currentElement, true))
+            return result
         }
 
         collectComponents(currentElement)
@@ -61,7 +62,7 @@ class AppleScriptStructureViewElement :
                     AppleScriptComponentScopeProcessor(components),
                     ResolveState.initial(),
                     null,
-                    element,
+                    null,
                 )
             is AppleScriptScriptObject ->
                 components.addAll(AppleScriptResolveUtil.getNamedSubComponentsFor(element))

@@ -295,6 +295,60 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         myFixture.checkResultByFile("codeinsight/set_var_result.scpt")
     }
 
+    fun testRenameLocalVariableInsideTellFilter() {
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            on run argv
+                set minDateAdded<caret> to missing value
+
+                tell application "Music"
+                    if minDateAdded is not missing value then
+                        set trackRef to a reference to (every track of library playlist 1 whose date added > minDateAdded)
+                    end if
+                end tell
+            end run
+            """.trimIndent(),
+        )
+        myFixture.renameElementAtCaret("minimumDateAdded")
+        val expected =
+            """
+            on run argv
+                set minimumDateAdded to missing value
+
+                tell application "Music"
+                    if minimumDateAdded is not missing value then
+                        set trackRef to a reference to (every track of library playlist 1 whose date added > minimumDateAdded)
+                    end if
+                end tell
+            end run
+            """.trimIndent()
+        assertEquals(expected, myFixture.editor.document.text)
+    }
+
+    fun testRenameLocalVariableDoesNotRewriteUnresolvedDictionaryPropertySelector() {
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            set name<caret> to "local"
+
+            tell application "Music"
+                set trackRef to a reference to (every track of library playlist 1 whose name is "target")
+            end tell
+            """.trimIndent(),
+        )
+        myFixture.renameElementAtCaret("localName")
+        val expected =
+            """
+            set localName to "local"
+
+            tell application "Music"
+                set trackRef to a reference to (every track of library playlist 1 whose name is "target")
+            end tell
+            """.trimIndent()
+        assertEquals(expected, myFixture.editor.document.text)
+    }
+
     fun testUsages() {
         val usageInfos = myFixture.testFindUsages("codeinsight/set_var.scpt")
         assertEquals(2, usageInfos.size)
