@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.lang.ide.search
 
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.util.Computable
 import com.intellij.plugin.applescript.psi.AppleScriptHandler
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
 import com.intellij.psi.PsiElement
@@ -16,7 +17,10 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
     override fun execute(
         queryParameters: ReferencesSearch.SearchParameters,
         consumer: Processor<in PsiReference>,
-    ): Boolean = ReadAction.compute<Boolean, RuntimeException> { doExecute(queryParameters, consumer) }
+    ): Boolean =
+        ApplicationManager.getApplication().runReadAction(
+            Computable { doExecute(queryParameters, consumer) },
+        )
 
     private fun doExecute(
         queryParameters: ReferencesSearch.SearchParameters,
@@ -39,7 +43,7 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
 
             searchWord.isEmpty() ||
                 helper.processElementsWithWord(
-                    MyOccurrenceProcessor(handler, handlerSelector, consumer),
+                    HandlerOccurrenceProcessor(handler, handlerSelector, consumer),
                     queryParameters.effectiveSearchScope,
                     searchWord,
                     UsageSearchContext.IN_CODE,
@@ -48,22 +52,22 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
         }
     }
 
-    private class MyOccurrenceProcessor(
-        private val myHandler: AppleScriptHandler,
-        private val myHandlerSelector: String,
-        private val myConsumer: Processor<in PsiReference>,
+    private class HandlerOccurrenceProcessor(
+        private val handler: AppleScriptHandler,
+        private val handlerSelector: String,
+        private val consumer: Processor<in PsiReference>,
     ) : TextOccurenceProcessor {
         override fun execute(
             element: PsiElement,
             offsetInElement: Int,
         ): Boolean {
             val reference =
-                if (element is AppleScriptHandlerCall && myHandlerSelector == element.getHandlerSelector()) {
-                    element.references.firstOrNull { it.isReferenceTo(myHandler) }
+                if (element is AppleScriptHandlerCall && handlerSelector == element.getHandlerSelector()) {
+                    element.references.firstOrNull { it.isReferenceTo(handler) }
                 } else {
                     null
                 }
-            return reference?.let(myConsumer::process) ?: true
+            return reference?.let(consumer::process) ?: true
         }
     }
 }

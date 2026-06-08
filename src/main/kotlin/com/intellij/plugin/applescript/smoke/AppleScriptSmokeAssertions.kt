@@ -114,7 +114,7 @@ internal class AppleScriptSmokeAssertions {
         // Trigger the daemon and drain the EDT queue so public editor markup is populated.
         // The exact WEAK_WARNING severity is asserted in AppleScriptCodeInsightTest via
         // test-fixture HighlightInfo; this runtime smoke stays on public editor APIs.
-        DaemonCodeAnalyzer.getInstance(project).restart(context.psiFile)
+        DaemonCodeAnalyzer.getInstance(project).settingsChanged()
         repeat(DAEMON_DRAIN_ITERATIONS) {
             UIUtil.dispatchAllInvocationEvents()
         }

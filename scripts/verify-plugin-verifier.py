@@ -8,8 +8,8 @@ Plugin Verifier marks a target as "Compatible" but records warnings in
 Policy:
 - internal API findings are a hard CI/release failure;
 - deprecated, scheduled-for-removal, and experimental API findings are surfaced
-  as advisory debt so each merge or release can minimize them when a stable
-  public replacement exists.
+  by default and can be promoted to hard failures with
+  `--fail-on-api-warnings` for merge and release gates.
 """
 
 from __future__ import annotations
@@ -118,6 +118,19 @@ def print_advisory(
         print(file=sys.stderr)
 
 
+def print_warning_failure() -> None:
+    """Print strict-mode failure guidance for verifier API warnings."""
+    print(
+        "ERROR: Deprecated, scheduled-for-removal, or experimental API usage is "
+        "not allowed in this gate.",
+        file=sys.stderr,
+    )
+    print(
+        "Replace the API usage before merge or release.",
+        file=sys.stderr,
+    )
+
+
 def main() -> int:
     """CLI entry point."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -126,6 +139,14 @@ def main() -> int:
         type=Path,
         default=DEFAULT_REPORTS_DIR,
         help="Plugin Verifier reports directory.",
+    )
+    parser.add_argument(
+        "--fail-on-api-warnings",
+        action="store_true",
+        help=(
+            "Treat deprecated, scheduled-for-removal, and experimental API "
+            "findings as hard failures."
+        ),
     )
     args = parser.parse_args()
 
@@ -153,6 +174,24 @@ def main() -> int:
     deprecated = collect_usages(reports_dir, "deprecated-usages.txt")
     experimental = collect_usages(reports_dir, "experimental-api-usages.txt")
     print_advisory(deprecated=deprecated, experimental=experimental)
+
+    if args.fail_on_api_warnings and (deprecated or experimental):
+        if deprecated:
+            print_findings(
+                deprecated,
+                heading="ERROR: Deprecated API usage.",
+                guidance="Replace deprecated API usage before merge or release.",
+            )
+        if deprecated and experimental:
+            print(file=sys.stderr)
+        if experimental:
+            print_findings(
+                experimental,
+                heading="ERROR: Experimental API usage.",
+                guidance="Replace experimental API usage before merge or release.",
+            )
+        print_warning_failure()
+        return 1
 
     print(
         "Plugin Verifier API gate passed: "

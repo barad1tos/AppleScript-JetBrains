@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.smoke
 import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.impl.ProjectUtil
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
@@ -18,6 +19,8 @@ import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 
+internal val SMOKE_LOG: Logger = Logger.getInstance("#${AppleScriptSmokeRunner::class.java.name}")
+
 /**
  * Opens the smoke fixture project, waits for dictionary indexing, runs assertions, and
  * closes the project before process exit.
@@ -27,7 +30,7 @@ import java.util.concurrent.ExecutionException
  * null on a platform version, the fallback uses [ProjectManagerEx.openProject] with
  * [OpenProjectTask.build], the public no-argument factory.
  */
-internal class AppleScriptSmokeRunner(
+class AppleScriptSmokeRunner(
     private val fixtureRoot: String,
     private val fixtureDir: File,
 ) {
