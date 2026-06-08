@@ -2,8 +2,10 @@ package com.intellij.plugin.applescript.lang.ide.search
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Computable
+import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.psi.AppleScriptHandler
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
+import com.intellij.psi.MultiRangeReference
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
 import com.intellij.psi.search.PsiSearchHelper
@@ -44,7 +46,7 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
 
             searchWord.isEmpty() ||
                 helper.processElementsWithWord(
-                    HandlerOccurrenceProcessor(handler, handlerSelector, consumer),
+                    HandlerOccurrenceProcessor(handler, handlerSelector, searchWord, consumer),
                     queryParameters.effectiveSearchScope,
                     searchWord,
                     UsageSearchContext.IN_CODE,
@@ -56,8 +58,11 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
     private class HandlerOccurrenceProcessor(
         private val handler: AppleScriptHandler,
         private val handlerSelector: String,
+        private val searchWord: String,
         private val consumer: Processor<in PsiReference>,
     ) : TextOccurenceProcessor {
+        private val processedReferences: MutableSet<PsiReference> = HashSet()
+
         override fun execute(
             element: PsiElement,
             offsetInElement: Int,
@@ -65,11 +70,36 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
             val handlerCall = PsiTreeUtil.getParentOfType(element, AppleScriptHandlerCall::class.java, false)
             val reference =
                 if (handlerCall != null && handlerSelector == handlerCall.getHandlerSelector()) {
-                    handlerCall.references.firstOrNull { it.isReferenceTo(handler) }
+                    handlerCall.references.firstOrNull { reference ->
+                        reference.isReferenceTo(handler) &&
+                            reference.containsOccurrence(element, offsetInElement, handlerCall)
+                    }
                 } else {
                     null
                 }
-            return reference?.let(consumer::process) ?: true
+            return if (reference == null || !processedReferences.add(reference)) {
+                true
+            } else {
+                consumer.process(reference)
+            }
+        }
+
+        private fun PsiReference.containsOccurrence(
+            element: PsiElement,
+            offsetInElement: Int,
+            handlerCall: AppleScriptHandlerCall,
+        ): Boolean {
+            val occurrenceStart = element.textRange.startOffset + offsetInElement - handlerCall.textRange.startOffset
+            val occurrenceRange = TextRange(occurrenceStart, occurrenceStart + searchWord.length)
+            val referenceRanges =
+                if (this is MultiRangeReference) {
+                    ranges
+                } else {
+                    listOf(rangeInElement)
+                }
+            return referenceRanges.any { range ->
+                range.intersects(occurrenceRange.startOffset, occurrenceRange.endOffset)
+            }
         }
     }
 }

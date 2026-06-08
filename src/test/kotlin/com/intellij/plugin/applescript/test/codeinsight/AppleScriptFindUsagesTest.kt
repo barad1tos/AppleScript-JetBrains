@@ -64,7 +64,33 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
                 .search(handler, GlobalSearchScope.fileScope(myFixture.file))
                 .findAll()
 
-        assertTrue("Find Usages must return handler call references; ${handlerCallDebug()}", usages.isNotEmpty())
+        assertEquals("Find Usages must return handler call references; ${handlerCallDebug()}", 2, usages.size)
+    }
+
+    fun testFindUsagesIgnoresHandlerArgumentWordsMatchingSelector() {
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            on foo:f bar:r bazzz:z
+                return f
+            end foo:bar:baz:
+
+            tell it to foo:foo bar:bar bazzz:bazzz
+            """.trimIndent(),
+        )
+        val handler =
+            findChildrenOfType(myFixture.file, AppleScriptHandler::class.java)
+                .single { it.getSelector() == "foo:bar:bazzz:" }
+        val handlerCalls = findChildrenOfType(myFixture.file, AppleScriptHandlerCall::class.java)
+
+        assertEquals("Regression setup must parse one handler call", 1, handlerCalls.size)
+
+        val usages =
+            ReferencesSearch
+                .search(handler, GlobalSearchScope.fileScope(myFixture.file))
+                .findAll()
+
+        assertEquals("Find Usages must ignore argument occurrences matching the selector", 1, usages.size)
     }
 
     fun testFindUsagesReturnsDictionaryCommandCallSites() {
