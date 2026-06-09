@@ -12,32 +12,20 @@ class AppleScriptHighlightingTest : BasePlatformTestCase() {
     }
 
     fun testTellBlockHighlightingDoesNotCrash() {
-        myFixture.configureByText(
-            AppleScriptFileType,
-            """tell application "Finder"
+        myFixture.configureByText(AppleScriptFileType, """tell application "Finder"
     activate
-end tell""",
-        )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+end tell""")
+        myFixture.doHighlighting()
     }
 
     fun testCommentHighlightingDoesNotCrash() {
-        myFixture.configureByText(
-            AppleScriptFileType,
-            "-- this is a comment\nset x to 1",
-        )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.configureByText(AppleScriptFileType, "-- this is a comment\nset x to 1")
+        myFixture.doHighlighting()
     }
 
     fun testStringHighlightingDoesNotCrash() {
-        myFixture.configureByText(
-            AppleScriptFileType,
-            """set x to "hello world"""",
-        )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.configureByText(AppleScriptFileType, """set x to "hello world"""")
+        myFixture.doHighlighting()
     }
 
     fun testHandlerCallHighlightingDoesNotCrash() {
@@ -53,8 +41,7 @@ end tell""",
             end run
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 
     fun testNestedTellBlockHighlightingDoesNotCrash() {
@@ -68,8 +55,7 @@ end tell""",
             end tell
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 
     fun testIfBlockHighlightingDoesNotCrash() {
@@ -83,8 +69,7 @@ end tell""",
             end if
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 
     fun testRepeatBlockHighlightingDoesNotCrash() {
@@ -96,8 +81,7 @@ end tell""",
             end repeat
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 
     fun testTryBlockHighlightingDoesNotCrash() {
@@ -111,8 +95,7 @@ end tell""",
             end try
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 
     fun testMultipleHandlersHighlightingDoesNotCrash() {
@@ -133,8 +116,7 @@ end tell""",
             end run
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 
     fun testLogicalOperatorHighlighting() {
@@ -179,8 +161,7 @@ end tell""",
             end script
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 
     fun testConsideringIgnoringHighlightingDoesNotCrash() {
@@ -194,8 +175,7 @@ end tell""",
             end considering
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 
     fun testDictionaryCommandHighlightingDoesNotCrash() {
@@ -213,7 +193,6 @@ end tell""",
             end tell
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull("Highlights must not be null", highlights)
+        myFixture.doHighlighting()
     }
 }

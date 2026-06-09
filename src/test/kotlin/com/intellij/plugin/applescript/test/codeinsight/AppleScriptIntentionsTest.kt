@@ -37,10 +37,7 @@ class AppleScriptIntentionsTest : BasePlatformTestCase() {
             """.trimIndent(),
         )
         val handler = PsiTreeUtil.findChildOfType(myFixture.file, AppleScriptHandler::class.java)
-        if (handler == null) {
-            // Handler PSI type may not be available in test context
-            return
-        }
+            ?: return // Handler PSI type not available in test context — grammar may produce different node
         val label = PsiTreeUtil.findChildOfType(handler, AppleScriptHandlerParameterLabel::class.java)
             ?: return
 

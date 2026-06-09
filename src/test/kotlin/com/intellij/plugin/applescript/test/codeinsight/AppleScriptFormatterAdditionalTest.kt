@@ -24,7 +24,7 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
             com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
         }
-        assertNotNull("Formatted file must not be null", myFixture.file)
+        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
     }
 
     fun testFormatterDoesNotCrashOnIfBlock() {
@@ -39,7 +39,7 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
             com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
         }
-        assertNotNull("Formatted file must not be null", myFixture.file)
+        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
     }
 
     fun testFormatterDoesNotCrashOnHandler() {
@@ -54,7 +54,7 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
             com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
         }
-        assertNotNull("Formatted file must not be null", myFixture.file)
+        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
     }
 
     fun testFormatterDoesNotCrashOnNestedBlocks() {
@@ -71,7 +71,7 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
             com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
         }
-        assertNotNull("Formatted file must not be null", myFixture.file)
+        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
     }
 
     fun testFormatterDoesNotCrashOnTryBlock() {
@@ -88,7 +88,7 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
             com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
         }
-        assertNotNull("Formatted file must not be null", myFixture.file)
+        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
     }
 
     fun testFormatterDoesNotCrashOnRepeatBlock() {
@@ -103,6 +103,6 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
             com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
         }
-        assertNotNull("Formatted file must not be null", myFixture.file)
+        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
     }
 }

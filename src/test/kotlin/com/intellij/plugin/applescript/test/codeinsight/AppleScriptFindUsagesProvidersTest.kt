@@ -112,10 +112,9 @@ class AppleScriptFindUsagesProvidersTest : BasePlatformTestCase() {
         val nameRef = myFixture.file.findElementAt(myFixture.editor.document.text.indexOf("name"))
         assertNotNull(nameRef)
         val parent = nameRef!!.parent
-        if (detector.isReadWriteAccessible(parent)) {
-            val access = detector.getExpressionAccess(parent)
-            assertNotNull(access)
-        }
+        assertNotNull("Parent must not be null", parent)
+        val access = detector.getExpressionAccess(parent)
+        assertNotNull("Access must not be null", access)
     }
 
     fun testReadWriteAccessDetectorIsRegistered() {

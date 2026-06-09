@@ -1,10 +1,6 @@
 package com.intellij.plugin.applescript.test.codeinsight
 
 import com.intellij.plugin.applescript.AppleScriptFileType
-import com.intellij.plugin.applescript.lang.ide.completion.AppleScriptCompletionWeigher
-import com.intellij.plugin.applescript.lang.ide.search.AppleScriptDictionaryComponentReferencesSearch
-import com.intellij.plugin.applescript.lang.ide.search.AppleScriptHandlerDeclarationSearcher
-import com.intellij.plugin.applescript.lang.ide.search.AppleScriptHandlerReferencesSearch
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptSearchAndCompletionAdditionalTest : BasePlatformTestCase() {
@@ -40,31 +36,11 @@ class AppleScriptSearchAndCompletionAdditionalTest : BasePlatformTestCase() {
         assertNotNull("CompletionWeigher must be registered", element)
     }
 
-    fun testCompletionWeigherIsNotNull() {
-        val weigher = AppleScriptCompletionWeigher()
-        assertNotNull("Completion weigher must not be null", weigher)
-    }
-
-    fun testHandlerReferencesSearchIsNotNull() {
-        val search = AppleScriptHandlerReferencesSearch()
-        assertNotNull("Handler references search must not be null", search)
-    }
-
-    fun testDictionaryComponentReferencesSearchIsNotNull() {
-        val search = AppleScriptDictionaryComponentReferencesSearch()
-        assertNotNull("Dictionary component references search must not be null", search)
-    }
-
-    fun testHandlerDeclarationSearcherIsNotNull() {
-        val searcher = AppleScriptHandlerDeclarationSearcher()
-        assertNotNull("Handler declaration searcher must not be null", searcher)
-    }
-
     fun testCompletionOnKeywords() {
         myFixture.configureByText(AppleScriptFileType, "<caret>")
         myFixture.completeBasic()
         val elements = myFixture.lookupElements
-        assertNotNull("Completion must return elements", elements)
+        assertTrue("Completion must return elements", elements != null && elements.isNotEmpty())
     }
 
     fun testCompletionInsideTellBlock() {
@@ -84,6 +60,6 @@ class AppleScriptSearchAndCompletionAdditionalTest : BasePlatformTestCase() {
         )
         myFixture.completeBasic()
         val elements = myFixture.lookupElements
-        assertNotNull("Completion must return elements inside tell block", elements)
+        assertTrue("Completion must return elements inside tell block", elements != null && elements.isNotEmpty())
     }
 }

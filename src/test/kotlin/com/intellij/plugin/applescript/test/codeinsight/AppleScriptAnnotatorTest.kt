@@ -25,7 +25,7 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
         assertTrue("Known application must not produce errors", errors.isEmpty())
     }
 
-    fun testHandlerCallHighlighting() {
+    fun testHandlerCallHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -38,11 +38,10 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end run
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 
-    fun testIfThenElseHighlighting() {
+    fun testIfThenElseHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -57,11 +56,10 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end checkValue
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 
-    fun testTellBlockHighlighting() {
+    fun testTellBlockHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -71,11 +69,10 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end tell
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 
-    fun testTryOnErrorHighlighting() {
+    fun testTryOnErrorHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -86,11 +83,10 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end try
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 
-    fun testRepeatLoopHighlighting() {
+    fun testRepeatLoopHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -100,11 +96,10 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end repeat
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 
-    fun testScriptObjectHighlighting() {
+    fun testScriptObjectHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -118,11 +113,10 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end script
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 
-    fun testConsideringIgnoringHighlighting() {
+    fun testConsideringIgnoringHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -133,11 +127,10 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end considering
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 
-    fun testMultipleTellBlocksHighlighting() {
+    fun testMultipleTellBlocksHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -150,11 +143,10 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end tell
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 
-    fun testNestedHandlersHighlighting() {
+    fun testNestedHandlersHighlightingDoesNotCrash() {
         myFixture.configureByText(
             AppleScriptFileType,
             """
@@ -167,7 +159,6 @@ class AppleScriptAnnotatorTest : BasePlatformTestCase() {
             end outerHandler
             """.trimIndent(),
         )
-        val highlights = myFixture.doHighlighting()
-        assertNotNull(highlights)
+        myFixture.doHighlighting()
     }
 }
