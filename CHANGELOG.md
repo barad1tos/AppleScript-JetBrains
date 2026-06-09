@@ -2,6 +2,15 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.7] - 2026-06-09
+
+### Fixed
+
+- Fixed Structure View to show AppleScript handlers, properties, and script objects at the root level instead of showing an empty tree.
+- Restored dictionary quick documentation when hovering over dictionary terms such as `track` inside `tell application "Music"`.
+- Local variable references inside `tell…whose` filters now resolve for Find Usages and quick documentation.
+- Added regression coverage for documentation, Find Usages, and Structure View.
+
 ## [2.0.6] - 2026-06-08
 
 ### Fixed
