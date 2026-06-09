@@ -9,7 +9,10 @@ class AppleScriptIntentionsTest : BasePlatformTestCase() {
         myFixture.configureByText(AppleScriptFileType, """tell application "Finder" to activate""")
         val quickFix = AddApplicationDictionaryQuickFix("Finder")
 
-        assertTrue("Quick fix must be available on AppleScript file", quickFix.isAvailable(project, myFixture.editor, myFixture.file))
+        assertTrue(
+            "Quick fix must be available on AppleScript file",
+            quickFix.isAvailable(project, myFixture.editor, myFixture.file),
+        )
     }
 
     fun testAddDictionaryQuickFixTextAndFamily() {

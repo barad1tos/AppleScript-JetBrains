@@ -8,10 +8,10 @@ repos:
       - id: check-json
       - id: check-xml
       - id: check-added-large-files
-        args: ["--maxkb=500"]
+        args: ['--maxkb=500']
       - id: check-merge-conflict
       - id: no-commit-to-branch
-        args: ["--branch", "master"]
+        args: ['--branch', 'main']
         stages: [pre-commit, commit-msg]
       - id: detect-private-key
 
@@ -19,7 +19,7 @@ repos:
     rev: v1.22.0
     hooks:
       - id: zizmor
-        args: ["--min-severity", "medium"]
+        args: ['--min-severity', 'medium']
 
   - repo: local
     hooks:

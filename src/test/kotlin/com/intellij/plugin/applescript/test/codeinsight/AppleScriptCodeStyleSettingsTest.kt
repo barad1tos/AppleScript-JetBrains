@@ -33,24 +33,28 @@ class AppleScriptCodeStyleSettingsTest : BasePlatformTestCase() {
 
     fun testCodeStyleSettingsProviderCreatesConfigurable() {
         val provider = AppleScriptCodeStyleSettingsProvider()
-        val settings = com.intellij.psi.codeStyle.CodeStyleSettings()
+        val settings =
+            com.intellij.psi.codeStyle
+                .CodeStyleSettings()
         val configurable = provider.createConfigurable(settings, settings)
         assertNotNull("Configurable must not be null", configurable)
     }
 
     fun testCodeStyleSettingsProviderIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "codeStyleSettingsProvider",
-            "com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptCodeStyleSettingsProvider",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "codeStyleSettingsProvider",
+                "com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptCodeStyleSettingsProvider",
+            )
         assertNotNull("AppleScriptCodeStyleSettingsProvider must be registered", element)
     }
 
     fun testLanguageCodeStyleSettingsProviderIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "langCodeStyleSettingsProvider",
-            "com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptLanguageCodeStyleSettingsProvider",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "langCodeStyleSettingsProvider",
+                "com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptLanguageCodeStyleSettingsProvider",
+            )
         assertNotNull("AppleScriptLanguageCodeStyleSettingsProvider must be registered", element)
     }
 }

@@ -1,7 +1,7 @@
 package com.intellij.plugin.applescript.test.lexer
 
-import com.intellij.plugin.applescript.AppleScriptLanguage
 import com.intellij.plugin.applescript.AppleScriptLexerAdapter
+import com.intellij.plugin.applescript.psi.AppleScriptTypes
 import com.intellij.psi.TokenType
 import com.intellij.psi.tree.IElementType
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -37,39 +37,42 @@ class AppleScriptLexerCoverageTest : BasePlatformTestCase() {
     fun testLexerTokenizesComments() {
         val tokens = tokenize("-- this is a comment\nset x to 1")
         assertTrue("Must have tokens", tokens.isNotEmpty())
-        val hasComment = tokens.any { it.first == com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMENT }
+        val hasComment = tokens.any { it.first == AppleScriptTypes.COMMENT }
         assertTrue("Must have comment token", hasComment)
     }
 
     fun testLexerTokenizesTellBlock() {
-        val script = """
+        val script =
+            """
             tell application "Finder"
                 activate
                 get name of folder 1
             end tell
-        """.trimIndent()
+            """.trimIndent()
         val tokens = tokenize(script)
         assertTrue("Must have tokens", tokens.size > 5)
     }
 
     fun testLexerTokenizesIfBlock() {
-        val script = """
+        val script =
+            """
             if true then
                 set x to 1
             else
                 set x to 2
             end if
-        """.trimIndent()
+            """.trimIndent()
         val tokens = tokenize(script)
         assertTrue("Must have tokens", tokens.size > 5)
     }
 
     fun testLexerTokenizesHandler() {
-        val script = """
+        val script =
+            """
             on greet(name)
                 return "Hello " & name
             end greet
-        """.trimIndent()
+            """.trimIndent()
         val tokens = tokenize(script)
         assertTrue("Must have tokens", tokens.size > 5)
     }
@@ -95,33 +98,36 @@ class AppleScriptLexerCoverageTest : BasePlatformTestCase() {
     }
 
     fun testLexerTokenizesRepeatLoop() {
-        val script = """
+        val script =
+            """
             repeat with i from 1 to 10
                 log i
             end repeat
-        """.trimIndent()
+            """.trimIndent()
         val tokens = tokenize(script)
         assertTrue("Must have tokens", tokens.size > 5)
     }
 
     fun testLexerTokenizesTryCatch() {
-        val script = """
+        val script =
+            """
             try
                 set x to 1 / 0
             on error errMsg
                 log errMsg
             end try
-        """.trimIndent()
+            """.trimIndent()
         val tokens = tokenize(script)
         assertTrue("Must have tokens", tokens.size > 5)
     }
 
     fun testLexerTokenizesScriptObject() {
-        val script = """
+        val script =
+            """
             script MyScript
                 property x : 1
             end script
-        """.trimIndent()
+            """.trimIndent()
         val tokens = tokenize(script)
         assertTrue("Must have tokens", tokens.size > 5)
     }

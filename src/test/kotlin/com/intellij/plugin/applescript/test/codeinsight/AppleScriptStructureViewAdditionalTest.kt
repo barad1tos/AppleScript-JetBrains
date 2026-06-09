@@ -6,10 +6,11 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptStructureViewAdditionalTest : BasePlatformTestCase() {
     fun testStructureViewFactoryIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "lang.psiStructureViewFactory",
-            "com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewFactory",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "lang.psiStructureViewFactory",
+                "com.intellij.plugin.applescript.lang.ide.structure.AppleScriptStructureViewFactory",
+            )
         assertNotNull("StructureViewFactory must be registered", element)
     }
 

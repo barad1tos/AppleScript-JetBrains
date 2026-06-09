@@ -2,11 +2,12 @@ package com.intellij.plugin.applescript.test.codeinsight
 
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptAnnotatorTest : BasePlatformTestCase() {
     fun testKnownApplicationDoesNotProduceError() {
-        val registryService = com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
         com.intellij.testFramework.PlatformTestUtil.waitWithEventsDispatching(
             "Standard dictionaries were not initialized",
             { registryService.isInitialized() },

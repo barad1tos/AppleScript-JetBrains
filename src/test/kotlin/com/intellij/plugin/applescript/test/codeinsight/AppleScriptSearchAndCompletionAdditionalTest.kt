@@ -1,38 +1,43 @@
 package com.intellij.plugin.applescript.test.codeinsight
 
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptSearchAndCompletionAdditionalTest : BasePlatformTestCase() {
     fun testHandlerReferencesSearchIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "referencesSearch",
-            "com.intellij.plugin.applescript.lang.ide.search.AppleScriptHandlerReferencesSearch",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "referencesSearch",
+                "com.intellij.plugin.applescript.lang.ide.search.AppleScriptHandlerReferencesSearch",
+            )
         assertNotNull("HandlerReferencesSearch must be registered", element)
     }
 
     fun testDictionaryComponentReferencesSearchIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "referencesSearch",
-            "com.intellij.plugin.applescript.lang.ide.search.AppleScriptDictionaryComponentReferencesSearch",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "referencesSearch",
+                "com.intellij.plugin.applescript.lang.ide.search.AppleScriptDictionaryComponentReferencesSearch",
+            )
         assertNotNull("DictionaryComponentReferencesSearch must be registered", element)
     }
 
     fun testHandlerDeclarationSearcherIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "pom.declarationSearcher",
-            "com.intellij.plugin.applescript.lang.ide.search.AppleScriptHandlerDeclarationSearcher",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "pom.declarationSearcher",
+                "com.intellij.plugin.applescript.lang.ide.search.AppleScriptHandlerDeclarationSearcher",
+            )
         assertNotNull("HandlerDeclarationSearcher must be registered", element)
     }
 
     fun testCompletionWeigherIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "weigher",
-            "com.intellij.plugin.applescript.lang.ide.completion.AppleScriptCompletionWeigher",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "weigher",
+                "com.intellij.plugin.applescript.lang.ide.completion.AppleScriptCompletionWeigher",
+            )
         assertNotNull("CompletionWeigher must be registered", element)
     }
 
@@ -44,7 +49,7 @@ class AppleScriptSearchAndCompletionAdditionalTest : BasePlatformTestCase() {
     }
 
     fun testCompletionInsideTellBlock() {
-        val registryService = com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
         com.intellij.testFramework.PlatformTestUtil.waitWithEventsDispatching(
             "Standard dictionaries were not initialized",
             { registryService.isInitialized() },
