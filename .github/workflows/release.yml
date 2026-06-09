@@ -19,13 +19,13 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Verify release tag is on master
+      - name: Verify release tag is on main
         shell: bash
         run: |
           release_commit="$(git rev-parse HEAD)"
-          git fetch --no-tags origin +refs/heads/master:refs/remotes/origin/master
-          if ! git merge-base --is-ancestor "$release_commit" refs/remotes/origin/master; then
-            echo "::error::Release tag ${GITHUB_REF_NAME} (${release_commit}) is not on origin/master"
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$release_commit" refs/remotes/origin/main; then
+            echo "::error::Release tag ${GITHUB_REF_NAME} (${release_commit}) is not on origin/main"
             exit 1
           fi
 
