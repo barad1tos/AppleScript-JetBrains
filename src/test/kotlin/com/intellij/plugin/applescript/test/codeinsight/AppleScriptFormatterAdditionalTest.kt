@@ -5,10 +5,11 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
     fun testFormatterIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "lang.formatter",
-            "com.intellij.plugin.applescript.lang.formatter.AppleScriptFormattingModelBuilder",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "lang.formatter",
+                "com.intellij.plugin.applescript.lang.formatter.AppleScriptFormattingModelBuilder",
+            )
         assertNotNull("Formatter must be registered", element)
     }
 
@@ -22,9 +23,15 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
             """.trimIndent(),
         )
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-            com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
+            com.intellij.psi.codeStyle.CodeStyleManager
+                .getInstance(project)
+                .reformat(myFixture.file)
         }
-        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
+        assertTrue(
+            "Formatted document must not be empty",
+            myFixture.editor.document.text
+                .isNotEmpty(),
+        )
     }
 
     fun testFormatterDoesNotCrashOnIfBlock() {
@@ -37,9 +44,15 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
             """.trimIndent(),
         )
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-            com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
+            com.intellij.psi.codeStyle.CodeStyleManager
+                .getInstance(project)
+                .reformat(myFixture.file)
         }
-        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
+        assertTrue(
+            "Formatted document must not be empty",
+            myFixture.editor.document.text
+                .isNotEmpty(),
+        )
     }
 
     fun testFormatterDoesNotCrashOnHandler() {
@@ -52,9 +65,15 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
             """.trimIndent(),
         )
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-            com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
+            com.intellij.psi.codeStyle.CodeStyleManager
+                .getInstance(project)
+                .reformat(myFixture.file)
         }
-        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
+        assertTrue(
+            "Formatted document must not be empty",
+            myFixture.editor.document.text
+                .isNotEmpty(),
+        )
     }
 
     fun testFormatterDoesNotCrashOnNestedBlocks() {
@@ -69,9 +88,15 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
             """.trimIndent(),
         )
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-            com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
+            com.intellij.psi.codeStyle.CodeStyleManager
+                .getInstance(project)
+                .reformat(myFixture.file)
         }
-        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
+        assertTrue(
+            "Formatted document must not be empty",
+            myFixture.editor.document.text
+                .isNotEmpty(),
+        )
     }
 
     fun testFormatterDoesNotCrashOnTryBlock() {
@@ -86,9 +111,15 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
             """.trimIndent(),
         )
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-            com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
+            com.intellij.psi.codeStyle.CodeStyleManager
+                .getInstance(project)
+                .reformat(myFixture.file)
         }
-        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
+        assertTrue(
+            "Formatted document must not be empty",
+            myFixture.editor.document.text
+                .isNotEmpty(),
+        )
     }
 
     fun testFormatterDoesNotCrashOnRepeatBlock() {
@@ -101,8 +132,14 @@ class AppleScriptFormatterAdditionalTest : BasePlatformTestCase() {
             """.trimIndent(),
         )
         com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
-            com.intellij.psi.codeStyle.CodeStyleManager.getInstance(project).reformat(myFixture.file)
+            com.intellij.psi.codeStyle.CodeStyleManager
+                .getInstance(project)
+                .reformat(myFixture.file)
         }
-        assertTrue("Formatted document must not be empty", myFixture.editor.document.text.isNotEmpty())
+        assertTrue(
+            "Formatted document must not be empty",
+            myFixture.editor.document.text
+                .isNotEmpty(),
+        )
     }
 }

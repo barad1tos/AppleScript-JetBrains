@@ -109,7 +109,10 @@ end tell""",
         assertEquals("Opening paren must match closing paren", rightOffset, matchedRight)
     }
 
-    private fun assertBraceMatches(script: String, leftBraceOffset: Int) {
+    private fun assertBraceMatches(
+        script: String,
+        leftBraceOffset: Int,
+    ) {
         myFixture.configureByText(AppleScriptFileType, script)
         myFixture.editor.caretModel.moveToOffset(leftBraceOffset)
         val rightOffset = BraceMatchingUtil.getMatchedBraceOffset(myFixture.editor, true, myFixture.file)

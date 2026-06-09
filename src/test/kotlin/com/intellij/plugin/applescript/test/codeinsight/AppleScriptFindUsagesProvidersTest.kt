@@ -21,8 +21,10 @@ class AppleScriptFindUsagesProvidersTest : BasePlatformTestCase() {
             end run
             """.trimIndent(),
         )
-        val variable = PsiTreeUtil.findChildrenOfType(myFixture.file, AppleScriptTargetVariable::class.java)
-            .first { it.name == "myVar" }
+        val variable =
+            PsiTreeUtil
+                .findChildrenOfType(myFixture.file, AppleScriptTargetVariable::class.java)
+                .first { it.name == "myVar" }
 
         assertTrue("Variable declaration must be read-write accessible", detector.isReadWriteAccessible(variable))
         assertTrue("Variable declaration must be write access", detector.isDeclarationWriteAccess(variable))
@@ -37,8 +39,10 @@ class AppleScriptFindUsagesProvidersTest : BasePlatformTestCase() {
             end run
             """.trimIndent(),
         )
-        val variable = PsiTreeUtil.findChildrenOfType(myFixture.file, AppleScriptTargetVariable::class.java)
-            .first { it.name == "myVar" }
+        val variable =
+            PsiTreeUtil
+                .findChildrenOfType(myFixture.file, AppleScriptTargetVariable::class.java)
+                .first { it.name == "myVar" }
 
         val access = detector.getExpressionAccess(variable)
         assertEquals(
@@ -57,9 +61,11 @@ class AppleScriptFindUsagesProvidersTest : BasePlatformTestCase() {
             end tell
             """.trimIndent(),
         )
-        val activateElement = myFixture.file.findElementAt(
-            myFixture.editor.document.text.indexOf("activate"),
-        )
+        val activateElement =
+            myFixture.file.findElementAt(
+                myFixture.editor.document.text
+                    .indexOf("activate"),
+            )
         assertNotNull(activateElement)
         val access = detector.getExpressionAccess(activateElement!!)
         assertEquals(
@@ -109,7 +115,11 @@ class AppleScriptFindUsagesProvidersTest : BasePlatformTestCase() {
             end tell
             """.trimIndent(),
         )
-        val nameRef = myFixture.file.findElementAt(myFixture.editor.document.text.indexOf("name"))
+        val nameRef =
+            myFixture.file.findElementAt(
+                myFixture.editor.document.text
+                    .indexOf("name"),
+            )
         assertNotNull(nameRef)
         val parent = nameRef!!.parent
         assertNotNull("Parent must not be null", parent)
@@ -118,26 +128,29 @@ class AppleScriptFindUsagesProvidersTest : BasePlatformTestCase() {
     }
 
     fun testReadWriteAccessDetectorIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "readWriteAccessDetector",
-            "com.intellij.plugin.applescript.lang.ide.findUsages.AppleScriptReadWriteAccessDetector",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "readWriteAccessDetector",
+                "com.intellij.plugin.applescript.lang.ide.findUsages.AppleScriptReadWriteAccessDetector",
+            )
         assertNotNull("ReadWriteAccessDetector must be registered", element)
     }
 
     fun testUsageTypeProviderIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "usageTypeProvider",
-            "com.intellij.plugin.applescript.lang.ide.findUsages.AppleScriptUsageTypeProvider",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "usageTypeProvider",
+                "com.intellij.plugin.applescript.lang.ide.findUsages.AppleScriptUsageTypeProvider",
+            )
         assertNotNull("UsageTypeProvider must be registered", element)
     }
 
     fun testElementDescriptionProviderIsRegistered() {
-        val element = PluginDescriptorTestSupport.findElement(
-            "elementDescriptionProvider",
-            "com.intellij.plugin.applescript.lang.ide.findUsages.AppleScriptElementDescriptionProvider",
-        )
+        val element =
+            PluginDescriptorTestSupport.findElement(
+                "elementDescriptionProvider",
+                "com.intellij.plugin.applescript.lang.ide.findUsages.AppleScriptElementDescriptionProvider",
+            )
         assertNotNull("ElementDescriptionProvider must be registered", element)
     }
 }

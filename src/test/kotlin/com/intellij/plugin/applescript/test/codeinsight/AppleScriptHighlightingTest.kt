@@ -2,6 +2,7 @@ package com.intellij.plugin.applescript.test.codeinsight
 
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighter
+import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTypes
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
@@ -12,9 +13,12 @@ class AppleScriptHighlightingTest : BasePlatformTestCase() {
     }
 
     fun testTellBlockHighlightingDoesNotCrash() {
-        myFixture.configureByText(AppleScriptFileType, """tell application "Finder"
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """tell application "Finder"
     activate
-end tell""")
+end tell""",
+        )
         myFixture.doHighlighting()
     }
 
@@ -179,8 +183,7 @@ end tell""")
     }
 
     fun testDictionaryCommandHighlightingDoesNotCrash() {
-        val registryService =
-            com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
         com.intellij.testFramework.PlatformTestUtil.waitWithEventsDispatching(
             "Standard dictionaries were not initialized",
             { registryService.isInitialized() },

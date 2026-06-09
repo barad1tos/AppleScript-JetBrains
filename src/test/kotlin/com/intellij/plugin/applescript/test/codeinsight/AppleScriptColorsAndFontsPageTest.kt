@@ -1,7 +1,6 @@
 package com.intellij.plugin.applescript.test.codeinsight
 
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptColorsAndFontsPage
-import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptColorsAndFontsPageTest : BasePlatformTestCase() {
@@ -52,13 +51,23 @@ class AppleScriptColorsAndFontsPageTest : BasePlatformTestCase() {
         val tags = page.additionalHighlightingTagToDescriptorMap
         assertNotNull("Tag map must not be null", tags)
 
-        val expectedKeys = setOf(
-            "keyword", "logical operator", "comparison operator",
-            "language literal", "built-in type", "handler call",
-            "string", "operator", "comment", "command",
-            "command parameter", "dictionary class", "dictionary property",
-            "dictionary constant",
-        )
+        val expectedKeys =
+            setOf(
+                "keyword",
+                "logical operator",
+                "comparison operator",
+                "language literal",
+                "built-in type",
+                "handler call",
+                "string",
+                "operator",
+                "comment",
+                "command",
+                "command parameter",
+                "dictionary class",
+                "dictionary property",
+                "dictionary constant",
+            )
         assertEquals(expectedKeys, tags.keys)
     }
 

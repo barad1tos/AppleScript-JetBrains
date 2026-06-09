@@ -18,8 +18,10 @@ class AppleScriptRefactoringTest : BasePlatformTestCase() {
             end run
             """.trimIndent(),
         )
-        val variable = PsiTreeUtil.findChildrenOfType(myFixture.file, AppleScriptTargetVariable::class.java)
-            .first { it.name == "myVar" }
+        val variable =
+            PsiTreeUtil
+                .findChildrenOfType(myFixture.file, AppleScriptTargetVariable::class.java)
+                .first { it.name == "myVar" }
 
         assertTrue("Safe delete must be available for named element", elementProvider.isSafeDeleteAvailable(variable))
     }
