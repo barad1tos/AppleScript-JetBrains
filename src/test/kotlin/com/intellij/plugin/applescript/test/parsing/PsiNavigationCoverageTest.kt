@@ -2,7 +2,12 @@ package com.intellij.plugin.applescript.test.parsing
 
 import com.intellij.plugin.applescript.AppleScriptFile
 import com.intellij.plugin.applescript.AppleScriptFileType
-import com.intellij.plugin.applescript.psi.*
+import com.intellij.plugin.applescript.psi.AppleScriptHandler
+import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
+import com.intellij.plugin.applescript.psi.AppleScriptPropertyReference
+import com.intellij.plugin.applescript.psi.AppleScriptScriptObject
+import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
+import com.intellij.plugin.applescript.psi.AppleScriptTellCompoundStatement
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase

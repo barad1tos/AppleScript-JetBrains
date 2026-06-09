@@ -179,7 +179,8 @@ end tell""")
     }
 
     fun testDictionaryCommandHighlightingDoesNotCrash() {
-        val registryService = com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.getInstance()
+        val registryService =
+            com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.getInstance()
         com.intellij.testFramework.PlatformTestUtil.waitWithEventsDispatching(
             "Standard dictionaries were not initialized",
             { registryService.isInitialized() },
