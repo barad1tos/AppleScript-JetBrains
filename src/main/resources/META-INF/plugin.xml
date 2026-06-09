@@ -3,7 +3,7 @@
   <name>AppleScript Toolkit</name>
   <product-descriptor
       code="PAPPLESCRIPT"
-      release-date="20260609"
+      release-date="20260605"
       release-version="20"/>
   <vendor email="roman.borodavkin@gmail.com"
           url="https://github.com/barad1tos/AppleScript-JetBrains">barad1tos software</vendor>
