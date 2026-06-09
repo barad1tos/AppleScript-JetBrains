@@ -189,7 +189,18 @@ kover {
         filters {
             excludes {
                 classes(
+                    // Generated Grammar-Kit parser — regenerated from AppleScript.bnf on every build.
+                    // Boilerplate accept/acceptChildren methods carry no hand-written logic worth asserting.
                     "com.intellij.plugin.applescript.lang.parser.AppleScriptParser*",
+                    // Generated PSI implementations (src/main/gen/) — auto-produced by Grammar-Kit
+                    // from the BNF grammar. Each class is a thin shell of accept/acceptChildren/getChildren
+                    // stubs with no hand-written branching. Testing them exercises generated boilerplate,
+                    // not real user-facing behaviour. Coverage belongs on the hand-written consumers
+                    // (resolvers, annotators, completion contributors) that sit on top of these PSI types.
+                    "com.intellij.plugin.applescript.psi.impl.*",
+                    "com.intellij.plugin.applescript.psi.sdef.impl.*",
+                    // Smoke tests require a running IDE instance with full plugin classpath.
+                    // They cannot execute in headless CI and are excluded from coverage accounting.
                     "com.intellij.plugin.applescript.smoke.*",
                 )
             }
