@@ -286,10 +286,10 @@ val runIdeHeadlessSmoke by intellijPlatformTesting.runIde.registering {
             "-Dapplescript.smoke.fixtureRoot=${file("src/test/resources/testData/runIde").absolutePath}",
         )
         args("applescript-smoke")
-        // 3-minute Gradle-level cap (T-02-S mitigation). CI also enforces its own job
-        // timeout. CONTEXT D-13 expected wall-time is ~75s; this leaves headroom for
+        // 5-minute Gradle-level cap. CI also enforces its own job timeout.
+        // CONTEXT D-13 expected wall-time is ~75s; this leaves headroom for
         // cold IDE boot on the first CI run after a cache miss.
-        timeout.set(Duration.ofMinutes(3))
+        timeout.set(Duration.ofMinutes(5))
     }
 }
 
