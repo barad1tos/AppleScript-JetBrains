@@ -190,6 +190,7 @@ kover {
             excludes {
                 classes(
                     "com.intellij.plugin.applescript.lang.parser.AppleScriptParser*",
+                    "com.intellij.plugin.applescript.smoke.*",
                 )
             }
         }
