@@ -64,7 +64,10 @@ end tell""",
             """.trimIndent(),
         )
         assertNotNull(file)
-        val scriptObj = PsiTreeUtil.findChildOfType(file, com.intellij.plugin.applescript.psi.AppleScriptScriptObject::class.java)
+        val scriptObj = PsiTreeUtil.findChildOfType(
+            file,
+            com.intellij.plugin.applescript.psi.AppleScriptScriptObject::class.java,
+        )
         assertNotNull("Must find script object", scriptObj)
     }
 

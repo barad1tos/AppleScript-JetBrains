@@ -6,7 +6,8 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptAnnotatorTest : BasePlatformTestCase() {
     fun testKnownApplicationDoesNotProduceError() {
-        val registryService = com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.getInstance()
+        val registryService =
+            com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.getInstance()
         com.intellij.testFramework.PlatformTestUtil.waitWithEventsDispatching(
             "Standard dictionaries were not initialized",
             { registryService.isInitialized() },
