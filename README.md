@@ -7,8 +7,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/barad1tos/AppleScript-JetBrains/releases/latest">
-    <img src="https://img.shields.io/badge/Download-latest-blue?style=for-the-badge&colorA=1F2430" alt="Download latest release">
+  <a href="https://plugins.jetbrains.com/plugin/32123-applescript-toolkit">
+    <img src="https://img.shields.io/badge/Install-JetBrains%20Marketplace-FFCC66?style=for-the-badge&logo=jetbrains&logoColor=white&colorA=1F2430" alt="Install from Marketplace">
   </a>
 </p>
 
@@ -19,8 +19,11 @@
   <a href="https://codecov.io/gh/barad1tos/AppleScript-JetBrains">
     <img src="https://codecov.io/gh/barad1tos/AppleScript-JetBrains/graph/badge.svg" alt="Coverage">
   </a>
-  <a href="gradle.properties">
-    <img src="https://img.shields.io/badge/IntelliJ%20Platform-2025.1%20to%202026.1-7C4DFF?colorA=1F2430" alt="IntelliJ Platform 2025.1 to 2026.1">
+  <a href="https://plugins.jetbrains.com/plugin/32123-applescript-toolkit">
+    <img src="https://img.shields.io/jetbrains/plugin/v/32123-applescript-toolkit?label=Marketplace&colorA=1F2430&colorB=FFCC66" alt="JetBrains Marketplace">
+  </a>
+  <a href="https://plugins.jetbrains.com/plugin/32123-applescript-toolkit">
+    <img src="https://img.shields.io/jetbrains/plugin/d/32123-applescript-toolkit?colorA=1F2430&colorB=73D0FF" alt="Downloads">
   </a>
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-Apache--2.0-23C284?colorA=1F2430" alt="Apache 2.0 license">
@@ -62,8 +65,9 @@ AppleScript Toolkit brings AppleScript editing, code insight, dictionary tooling
 
 ### From JetBrains Marketplace
 
-A paid Marketplace listing is planned under the `barad1tos software` vendor profile.
-Until the listing is published, install a local build from disk.
+**Settings** → **Plugins** → **Marketplace** → search **"AppleScript Toolkit"** → **Install**
+
+Restart the IDE after installation.
 
 ### From disk
 
