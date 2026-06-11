@@ -32,15 +32,29 @@
 
 <br>
 
-AppleScript Toolkit brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is a maintained revival of the original Apache-2.0 AppleScript plugin, with the handwritten IntelliJ Platform implementation modernized in Kotlin and the existing Grammar-Kit parser core preserved and hardened.
+AppleScript Toolkit brings AppleScript editing, code insight, dictionary tooling, and macOS script execution back to current JetBrains IDEs. It is for people who still automate real macOS workflows with AppleScript, but want the editing, navigation, and project ergonomics of IntelliJ IDEA instead of a separate script editor.
 
-## What sets it apart
+The project is a maintained revival of the original Apache-2.0 AppleScript plugin, with the handwritten IntelliJ Platform implementation modernized in Kotlin and the existing Grammar-Kit parser core preserved and hardened.
 
-- **Modern compatibility** — targets IntelliJ Platform 2025.1 through 2026.1 with current Gradle, Kotlin, CI, and Plugin Verifier coverage
-- **AppleScript language model** — syntax highlighting, parsing, structure view, navigation, find usages, documentation, and rename support where the current PSI/resolver model supports them
-- **Dictionary-aware editing** — loads scriptable-application dictionaries and `.sdef` / `.xml` dictionary files to drive completion and documentation
-- **macOS runtime integration** — run configurations execute AppleScript through the system runtime on macOS
-- **Maintained fork hygiene** — Apache-2.0 attribution is preserved, and Marketplace identity trade-offs are documented before publication
+Long-term, I’d like to move toward some of the workflow capabilities people know from Script Debugger while staying within the IntelliJ Platform ecosystem. The current focus is the foundation for that path: reliable parsing, dictionary-aware completion and documentation, structure navigation, gutter actions, and script execution inside the IDE.
+
+## What you get today
+
+- **A JetBrains-native AppleScript workspace** — edit `.applescript` and `.scpt` files with syntax highlighting, project navigation, structure view, and IDE run output.
+- **Dictionary-aware code insight** — load scriptable-application dictionaries and `.sdef` / `.xml` files to drive completion, quick documentation, and application-specific terms.
+- **Navigation for real scripts** — scan handlers, properties, script objects, and larger automation files without treating AppleScript as plain text.
+- **macOS execution path** — run configurations execute scripts through the system AppleScript runtime and show results inside the IDE.
+- **Modern plugin maintenance** — targets IntelliJ Platform 2025.1 through 2026.1 with current Gradle, Kotlin, CI, and Plugin Verifier coverage.
+
+## Feature tour
+
+| Preview | What it helps with |
+|---------|--------------------|
+| <img src="assets/screenshots/editor-structure-overview.png" alt="AppleScript file open in IntelliJ IDEA with syntax highlighting and structure view" width="420"> | **AppleScript as an IDE language, not a text blob.** Syntax highlighting, parser-backed structure, and JetBrains project navigation work together for `.applescript` and `.scpt` files. |
+| <img src="assets/screenshots/large-script-structure-view.png" alt="Large AppleScript file with structure view and editor navigation" width="420"> | **Keep larger scripts navigable.** Structure View surfaces handlers and script sections so long automation files are easier to scan, jump through, and maintain. |
+| <img src="assets/screenshots/dictionary-completion-tell-application.png" alt="Dictionary-aware completion inside a tell application block" width="420"><br><br><img src="assets/screenshots/music-dictionary-completion.png" alt="Music dictionary completion suggestions for AppleScript terms" width="420"> | **Complete application terms where you actually write them.** Completion uses loaded application dictionaries and Scripting Additions data, including dictionary terms inside `tell application` blocks. |
+| <img src="assets/screenshots/quick-documentation-dictionary.png" alt="Quick documentation popup for a Music dictionary class" width="420"> | **Inspect dictionary details without breaking flow.** Quick documentation shows classes, elements, and properties from application dictionaries directly in the editor. |
+| <img src="assets/screenshots/run-configuration-output.png" alt="AppleScript run configuration output in the IDE Run tool window" width="420"><br><br><img src="assets/screenshots/gutter-line-marker.png" alt="AppleScript gutter line marker in the editor" width="420"> | **Run and act from inside the IDE.** Run configurations execute scripts through the macOS AppleScript runtime, while gutter markers and editor actions keep script workflow close to the code. |
 
 ## Language Support
 
