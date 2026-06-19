@@ -16,6 +16,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
 import com.intellij.plugin.applescript.psi.AppleScriptScriptObject
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
+import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil.findChildrenOfType
@@ -138,6 +139,42 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
                     .findAll()
 
             assertEquals("Find Usages must return dictionary command references", 1, usages.size)
+        } finally {
+            dictionaryInfo.getApplicationFile()?.path?.let(persistence::removeDictionaryInfo)
+        }
+    }
+
+    fun testUsingTermsFromApplicationCommandHandlerParsesWithoutErrors() {
+        val applicationName = "SyntheticUsingTermsMusic_${System.nanoTime()}"
+        val dictionaryFile = writeFindUsagesMusicDictionaryXml()
+        val dictionaryInfo = initializedDictionaryInfo(applicationName, dictionaryFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            runBlocking {
+                SdefIndexService.getInstance().ingest(applicationName, dictionaryFile)
+            }
+            registryService.standardReady.complete(Result.success(Unit))
+            registryService.appsReady.complete(Result.success(Unit))
+            requireNotNull(projectDictionaries.createDictionary(applicationName)) {
+                "Regression setup must create the synthetic project dictionary"
+            }
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                using terms from application "$applicationName"
+                    on play
+                        return true
+                    end play
+                end using terms from
+                """.trimIndent(),
+            )
+
+            assertNoParserErrors()
         } finally {
             dictionaryInfo.getApplicationFile()?.path?.let(persistence::removeDictionaryInfo)
         }
@@ -357,6 +394,21 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
         file.deleteOnExit()
         file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
         return file
+    }
+
+    private fun assertNoParserErrors() {
+        val errors = findChildrenOfType(myFixture.file, PsiErrorElement::class.java)
+        if (errors.isEmpty()) return
+
+        val text = myFixture.file.text
+        val report =
+            errors.joinToString("\n") { error ->
+                val offset = error.textRange.startOffset
+                val line = text.substring(0, offset).count { it == '\n' } + 1
+                val snippet = error.text.replace("\n", "\\n").take(40)
+                "  line $line offset $offset: '$snippet' - ${error.errorDescription}"
+            }
+        fail("using terms dictionary handler fixture has ${errors.size} parser error(s):\n$report")
     }
 
     private fun handlerCallDebug(): String =

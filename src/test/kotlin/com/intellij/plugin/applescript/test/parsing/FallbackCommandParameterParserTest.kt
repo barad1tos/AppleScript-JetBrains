@@ -432,6 +432,24 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertEquals(listOf("saving"), ast.textsOf(COMMAND_PARAMETER_SELECTOR))
     }
 
+    fun testDictionaryModifierListDirectParameterKeepsSelectorAfterRawBracketFallback() {
+        val builder = createBuilder("{command down} using selectedWindow")
+        val command =
+            dictionaryCommand(
+                name = "keystroke",
+                directParameterType = "anything",
+                parameters = listOf("using"),
+            )
+
+        val ast =
+            parseWithRootSection(builder) {
+                DictionaryCommandParameterParser.parseParametersForCommand(builder, 0, command)
+            }
+
+        assertEquals(listOf("{command down}"), ast.textsOf(DIRECT_PARAMETER_VAL))
+        assertEquals(listOf("using"), ast.textsOf(COMMAND_PARAMETER_SELECTOR))
+    }
+
     private fun createBuilder(text: String): PsiBuilder {
         val parserDefinition = AppleScriptParserDefinition()
         val anchorFile = myFixture.configureByText(AppleScriptFileType, "")
