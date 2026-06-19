@@ -16,12 +16,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.FOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.LCURLY
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OVER
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.RCURLY
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.UNDER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.USING
@@ -94,12 +90,12 @@ internal object DictionaryDirectParameterParser {
         isTellCompound: Boolean,
     ): Boolean {
         val marker = enter_section_(builder, level, _NONE_, "<parse Command Direct Parameter Value >")
-        var result = parseBracketedDirectValueBeforeSelector(builder)
-        if (!result) {
-            result = parseTypedValue(builder, level + 1, parameter.typeSpecifier)
-        }
+        var result = parseTypedValue(builder, level + 1, parameter.typeSpecifier)
         if (!result) {
             result = AppleScriptParser.expression(builder, level + 1)
+        }
+        if (!result) {
+            result = parseBracketedDirectValueBeforeSelector(builder)
         }
         exit_section_(builder, level, marker, DIRECT_PARAMETER_VAL, result, false, null)
         return result || parameter.isOptional() || isTellCompound
@@ -112,48 +108,21 @@ internal object DictionaryDirectParameterParser {
     ): Boolean =
         when (typeSpecifier) {
             "type" -> TypeSpecifierParser.parseTypeSpecifier(builder, level + 1)
-            "number" -> AppleScriptParser.numberLiteralExpression(builder, level + 1)
-            "integer" -> AppleScriptParser.integerLiteralExpression(builder, level + 1)
-            "real" -> AppleScriptParser.realLiteralExpression(builder, level + 1)
             else -> false
         }
 
     private fun parseBracketedDirectValueBeforeSelector(builder: PsiBuilder): Boolean {
         val shouldConsume = isBracketedDirectParameterBeforeSelector(builder)
         if (shouldConsume) {
-            consumeBracketedValue(builder)
+            AppleScriptBracketedValueParser.consume(builder, allowNewlines = true)
         }
         return shouldConsume
     }
 
-    private fun isBracketedDirectParameterBeforeSelector(builder: PsiBuilder): Boolean {
-        var result = false
-        if (builder.tokenType === LCURLY || builder.tokenType === LPAREN) {
-            val expectedClosers = mutableListOf<IElementType>()
-            var offset = 0
-            var shouldContinue = true
-            while (shouldContinue) {
-                when (val token = builder.lookAhead(offset)) {
-                    null -> shouldContinue = false
-                    LCURLY -> expectedClosers += RCURLY
-                    LPAREN -> expectedClosers += RPAREN
-                    RCURLY, RPAREN -> {
-                        val isBalancedClose =
-                            expectedClosers.isNotEmpty() &&
-                                expectedClosers.removeAt(expectedClosers.lastIndex) === token
-                        if (isBalancedClose && expectedClosers.isEmpty()) {
-                            result = isCommandParameterSelectorStart(nextNonSpaceToken(builder, offset + 1))
-                            shouldContinue = false
-                        } else if (!isBalancedClose) {
-                            shouldContinue = false
-                        }
-                    }
-                }
-                offset += 1
-            }
-        }
-        return result
-    }
+    private fun isBracketedDirectParameterBeforeSelector(builder: PsiBuilder): Boolean =
+        AppleScriptBracketedValueParser
+            .scan(builder, allowNewlines = true)
+            ?.let { scan -> isCommandParameterSelectorStart(nextNonSpaceToken(builder, scan.endOffset)) } == true
 
     private fun isCommandParameterSelectorStart(tokenType: IElementType?): Boolean =
         tokenType != null && commandParameterSelectorStarts.contains(tokenType)
@@ -169,19 +138,5 @@ internal object DictionaryDirectParameterParser {
             tokenType = builder.lookAhead(offset)
         }
         return tokenType
-    }
-
-    private fun consumeBracketedValue(builder: PsiBuilder) {
-        val expectedClosers = mutableListOf<IElementType>()
-        var consumedBalancedValue = false
-        while (!builder.eof() && !consumedBalancedValue) {
-            when (builder.tokenType) {
-                LCURLY -> expectedClosers += RCURLY
-                LPAREN -> expectedClosers += RPAREN
-                RCURLY, RPAREN -> expectedClosers.removeAt(expectedClosers.lastIndex)
-            }
-            builder.advanceLexer()
-            consumedBalancedValue = expectedClosers.isEmpty()
-        }
     }
 }

@@ -26,6 +26,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_CLASS_IDENTIFIER_PLURAL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DIRECT_PARAMETER_VAL
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.REFERENCE_EXPRESSION
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.tree.IElementType
@@ -392,6 +393,43 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
             }
 
         assertEquals(listOf("to", "starting at"), ast.textsOf(COMMAND_PARAMETER_SELECTOR))
+    }
+
+    fun testDictionaryNumberDirectParameterKeepsFullExpression() {
+        val builder = createBuilder("1 + upperLimit from 0 to 10")
+        val command =
+            dictionaryCommand(
+                name = "random number",
+                directParameterType = "number",
+                parameters = listOf("from", "to"),
+            )
+
+        val ast =
+            parseWithRootSection(builder) {
+                DictionaryCommandParameterParser.parseParametersForCommand(builder, 0, command)
+            }
+
+        assertEquals(listOf("1 + upperLimit"), ast.textsOf(DIRECT_PARAMETER_VAL))
+        assertEquals(listOf("from", "to"), ast.textsOf(COMMAND_PARAMETER_SELECTOR))
+    }
+
+    fun testDictionaryBracketedDirectParameterKeepsExpressionPsiBeforeSelector() {
+        val builder = createBuilder("{docRef} saving no")
+        val command =
+            dictionaryCommand(
+                name = "close",
+                directParameterType = "specifier",
+                parameters = listOf("saving"),
+            )
+
+        val ast =
+            parseWithRootSection(builder) {
+                DictionaryCommandParameterParser.parseParametersForCommand(builder, 0, command)
+            }
+
+        assertEquals(listOf("{docRef}"), ast.textsOf(DIRECT_PARAMETER_VAL))
+        assertTrue(ast.textsOf(REFERENCE_EXPRESSION).contains("docRef"))
+        assertEquals(listOf("saving"), ast.textsOf(COMMAND_PARAMETER_SELECTOR))
     }
 
     private fun createBuilder(text: String): PsiBuilder {

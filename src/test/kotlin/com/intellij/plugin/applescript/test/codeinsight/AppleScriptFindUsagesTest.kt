@@ -66,8 +66,13 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
             ReferencesSearch
                 .search(handler, GlobalSearchScope.fileScope(myFixture.file))
                 .findAll()
+        val usageLines =
+            usages
+                .map { usage -> myFixture.editor.document.getLineNumber(usage.element.textRange.startOffset) + 1 }
+                .sorted()
 
         assertEquals("Find Usages must return handler call references; ${handlerCallDebug()}", 2, usages.size)
+        assertEquals("Find Usages must ignore object-owned handler calls", listOf(22, 26), usageLines)
     }
 
     fun testFindUsagesIgnoresHandlerArgumentWordsMatchingSelector() {
