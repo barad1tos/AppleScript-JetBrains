@@ -164,8 +164,21 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertNoParserErrors("tell_to_unknown_command.applescript")
     }
 
+    fun testTellToUnknownCommandAfterDictionaryCommandParse() {
+        assertNoParserErrors("music_library.applescript")
+        assertNoParserErrors("tell_to_unknown_command.applescript")
+    }
+
     fun testPermissiveHeadNegative() {
         assertNoParserErrors("permissive_head_negative.applescript")
+    }
+
+    fun testGenreUpdaterBatchTrackUpdates() {
+        assertNoParserErrors("genreupdater_batch_update_tracks.applescript")
+    }
+
+    fun testGenreUpdaterTrackPropertyUpdate() {
+        assertNoParserErrors("genreupdater_update_property.applescript")
     }
 
     private fun assertNoParserErrors(fileName: String): PsiFile {
