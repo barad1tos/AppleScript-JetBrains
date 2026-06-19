@@ -2,6 +2,12 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.8] - 2026-06-20
+
+- [Fix] Valid AppleScript property-update statements no longer show false parser errors when assigning values to application object properties.
+- [Fix] Dictionary commands with bracketed argument values now keep parsing following selector parameters instead of marking correct command calls as incomplete.
+- [Fix] Command handlers inside `using terms from application` blocks now parse cleanly, preserving navigation and Find Usages behavior for handler names.
+
 ## [2.0.7] - 2026-06-09
 
 ### Fixed

@@ -26,6 +26,12 @@
     </p>
   ]]></description>
   <change-notes><![CDATA[
+    <h3>2.0.8</h3>
+    <ul>
+      <li>[Fix] Valid AppleScript property-update statements no longer show false parser errors when assigning values to application object properties.</li>
+      <li>[Fix] Dictionary commands with bracketed argument values now keep parsing following selector parameters instead of marking correct command calls as incomplete.</li>
+      <li>[Fix] Command handlers inside <code>using terms from application</code> blocks now parse cleanly, preserving navigation and Find Usages behavior for handler names.</li>
+    </ul>
     <h3>2.0.7</h3>
     <ul>
       <li>Fixed Structure View to show AppleScript handlers, properties, and script objects at the root level instead of showing an empty tree.</li>
