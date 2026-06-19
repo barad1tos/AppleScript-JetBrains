@@ -21,13 +21,6 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
 internal object CommandHandlerCallParser {
-    private val FALLBACK_FIRST_COMMAND_NAMES: Set<String> =
-        setOf(
-            "choose from list",
-            "make",
-            "write",
-        )
-
     fun parseCallExpression(
         builder: PsiBuilder,
         level: Int,
@@ -44,7 +37,7 @@ internal object CommandHandlerCallParser {
                 val allCommandsWithName =
                     DictionaryCommandCollector.collectCommands(builder, parsedCommandName.get(), lookupScope)
                 result =
-                    parseFallbackOrDictionaryCommandParameters(
+                    CommandHandlerParameterParser.parseFallbackOrDictionaryCommandParameters(
                         builder,
                         level,
                         parsedCommandName.get(),
@@ -80,7 +73,12 @@ internal object CommandHandlerCallParser {
                         parsedCommandName.get(),
                         DictionaryCommandLookupScope(lookupScope.toldApplicationName, false, null),
                     )
-                result = parseDictionaryCommandParameters(builder, level, allCommandsWithName)
+                result =
+                    CommandHandlerParameterParser.parseDictionaryCommandParameters(
+                        builder,
+                        level,
+                        allCommandsWithName,
+                    )
             }
         }
         return result
@@ -90,44 +88,11 @@ internal object CommandHandlerCallParser {
         val tokenText = builder.tokenText
         return !nextTokenIs(builder, NLS) &&
             builder.tokenType !== COUNT &&
-            !isAssignmentObjectOperandBeforeTerminator(builder) &&
-            !isAssignmentTargetPhraseBeforeTerminator(builder) &&
+            !CommandHandlerAssignmentGuard.isObjectOperandBeforeTerminator(builder) &&
+            !CommandHandlerAssignmentGuard.isTargetPhraseBeforeTerminator(builder) &&
             !tokenText.isNullOrEmpty() &&
             AppleScriptNames.isIdentifierStart(tokenText[0])
     }
-
-    private fun isAssignmentObjectOperandBeforeTerminator(builder: PsiBuilder): Boolean =
-        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
-            builder.lookAhead(1) === TO &&
-            isObjectPointer(AppleScriptParserTrivia.previousNonSpaceToken(builder))
-
-    private fun isAssignmentTargetPhraseBeforeTerminator(builder: PsiBuilder): Boolean =
-        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
-            isAssignmentTargetIntroducer(AppleScriptParserTrivia.previousNonSpaceToken(builder)) &&
-            hasAssignmentTerminatorAfterTargetPhrase(builder)
-
-    private fun isAssignmentTargetIntroducer(tokenType: IElementType?): Boolean =
-        tokenType === SET || isObjectPointer(tokenType)
-
-    private fun hasAssignmentTerminatorAfterTargetPhrase(builder: PsiBuilder): Boolean {
-        var offset = 0
-        var tokenType = builder.tokenType
-        var consumedTargetWord = false
-        while (isAssignmentTargetWord(tokenType)) {
-            consumedTargetWord = true
-            offset += 1
-            tokenType = builder.lookAhead(offset)
-        }
-        return consumedTargetWord && tokenType === TO
-    }
-
-    private fun isAssignmentTargetWord(tokenType: IElementType?): Boolean =
-        tokenType === VAR_IDENTIFIER ||
-            tokenType === BUILT_IN_PROPERTY ||
-            tokenType === SET ||
-            FallbackDictionaryTermPredicates.isContextualPropertyTerm(tokenType)
-
-    private fun isObjectPointer(tokenType: IElementType?): Boolean = tokenType === OF || tokenType === IN
 
     private fun commandLookupScope(builder: PsiBuilder): DictionaryCommandLookupScope {
         val areThereUseStatements =
@@ -187,18 +152,99 @@ internal object CommandHandlerCallParser {
         exit_section_(builder, level, commandNameMarker, DICTIONARY_COMMAND_NAME, commandNameResult, false, null)
         return commandNameResult
     }
+}
 
-    private fun parseFallbackOrDictionaryCommandParameters(
+private object CommandHandlerAssignmentGuard {
+    fun isObjectOperandBeforeTerminator(builder: PsiBuilder): Boolean =
+        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            builder.lookAhead(1) === TO &&
+            isObjectPointer(AppleScriptParserTrivia.previousNonSpaceToken(builder))
+
+    fun isTargetPhraseBeforeTerminator(builder: PsiBuilder): Boolean =
+        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            isAssignmentTargetIntroducer(AppleScriptParserTrivia.previousNonSpaceToken(builder)) &&
+            hasAssignmentTerminatorAfterTargetPhrase(builder)
+
+    private fun isAssignmentTargetIntroducer(tokenType: IElementType?): Boolean =
+        tokenType === SET || isObjectPointer(tokenType)
+
+    private fun hasAssignmentTerminatorAfterTargetPhrase(builder: PsiBuilder): Boolean {
+        var offset = 0
+        var tokenType = builder.tokenType
+        var consumedTargetWord = false
+        while (isAssignmentTargetWord(tokenType)) {
+            consumedTargetWord = true
+            offset += 1
+            tokenType = builder.lookAhead(offset)
+        }
+        return consumedTargetWord && tokenType === TO
+    }
+
+    private fun isAssignmentTargetWord(tokenType: IElementType?): Boolean =
+        tokenType === VAR_IDENTIFIER ||
+            tokenType === BUILT_IN_PROPERTY ||
+            tokenType === SET ||
+            FallbackDictionaryTermPredicates.isContextualPropertyTerm(tokenType)
+
+    private fun isObjectPointer(tokenType: IElementType?): Boolean = tokenType === OF || tokenType === IN
+}
+
+private object CommandHandlerParameterParser {
+    private val FALLBACK_FIRST_COMMAND_NAMES: Set<String> =
+        setOf(
+            "choose from list",
+            "make",
+            "write",
+        )
+
+    fun parseFallbackOrDictionaryCommandParameters(
         builder: PsiBuilder,
         level: Int,
         parsedCommandName: String,
         allCommandsWithName: List<AppleScriptCommand>,
-    ): Boolean =
-        if (allCommandsWithName.isEmpty() || isFallbackFirstCommand(parsedCommandName)) {
-            FallbackCommandParameterParser.parseParameters(builder, level + 1, parsedCommandName)
+    ): Boolean {
+        return if (allCommandsWithName.isEmpty()) {
+            parseUnknownCommandParameters(builder, level, parsedCommandName)
+        } else if (isFallbackFirstCommand(parsedCommandName)) {
+            parseFallbackFirstDictionaryCommandParameters(
+                builder,
+                level,
+                parsedCommandName,
+                allCommandsWithName,
+            )
         } else {
             parseDictionaryCommandParameters(builder, level, allCommandsWithName)
         }
+    }
+
+    private fun parseUnknownCommandParameters(
+        builder: PsiBuilder,
+        level: Int,
+        parsedCommandName: String,
+    ): Boolean {
+        val previousMode =
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE)
+        val parserProvidedMode =
+            if (FallbackCommandParameterParser.isStructuredDirectParameterStart(builder.tokenType)) {
+                FallbackCommandParameterMode.OptionalDirectParameter
+            } else if (FallbackCommandParameterParser.isIdentifierPhraseDirectParameterStart(builder)) {
+                FallbackCommandParameterMode.OptionalDirectParameter
+            } else {
+                previousMode
+            }
+        builder.putUserData(
+            AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE,
+            parserProvidedMode,
+        )
+        return try {
+            FallbackCommandParameterParser.parseParameters(builder, level + 1, parsedCommandName)
+        } finally {
+            builder.putUserData(
+                AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE,
+                previousMode,
+            )
+        }
+    }
 
     // These commands route through the fallback parameter parser even when a loaded standard
     // dictionary defines them: their real-world parameter syntax uses multi-word labels and
@@ -206,7 +252,69 @@ internal object CommandHandlerCallParser {
     private fun isFallbackFirstCommand(commandName: String): Boolean =
         commandName.lowercase() in FALLBACK_FIRST_COMMAND_NAMES
 
-    private fun parseDictionaryCommandParameters(
+    private fun parseFallbackFirstDictionaryCommandParameters(
+        builder: PsiBuilder,
+        level: Int,
+        parsedCommandName: String,
+        allCommandsWithName: List<AppleScriptCommand>,
+    ): Boolean {
+        val previousMode =
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE)
+        val previousNames =
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES)
+        builder.putUserData(
+            AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE,
+            fallbackParameterMode(builder, allCommandsWithName),
+        )
+        builder.putUserData(
+            AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES,
+            fallbackParameterNames(allCommandsWithName),
+        )
+        return try {
+            FallbackCommandParameterParser.parseParameters(builder, level + 1, parsedCommandName)
+        } finally {
+            builder.putUserData(
+                AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE,
+                previousMode,
+            )
+            builder.putUserData(
+                AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES,
+                previousNames,
+            )
+        }
+    }
+
+    private fun fallbackParameterMode(
+        builder: PsiBuilder,
+        allCommandsWithName: List<AppleScriptCommand>,
+    ): FallbackCommandParameterMode =
+        if (isDictionaryParameterSelectorStart(builder, allCommandsWithName)) {
+            FallbackCommandParameterMode.ParametersOnly
+        } else {
+            FallbackCommandParameterMode.OptionalDirectParameter
+        }
+
+    private fun isDictionaryParameterSelectorStart(
+        builder: PsiBuilder,
+        allCommandsWithName: List<AppleScriptCommand>,
+    ): Boolean {
+        val tokenText = builder.tokenText ?: return false
+        return allCommandsWithName.any { command ->
+            command.parameters.any { parameter ->
+                parameter
+                    .getName()
+                    .substringBefore(' ')
+                    .equals(tokenText, ignoreCase = true)
+            }
+        }
+    }
+
+    private fun fallbackParameterNames(allCommandsWithName: List<AppleScriptCommand>): Set<String> =
+        allCommandsWithName
+            .flatMap { command -> command.parameters.map { parameter -> parameter.getName() } }
+            .toSet()
+
+    fun parseDictionaryCommandParameters(
         builder: PsiBuilder,
         level: Int,
         allCommandsWithName: List<AppleScriptCommand>,

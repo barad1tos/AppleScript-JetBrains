@@ -190,7 +190,7 @@ internal object DictionaryCommandParameterParser {
         commandDefinition: AppleScriptCommand,
     ): Boolean {
         val marker = builder.mark()
-        var parsedParameterSelector = builder.tokenText ?: ""
+        var parsedParameterSelector = currentTokenWord(builder).orEmpty()
         var result = false
 
         while (!builder.eof() && builder.tokenType !== NLS && builder.tokenType !== COMMENT) {
@@ -199,7 +199,7 @@ internal object DictionaryCommandParameterParser {
                 result = true
                 break
             }
-            parsedParameterSelector += " " + builder.tokenText
+            parsedParameterSelector += " " + currentTokenWord(builder)
         }
 
         marker.rollbackTo()
@@ -215,16 +215,18 @@ internal object DictionaryCommandParameterParser {
         if (!recursion_guard_(builder, level, "parseCommandParameterSelector")) return false
         var result = false
         val marker = enter_section_(builder, level, _NONE_, "<parse Command Parameter Selector>")
-        parsedParameterSelector.set(builder.tokenText ?: "")
+        parsedParameterSelector.set(currentTokenWord(builder).orEmpty())
         while (!builder.eof() && builder.tokenType !== NLS && builder.tokenType !== COMMENT) {
             builder.advanceLexer()
             if (command.getParameterByName(parsedParameterSelector.get()) != null) {
                 result = true
                 break
             }
-            parsedParameterSelector.set(parsedParameterSelector.get() + " " + builder.tokenText)
+            parsedParameterSelector.set(parsedParameterSelector.get() + " " + currentTokenWord(builder))
         }
         exit_section_(builder, level, marker, COMMAND_PARAMETER_SELECTOR, result, false, null)
         return result
     }
+
+    private fun currentTokenWord(builder: PsiBuilder): String? = builder.tokenText ?: builder.tokenType?.toString()
 }

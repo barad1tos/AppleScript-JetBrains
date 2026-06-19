@@ -672,7 +672,7 @@ handlerLabeledParametersDefinition ::= (on|to) identifier !LPAREN labeledParamet
 {mixin="com.intellij.plugin.applescript.psi.impl.AbstractAppleScriptComponent"
 implements="com.intellij.plugin.applescript.psi.AppleScriptComponent"
 methods=[getParameterComponentList]}
-//The word of or in before directParamName is required in user-defined handlers, but is optional in 
+//The word of or in before directParamName is required in user-defined handlers, but is optional in
 // terminology-defined handlers (for example, those defined by applications).
 labeledParameterDeclarationList ::= ((of|in)? directParameterDeclaration | targetVariablePattern )? labeledParameterDeclarationPart*
 {methods=[getComponentList]}
@@ -813,7 +813,7 @@ continue_statement ::= continue expression
 
 
 //===COMMANDS===
-//An AppleScript command is one that is built into the AppleScript language. There currently are five such commands: 
+//An AppleScript command is one that is built into the AppleScript language. There currently are five such commands:
 // get , set, count, copy, and run. Except for copy , each of these commands can also be implemented by applications.
 private appleScriptCommandExpression ::= getCommandExpression|runCommandExpression|countCommandExpression|
 errorCommandExpression|logCommandExpression|activateCommandExpression|launchCommandExpression
@@ -857,7 +857,8 @@ assignmentStatement ::= setCommandAppleScript|copyCommandStatement
 
 //set AppleScript command
 private setCommandAppleScript ::= setCommandAppleScriptSetSyntax|setCommandAppleScriptReturningSyntax
-private setCommandAppleScriptSetSyntax ::= set THE_KW? (targetVariablePattern to|objectReferenceWrapper to) THE_KW? expression
+private setCommandAppleScriptSetSyntax ::= set THE_KW? (setCommandAppleScriptObjectPropertyTarget to|targetVariablePattern to|objectReferenceWrapper to) THE_KW? expression
+private setCommandAppleScriptObjectPropertyTarget ::= <<parseSetObjectPropertyAssignmentTarget>>
 private setCommandAppleScriptReturningSyntax ::= expression returning targetVariablePattern
 private targetVariablePattern ::= targetVariable|targetListLiteral|targetRecordLiteral
 

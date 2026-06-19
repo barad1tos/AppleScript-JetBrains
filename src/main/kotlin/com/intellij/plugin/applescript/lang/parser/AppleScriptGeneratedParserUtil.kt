@@ -7,14 +7,17 @@ import com.intellij.openapi.util.Ref
 import com.intellij.plugin.applescript.AppleScriptNames
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_COMMAND_NAME
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.REFERENCE_EXPRESSION
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
 import java.util.Stack
 
 // Grammar-Kit generates Java code with a static import from this exact parserUtilClass.
 // The facade keeps parser-state keys and inherits @JvmStatic hooks from focused superclasses,
 // preserving the generated-parser ABI without hiding per-class function-count checks.
-class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserDictionaryHooks() {
+class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserAssignmentHooks() {
     companion object {
         internal val PARSING_COMMAND_HANDLER_CALL_PARAMETERS: Key<Boolean> =
             Key.create("applescript.parsing.command.handler.parameters")
@@ -31,6 +34,10 @@ class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserDictionaryHooks
         // parameter parser consumes the flag immediately so it cannot leak into sibling parses.
         internal val PARSING_PERMISSIVE_COMMAND_ALLOWED: Key<Boolean> =
             Key.create("applescript.parsing.permissive.command.allowed")
+        internal val PARSING_FALLBACK_COMMAND_PARAMETER_MODE: Key<FallbackCommandParameterMode> =
+            Key.create("applescript.parsing.fallback.command.parameter.mode")
+        internal val PARSING_FALLBACK_COMMAND_PARAMETER_NAMES: Key<Set<String>> =
+            Key.create("applescript.parsing.fallback.command.parameter.names")
 
         @JvmField
         val TOLD_APPLICATION_NAME_STACK: Key<Stack<String>> =
@@ -70,6 +77,60 @@ class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserDictionaryHooks
             builder: PsiBuilder,
             level: Int,
         ): Boolean = PropertyLabelParser.parse(builder, level)
+    }
+}
+
+open class AppleScriptGeneratedParserAssignmentHooks : AppleScriptGeneratedParserDictionaryHooks() {
+    companion object {
+        @JvmStatic
+        fun parseSetObjectPropertyAssignmentTarget(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean = SetObjectPropertyAssignmentParser.parse(builder, level)
+    }
+}
+
+internal object SetObjectPropertyAssignmentParser {
+    fun parse(
+        builder: PsiBuilder,
+        level: Int,
+    ): Boolean =
+        GeneratedParserUtilBase.recursion_guard_(builder, level, "parseSetObjectPropertyAssignmentTarget") &&
+            hasObjectPointerBeforeAssignmentTerminator(builder) &&
+            parseMarkedTarget(builder, level + 1)
+
+    private fun parseMarkedTarget(
+        builder: PsiBuilder,
+        level: Int,
+    ): Boolean {
+        val marker = builder.mark()
+        val result =
+            AppleScriptParser.propertyReference(builder, level + 1) &&
+                parseObjectReferences(builder, level + 1)
+        if (result) marker.drop() else marker.rollbackTo()
+        return result
+    }
+
+    private fun parseObjectReferences(
+        builder: PsiBuilder,
+        level: Int,
+    ): Boolean {
+        var parsedObjectReference = false
+        while (AppleScriptParser.objectReferenceExpression(builder, level + 1)) {
+            parsedObjectReference = true
+        }
+        return parsedObjectReference
+    }
+
+    private fun hasObjectPointerBeforeAssignmentTerminator(builder: PsiBuilder): Boolean {
+        var offset = 0
+        while (true) {
+            when (builder.lookAhead(offset)) {
+                OF, IN -> return true
+                TO, NLS, null -> return false
+                else -> offset += 1
+            }
+        }
     }
 }
 
@@ -245,7 +306,11 @@ open class AppleScriptGeneratedParserFlowHooks : AppleScriptGeneratedParserComma
         ): Boolean =
             recursion_guard_(builder, level, "isTellStatementStart") &&
                 TellStatementParser.isTellStatementStart(builder)
+    }
+}
 
+open class AppleScriptGeneratedParserSpecialHandlerHooks : AppleScriptGeneratedParserFlowHooks() {
+    companion object {
         @JvmStatic
         fun parseSpecialHandlerSignature(
             builder: PsiBuilder,
@@ -254,7 +319,7 @@ open class AppleScriptGeneratedParserFlowHooks : AppleScriptGeneratedParserComma
     }
 }
 
-open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParserFlowHooks() {
+open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParserSpecialHandlerHooks() {
     companion object {
         @JvmStatic
         fun parseDictionaryCommandName(

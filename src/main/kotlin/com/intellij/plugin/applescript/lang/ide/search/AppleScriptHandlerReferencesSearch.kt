@@ -5,6 +5,7 @@ import com.intellij.openapi.util.Computable
 import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.psi.AppleScriptHandler
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
+import com.intellij.plugin.applescript.psi.AppleScriptObjectReferenceExpression
 import com.intellij.psi.MultiRangeReference
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiReference
@@ -69,7 +70,10 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
         ): Boolean {
             val handlerCall = PsiTreeUtil.getParentOfType(element, AppleScriptHandlerCall::class.java, false)
             val reference =
-                if (handlerCall != null && handlerSelector == handlerCall.getHandlerSelector()) {
+                if (handlerCall != null &&
+                    handlerSelector == handlerCall.getHandlerSelector() &&
+                    !handlerCall.isObjectOwnedCall()
+                ) {
                     handlerCall.references.firstOrNull { reference ->
                         reference.isReferenceTo(handler) &&
                             reference.containsOccurrence(element, offsetInElement, handlerCall)
@@ -100,6 +104,18 @@ class AppleScriptHandlerReferencesSearch : QueryExecutor<PsiReference, Reference
             return referenceRanges.any { range ->
                 range.intersects(occurrenceRange.startOffset, occurrenceRange.endOffset)
             }
+        }
+
+        private fun AppleScriptHandlerCall.isObjectOwnedCall(): Boolean {
+            val objectReference =
+                PsiTreeUtil.getParentOfType(
+                    this,
+                    AppleScriptObjectReferenceExpression::class.java,
+                    true,
+                )
+            return objectReference
+                ?.handlerInterleavedParametersCallList
+                ?.any { handlerCall -> handlerCall === this } == true
         }
     }
 }
