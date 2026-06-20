@@ -186,6 +186,370 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testUnknownSystemEventsProcessReferenceIsWeakWarning() {
+        val unknownProcessName = "SyntheticMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "system events"
+                set value of slider 1 of group 1 of tab group 1 of window 1 of process "$unknownProcessName" to 1
+            end tell
+            """.trimIndent(),
+        )
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertTrue(
+            "unknown System Events process must be a weak warning; severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse("unknown process must not be an ERROR", severities.contains(HighlightSeverity.ERROR))
+        assertEquals(
+            "warning must appear exactly once; descriptions=$descriptions",
+            1,
+            descriptions.count { description ->
+                description == "Process \"$unknownProcessName\" is not known on this macOS installation"
+            },
+        )
+        assertTrue(
+            "warning must explain the local-discovery basis; descriptions=$descriptions",
+            descriptions.contains("Process \"$unknownProcessName\" is not known on this macOS installation"),
+        )
+    }
+
+    fun testUnknownSystemEventsProcessReferenceInsideSimpleTellIsWeakWarning() {
+        val unknownProcessName = "SyntheticSimpleTellMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "System Events" to set frontmost of process "$unknownProcessName" to true
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertTrue(
+            "unknown System Events process in simple tell must be a weak warning; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "unknown process in simple tell must not be an ERROR; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+        assertEquals(
+            "warning must appear exactly once; descriptions=$descriptions",
+            1,
+            descriptions.count { description ->
+                description == "Process \"$unknownProcessName\" is not known on this macOS installation"
+            },
+        )
+        assertTrue(
+            "warning must explain the local-discovery basis; descriptions=$descriptions",
+            descriptions.contains("Process \"$unknownProcessName\" is not known on this macOS installation"),
+        )
+    }
+
+    fun testUnknownSystemEventsProcessReferenceInsideNestedObjectTellIsWeakWarning() {
+        val unknownProcessName = "SyntheticNestedObjectMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        discovery.addDiscoveredApplicationName("Finder")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "System Events"
+                tell process "Finder"
+                    set value of slider 1 of group 1 of tab group 1 of window 1 of process "$unknownProcessName" to 1
+                end tell
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertTrue(
+            "unknown process inside nested object tell must still see outer System Events; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "unknown process inside nested object tell must not be an ERROR; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+        assertEquals(
+            "warning must appear exactly once; descriptions=$descriptions",
+            1,
+            descriptions.count { description ->
+                description == "Process \"$unknownProcessName\" is not known on this macOS installation"
+            },
+        )
+        assertTrue(
+            "warning must explain the local-discovery basis; descriptions=$descriptions",
+            descriptions.contains("Process \"$unknownProcessName\" is not known on this macOS installation"),
+        )
+    }
+
+    fun testUnknownSystemEventsProcessReferenceInsideNestedApplicationTellIsNotHighlighted() {
+        val unknownProcessName = "SyntheticNestedApplicationMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        discovery.addDiscoveredApplicationName("Finder")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "System Events"
+                tell application "Finder"
+                    set value of slider 1 of group 1 of tab group 1 of window 1 of process "$unknownProcessName" to 1
+                end tell
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertFalse(
+            "nested tell application \"Finder\" must override outer System Events; " +
+                "descriptions=$descriptions",
+            descriptions.any { description -> description.contains("not known on this macOS installation") },
+        )
+        assertFalse(
+            "nested tell application \"Finder\" must not get a weak warning; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "nested tell application \"Finder\" must not get an error; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+    }
+
+    fun testKnownSystemEventsProcessReferenceIsNotHighlighted() {
+        val knownProcessName = "SyntheticKnownProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        discovery.addDiscoveredApplicationName(knownProcessName)
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "System Events"
+                set value of slider 1 of group 1 of tab group 1 of window 1 of process "$knownProcessName" to 1
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, knownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertFalse(
+            "known System Events process must not be highlighted as unknown; descriptions=$descriptions",
+            descriptions.any { description -> description.contains("not known on this macOS installation") },
+        )
+        assertFalse(
+            "known System Events process must not get a weak warning; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "known System Events process must not get an error; severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+    }
+
+    fun testSystemEventsProcessInspectionIgnoresDynamicNames() {
+        val dynamicProcessName = "SyntheticDynamicMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            set processReferenceName to "$dynamicProcessName"
+            tell application "System Events"
+                set frontmost of process processReferenceName to true
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processReference = "process processReferenceName"
+        val processReferenceStart =
+            myFixture.editor.document.charsSequence
+                .indexOf(processReference)
+        assertTrue("expected to find '$processReference'", processReferenceStart >= 0)
+        val dynamicNameRange =
+            TextRange(
+                processReferenceStart + "process ".length,
+                processReferenceStart + processReference.length,
+            )
+        val severities =
+            highlights
+                .filter { highlight -> dynamicNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> dynamicNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertFalse(
+            "dynamic process names must not be validated as literal process references; descriptions=$descriptions",
+            descriptions.any { description -> description.contains("not known on this macOS installation") },
+        )
+        assertFalse(
+            "dynamic process names must not get a weak warning; severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "dynamic process names must not get an error; severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+    }
+
+    fun testProcessReferenceOutsideSystemEventsIsNotHighlighted() {
+        val unknownProcessName = "SyntheticOutsideSystemEvents_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("Finder")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "Finder"
+                set targetProcess to process "$unknownProcessName"
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertFalse(
+            "process-like references outside System Events must not be validated; descriptions=$descriptions",
+            descriptions.any { description -> description.contains("not known on this macOS installation") },
+        )
+        assertFalse(
+            "process-like references outside System Events must not get a weak warning; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "process-like references outside System Events must not get an error; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+    }
+
     fun testDatePropertyReferencesUsePropertyHighlighting() {
         val script =
             """

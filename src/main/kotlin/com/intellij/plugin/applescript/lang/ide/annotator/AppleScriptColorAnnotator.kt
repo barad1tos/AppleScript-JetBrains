@@ -7,6 +7,7 @@ import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.intentions.RenameParameterLabelQuickFix
 import com.intellij.plugin.applescript.psi.AppleScriptAppleScriptProperty
+import com.intellij.plugin.applescript.psi.AppleScriptApplicationObjectReference
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
 import com.intellij.plugin.applescript.psi.AppleScriptBuiltInClassIdentifier
 import com.intellij.plugin.applescript.psi.AppleScriptCommandParameterSelector
@@ -19,6 +20,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptExpression
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerCall
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerParameterLabel
 import com.intellij.plugin.applescript.psi.AppleScriptIncompleteExpression
+import com.intellij.plugin.applescript.psi.AppleScriptNameReference
 import com.intellij.plugin.applescript.psi.AppleScriptNumericConstant
 import com.intellij.plugin.applescript.psi.AppleScriptPropertyReference
 import com.intellij.plugin.applescript.psi.AppleScriptReferenceElement
@@ -135,6 +137,16 @@ private object AppleScriptAnnotationSupport {
                     AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
                 )
             is AppleScriptDictionaryConstant -> annotateDictionaryConstant(holder, element)
+            is AppleScriptApplicationObjectReference ->
+                AppleScriptSystemEventsProcessReferenceAnnotator.annotate(
+                    holder,
+                    element,
+                )
+            is AppleScriptNameReference ->
+                AppleScriptSystemEventsProcessReferenceAnnotator.annotate(
+                    holder,
+                    element,
+                )
             is AppleScriptApplicationReference ->
                 AppleScriptApplicationReferenceAnnotator.annotate(
                     holder,
