@@ -107,7 +107,7 @@ internal object GenericFallbackCommandHeadParser {
         builder: PsiBuilder,
         words: List<String>,
     ) {
-        if (words.size == 1 && FallbackCommandParameterParser.isStructuredDirectParameterStart(builder.tokenType)) {
+        if (words.size == 1 && FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder)) {
             builder.putUserData(
                 AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE,
                 FallbackCommandParameterMode.OptionalDirectParameter,
@@ -151,6 +151,7 @@ internal object GenericFallbackCommandHeadParser {
                 isPrepositionOrForStart(tokenType) ||
                     FallbackCommandParameterParser.isValueLiteralStart(tokenType) ||
                     FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder) ||
+                    FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder) ||
                     (
                         allowsPropertyReferenceTail &&
                             FallbackCommandParameterParser.isPropertyReferenceDirectParameterStart(builder)

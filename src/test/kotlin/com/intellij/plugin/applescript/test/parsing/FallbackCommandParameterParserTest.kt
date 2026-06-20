@@ -254,6 +254,32 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertNoParserErrors(psiFile)
     }
 
+    fun testFullParserCloseEveryWindowDirectParameter() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "Finder"
+                    close every window
+                    close some window
+                    close first window
+                    close a reference to every window
+                end tell
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(
+            listOf(
+                "every window",
+                "some window",
+                "first window",
+                "a reference to every window",
+            ),
+            psiFile.node.textsOf(DIRECT_PARAMETER_VAL),
+        )
+    }
+
     fun testFullParserTabTextConstantStillParsesOutsideDictionaryClassPhrase() {
         val psiFile =
             myFixture.configureByText(

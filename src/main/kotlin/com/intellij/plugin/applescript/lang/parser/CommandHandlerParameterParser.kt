@@ -53,6 +53,8 @@ internal object CommandHandlerParameterParser {
                     FallbackCommandParameterMode.OptionalDirectParameter
                 FallbackCommandParameterParser.isPropertyReferenceDirectParameterStart(builder) ->
                     FallbackCommandParameterMode.OptionalDirectParameter
+                FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder) ->
+                    FallbackCommandParameterMode.OptionalDirectParameter
                 FallbackCommandParameterParser.isIdentifierPhraseDirectParameterStart(builder) ->
                     FallbackCommandParameterMode.OptionalDirectParameter
                 isIdentifierExpressionDirectParameterStart(builder) ->
@@ -82,6 +84,7 @@ internal object CommandHandlerParameterParser {
                 FallbackCommandParameterParser.isStructuredDirectParameterStart(builder.tokenType) ||
                     FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder) ||
                     FallbackCommandParameterParser.isPropertyReferenceDirectParameterStart(builder) ||
+                    FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder) ||
                     FallbackCommandParameterParser.isIdentifierPhraseDirectParameterStart(builder) ||
                     isDictionaryParameterSelectorStart(builder, allCommandsWithName)
             )

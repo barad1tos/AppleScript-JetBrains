@@ -90,6 +90,39 @@ internal object FallbackCommandParameterValueBoundaries {
         return isCompleteValue
     }
 
+    fun hasGrammarValueBeforeBoundary(builder: PsiBuilder): Boolean =
+        hasValueBeforeBoundary(builder) { candidateBuilder, level ->
+            AppleScriptParser.arbitraryReference(candidateBuilder, level)
+        } ||
+            hasValueBeforeBoundary(builder) { candidateBuilder, level ->
+                AppleScriptParser.everyRangeReference(candidateBuilder, level)
+            } ||
+            hasValueBeforeBoundary(builder) { candidateBuilder, level ->
+                AppleScriptParser.everyElemReference(candidateBuilder, level)
+            } ||
+            hasValueBeforeBoundary(builder) { candidateBuilder, level ->
+                AppleScriptParser.middleElemReference(candidateBuilder, level)
+            } ||
+            hasValueBeforeBoundary(builder) { candidateBuilder, level ->
+                AppleScriptParser.relativeReference(candidateBuilder, level)
+            } ||
+            hasValueBeforeBoundary(builder) { candidateBuilder, level ->
+                AppleScriptParser.indexReference(candidateBuilder, level)
+            } ||
+            hasValueBeforeBoundary(builder) { candidateBuilder, level ->
+                AppleScriptParser.literalExpression(candidateBuilder, level)
+            }
+
+    private fun hasValueBeforeBoundary(
+        builder: PsiBuilder,
+        parseValue: (PsiBuilder, Int) -> Boolean,
+    ): Boolean {
+        val marker = builder.mark()
+        val hasBoundary = parseValue(builder, 0) && isValueBoundary(builder.tokenType)
+        marker.rollbackTo()
+        return hasBoundary
+    }
+
     fun hasIdentifierPhraseBeforePrepositionSelector(builder: PsiBuilder): Boolean =
         identifierRunLength(builder).let { identifiers ->
             identifiers > 0 &&

@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.lang.parser
 
 import com.intellij.lang.PsiBuilder
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
 internal enum class FallbackCommandParameterMode {
@@ -107,6 +108,10 @@ internal object FallbackCommandParameterParser {
 
     fun isPropertyReferenceDirectParameterStart(builder: PsiBuilder): Boolean =
         FallbackCommandParameterValueBoundaries.hasPropertyReferenceValueBeforeBoundary(builder)
+
+    fun isGrammarValueDirectParameterStart(builder: PsiBuilder): Boolean =
+        builder.tokenType !== VAR_IDENTIFIER &&
+            FallbackCommandParameterValueBoundaries.hasGrammarValueBeforeBoundary(builder)
 
     fun isIdentifierPhraseDirectParameterStart(builder: PsiBuilder): Boolean =
         FallbackCommandParameterValueBoundaries.hasIdentifierPhraseBeforePrepositionSelector(builder)

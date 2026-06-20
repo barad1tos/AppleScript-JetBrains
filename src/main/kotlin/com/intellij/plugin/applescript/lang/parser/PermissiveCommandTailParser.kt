@@ -23,7 +23,7 @@ internal object PermissiveCommandTailParser {
         builder: PsiBuilder,
         level: Int,
     ) {
-        while (!builder.eof() && isPermissiveTailStart(builder.tokenType)) {
+        while (!builder.eof() && isPermissiveTailStart(builder)) {
             val marker = enter_section_(builder, level, _NONE_, "<permissive command parameter>")
             val consumed = consumeParameterChunk(builder, level + 1)
             exit_section_(builder, level, marker, COMMAND_PARAMETER, consumed, false, null)
@@ -49,6 +49,7 @@ internal object PermissiveCommandTailParser {
                 advanced = consumeBracketedValue(builder)
             }
             FallbackCommandParameterTokens.isValueLiteralStart(builder.tokenType) ||
+                FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder) ||
                 builder.tokenType === VAR_IDENTIFIER -> {
                 val before = builder.currentOffset
                 val parsed = AppleScriptParser.expression(builder, level + 1)
@@ -57,7 +58,7 @@ internal object PermissiveCommandTailParser {
                 }
                 advanced = true
             }
-            !advanced && isPermissiveTailStart(builder.tokenType) -> {
+            !advanced && isPermissiveTailStart(builder) -> {
                 builder.advanceLexer()
                 advanced = true
             }
@@ -79,13 +80,16 @@ internal object PermissiveCommandTailParser {
     private fun isObjectReferenceValueStart(builder: PsiBuilder): Boolean =
         builder.tokenType === VAR_IDENTIFIER && builder.lookAhead(1) === OF
 
-    private fun isPermissiveTailStart(tokenType: IElementType?): Boolean =
-        tokenType != null &&
+    private fun isPermissiveTailStart(builder: PsiBuilder): Boolean {
+        val tokenType = builder.tokenType
+        return tokenType != null &&
             tokenType !== NLS &&
             tokenType !== COMMENT &&
             tokenType !== OF &&
             (
                 isPermissiveSelectorWord(tokenType) ||
-                    FallbackCommandParameterTokens.isValueLiteralStart(tokenType)
+                    FallbackCommandParameterTokens.isValueLiteralStart(tokenType) ||
+                    FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder)
             )
+    }
 }
