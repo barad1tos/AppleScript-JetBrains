@@ -241,6 +241,19 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertNoParserErrors(psiFile)
     }
 
+    fun testFullParserSystemEventsPropertyPhraseWithToBeforeAssignmentValue() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "System Events" to set require password to wake of security preferences to true
+                tell application "System Events" to set require password to wake of security preferences to false
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
     fun testFullParserTabTextConstantStillParsesOutsideDictionaryClassPhrase() {
         val psiFile =
             myFixture.configureByText(

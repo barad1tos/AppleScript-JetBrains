@@ -14,6 +14,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.REFERENCE_EXPRESSION
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import java.util.Stack
 
 // Grammar-Kit generates Java code with a static import from this exact parserUtilClass.
@@ -126,13 +127,56 @@ internal object SetObjectPropertyAssignmentParser {
 
     private fun hasObjectPointerBeforeAssignmentTerminator(builder: PsiBuilder): Boolean {
         var offset = 0
-        while (true) {
+        var foundObjectPointer = false
+        var reachedTerminator = false
+
+        while (!foundObjectPointer && !reachedTerminator) {
+            val tokenType = builder.lookAhead(offset)
+            when {
+                tokenType === OF || tokenType === IN -> foundObjectPointer = true
+                tokenType === TO && !isPropertyPhraseContinuationBeforePointer(builder, offset) ->
+                    reachedTerminator = true
+                tokenType === NLS || tokenType == null -> reachedTerminator = true
+            }
+            if (!foundObjectPointer && !reachedTerminator) {
+                offset += 1
+            }
+        }
+
+        return foundObjectPointer
+    }
+
+    private fun isPropertyPhraseContinuationBeforePointer(
+        builder: PsiBuilder,
+        offset: Int,
+    ): Boolean {
+        val nextTokenType = builder.lookAhead(offset + 1)
+        val hasPropertyWordAfterTo =
+            nextTokenType === VAR_IDENTIFIER ||
+                FallbackDictionaryTermPredicates.isContextualPropertyTerm(nextTokenType)
+
+        return offset > 1 &&
+            hasPropertyWordAfterTo &&
+            hasObjectPointerBeforeNextTerminator(builder, offset + 1)
+    }
+
+    private fun hasObjectPointerBeforeNextTerminator(
+        builder: PsiBuilder,
+        startOffset: Int,
+    ): Boolean {
+        var offset = startOffset
+        var foundObjectPointer = false
+        var reachedTerminator = false
+
+        while (!foundObjectPointer && !reachedTerminator) {
             when (builder.lookAhead(offset)) {
-                OF, IN -> return true
-                TO, NLS, null -> return false
+                OF, IN -> foundObjectPointer = true
+                TO, NLS, null -> reachedTerminator = true
                 else -> offset += 1
             }
         }
+
+        return foundObjectPointer
     }
 }
 
