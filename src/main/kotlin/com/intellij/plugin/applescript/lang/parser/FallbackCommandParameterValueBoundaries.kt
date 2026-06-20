@@ -3,6 +3,8 @@ package com.intellij.plugin.applescript.lang.parser
 import com.intellij.lang.PsiBuilder
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMENT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.RCURLY
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
@@ -66,5 +68,7 @@ internal object FallbackCommandParameterValueBoundaries {
         tokenType == null ||
             tokenType === NLS ||
             tokenType === COMMENT ||
+            tokenType === RPAREN ||
+            tokenType === RCURLY ||
             FallbackCommandParameterTokens.isParameterSelectorStart(tokenType)
 }

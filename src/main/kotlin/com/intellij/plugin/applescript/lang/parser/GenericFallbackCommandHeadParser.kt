@@ -10,6 +10,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.FOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
@@ -28,6 +29,7 @@ internal object GenericFallbackCommandHeadParser {
     private val commandEntryPreviousTokens =
         TokenSet.create(
             NLS,
+            LPAREN,
             THEN,
             TO,
         )

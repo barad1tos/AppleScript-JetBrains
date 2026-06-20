@@ -14,6 +14,7 @@ import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.psi.PsiManager
 import com.intellij.psi.xml.XmlFile
+import org.jetbrains.annotations.TestOnly
 import java.io.File
 
 /**
@@ -142,6 +143,11 @@ class AppleScriptProjectDictionaryService(
     fun getDictionary(applicationName: String): ApplicationDictionary? = dictionaryMap[applicationName]
 
     fun getDictionaries(): Collection<ApplicationDictionary> = dictionaryMap.values
+
+    @TestOnly
+    internal fun clearCachedDictionariesForTests() {
+        dictionaryMap.clear()
+    }
 
     companion object {
         private val LOG: Logger = Logger.getInstance("#${AppleScriptProjectDictionaryService::class.java.name}")

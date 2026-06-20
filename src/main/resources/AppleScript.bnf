@@ -275,7 +275,7 @@ private resultList ::= expression
 private offendingObject ::= (referenceExpression &to) | expression
 private expectedType ::= expression
 private errorNumber ::= expression
-private errorMessage ::= expression
+private errorMessage ::= !(number|from|to|partial) expression
 
 tryStatement ::= try sep
                      blockBody?
@@ -291,7 +291,7 @@ varDeclarationListPart ::= identifier
 
 varDeclarationList ::= varAccessDeclaration (COMMA varDeclarationListPart)*
 
-private errorMessageVar ::= directParameterDeclaration|expression
+private errorMessageVar ::= !(number|from|to|partial) (directParameterDeclaration|expression)
 private errorNumberVar ::= directParameterDeclaration|expression
 private offendingObjectVar ::= directParameterDeclaration|expression
 private resultListVar ::= directParameterDeclaration|expression

@@ -49,6 +49,105 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertEquals(listOf("\"Hello\""), psiFile.node.textsOf(DIRECT_PARAMETER_VAL))
     }
 
+    fun testFullParserStandardAdditionsCommandInsideObjectReferenceConsumesListParameters() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set appLaunch to text returned of (display dialog "" default answer "" buttons {"Go"} default button "Go")
+                if appLaunch contains "" then
+                    error number -128
+                end if
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("buttons"))
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("default button"))
+    }
+
+    fun testFullParserErrorNumberBeforeElseIf() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                if applaunch contains "" then
+                    error number -128
+                else if applaunch contains applaunch then
+                    set didMatch to true
+                end if
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
+    fun testFullParserDialogAssignmentBeforeElseIf() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set applaunch to text returned of (display dialog "" default answer "" buttons {"Go"} default button "Go")
+                if applaunch contains "" then
+                    error number -128
+                else if applaunch contains applaunch then
+                    set didMatch to true
+                end if
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
+    fun testFullParserVariableApplicationTellBlock() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application applaunch
+                    quit
+                end tell
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
+    fun testFullParserVariableApplicationTellInsideTry() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                try
+                    tell application applaunch
+                        quit
+                    end tell
+                on error
+                    set didFail to true
+                end try
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
+    fun testFullParserSystemEventsProcessLookupBlock() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "System Events"
+                    set {processList, pidList} to the {name, unix id} of (every process whose name contains applaunch)
+                    if processList contains applaunch then
+                        do shell script "kill -KILL " & pidList
+                    end if
+                end tell
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
     fun testContainingSetOperandEmitsDictionaryClassName() {
         // The `of containing set` operand parses `containing set` as a plural dictionary class
         // identifier. Before this fallback, `containing` parsed as a bare reference and the `set`

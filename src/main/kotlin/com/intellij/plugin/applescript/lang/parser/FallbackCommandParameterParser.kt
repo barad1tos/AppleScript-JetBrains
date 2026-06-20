@@ -57,7 +57,7 @@ internal object FallbackCommandParameterParser {
         val previousFallbackContext =
             builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS)
         // Mark the fallback context before the direct parameter so the generic permissive head cannot
-        // re-engage on a parameter value (`display dialog "Hello" default answer ...`).
+        // re-engage on a command parameter value.
         builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS, true)
         try {
             parseParameterBody(builder, level, state)

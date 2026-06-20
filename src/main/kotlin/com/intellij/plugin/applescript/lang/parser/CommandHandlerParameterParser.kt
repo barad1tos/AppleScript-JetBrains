@@ -5,13 +5,6 @@ import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 
 internal object CommandHandlerParameterParser {
-    private val FALLBACK_FIRST_COMMAND_NAMES: Set<String> =
-        setOf(
-            "choose from list",
-            "make",
-            "write",
-        )
-
     fun parseFallbackOrDictionaryCommandParameters(
         builder: PsiBuilder,
         level: Int,
@@ -20,8 +13,8 @@ internal object CommandHandlerParameterParser {
     ): Boolean =
         if (allCommandsWithName.isEmpty()) {
             parseUnknownCommandParameters(builder, level, parsedCommandName)
-        } else if (isFallbackFirstCommand(parsedCommandName)) {
-            parseFallbackFirstDictionaryCommandParameters(
+        } else if (shouldUseDictionaryBackedFallback(builder, allCommandsWithName)) {
+            parseDictionaryBackedFallbackCommandParameters(
                 builder,
                 level,
                 parsedCommandName,
@@ -73,10 +66,18 @@ internal object CommandHandlerParameterParser {
         }
     }
 
-    private fun isFallbackFirstCommand(commandName: String): Boolean =
-        commandName.lowercase() in FALLBACK_FIRST_COMMAND_NAMES
+    private fun shouldUseDictionaryBackedFallback(
+        builder: PsiBuilder,
+        allCommandsWithName: List<AppleScriptCommand>,
+    ): Boolean =
+        allCommandsWithName.any { command -> command.directParameter != null || command.parameters.isNotEmpty() } &&
+            (
+                FallbackCommandParameterParser.isStructuredDirectParameterStart(builder.tokenType) ||
+                    FallbackCommandParameterParser.isIdentifierPhraseDirectParameterStart(builder) ||
+                    isDictionaryParameterSelectorStart(builder, allCommandsWithName)
+            )
 
-    private fun parseFallbackFirstDictionaryCommandParameters(
+    private fun parseDictionaryBackedFallbackCommandParameters(
         builder: PsiBuilder,
         level: Int,
         parsedCommandName: String,

@@ -78,6 +78,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertNoParserErrors("application_id_reference_min.applescript")
     }
 
+    fun testVariableApplicationTell() {
+        assertNoParserErrors("variable_application_tell.applescript")
+    }
+
     fun testRemoteDesktopTasks() {
         assertNoParserErrors("remote_desktop_task_min.applescript")
     }
