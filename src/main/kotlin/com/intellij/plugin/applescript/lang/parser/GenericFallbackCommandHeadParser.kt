@@ -9,6 +9,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.BY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.IF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
@@ -30,6 +31,7 @@ internal object GenericFallbackCommandHeadParser {
         TokenSet.create(
             NLS,
             LPAREN,
+            IF,
             THEN,
             TO,
         )
@@ -59,9 +61,10 @@ internal object GenericFallbackCommandHeadParser {
     ): Boolean {
         var result = false
         if (isCommandLegalContext(builder)) {
+            val allowsPropertyReferenceTail = allowsPropertyReferenceTail(builder)
             val marker = builder.mark()
             val words = parseHeadWords(builder)
-            if (isAcceptedHead(words, builder)) {
+            if (isAcceptedHead(words, builder, allowsPropertyReferenceTail)) {
                 marker.drop()
                 parsedName.set(words.joinToString(" "))
                 configureParameterParsing(builder, words)
@@ -76,14 +79,26 @@ internal object GenericFallbackCommandHeadParser {
     private fun parseHeadWords(builder: PsiBuilder): List<String> {
         val words = mutableListOf<String>()
         while (builder.tokenType === VAR_IDENTIFIER) {
-            val shouldStartTail =
-                isIdentifierBeforeSelectorStart(builder) ||
-                    isObjectReferenceValueStart(builder)
-            if (words.isNotEmpty() && shouldStartTail) {
+            if (words.isNotEmpty() && isIdentifierCommandTailStart(builder)) {
                 break
             }
             words += builder.tokenText.orEmpty()
             builder.advanceLexer()
+        }
+        if (words.isNotEmpty() && isPrepositionOrForStart(builder.tokenType)) {
+            val marker = builder.mark()
+            val phraseWords = mutableListOf(builder.tokenText.orEmpty())
+            builder.advanceLexer()
+            while (builder.tokenType === VAR_IDENTIFIER) {
+                phraseWords += builder.tokenText.orEmpty()
+                builder.advanceLexer()
+            }
+            if (phraseWords.size > 1 && FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder)) {
+                marker.drop()
+                words += phraseWords
+            } else {
+                marker.rollbackTo()
+            }
         }
         return words
     }
@@ -105,10 +120,11 @@ internal object GenericFallbackCommandHeadParser {
     private fun isAcceptedHead(
         words: List<String>,
         builder: PsiBuilder,
+        allowsPropertyReferenceTail: Boolean,
     ): Boolean =
         words.isNotEmpty() &&
             !isSingleWordCoercionCandidate(words, builder) &&
-            isCommandTailStart(builder)
+            isCommandTailStart(builder, allowsPropertyReferenceTail)
 
     private fun isCommandLegalContext(builder: PsiBuilder): Boolean {
         val isInsideFallbackParameters =
@@ -125,22 +141,36 @@ internal object GenericFallbackCommandHeadParser {
         return previousToken == null || commandEntryPreviousTokens.contains(previousToken)
     }
 
-    private fun isCommandTailStart(builder: PsiBuilder): Boolean {
+    private fun isCommandTailStart(
+        builder: PsiBuilder,
+        allowsPropertyReferenceTail: Boolean,
+    ): Boolean {
         val tokenType = builder.tokenType
         return tokenType != null &&
             (
                 isPrepositionOrForStart(tokenType) ||
                     FallbackCommandParameterParser.isValueLiteralStart(tokenType) ||
-                    isIdentifierBeforeSelectorStart(builder) ||
-                    isObjectReferenceValueStart(builder)
+                    FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder) ||
+                    (
+                        allowsPropertyReferenceTail &&
+                            FallbackCommandParameterParser.isPropertyReferenceDirectParameterStart(builder)
+                    ) ||
+                    isIdentifierCommandTailStart(builder)
             )
     }
 
-    private fun isIdentifierBeforeSelectorStart(builder: PsiBuilder): Boolean =
-        builder.tokenType === VAR_IDENTIFIER && isPrepositionOrForStart(builder.lookAhead(1))
+    private fun allowsPropertyReferenceTail(builder: PsiBuilder): Boolean =
+        AppleScriptParserTrivia.previousNonSpaceToken(builder) !== TO
 
-    private fun isObjectReferenceValueStart(builder: PsiBuilder): Boolean =
-        builder.tokenType === VAR_IDENTIFIER && builder.lookAhead(1) === OF
+    private fun isIdentifierCommandTailStart(builder: PsiBuilder): Boolean {
+        val nextTokenType = builder.lookAhead(1)
+        return builder.tokenType === VAR_IDENTIFIER &&
+            (
+                isPrepositionOrForStart(nextTokenType) ||
+                    nextTokenType === OF ||
+                    FallbackCommandParameterTokens.isExpressionContinuationStart(nextTokenType)
+            )
+    }
 
     private fun isSingleWordCoercionCandidate(
         words: List<String>,

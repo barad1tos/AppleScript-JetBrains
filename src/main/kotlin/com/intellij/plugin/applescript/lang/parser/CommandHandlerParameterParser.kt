@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.lang.parser
 import com.intellij.lang.PsiBuilder
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 
 internal object CommandHandlerParameterParser {
     fun parseFallbackOrDictionaryCommandParameters(
@@ -48,7 +49,13 @@ internal object CommandHandlerParameterParser {
             when {
                 FallbackCommandParameterParser.isStructuredDirectParameterStart(builder.tokenType) ->
                     FallbackCommandParameterMode.OptionalDirectParameter
+                FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder) ->
+                    FallbackCommandParameterMode.OptionalDirectParameter
+                FallbackCommandParameterParser.isPropertyReferenceDirectParameterStart(builder) ->
+                    FallbackCommandParameterMode.OptionalDirectParameter
                 FallbackCommandParameterParser.isIdentifierPhraseDirectParameterStart(builder) ->
+                    FallbackCommandParameterMode.OptionalDirectParameter
+                isIdentifierExpressionDirectParameterStart(builder) ->
                     FallbackCommandParameterMode.OptionalDirectParameter
                 else -> previousMode
             }
@@ -73,9 +80,15 @@ internal object CommandHandlerParameterParser {
         allCommandsWithName.any { command -> command.directParameter != null || command.parameters.isNotEmpty() } &&
             (
                 FallbackCommandParameterParser.isStructuredDirectParameterStart(builder.tokenType) ||
+                    FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder) ||
+                    FallbackCommandParameterParser.isPropertyReferenceDirectParameterStart(builder) ||
                     FallbackCommandParameterParser.isIdentifierPhraseDirectParameterStart(builder) ||
                     isDictionaryParameterSelectorStart(builder, allCommandsWithName)
             )
+
+    private fun isIdentifierExpressionDirectParameterStart(builder: PsiBuilder): Boolean =
+        builder.tokenType === VAR_IDENTIFIER &&
+            FallbackCommandParameterTokens.isExpressionContinuationStart(builder.lookAhead(1))
 
     private fun parseDictionaryBackedFallbackCommandParameters(
         builder: PsiBuilder,

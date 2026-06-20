@@ -102,6 +102,12 @@ internal object FallbackCommandParameterParser {
     fun isStructuredDirectParameterStart(tokenType: IElementType?): Boolean =
         FallbackCommandParameterTokens.isStructuredDirectParameterStart(tokenType)
 
+    fun isBuiltInClassDirectParameterStart(builder: PsiBuilder): Boolean =
+        FallbackCommandParameterValueBoundaries.hasBuiltInClassValueBeforeBoundary(builder)
+
+    fun isPropertyReferenceDirectParameterStart(builder: PsiBuilder): Boolean =
+        FallbackCommandParameterValueBoundaries.hasPropertyReferenceValueBeforeBoundary(builder)
+
     fun isIdentifierPhraseDirectParameterStart(builder: PsiBuilder): Boolean =
         FallbackCommandParameterValueBoundaries.hasIdentifierPhraseBeforePrepositionSelector(builder)
 

@@ -86,6 +86,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertNoParserErrors("top_level_end_after_conditional_launcher.applescript")
     }
 
+    fun testDelayIdentifierArithmeticDirectParameter() {
+        assertNoParserErrors("delay_identifier_arithmetic_direct_parameter.applescript")
+    }
+
     fun testRemoteDesktopTasks() {
         assertNoParserErrors("remote_desktop_task_min.applescript")
     }

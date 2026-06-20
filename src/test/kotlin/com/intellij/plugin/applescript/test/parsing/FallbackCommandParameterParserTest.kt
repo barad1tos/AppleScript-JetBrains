@@ -148,6 +148,112 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertNoParserErrors(psiFile)
     }
 
+    fun testFullParserSystemEventsExistsFileCondition() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "System Events"
+                    if exists file pauseFilePath then
+                        delete file pauseFilePath
+                    end if
+                end tell
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
+    fun testFullParserNestedTellTryHandlerWithFileCommands() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                on run
+                    set logMessages to ""
+                    set now to current date
+
+                    try
+                        tell application "System Events"
+                            if exists file pauseFilePath then
+                                try
+                                    set pauseContent to read file pauseFilePath
+                                    set pauseUntil to my parsePauseDate(pauseContent)
+
+                                    if now < pauseUntil then
+                                        set logMessages to logMessages & "Script is paused until " & (my formatDate(pauseUntil)) & return
+                                        my appendToFile(logFilePath, logMessages)
+                                        return logMessages
+                                    else
+                                        delete file pauseFilePath
+                                    end if
+                                on error errMsg
+                                    set logMessages to logMessages & "Error reading pause file: " & errMsg & return
+                                end try
+                            end if
+                        end tell
+
+                        set logMessages to logMessages & "Script ended at " & (my formatDate(current date)) & return
+                        my appendToFile(logFilePath, logMessages)
+                        return logMessages
+                    on error errorMessage
+                        set logMessages to logMessages & "Error: " & errorMessage & return
+                        display dialog "Unexpected Error: " & errorMessage buttons {"OK"} default button "OK"
+                    end try
+
+                    return logMessages
+                end run
+
+                on appendToFile(filePath, contents)
+                    try
+                        set fileHandle to open for access file filePath with write permission
+                        write contents to fileHandle starting at eof
+                        close access fileHandle
+                    on error
+                        try
+                            close access file filePath
+                        end try
+                    end try
+                end appendToFile
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
+    fun testFullParserSystemSettingsUiScriptingSpecifier() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "System Settings"
+                    activate
+                    reveal anchor "displaysDisplayTab" of pane id "com.apple.preference.displays"
+                    tell application "System Events"
+                        delay 1
+                        set value of slider 1 of group 1 of tab group 1 of window 1 of process "System Preferences" to 1
+                    end tell
+                    quit
+                end tell
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
+    fun testFullParserTabTextConstantStillParsesOutsideDictionaryClassPhrase() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set tabText to tab
+                set joinedText to tab & "value"
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+    }
+
     fun testContainingSetOperandEmitsDictionaryClassName() {
         // The `of containing set` operand parses `containing set` as a plural dictionary class
         // identifier. Before this fallback, `containing` parsed as a bare reference and the `set`
@@ -371,6 +477,40 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("starting at"))
     }
 
+    fun testStandardAdditionsWriteStartingAtSelectorWithIdentifierDirectParameter() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "write contents to fileHandle starting at eof",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("starting at"))
+    }
+
+    fun testStandardAdditionsOpenForAccessAcceptsFileDirectParameterWithSelector() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "set pauseFile to open for access file pauseFilePath with write permission",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("file pauseFilePath"), psiFile.node.textsOf(DIRECT_PARAMETER_VAL))
+        assertEquals(listOf("with write permission"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testStandardAdditionsCloseAccessAcceptsFileDirectParameter() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                "close access file filePath",
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(listOf("file filePath"), psiFile.node.textsOf(DIRECT_PARAMETER_VAL))
+    }
+
     fun testChooseFromListDefaultItemsAndMultipleSelectionsSelector() {
         val psiFile =
             myFixture.configureByText(
@@ -382,6 +522,21 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
 
         assertNoParserErrors(psiFile)
         assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("default items"))
+    }
+
+    fun testFullParserChooseFileAssignmentAcceptsLabeledParameters() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set applic to choose file with prompt "Choose Application" default location "/Applications"
+                set applic to POSIX path of applic
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("with prompt"))
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("default location"))
     }
 
     fun testPermissiveParameterAcceptsConstantValues() {
@@ -510,6 +665,23 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
 
         assertEquals(listOf("1 + upperLimit"), ast.textsOf(DIRECT_PARAMETER_VAL))
         assertEquals(listOf("from", "to"), ast.textsOf(COMMAND_PARAMETER_SELECTOR))
+    }
+
+    fun testDictionaryNumberDirectParameterKeepsIdentifierExpression() {
+        val builder = createBuilder("hhour * danswer")
+        val command =
+            dictionaryCommand(
+                name = "delay",
+                directParameterType = "number",
+                parameters = emptyList(),
+            )
+
+        val ast =
+            parseWithRootSection(builder) {
+                DictionaryCommandParameterParser.parseParametersForCommand(builder, 0, command)
+            }
+
+        assertEquals(listOf("hhour * danswer"), ast.textsOf(DIRECT_PARAMETER_VAL))
     }
 
     fun testDictionaryBracketedDirectParameterKeepsExpressionPsiBeforeSelector() {

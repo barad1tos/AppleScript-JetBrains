@@ -30,6 +30,14 @@ internal object FallbackDirectParameterParser {
         level: Int,
     ): Boolean =
         parseCompleteNumberLiteral(builder, level + 1) ||
+            FallbackCommandParameterValueBoundaries.parseBuiltInClassValueBeforeBoundary(
+                builder,
+                level + 1,
+            ) ||
+            FallbackCommandParameterValueBoundaries.parsePropertyReferenceValueBeforeBoundary(
+                builder,
+                level + 1,
+            ) ||
             FallbackCommandParameterValueBoundaries.consumeIdentifierPhraseBeforePrepositionSelector(builder) ||
             FallbackCommandParameterValueBoundaries.parseExpressionAtValueBoundary(builder, level + 1) ||
             parseStructuredBracketFallback(builder)

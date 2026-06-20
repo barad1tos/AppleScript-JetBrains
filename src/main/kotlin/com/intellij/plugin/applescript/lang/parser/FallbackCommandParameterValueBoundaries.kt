@@ -1,14 +1,80 @@
 package com.intellij.plugin.applescript.lang.parser
 
 import com.intellij.lang.PsiBuilder
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_PROPERTY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMENT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RCURLY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.THEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
 internal object FallbackCommandParameterValueBoundaries {
+    fun hasBuiltInClassValueBeforeBoundary(builder: PsiBuilder): Boolean {
+        val marker = builder.mark()
+        val parsed = AppleScriptParser.builtInClassIdentifier(builder, 0)
+        val hasBoundary =
+            parsed &&
+                (
+                    isBuiltInClassValueBoundary(builder.tokenType) ||
+                        (
+                            AppleScriptParser.expression(builder, 0) &&
+                                isBuiltInClassValueBoundary(builder.tokenType)
+                        )
+                )
+        marker.rollbackTo()
+        return hasBoundary
+    }
+
+    fun parseBuiltInClassValueBeforeBoundary(
+        builder: PsiBuilder,
+        level: Int,
+    ): Boolean {
+        val marker = builder.mark()
+        val parsed = AppleScriptParser.builtInClassIdentifier(builder, level + 1)
+        val isCompleteValue =
+            parsed &&
+                (
+                    isBuiltInClassValueBoundary(builder.tokenType) ||
+                        (
+                            AppleScriptParser.expression(builder, level + 1) &&
+                                isBuiltInClassValueBoundary(builder.tokenType)
+                        )
+                )
+        if (isCompleteValue) {
+            marker.drop()
+        } else {
+            marker.rollbackTo()
+        }
+        return isCompleteValue
+    }
+
+    fun hasPropertyReferenceValueBeforeBoundary(builder: PsiBuilder): Boolean {
+        if (builder.tokenType !== BUILT_IN_PROPERTY) return false
+        val marker = builder.mark()
+        val parsed = AppleScriptParser.propertyReference(builder, 0)
+        val hasBoundary = parsed && isPropertyReferenceValueBoundary(builder.tokenType)
+        marker.rollbackTo()
+        return hasBoundary
+    }
+
+    fun parsePropertyReferenceValueBeforeBoundary(
+        builder: PsiBuilder,
+        level: Int,
+    ): Boolean {
+        if (builder.tokenType !== BUILT_IN_PROPERTY) return false
+        val marker = builder.mark()
+        val parsed = AppleScriptParser.propertyReference(builder, level + 1)
+        val isCompleteValue = parsed && isPropertyReferenceValueBoundary(builder.tokenType)
+        if (isCompleteValue) {
+            marker.drop()
+        } else {
+            marker.rollbackTo()
+        }
+        return isCompleteValue
+    }
+
     fun parseExpressionAtValueBoundary(
         builder: PsiBuilder,
         level: Int,
@@ -70,5 +136,18 @@ internal object FallbackCommandParameterValueBoundaries {
             tokenType === COMMENT ||
             tokenType === RPAREN ||
             tokenType === RCURLY ||
+            tokenType === THEN ||
             FallbackCommandParameterTokens.isParameterSelectorStart(tokenType)
+
+    private fun isBuiltInClassValueBoundary(tokenType: IElementType?): Boolean =
+        tokenType == null ||
+            tokenType === NLS ||
+            tokenType === COMMENT ||
+            tokenType === RPAREN ||
+            tokenType === RCURLY ||
+            tokenType === THEN ||
+            FallbackCommandParameterTokens.isPrepositionParameterStart(tokenType)
+
+    private fun isPropertyReferenceValueBoundary(tokenType: IElementType?): Boolean =
+        FallbackCommandParameterTokens.isParameterSelectorStart(tokenType)
 }

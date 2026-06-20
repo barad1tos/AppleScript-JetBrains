@@ -92,7 +92,10 @@ internal object DictionaryDirectParameterParser {
         val marker = enter_section_(builder, level, _NONE_, "<parse Command Direct Parameter Value >")
         var result = parseTypedValue(builder, level + 1, parameter.typeSpecifier)
         if (!result) {
-            result = AppleScriptParser.expression(builder, level + 1)
+            result = FallbackCommandParameterValueBoundaries.parseBuiltInClassValueBeforeBoundary(builder, level + 1)
+        }
+        if (!result) {
+            result = AppleScriptGeneratedParserUtil.parseCommandParametersExpression(builder, level + 1)
         }
         if (!result) {
             result = parseBracketedDirectValueBeforeSelector(builder)
