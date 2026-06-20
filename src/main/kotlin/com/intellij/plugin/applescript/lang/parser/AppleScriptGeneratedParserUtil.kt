@@ -6,7 +6,9 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.Ref
 import com.intellij.plugin.applescript.AppleScriptNames
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMENT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_COMMAND_NAME
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.END
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
@@ -300,12 +302,33 @@ open class AppleScriptGeneratedParserFlowHooks : AppleScriptGeneratedParserComma
         ): Boolean = UseStatementParser.parseApplicationName(builder, level, tellStatementStartCondition)
 
         @JvmStatic
+        fun parseTopLevelEnd(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean =
+            recursion_guard_(builder, level, "parseTopLevelEnd") &&
+                builder.tokenType === END &&
+                isTopLevelEndTerminator(builder) &&
+                consumeToken(builder, END)
+
+        @JvmStatic
         fun isTellStatementStart(
             builder: PsiBuilder,
             level: Int,
         ): Boolean =
             recursion_guard_(builder, level, "isTellStatementStart") &&
                 TellStatementParser.isTellStatementStart(builder)
+    }
+}
+
+private fun isTopLevelEndTerminator(builder: PsiBuilder): Boolean {
+    var offset = 1
+    while (true) {
+        when (builder.lookAhead(offset)) {
+            null -> return true
+            COMMENT, NLS -> offset += 1
+            else -> return false
+        }
     }
 }
 

@@ -82,6 +82,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertNoParserErrors("variable_application_tell.applescript")
     }
 
+    fun testTopLevelEndAfterConditionalLauncher() {
+        assertNoParserErrors("top_level_end_after_conditional_launcher.applescript")
+    }
+
     fun testRemoteDesktopTasks() {
         assertNoParserErrors("remote_desktop_task_min.applescript")
     }

@@ -189,7 +189,7 @@
 
 appleScriptFile ::= compilation_unit_*
 
-private compilation_unit_ ::= topBlockBodyPart|sep
+private compilation_unit_ ::= <<parseTopLevelEnd>>|topBlockBodyPart|sep
 
 private topBlockBodyPart ::= topLevelStatement | statement | expression | incompleteExpression
 {recoverWhile=topBodyPartRecover}

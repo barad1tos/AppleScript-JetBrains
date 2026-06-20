@@ -1029,12 +1029,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // topBlockBodyPart|sep
+  // <<parseTopLevelEnd>>|topBlockBodyPart|sep
   static boolean compilation_unit_(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "compilation_unit_")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = topBlockBodyPart(builder_, level_ + 1);
+    result_ = parseTopLevelEnd(builder_, level_ + 1);
+    if (!result_) result_ = topBlockBodyPart(builder_, level_ + 1);
     if (!result_) result_ = sep(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
