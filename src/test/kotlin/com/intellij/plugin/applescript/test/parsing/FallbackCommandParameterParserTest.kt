@@ -539,6 +539,21 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("default location"))
     }
 
+    fun testFullParserChooseFileAcceptsOfTypeListParameter() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set ffile to (choose file with prompt "Get contents from..." of type {"txt", "md", "markdown", "rtf"})
+                set ffcont to read ffile
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("with prompt"))
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("of type"))
+    }
+
     fun testPermissiveParameterAcceptsConstantValues() {
         val psiFile =
             myFixture.configureByText(

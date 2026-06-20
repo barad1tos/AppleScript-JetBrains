@@ -8,7 +8,9 @@ import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_TYPE_S
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.TYPE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
 
@@ -18,12 +20,13 @@ internal object FallbackCommandSelectorParser {
         level: Int,
     ) {
         var shouldContinue = true
-        while (shouldContinue &&
-            (
-                FallbackCommandParameterTokens.isPrepositionParameterStart(builder.tokenType) ||
+        while (shouldContinue) {
+            val isParameterStart =
+                builder.tokenType === OF ||
+                    FallbackCommandParameterTokens.isPrepositionParameterStart(builder.tokenType) ||
                     builder.tokenType === VAR_IDENTIFIER
-            )
-        ) {
+            if (!isParameterStart) break
+
             val marker = enter_section_(builder, level, _NONE_, "<fallback command parameter>")
             val result =
                 parseParameterSelector(builder, level + 1) &&
@@ -36,10 +39,21 @@ internal object FallbackCommandSelectorParser {
     fun parseSelectorTokens(builder: PsiBuilder): Boolean =
         when {
             parseDictionarySelectorTokens(builder) -> true
-            FallbackCommandParameterTokens.isPrepositionParameterStart(builder.tokenType) -> {
+            builder.tokenType === OF ||
+                FallbackCommandParameterTokens.isPrepositionParameterStart(builder.tokenType) -> {
                 val selectorStart = builder.tokenType
                 builder.advanceLexer()
-                if (selectorStart === WITH && builder.tokenType === VAR_IDENTIFIER) {
+                val hasSelectorLabel =
+                    (
+                        builder.tokenType === VAR_IDENTIFIER ||
+                            builder.tokenType === BUILT_IN_TYPE_S ||
+                            builder.tokenType === TYPE
+                    ) &&
+                        (
+                            selectorStart === WITH ||
+                                FallbackCommandParameterTokens.isValueLiteralStart(builder.lookAhead(1))
+                        )
+                if (hasSelectorLabel) {
                     builder.advanceLexer()
                 }
                 true
@@ -68,7 +82,10 @@ internal object FallbackCommandSelectorParser {
     private fun parseSimpleLiteralValueBeforeSelector(builder: PsiBuilder): Boolean {
         val isBoundedLiteral =
             builder.tokenType === STRING_LITERAL &&
-                FallbackCommandParameterTokens.isParameterSelectorStart(builder.lookAhead(1))
+                (
+                    builder.lookAhead(1) === OF ||
+                        FallbackCommandParameterTokens.isParameterSelectorStart(builder.lookAhead(1))
+                )
         if (isBoundedLiteral) {
             builder.advanceLexer()
         }
