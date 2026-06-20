@@ -4,8 +4,10 @@ import com.intellij.lang.annotation.AnnotationHolder
 import com.intellij.lang.annotation.Annotator
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.plugin.applescript.lang.AppleScriptComponentType
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.intentions.RenameParameterLabelQuickFix
+import com.intellij.plugin.applescript.lang.parser.DictionaryCommandRegistry
 import com.intellij.plugin.applescript.psi.AppleScriptAppleScriptProperty
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationObjectReference
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
@@ -23,7 +25,11 @@ import com.intellij.plugin.applescript.psi.AppleScriptIncompleteExpression
 import com.intellij.plugin.applescript.psi.AppleScriptNameReference
 import com.intellij.plugin.applescript.psi.AppleScriptNumericConstant
 import com.intellij.plugin.applescript.psi.AppleScriptPropertyReference
+import com.intellij.plugin.applescript.psi.AppleScriptRawClassExpression
 import com.intellij.plugin.applescript.psi.AppleScriptReferenceElement
+import com.intellij.plugin.applescript.psi.AppleScriptReferenceExpression
+import com.intellij.plugin.applescript.psi.AppleScriptSimpleFormalParameter
+import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
 import com.intellij.plugin.applescript.psi.AppleScriptTokenTypesSets.HANDLER_PARAMETER_LABELS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.HANDLER_LABELED_PARAMETERS_CALL_EXPRESSION
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.HANDLER_LABELED_PARAMETERS_DEFINITION
@@ -32,6 +38,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.THE_KW
 import com.intellij.psi.PsiElement
 import com.intellij.psi.util.PsiTreeUtil
 
@@ -100,18 +107,22 @@ private object AppleScriptAnnotationSupport {
         element: PsiElement,
         holder: AnnotationHolder,
     ) {
+        annotateDictionaryTermColor(element, holder)
+        annotateLocalSymbolColor(element, holder)
+        annotateApplicationReferenceColor(element, holder)
+        if (element is AppleScriptIncompleteExpression) {
+            annotateIncompleteExpression(holder, element)
+        }
+    }
+
+    private fun annotateDictionaryTermColor(
+        element: PsiElement,
+        holder: AnnotationHolder,
+    ) {
         when (element) {
             is AppleScriptNumericConstant,
             is AppleScriptPropertyReference,
-            -> {
-                if (AppleScriptAnnotationPredicates.isDatePropertyReferenceTerm(element)) {
-                    createInfoAnnotation(
-                        holder,
-                        element,
-                        AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
-                    )
-                }
-            }
+            -> annotateDatePropertyReferenceTerm(holder, element)
             is AppleScriptDictionaryCommandName ->
                 createInfoAnnotation(
                     holder,
@@ -127,6 +138,7 @@ private object AppleScriptAnnotationSupport {
             is AppleScriptDictionaryClassName,
             is AppleScriptDictionaryClassIdentifierPlural,
             is AppleScriptBuiltInClassIdentifier,
+            is AppleScriptRawClassExpression,
             -> annotateClassTerm(holder, element)
             is AppleScriptAppleScriptProperty,
             is AppleScriptDictionaryPropertyName,
@@ -136,13 +148,61 @@ private object AppleScriptAnnotationSupport {
                     element,
                     AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
                 )
+            is AppleScriptReferenceExpression -> annotateReferenceExpressionColor(holder, element)
             is AppleScriptDictionaryConstant -> annotateDictionaryConstant(holder, element)
-            is AppleScriptApplicationObjectReference ->
-                AppleScriptSystemEventsProcessReferenceAnnotator.annotate(
-                    holder,
-                    element,
-                )
-            is AppleScriptNameReference ->
+        }
+    }
+
+    private fun annotateDatePropertyReferenceTerm(
+        holder: AnnotationHolder,
+        element: PsiElement,
+    ) {
+        if (AppleScriptAnnotationPredicates.isDatePropertyReferenceTerm(element)) {
+            createInfoAnnotation(
+                holder,
+                element,
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
+            )
+        }
+    }
+
+    private fun annotateLocalSymbolColor(
+        element: PsiElement,
+        holder: AnnotationHolder,
+    ) {
+        when (element) {
+            is AppleScriptTargetVariable ->
+                createInfoAnnotation(holder, element.getIdentifier(), AppleScriptSyntaxHighlighterColors.VARIABLE)
+            is AppleScriptSimpleFormalParameter ->
+                createInfoAnnotation(holder, element.getIdentifier(), AppleScriptSyntaxHighlighterColors.VARIABLE)
+        }
+    }
+
+    private fun annotateReferenceExpressionColor(
+        holder: AnnotationHolder,
+        element: AppleScriptReferenceExpression,
+    ) {
+        val attributeKey =
+            when {
+                AppleScriptAnnotationPredicates.isStandardDeterminerCommandReference(element) ->
+                    AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR
+                AppleScriptAnnotationPredicates.isResolvedLocalSymbolReference(element) ->
+                    AppleScriptSyntaxHighlighterColors.VARIABLE
+                else -> null
+            }
+        if (attributeKey != null) {
+            createInfoAnnotation(holder, element, attributeKey)
+        }
+    }
+
+    private fun annotateApplicationReferenceColor(
+        element: PsiElement,
+        holder: AnnotationHolder,
+    ) {
+        when (element) {
+            is AppleScriptApplicationObjectReference,
+            is AppleScriptNameReference,
+            ->
                 AppleScriptSystemEventsProcessReferenceAnnotator.annotate(
                     holder,
                     element,
@@ -153,7 +213,6 @@ private object AppleScriptAnnotationSupport {
                     element,
                     false,
                 )
-            is AppleScriptIncompleteExpression -> annotateIncompleteExpression(holder, element)
         }
     }
 
@@ -286,6 +345,23 @@ private object AppleScriptAnnotationPredicates {
     fun isMyPositionalHandlerCallName(element: AppleScriptReferenceElement): Boolean =
         PsiTreeUtil.prevVisibleLeaf(element)?.node?.elementType === MY &&
             PsiTreeUtil.nextVisibleLeaf(element)?.node?.elementType === LPAREN
+
+    fun isStandardDeterminerCommandReference(element: AppleScriptReferenceExpression): Boolean {
+        val previousLeaf = PsiTreeUtil.prevVisibleLeaf(element)
+        val commandName =
+            if (previousLeaf?.node?.elementType === THE_KW) {
+                "${previousLeaf.text} ${element.text}"
+            } else {
+                return false
+            }
+        return DictionaryCommandRegistry.isStdCommand(commandName)
+    }
+
+    fun isResolvedLocalSymbolReference(element: AppleScriptReferenceExpression): Boolean =
+        AppleScriptComponentType.typeOf(element.reference.resolve()).let { componentType ->
+            componentType == AppleScriptComponentType.VARIABLE ||
+                componentType == AppleScriptComponentType.PARAMETER
+        }
 
     private fun isPropertyReferenceOperator(element: PsiElement?): Boolean =
         element?.node?.elementType.let { elementType ->

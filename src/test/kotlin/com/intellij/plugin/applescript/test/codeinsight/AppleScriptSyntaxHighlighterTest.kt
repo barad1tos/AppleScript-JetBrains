@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.test.codeinsight
 
 import com.intellij.openapi.editor.DefaultLanguageHighlighterColors
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighter
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GT
@@ -20,22 +21,49 @@ class AppleScriptSyntaxHighlighterTest : BasePlatformTestCase() {
         assertHighlightName(highlighter, INTEGER, "APPLE_SCRIPT_BUILT_IN_TYPE")
     }
 
-    fun testDictionarySelectorAndConstantUseDistinctFallbackHighlighting() {
-        val selectorFallback = AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR.fallbackAttributeKey
-        val constantFallback = AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR.fallbackAttributeKey
+    fun testDictionaryRolesUseThemeAwareFallbacks() {
+        assertFallback(
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+            DefaultLanguageHighlighterColors.FUNCTION_CALL,
+        )
+        assertFallback(
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+            DefaultLanguageHighlighterColors.KEYWORD,
+        )
+        assertFallback(
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR,
+            DefaultLanguageHighlighterColors.CLASS_NAME,
+        )
+        assertFallback(
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR,
+            DefaultLanguageHighlighterColors.INSTANCE_FIELD,
+        )
+        assertFallback(
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR,
+            DefaultLanguageHighlighterColors.CONSTANT,
+        )
+    }
 
-        assertTrue(
-            "dictionary command selector should inherit keyword highlighting by default",
-            selectorFallback === DefaultLanguageHighlighterColors.KEYWORD,
-        )
-        assertTrue(
-            "dictionary constant should keep constant highlighting by default",
-            constantFallback === DefaultLanguageHighlighterColors.CONSTANT,
-        )
-        assertTrue(
-            "dictionary selector and constant fallbacks must stay visually distinguishable by default",
-            selectorFallback !== constantFallback,
-        )
+    fun testCoreRolesUseThemeAwareFallbacks() {
+        val expectedFallbacks =
+            mapOf(
+                AppleScriptSyntaxHighlighterColors.KEYWORD to DefaultLanguageHighlighterColors.KEYWORD,
+                AppleScriptSyntaxHighlighterColors.LOGICAL_OPERATOR to DefaultLanguageHighlighterColors.OPERATION_SIGN,
+                AppleScriptSyntaxHighlighterColors.COMPARISON_OPERATOR to
+                    DefaultLanguageHighlighterColors.OPERATION_SIGN,
+                AppleScriptSyntaxHighlighterColors.LANGUAGE_LITERAL to DefaultLanguageHighlighterColors.CONSTANT,
+                AppleScriptSyntaxHighlighterColors.BUILT_IN_TYPE to DefaultLanguageHighlighterColors.CLASS_NAME,
+                AppleScriptSyntaxHighlighterColors.HANDLER_CALL to DefaultLanguageHighlighterColors.FUNCTION_CALL,
+                AppleScriptSyntaxHighlighterColors.VARIABLE to DefaultLanguageHighlighterColors.LOCAL_VARIABLE,
+                AppleScriptSyntaxHighlighterColors.STRING to DefaultLanguageHighlighterColors.STRING,
+                AppleScriptSyntaxHighlighterColors.NUMBER to DefaultLanguageHighlighterColors.NUMBER,
+                AppleScriptSyntaxHighlighterColors.OPERATION_SIGN to DefaultLanguageHighlighterColors.OPERATION_SIGN,
+                AppleScriptSyntaxHighlighterColors.COMMENT to DefaultLanguageHighlighterColors.LINE_COMMENT,
+            )
+
+        for ((key, fallbackKey) in expectedFallbacks) {
+            assertFallback(key, fallbackKey)
+        }
     }
 
     private fun assertHighlightName(
@@ -51,6 +79,16 @@ class AppleScriptSyntaxHighlighterTest : BasePlatformTestCase() {
         assertTrue(
             "$tokenType should include $expectedExternalName; actual keys=$actualNames",
             expectedExternalName in actualNames,
+        )
+    }
+
+    private fun assertFallback(
+        key: TextAttributesKey,
+        expectedFallback: TextAttributesKey,
+    ) {
+        assertTrue(
+            "${key.externalName} must inherit from ${expectedFallback.externalName}",
+            key.fallbackAttributeKey === expectedFallback,
         )
     }
 }

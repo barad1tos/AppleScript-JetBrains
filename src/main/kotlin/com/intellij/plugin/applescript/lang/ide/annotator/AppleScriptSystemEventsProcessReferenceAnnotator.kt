@@ -37,15 +37,10 @@ internal object AppleScriptSystemEventsProcessReferenceAnnotator {
 
     fun annotate(
         holder: AnnotationHolder,
-        reference: AppleScriptApplicationObjectReference,
+        reference: PsiElement,
     ) {
-        annotateInternal(holder, reference)
-    }
+        if (reference !is AppleScriptApplicationObjectReference && reference !is AppleScriptNameReference) return
 
-    fun annotate(
-        holder: AnnotationHolder,
-        reference: AppleScriptNameReference,
-    ) {
         annotateInternal(holder, reference)
     }
 

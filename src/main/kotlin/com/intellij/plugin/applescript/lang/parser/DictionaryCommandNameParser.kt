@@ -41,23 +41,23 @@ internal object DictionaryCommandNameParser {
                 applicationName,
                 parsedName.get(),
             )
-        var nextTokenText = parsedName.get()
         while (builder.tokenText != null && commandWithPrefixExists) {
             builder.advanceLexer()
-            nextTokenText += " ${builder.tokenText}"
-            commandWithPrefixExists =
-                DictionaryCommandRegistry.isCommandWithPrefixExist(
-                    applicationName,
-                    nextTokenText,
-                )
+            val nextCommandName = nextCommandName(parsedName.get(), builder.tokenText)
+            commandWithPrefixExists = nextCommandName != null &&
+                DictionaryCommandRegistry.isCommandWithPrefixExist(applicationName, nextCommandName)
             if (commandWithPrefixExists) {
-                parsedName.set(nextTokenText)
+                parsedName.set(nextCommandName)
             } else if (DictionaryCommandRegistry.isApplicationCommand(applicationName, parsedName.get())) {
                 result =
+                    nextCommandName == null ||
                     !shouldCheckStandardLibrary ||
-                    !DictionaryCommandRegistry.isStdCommandWithPrefixExist(nextTokenText)
+                    !DictionaryCommandRegistry.isStdCommandWithPrefixExist(nextCommandName)
                 result = result &&
-                    !DictionaryClassRegistry.isClassWithPrefixExist(applicationName, nextTokenText)
+                    (
+                        nextCommandName == null ||
+                            !DictionaryClassRegistry.isClassWithPrefixExist(applicationName, nextCommandName)
+                    )
                 break
             }
         }
@@ -132,13 +132,13 @@ internal object DictionaryCommandNameParser {
         parsedName.set(builder.tokenText ?: "")
         val marker = enter_section_(builder)
         var commandWithPrefixExists = DictionaryCommandRegistry.isStdCommandWithPrefixExist(parsedName.get())
-        var nextTokenText = parsedName.get()
         while (builder.tokenText != null && commandWithPrefixExists) {
             builder.advanceLexer()
-            nextTokenText += " ${builder.tokenText}"
-            commandWithPrefixExists = DictionaryCommandRegistry.isStdCommandWithPrefixExist(nextTokenText)
+            val nextCommandName = nextCommandName(parsedName.get(), builder.tokenText)
+            commandWithPrefixExists = nextCommandName != null &&
+                DictionaryCommandRegistry.isStdCommandWithPrefixExist(nextCommandName)
             if (commandWithPrefixExists) {
-                parsedName.set(nextTokenText)
+                parsedName.set(nextCommandName)
             } else if (DictionaryCommandRegistry.isStdCommand(parsedName.get())) {
                 result = true
                 break
@@ -147,4 +147,9 @@ internal object DictionaryCommandNameParser {
         exit_section_(builder, marker, null, result)
         return result
     }
+
+    private fun nextCommandName(
+        parsedName: String,
+        nextTokenText: String?,
+    ): String? = nextTokenText?.let { tokenText -> "$parsedName $tokenText" }
 }

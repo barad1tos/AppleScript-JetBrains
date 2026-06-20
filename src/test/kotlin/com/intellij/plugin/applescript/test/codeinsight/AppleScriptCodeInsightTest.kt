@@ -616,6 +616,100 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         )
     }
 
+    fun testClipboardFileCommandsUseSemanticHighlighting() {
+        val script =
+            """
+            set d to the clipboard as «class utf8»
+            set fn to choose file name
+            set fid to open for access fn with write permission
+            write d to fid
+            close access fid
+            """.trimIndent()
+
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Standard dictionaries were not initialized",
+            { registryService.isInitialized() },
+            10,
+        )
+        myFixture.configureByText(AppleScriptFileType, script)
+        val highlights = myFixture.doHighlighting()
+        val document = myFixture.editor.document
+
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "the clipboard",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "choose file name",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "open for access",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "write d to fid",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "close access",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "with write",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "«class utf8»",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "set d",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "set fn",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "set fid",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "write d",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "close access fid",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+    }
+
     fun testMyHandlerCallUsesFunctionHighlighting() {
         val script =
             """
@@ -753,6 +847,19 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     ): Set<String> =
         highlightingKeysFor(highlights, textRange)
             .mapTo(mutableSetOf()) { key -> key.externalName }
+
+    private fun assertHighlightingKeysContain(
+        highlights: List<HighlightInfo>,
+        document: Document,
+        text: String,
+        expectedKey: TextAttributesKey,
+    ) {
+        val keys = highlightingKeysFor(highlights, textRangeFor(document, text))
+        assertTrue(
+            "$text must use ${expectedKey.externalName}; keys=$keys",
+            keys.contains(expectedKey),
+        )
+    }
 
     private fun textRangeFor(
         document: Document,
