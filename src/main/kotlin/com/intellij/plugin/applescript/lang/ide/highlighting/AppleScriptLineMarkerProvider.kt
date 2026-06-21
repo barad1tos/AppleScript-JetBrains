@@ -4,9 +4,12 @@ import com.intellij.codeInsight.daemon.RelatedItemLineMarkerInfo
 import com.intellij.codeInsight.daemon.RelatedItemLineMarkerProvider
 import com.intellij.codeInsight.navigation.NavigationGutterIconBuilder
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
 import com.intellij.psi.PsiElement
+import com.intellij.psi.impl.FakePsiElement
 import com.intellij.psi.util.PsiTreeUtil
+import javax.swing.Icon
 
 class AppleScriptLineMarkerProvider : RelatedItemLineMarkerProvider() {
     override fun collectNavigationMarkers(
@@ -26,13 +29,15 @@ private fun AppleScriptApplicationReference.createApplicationDictionaryMarker():
     val dictionary =
         getApplicationName()
             ?.takeUnless(String::isEmpty)
-            ?.let { appName -> dictionaryService?.getDictionary(appName) }
+            ?.let { appName -> dictionaryService?.resolveDictionaryFromCache(appName) }
 
     return dictionary?.let {
         NavigationGutterIconBuilder
-            .create(it.getIcon(0))
+            .create(it.lineMarkerIcon())
             .setTargets(it)
             .setTooltipText("Navigate to application dictionary file")
             .createLineMarkerInfo(leafNode)
     }
 }
+
+private fun ApplicationDictionary.lineMarkerIcon(): Icon = (this as? FakePsiElement)?.getIcon(false) ?: getIcon(0)

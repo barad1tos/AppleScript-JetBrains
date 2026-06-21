@@ -39,7 +39,7 @@ internal object FallbackDirectParameterParser {
                 level + 1,
             ) ||
             FallbackCommandParameterValueBoundaries.parseExpressionAtValueBoundary(builder, level + 1) ||
-            FallbackCommandParameterValueBoundaries.consumeIdentifierPhraseBeforePrepositionSelector(builder) ||
+            FallbackCommandParameterValueBoundaries.consumeIdentifierPhraseBeforeCommandSelector(builder) ||
             parseStructuredBracketFallback(builder)
 
     private fun parseStructuredBracketFallback(builder: PsiBuilder): Boolean =

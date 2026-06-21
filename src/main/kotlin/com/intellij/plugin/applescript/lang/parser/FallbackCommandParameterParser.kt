@@ -114,7 +114,7 @@ internal object FallbackCommandParameterParser {
             FallbackCommandParameterValueBoundaries.hasGrammarValueBeforeBoundary(builder)
 
     fun isIdentifierPhraseDirectParameterStart(builder: PsiBuilder): Boolean =
-        FallbackCommandParameterValueBoundaries.hasIdentifierPhraseBeforePrepositionSelector(builder)
+        FallbackCommandParameterValueBoundaries.hasIdentifierPhraseBeforeCommandSelector(builder)
 
     fun parseSelectorTokens(builder: PsiBuilder): Boolean = FallbackCommandSelectorParser.parseSelectorTokens(builder)
 }

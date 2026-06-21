@@ -1,10 +1,8 @@
 package com.intellij.plugin.applescript.lang.parser
 
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.ABOUT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.AGAINST
+import com.intellij.plugin.applescript.psi.AppleScriptTokenTypesSets.HANDLER_PARAMETER_LABELS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BAND
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.BY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMENT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.CURRENT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DIGITS
@@ -14,11 +12,9 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.DOT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.ENDS_WITH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.EQ
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.FALSE
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.GT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INT_DIV
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IS_CONTAIN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IS_IN
@@ -32,17 +28,13 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.MISSING_VALUE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.MOD
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.OVER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.PLUS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.POW
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RETURN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STAR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STARTS_BEGINS_WITH
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TRUE
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.UNDER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.USING
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
@@ -78,6 +70,15 @@ internal object FallbackCommandParameterTokens {
             STARTS_BEGINS_WITH,
         )
 
+    private val fallbackCommandSelectorExtensions =
+        TokenSet.create(
+            AS,
+            GIVEN,
+            USING,
+            WITH,
+            WITHOUT,
+        )
+
     fun isValueLiteralStart(tokenType: IElementType?): Boolean =
         isStructuredDirectParameterStart(tokenType) ||
             tokenType === RETURN ||
@@ -96,26 +97,17 @@ internal object FallbackCommandParameterTokens {
         tokenType != null &&
             tokenType !== NLS &&
             tokenType !== COMMENT &&
-            !isPrepositionParameterStart(tokenType)
+            !isCommandSelectorStart(tokenType)
 
-    fun isPrepositionParameterStart(tokenType: IElementType?): Boolean =
-        tokenType === TO ||
-            tokenType === INTO ||
-            tokenType === FROM ||
-            tokenType === ON ||
-            tokenType === WITH ||
-            tokenType === WITHOUT ||
-            tokenType === GIVEN ||
-            tokenType === AS ||
-            tokenType === USING ||
-            tokenType === ABOUT ||
-            tokenType === AGAINST ||
-            tokenType === BY ||
-            tokenType === OVER ||
-            tokenType === UNDER
+    fun isCommandSelectorStart(tokenType: IElementType?): Boolean =
+        tokenType != null &&
+            (
+                HANDLER_PARAMETER_LABELS.contains(tokenType) ||
+                    fallbackCommandSelectorExtensions.contains(tokenType)
+            )
 
     fun isParameterSelectorStart(tokenType: IElementType?): Boolean =
-        isPrepositionParameterStart(tokenType) || tokenType === VAR_IDENTIFIER
+        isCommandSelectorStart(tokenType) || tokenType === VAR_IDENTIFIER
 
     fun isExpressionContinuationStart(tokenType: IElementType?): Boolean =
         tokenType != null && expressionContinuationStarts.contains(tokenType)

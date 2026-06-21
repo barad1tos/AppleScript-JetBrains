@@ -5,14 +5,11 @@ import com.intellij.lang.parser.GeneratedParserUtilBase._NONE_
 import com.intellij.lang.parser.GeneratedParserUtilBase.enter_section_
 import com.intellij.lang.parser.GeneratedParserUtilBase.exit_section_
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AFTER
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMENT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.FOR
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TEXT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.USING
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
@@ -73,10 +70,7 @@ internal object PermissiveCommandTailParser {
     }
 
     private fun isPermissiveSelectorWord(tokenType: IElementType?): Boolean =
-        FallbackCommandParameterTokens.isPrepositionParameterStart(tokenType) ||
-            tokenType === FOR ||
-            tokenType === AS ||
-            tokenType === USING ||
+        FallbackCommandParameterTokens.isCommandSelectorStart(tokenType) ||
             isPermissiveKeywordSelectorWord(tokenType) ||
             tokenType === VAR_IDENTIFIER
 

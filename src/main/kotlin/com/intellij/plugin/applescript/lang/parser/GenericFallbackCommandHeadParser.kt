@@ -2,27 +2,14 @@ package com.intellij.plugin.applescript.lang.parser
 
 import com.intellij.lang.PsiBuilder
 import com.intellij.openapi.util.Ref
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.ABOUT
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.AGAINST
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.AS
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.BY
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.FOR
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.FROM
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.GIVEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IF
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTO
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.LPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.ON
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.OVER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.UNDER
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.USING
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
-import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITHOUT
 import com.intellij.psi.tree.IElementType
 import com.intellij.psi.tree.TokenSet
 
@@ -34,25 +21,6 @@ internal object GenericFallbackCommandHeadParser {
             IF,
             THEN,
             TO,
-        )
-
-    private val commandSelectorStarts =
-        TokenSet.create(
-            WITH,
-            WITHOUT,
-            GIVEN,
-            INTO,
-            FROM,
-            FOR,
-            TO,
-            ON,
-            AS,
-            USING,
-            ABOUT,
-            AGAINST,
-            BY,
-            OVER,
-            UNDER,
         )
 
     fun parse(
@@ -85,7 +53,7 @@ internal object GenericFallbackCommandHeadParser {
             words += builder.tokenText.orEmpty()
             builder.advanceLexer()
         }
-        if (words.isNotEmpty() && isPrepositionOrForStart(builder.tokenType)) {
+        if (words.isNotEmpty() && isCommandSelectorStart(builder.tokenType)) {
             val marker = builder.mark()
             val phraseWords = mutableListOf(builder.tokenText.orEmpty())
             builder.advanceLexer()
@@ -148,7 +116,7 @@ internal object GenericFallbackCommandHeadParser {
         val tokenType = builder.tokenType
         return tokenType != null &&
             (
-                isPrepositionOrForStart(tokenType) ||
+                isCommandSelectorStart(tokenType) ||
                     FallbackCommandParameterParser.isValueLiteralStart(tokenType) ||
                     FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder) ||
                     FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder) ||
@@ -167,7 +135,7 @@ internal object GenericFallbackCommandHeadParser {
         val nextTokenType = builder.lookAhead(1)
         return builder.tokenType === VAR_IDENTIFIER &&
             (
-                isPrepositionOrForStart(nextTokenType) ||
+                isCommandSelectorStart(nextTokenType) ||
                     nextTokenType === OF ||
                     FallbackCommandParameterTokens.isExpressionContinuationStart(nextTokenType)
             )
@@ -178,6 +146,6 @@ internal object GenericFallbackCommandHeadParser {
         builder: PsiBuilder,
     ): Boolean = words.size == 1 && builder.tokenType === AS
 
-    private fun isPrepositionOrForStart(tokenType: IElementType?): Boolean =
-        tokenType != null && commandSelectorStarts.contains(tokenType)
+    private fun isCommandSelectorStart(tokenType: IElementType?): Boolean =
+        FallbackCommandParameterTokens.isCommandSelectorStart(tokenType)
 }

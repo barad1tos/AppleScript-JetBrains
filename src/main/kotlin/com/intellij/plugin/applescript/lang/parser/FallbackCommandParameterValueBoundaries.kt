@@ -123,17 +123,17 @@ internal object FallbackCommandParameterValueBoundaries {
         return hasBoundary
     }
 
-    fun hasIdentifierPhraseBeforePrepositionSelector(builder: PsiBuilder): Boolean =
+    fun hasIdentifierPhraseBeforeCommandSelector(builder: PsiBuilder): Boolean =
         identifierRunLength(builder).let { identifiers ->
             identifiers > 0 &&
-                FallbackCommandParameterTokens.isPrepositionParameterStart(builder.lookAhead(identifiers))
+                FallbackCommandParameterTokens.isCommandSelectorStart(builder.lookAhead(identifiers))
         }
 
-    fun consumeIdentifierPhraseBeforePrepositionSelector(builder: PsiBuilder): Boolean {
+    fun consumeIdentifierPhraseBeforeCommandSelector(builder: PsiBuilder): Boolean {
         val identifierCount = identifierRunLength(builder)
         val shouldConsume =
             identifierCount > 0 &&
-                FallbackCommandParameterTokens.isPrepositionParameterStart(builder.lookAhead(identifierCount))
+                FallbackCommandParameterTokens.isCommandSelectorStart(builder.lookAhead(identifierCount))
         if (shouldConsume) {
             repeat(identifierCount) {
                 builder.advanceLexer()
@@ -217,7 +217,7 @@ internal object FallbackCommandParameterValueBoundaries {
             tokenType === RPAREN ||
             tokenType === RCURLY ||
             tokenType === THEN ||
-            FallbackCommandParameterTokens.isPrepositionParameterStart(tokenType)
+            FallbackCommandParameterTokens.isCommandSelectorStart(tokenType)
 
     private fun isPropertyReferenceValueBoundary(tokenType: IElementType?): Boolean =
         FallbackCommandParameterTokens.isParameterSelectorStart(tokenType)

@@ -23,7 +23,7 @@ internal object FallbackCommandSelectorParser {
         while (shouldContinue) {
             val isParameterStart =
                 builder.tokenType === OF ||
-                    FallbackCommandParameterTokens.isPrepositionParameterStart(builder.tokenType) ||
+                    FallbackCommandParameterTokens.isCommandSelectorStart(builder.tokenType) ||
                     builder.tokenType === VAR_IDENTIFIER ||
                     matchingDictionaryParameterDefinition(builder) != null
             if (!isParameterStart) break
@@ -48,7 +48,7 @@ internal object FallbackCommandSelectorParser {
         when {
             parseDictionarySelectorTokens(builder) -> true
             builder.tokenType === OF ||
-                FallbackCommandParameterTokens.isPrepositionParameterStart(builder.tokenType) -> {
+                FallbackCommandParameterTokens.isCommandSelectorStart(builder.tokenType) -> {
                 val selectorStart = builder.tokenType
                 builder.advanceLexer()
                 val hasSelectorLabel =

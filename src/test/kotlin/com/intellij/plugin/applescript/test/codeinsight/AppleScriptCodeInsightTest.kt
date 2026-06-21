@@ -8,20 +8,30 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.AppleScriptIcons
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
+import com.intellij.plugin.applescript.lang.dictionary.icons.DictionaryIconLoader
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
+import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
+import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
+import com.intellij.psi.xml.XmlFile
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.awt.image.BufferedImage
 import java.io.File
+import javax.swing.Icon
 
 /**
  * Code-insight smoke suite (completion, annotator, file-type, formatter, rename,
@@ -143,6 +153,170 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             )
         } finally {
             persistence.removeDictionaryInfo(applicationFile.path)
+        }
+    }
+
+    fun testApplicationReferenceLineMarkerUsesGeneratedDictionaryCache() {
+        val applicationName = "SyntheticMarkerApp_${System.nanoTime()}"
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        generatedDictionaryFile.parentFile.mkdirs()
+        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+
+        try {
+            assertNull(projectDictionaries.getDictionary(applicationName))
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val markers = myFixture.findAllGutters()
+
+            assertEquals("Generated dictionary cache should create one gutter marker", 1, markers.size)
+            assertNull(
+                "Line markers must not create a project dictionary; explicit load paths own that side effect",
+                projectDictionaries.getDictionary(applicationName),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+        }
+    }
+
+    fun testApplicationReferenceLineMarkerUsesGeneratedCacheApplicationBundleIcon() {
+        val applicationName = "Things3"
+        val applicationBundle = File("/Applications/Things3.app")
+        if (!applicationBundle.isDirectory) return
+
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        generatedDictionaryFile.parentFile.mkdirs()
+        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
+        assertNotNull(applicationIcon)
+        requireNotNull(applicationIcon)
+
+        try {
+            assertNull(projectDictionaries.getDictionary(applicationName))
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val markers = myFixture.findAllGutters()
+
+            assertEquals("Generated cache application reference should create one gutter marker", 1, markers.size)
+            assertTrue(
+                "Generated cache gutter marker should use the application bundle icon",
+                markers.single().icon.renderedPixelsEqual(applicationIcon),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+        }
+    }
+
+    fun testApplicationReferenceLineMarkerRefreshesCachedDictionaryWithoutApplicationBundleIcon() {
+        val applicationName = "Things3"
+        val applicationBundle = File("/Applications/Things3.app")
+        if (!applicationBundle.isDirectory) return
+
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        generatedDictionaryFile.parentFile.mkdirs()
+        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        val staleDictionaryFile =
+            File
+                .createTempFile("things3-stale", ".xml")
+                .also { file -> file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml()) }
+        val dictionaryXmlFile =
+            LocalFileSystem
+                .getInstance()
+                .refreshAndFindFileByIoFile(staleDictionaryFile)
+                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
+        assertNotNull(dictionaryXmlFile)
+        requireNotNull(dictionaryXmlFile)
+        val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
+        assertNotNull(applicationIcon)
+        requireNotNull(applicationIcon)
+
+        try {
+            projectDictionaries.cacheDictionaryForTest(
+                applicationName,
+                ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null),
+            )
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val markers = myFixture.findAllGutters()
+
+            assertEquals("Application reference should create one gutter marker", 1, markers.size)
+            assertTrue(
+                "Stale project dictionary cache should not force a generic gutter marker icon",
+                markers.single().icon.renderedPixelsEqual(applicationIcon),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+            staleDictionaryFile.delete()
+        }
+    }
+
+    fun testApplicationReferenceLineMarkerUsesApplicationBundleIcon() {
+        val applicationBundle = File("/System/Applications/Music.app")
+        if (!applicationBundle.isDirectory) return
+
+        val applicationName = "SyntheticMarkerIconApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "marker-icon",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val dictionaryInfo =
+            DictionaryInfo(applicationName, dictionaryFile, applicationBundle)
+                .also { info -> info.setInitialized(true) }
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
+            assertNotNull(applicationIcon)
+            requireNotNull(applicationIcon)
+            assertFalse(
+                "Test setup must load a non-generic application icon before checking the gutter marker",
+                applicationIcon.renderedPixelsEqual(AppleScriptIcons.OPEN_DICTIONARY),
+            )
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val markers = myFixture.findAllGutters()
+
+            assertEquals("Application reference should create one gutter marker", 1, markers.size)
+            assertTrue(
+                "Application dictionary gutter marker should use the application bundle icon",
+                markers.single().icon.renderedPixelsEqual(applicationIcon),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            persistence.removeDictionaryInfo(applicationBundle.path)
+            dictionaryFile.delete()
         }
     }
 
@@ -953,6 +1127,43 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val startOffset = document.charsSequence.indexOf(text)
         assertTrue("expected to find '$text'", startOffset >= 0)
         return TextRange(startOffset, startOffset + text.length)
+    }
+
+    private fun Icon.renderedPixelsEqual(other: Icon): Boolean {
+        val left = renderIcon()
+        val right = other.renderIcon()
+        if (left.width != right.width || left.height != right.height) return false
+
+        for (x in 0 until left.width) {
+            for (y in 0 until left.height) {
+                if (left.getRGB(x, y) != right.getRGB(x, y)) return false
+            }
+        }
+        return true
+    }
+
+    private fun Icon.renderIcon(): BufferedImage {
+        val image =
+            BufferedImage(
+                iconWidth.coerceAtLeast(1),
+                iconHeight.coerceAtLeast(1),
+                BufferedImage.TYPE_INT_ARGB,
+            )
+        val graphics = image.createGraphics()
+        paintIcon(null, graphics, 0, 0)
+        graphics.dispose()
+        return image
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun AppleScriptProjectDictionaryService.cacheDictionaryForTest(
+        applicationName: String,
+        dictionary: ApplicationDictionary,
+    ) {
+        val field = javaClass.getDeclaredField("dictionaryMap")
+        field.isAccessible = true
+        val dictionaryMap = field.get(this) as MutableMap<String, ApplicationDictionary>
+        dictionaryMap[applicationName] = dictionary
     }
 
     companion object {

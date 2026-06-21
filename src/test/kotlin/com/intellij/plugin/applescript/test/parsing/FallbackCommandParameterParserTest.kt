@@ -474,7 +474,8 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
             )
 
         assertNoParserErrors(psiFile)
-        assertEquals(listOf("width for labels theLabelStrings"), psiFile.node.textsOf(COMMAND_PARAMETER))
+        assertEquals(listOf("width"), psiFile.node.textsOf(DIRECT_PARAMETER_VAL))
+        assertEquals(listOf("for labels theLabelStrings"), psiFile.node.textsOf(COMMAND_PARAMETER))
     }
 
     fun testFullParserGenericHeadAcceptsKeywordLabels() {
@@ -533,6 +534,54 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
 
         assertNoParserErrors(psiFile)
         assertEquals(listOf("by column 1", "over itemsList"), psiFile.node.textsOf(COMMAND_PARAMETER))
+    }
+
+    fun testFullParserGenericHeadAcceptsBnfHandlerParameterLabelsAsFallbackSelectors() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                place above anchorA
+                place between anchorB
+                place onto anchorC
+                place since anchorD
+                place through anchorE
+                place out of anchorF
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertEquals(
+            listOf("above", "between", "onto", "since", "through", "out of"),
+            psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR),
+        )
+    }
+
+    fun testFullParserThingsImportScriptWithMakeAtBeginning() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                set chosenFile to (choose file with prompt "Select a file to import:")
+                open for access chosenFile
+
+                set fileContents to read chosenFile using delimiter {linefeed}
+                close access chosenFile
+
+                tell application "Things3"
+                    activate
+                    show list "Inbox"
+
+                    repeat with currentLine in reverse of fileContents
+                    set newToDo to make new to do ¬
+                        with properties {name:currentLine} ¬
+                        at beginning of list "Inbox"
+                    end repeat
+                end tell
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
     }
 
     fun testStandardAdditionsWriteStartingAtSelector() {
