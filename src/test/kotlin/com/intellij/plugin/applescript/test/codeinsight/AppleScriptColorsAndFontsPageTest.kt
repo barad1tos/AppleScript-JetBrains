@@ -24,7 +24,7 @@ class AppleScriptColorsAndFontsPageTest : BasePlatformTestCase() {
 
     fun testAttributeDescriptorsCount() {
         val descriptors = page.attributeDescriptors
-        assertEquals("Must have 14 attribute descriptors", 14, descriptors.size)
+        assertEquals("Must have 15 attribute descriptors", 15, descriptors.size)
     }
 
     fun testAttributeDescriptorsContainExpectedEntries() {
@@ -37,6 +37,7 @@ class AppleScriptColorsAndFontsPageTest : BasePlatformTestCase() {
         assertTrue(displayNames.contains("Language literal"))
         assertTrue(displayNames.contains("Built-in type"))
         assertTrue(displayNames.contains("Handler call"))
+        assertTrue(displayNames.contains("Variable"))
         assertTrue(displayNames.contains("String"))
         assertTrue(displayNames.contains("Operator"))
         assertTrue(displayNames.contains("Comment"))
@@ -59,6 +60,7 @@ class AppleScriptColorsAndFontsPageTest : BasePlatformTestCase() {
                 "language literal",
                 "built-in type",
                 "handler call",
+                "variable",
                 "string",
                 "operator",
                 "comment",

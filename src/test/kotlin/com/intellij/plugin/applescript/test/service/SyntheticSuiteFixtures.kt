@@ -9,6 +9,12 @@ private val DO_SHELL_SCRIPT_COMMAND_CODE = appleScriptCode('s', 'y', 's', 't', '
 private val EMPTY_SUITE_CODE = appleScriptCode('e', 'm', 'p', 't')
 private val MUSIC_PLAY_COMMAND_CODE = appleScriptCode('h', 'o', 'o', 'k', 'p', 'l', 'a', 'y')
 private val MUSIC_SUITE_CODE = appleScriptCode('m', 'u', 's', 'c')
+private val TASK_LIST_SUITE_CODE = appleScriptCode('t', 'a', 's', 'k')
+private val TASK_LIST_SHOW_COMMAND_CODE = appleScriptCode('s', 'h', 'o', 'w')
+private val TASK_LIST_MAKE_COMMAND_CODE = appleScriptCode('m', 'a', 'k', 'e')
+private val TASK_LIST_NAME_PROPERTY_CODE = appleScriptCode('p', 'n', 'a', 'm')
+private val TASK_LIST_TO_DO_CLASS_CODE = appleScriptCode('t', 'o', 'd', 'o')
+private val TASK_LIST_LIST_CLASS_CODE = appleScriptCode('l', 'i', 's', 't')
 private val TRACK_CLASS_CODE = appleScriptCode('c', 'T', 'r', 'k')
 private val TRACK_NAME_PROPERTY_CODE = appleScriptCode('p', 'n', 'a', 'm')
 private val STANDARD_ADDITIONS_SUITE_CODE = appleScriptCode('s', 't', 'd', 'a')
@@ -108,6 +114,29 @@ object SyntheticSuiteFixtures {
                 <command name="play" code="$MUSIC_PLAY_COMMAND_CODE" description="Play the current track"/>
                 <class name="track" code="$TRACK_CLASS_CODE" description="A track in a playlist">
                     <property name="name" code="$TRACK_NAME_PROPERTY_CODE" type="text"/>
+                </class>
+            </suite>
+        </dictionary>
+        """.trimIndent()
+
+    fun taskListAppXml(): String =
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <dictionary title="Task List Terminology">
+            <suite name="Task List Suite" code="$TASK_LIST_SUITE_CODE" description="Task list commands">
+                <command name="show" code="$TASK_LIST_SHOW_COMMAND_CODE" description="Show a list">
+                    <direct-parameter type="specifier"/>
+                </command>
+                <command name="make" code="$TASK_LIST_MAKE_COMMAND_CODE" description="Make a new item">
+                    <parameter name="new" code="kocl" type="type"/>
+                    <parameter name="with properties" code="prdt" type="record"/>
+                    <parameter name="at" code="insh" type="specifier"/>
+                </command>
+                <class name="list" code="$TASK_LIST_LIST_CLASS_CODE" description="A task list">
+                    <property name="name" code="$TASK_LIST_NAME_PROPERTY_CODE" type="text"/>
+                </class>
+                <class name="to do" plural="to dos" code="$TASK_LIST_TO_DO_CLASS_CODE" description="A task">
+                    <property name="name" code="$TASK_LIST_NAME_PROPERTY_CODE" type="text"/>
                 </class>
             </suite>
         </dictionary>

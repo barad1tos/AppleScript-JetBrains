@@ -3,15 +3,9 @@ package com.intellij.plugin.applescript.lang.parser
 import com.intellij.lang.PsiBuilder
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 
 internal object CommandHandlerParameterParser {
-    private val FALLBACK_FIRST_COMMAND_NAMES: Set<String> =
-        setOf(
-            "choose from list",
-            "make",
-            "write",
-        )
-
     fun parseFallbackOrDictionaryCommandParameters(
         builder: PsiBuilder,
         level: Int,
@@ -20,8 +14,8 @@ internal object CommandHandlerParameterParser {
     ): Boolean =
         if (allCommandsWithName.isEmpty()) {
             parseUnknownCommandParameters(builder, level, parsedCommandName)
-        } else if (isFallbackFirstCommand(parsedCommandName)) {
-            parseFallbackFirstDictionaryCommandParameters(
+        } else if (shouldUseDictionaryBackedFallback(builder, allCommandsWithName)) {
+            parseDictionaryBackedFallbackCommandParameters(
                 builder,
                 level,
                 parsedCommandName,
@@ -55,7 +49,15 @@ internal object CommandHandlerParameterParser {
             when {
                 FallbackCommandParameterParser.isStructuredDirectParameterStart(builder.tokenType) ->
                     FallbackCommandParameterMode.OptionalDirectParameter
+                FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder) ->
+                    FallbackCommandParameterMode.OptionalDirectParameter
+                FallbackCommandParameterParser.isPropertyReferenceDirectParameterStart(builder) ->
+                    FallbackCommandParameterMode.OptionalDirectParameter
+                FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder) ->
+                    FallbackCommandParameterMode.OptionalDirectParameter
                 FallbackCommandParameterParser.isIdentifierPhraseDirectParameterStart(builder) ->
+                    FallbackCommandParameterMode.OptionalDirectParameter
+                isIdentifierExpressionDirectParameterStart(builder) ->
                     FallbackCommandParameterMode.OptionalDirectParameter
                 else -> previousMode
             }
@@ -73,10 +75,25 @@ internal object CommandHandlerParameterParser {
         }
     }
 
-    private fun isFallbackFirstCommand(commandName: String): Boolean =
-        commandName.lowercase() in FALLBACK_FIRST_COMMAND_NAMES
+    private fun shouldUseDictionaryBackedFallback(
+        builder: PsiBuilder,
+        allCommandsWithName: List<AppleScriptCommand>,
+    ): Boolean =
+        allCommandsWithName.any { command -> command.directParameter != null || command.parameters.isNotEmpty() } &&
+            (
+                FallbackCommandParameterParser.isStructuredDirectParameterStart(builder.tokenType) ||
+                    FallbackCommandParameterParser.isBuiltInClassDirectParameterStart(builder) ||
+                    FallbackCommandParameterParser.isPropertyReferenceDirectParameterStart(builder) ||
+                    FallbackCommandParameterParser.isGrammarValueDirectParameterStart(builder) ||
+                    FallbackCommandParameterParser.isIdentifierPhraseDirectParameterStart(builder) ||
+                    isDictionaryParameterSelectorStart(builder, allCommandsWithName)
+            )
 
-    private fun parseFallbackFirstDictionaryCommandParameters(
+    private fun isIdentifierExpressionDirectParameterStart(builder: PsiBuilder): Boolean =
+        builder.tokenType === VAR_IDENTIFIER &&
+            FallbackCommandParameterTokens.isExpressionContinuationStart(builder.lookAhead(1))
+
+    private fun parseDictionaryBackedFallbackCommandParameters(
         builder: PsiBuilder,
         level: Int,
         parsedCommandName: String,
@@ -86,6 +103,8 @@ internal object CommandHandlerParameterParser {
             builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE)
         val previousNames =
             builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES)
+        val previousDefinitions =
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS)
         builder.putUserData(
             AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE,
             fallbackParameterMode(builder, allCommandsWithName),
@@ -93,6 +112,10 @@ internal object CommandHandlerParameterParser {
         builder.putUserData(
             AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES,
             fallbackParameterNames(allCommandsWithName),
+        )
+        builder.putUserData(
+            AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS,
+            fallbackParameterDefinitions(allCommandsWithName),
         )
         return try {
             FallbackCommandParameterParser.parseParameters(builder, level + 1, parsedCommandName)
@@ -104,6 +127,10 @@ internal object CommandHandlerParameterParser {
             builder.putUserData(
                 AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES,
                 previousNames,
+            )
+            builder.putUserData(
+                AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS,
+                previousDefinitions,
             )
         }
     }
@@ -137,6 +164,23 @@ internal object CommandHandlerParameterParser {
         allCommandsWithName
             .flatMap { command -> command.parameters.map { parameter -> parameter.getName() } }
             .toSet()
+
+    private fun fallbackParameterDefinitions(
+        allCommandsWithName: List<AppleScriptCommand>,
+    ): Map<String, FallbackCommandParameterDefinition> =
+        buildMap {
+            for (command in allCommandsWithName) {
+                for (parameter in command.parameters) {
+                    putIfAbsent(
+                        parameter.getName(),
+                        FallbackCommandParameterDefinition(
+                            typeSpecifier = parameter.typeSpecifier,
+                            applicationName = command.dictionary.applicationName,
+                        ),
+                    )
+                }
+            }
+        }
 
     private fun isIncompleteHandlerCall(
         allCommandsWithName: List<AppleScriptCommand>,

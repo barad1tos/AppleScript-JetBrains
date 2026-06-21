@@ -90,9 +90,12 @@ internal object DictionaryDirectParameterParser {
         isTellCompound: Boolean,
     ): Boolean {
         val marker = enter_section_(builder, level, _NONE_, "<parse Command Direct Parameter Value >")
-        var result = parseTypedValue(builder, level + 1, parameter.typeSpecifier)
+        var result = parseTypedValue(builder, level + 1, parameter)
         if (!result) {
-            result = AppleScriptParser.expression(builder, level + 1)
+            result = FallbackCommandParameterValueBoundaries.parseBuiltInClassValueBeforeBoundary(builder, level + 1)
+        }
+        if (!result) {
+            result = AppleScriptGeneratedParserUtil.parseCommandParametersExpression(builder, level + 1)
         }
         if (!result) {
             result = parseBracketedDirectValueBeforeSelector(builder)
@@ -104,10 +107,15 @@ internal object DictionaryDirectParameterParser {
     private fun parseTypedValue(
         builder: PsiBuilder,
         level: Int,
-        typeSpecifier: String,
+        parameter: CommandDirectParameter,
     ): Boolean =
-        when (typeSpecifier) {
-            "type" -> TypeSpecifierParser.parseTypeSpecifier(builder, level + 1)
+        when (parameter.typeSpecifier) {
+            "type" ->
+                TypeSpecifierParser.parseTypeSpecifier(
+                    builder,
+                    level + 1,
+                    parameter.myCommand.dictionary.applicationName,
+                )
             else -> false
         }
 

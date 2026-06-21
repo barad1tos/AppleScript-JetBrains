@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.lang.parser
 
 import com.intellij.lang.PsiBuilder
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
 internal enum class FallbackCommandParameterMode {
@@ -57,7 +58,7 @@ internal object FallbackCommandParameterParser {
         val previousFallbackContext =
             builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS)
         // Mark the fallback context before the direct parameter so the generic permissive head cannot
-        // re-engage on a parameter value (`display dialog "Hello" default answer ...`).
+        // re-engage on a command parameter value.
         builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS, true)
         try {
             parseParameterBody(builder, level, state)
@@ -102,8 +103,18 @@ internal object FallbackCommandParameterParser {
     fun isStructuredDirectParameterStart(tokenType: IElementType?): Boolean =
         FallbackCommandParameterTokens.isStructuredDirectParameterStart(tokenType)
 
+    fun isBuiltInClassDirectParameterStart(builder: PsiBuilder): Boolean =
+        FallbackCommandParameterValueBoundaries.hasBuiltInClassValueBeforeBoundary(builder)
+
+    fun isPropertyReferenceDirectParameterStart(builder: PsiBuilder): Boolean =
+        FallbackCommandParameterValueBoundaries.hasPropertyReferenceValueBeforeBoundary(builder)
+
+    fun isGrammarValueDirectParameterStart(builder: PsiBuilder): Boolean =
+        builder.tokenType !== VAR_IDENTIFIER &&
+            FallbackCommandParameterValueBoundaries.hasGrammarValueBeforeBoundary(builder)
+
     fun isIdentifierPhraseDirectParameterStart(builder: PsiBuilder): Boolean =
-        FallbackCommandParameterValueBoundaries.hasIdentifierPhraseBeforePrepositionSelector(builder)
+        FallbackCommandParameterValueBoundaries.hasIdentifierPhraseBeforeCommandSelector(builder)
 
     fun parseSelectorTokens(builder: PsiBuilder): Boolean = FallbackCommandSelectorParser.parseSelectorTokens(builder)
 }

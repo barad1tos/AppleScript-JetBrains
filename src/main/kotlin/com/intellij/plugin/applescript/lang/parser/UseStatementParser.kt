@@ -19,8 +19,14 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.ID
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SCRIPTING_ADDITIONS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.THE_KW
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 
 internal object UseStatementParser {
+    private data class ParsedApplicationNameToken(
+        val applicationName: String,
+        val isKnownDictionaryTarget: Boolean,
+    )
+
     fun parseUsedApplicationNameExternal(
         builder: PsiBuilder,
         level: Int,
@@ -103,7 +109,12 @@ internal object UseStatementParser {
     private fun parseReferencedApplicationName(
         builder: PsiBuilder,
         hasApplicationToken: Boolean,
-    ): String? = if (hasApplicationToken) parseApplicationNameToken(builder) else null
+    ): String? =
+        if (hasApplicationToken) {
+            parseApplicationNameToken(builder, allowVariableReference = false)?.applicationName
+        } else {
+            null
+        }
 
     private fun registerUsedApplicationName(
         builder: PsiBuilder,
@@ -135,32 +146,49 @@ internal object UseStatementParser {
         tellStatementStartCondition: Parser,
     ): Boolean {
         var result = false
-        if (nextTokenIs(builder, "", STRING_LITERAL, ID)) {
-            val applicationNameString = parseApplicationNameToken(builder)
-            result = applicationNameString != null
-            if (result &&
-                !StringUtil.isEmptyOrSpaces(applicationNameString) &&
-                tellStatementStartCondition.parse(builder, level + 1)
-            ) {
-                ParserApplicationNameStack.pushTargetApplicationName(builder, requireNotNull(applicationNameString))
+        if (nextTokenIs(builder, "", STRING_LITERAL, ID, VAR_IDENTIFIER)) {
+            val parsedApplicationName = parseApplicationNameToken(builder, allowVariableReference = true)
+            result = parsedApplicationName != null
+            parsedApplicationName?.let { applicationName ->
+                val hasKnownTargetName = !StringUtil.isEmptyOrSpaces(applicationName.applicationName)
+                if (applicationName.isKnownDictionaryTarget &&
+                    hasKnownTargetName &&
+                    tellStatementStartCondition.parse(builder, level + 1)
+                ) {
+                    ParserApplicationNameStack.pushTargetApplicationName(builder, applicationName.applicationName)
+                }
             }
         }
         return result
     }
 
-    private fun parseApplicationNameToken(builder: PsiBuilder): String? {
+    private fun parseApplicationNameToken(
+        builder: PsiBuilder,
+        allowVariableReference: Boolean,
+    ): ParsedApplicationNameToken? {
         val isApplicationIdReference = consumeToken(builder, ID)
-        val applicationNameString = builder.tokenText?.replace("\"", "")
-        val result = consumeToken(builder, STRING_LITERAL) || (!isApplicationIdReference && consumeToken(builder, ID))
-        return applicationNameString
-            ?.takeIf { result && !StringUtil.isEmptyOrSpaces(it) }
-            ?.let { applicationName ->
+        val applicationNameText = builder.tokenText?.replace("\"", "")
+        val isLiteralName = consumeToken(builder, STRING_LITERAL)
+        val isVariableReference =
+            !isApplicationIdReference &&
+                !isLiteralName &&
+                allowVariableReference &&
+                consumeToken(builder, VAR_IDENTIFIER)
+        return applicationNameText
+            ?.takeIf { (isLiteralName || isVariableReference) && !StringUtil.isEmptyOrSpaces(it) }
+            ?.let { parsedName ->
                 if (isApplicationIdReference) {
                     ApplicationDiscoveryService
                         .getInstance()
-                        .findKnownApplicationNameByBundleIdentifier(applicationName) ?: applicationName
+                        .findKnownApplicationNameByBundleIdentifier(parsedName)
+                        ?.let { applicationName ->
+                            ParsedApplicationNameToken(applicationName, isKnownDictionaryTarget = true)
+                        } ?: ParsedApplicationNameToken(parsedName, isKnownDictionaryTarget = true)
                 } else {
-                    applicationName
+                    ParsedApplicationNameToken(
+                        applicationName = parsedName,
+                        isKnownDictionaryTarget = isLiteralName,
+                    )
                 }
             }
     }

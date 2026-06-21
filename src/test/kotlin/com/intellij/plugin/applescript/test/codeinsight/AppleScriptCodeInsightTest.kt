@@ -8,19 +8,30 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.AppleScriptIcons
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
+import com.intellij.plugin.applescript.lang.dictionary.icons.DictionaryIconLoader
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptSystemEventsProcessReferenceAnnotator
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
+import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
+import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
+import com.intellij.psi.xml.XmlFile
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.awt.image.BufferedImage
 import java.io.File
+import javax.swing.Icon
 
 /**
  * Code-insight smoke suite (completion, annotator, file-type, formatter, rename,
@@ -145,6 +156,213 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testApplicationReferenceLineMarkerUsesGeneratedDictionaryCache() {
+        val applicationName = "SyntheticMarkerApp_${System.nanoTime()}"
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        generatedDictionaryFile.parentFile.mkdirs()
+        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+
+        try {
+            assertNull(projectDictionaries.getDictionary(applicationName))
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val markers = myFixture.findAllGutters()
+
+            assertEquals("Generated dictionary cache should create one gutter marker", 1, markers.size)
+            assertNull(
+                "Line markers must not create a project dictionary; explicit load paths own that side effect",
+                projectDictionaries.getDictionary(applicationName),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+        }
+    }
+
+    fun testCachedDictionaryLookupIgnoresMalformedGeneratedCacheWithoutRemovingPersistedInfo() {
+        val applicationName = "SyntheticMalformedCacheApp_${System.nanoTime()}"
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val registeredDictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "registered-dictionary",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val applicationFile = File(registeredDictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo = DictionaryInfo(applicationName, registeredDictionaryFile, applicationFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        generatedDictionaryFile.parentFile.mkdirs()
+        generatedDictionaryFile.writeText("<dictionary><suite>")
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+
+            val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
+
+            assertNull("Malformed generated cache must not create a transient dictionary", dictionary)
+            assertTrue(
+                "Malformed generated cache must not evict existing persisted dictionary info",
+                persistence
+                    .dictionaryInfoSnapshot
+                    .any { info ->
+                        info.getApplicationName() == applicationName &&
+                            info.getDictionaryFile().path == registeredDictionaryFile.path
+                    },
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            persistence.removeDictionaryInfo(applicationFile.path)
+            generatedDictionaryFile.delete()
+            registeredDictionaryFile.delete()
+        }
+    }
+
+    fun testApplicationReferenceLineMarkerUsesGeneratedCacheApplicationBundleIcon() {
+        val applicationName = "Things3"
+        val applicationBundle = File("/Applications/Things3.app")
+        if (!applicationBundle.isDirectory) return
+
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        generatedDictionaryFile.parentFile.mkdirs()
+        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
+        assertNotNull(applicationIcon)
+        requireNotNull(applicationIcon)
+
+        try {
+            assertNull(projectDictionaries.getDictionary(applicationName))
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val markers = myFixture.findAllGutters()
+
+            assertEquals("Generated cache application reference should create one gutter marker", 1, markers.size)
+            assertTrue(
+                "Generated cache gutter marker should use the application bundle icon",
+                markers.single().icon.renderedPixelsEqual(applicationIcon),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+        }
+    }
+
+    fun testApplicationReferenceLineMarkerRefreshesCachedDictionaryWithoutApplicationBundleIcon() {
+        val applicationName = "Things3"
+        val applicationBundle = File("/Applications/Things3.app")
+        if (!applicationBundle.isDirectory) return
+
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        generatedDictionaryFile.parentFile.mkdirs()
+        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        val staleDictionaryFile =
+            File
+                .createTempFile("things3-stale", ".xml")
+                .also { file -> file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml()) }
+        val dictionaryXmlFile =
+            LocalFileSystem
+                .getInstance()
+                .refreshAndFindFileByIoFile(staleDictionaryFile)
+                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
+        assertNotNull(dictionaryXmlFile)
+        requireNotNull(dictionaryXmlFile)
+        val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
+        assertNotNull(applicationIcon)
+        requireNotNull(applicationIcon)
+
+        try {
+            projectDictionaries.cacheDictionaryForTests(
+                applicationName,
+                ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null),
+            )
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val markers = myFixture.findAllGutters()
+
+            assertEquals("Application reference should create one gutter marker", 1, markers.size)
+            assertTrue(
+                "Stale project dictionary cache should not force a generic gutter marker icon",
+                markers.single().icon.renderedPixelsEqual(applicationIcon),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+            staleDictionaryFile.delete()
+        }
+    }
+
+    fun testApplicationReferenceLineMarkerUsesApplicationBundleIcon() {
+        val applicationBundle = File("/System/Applications/Music.app")
+        if (!applicationBundle.isDirectory) return
+
+        val applicationName = "SyntheticMarkerIconApp_${System.nanoTime()}"
+        val dictionaryFile =
+            File
+                .createTempFile("marker-icon", ".xml")
+                .also { file -> file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml()) }
+        val dictionaryXmlFile =
+            LocalFileSystem
+                .getInstance()
+                .refreshAndFindFileByIoFile(dictionaryFile)
+                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
+        assertNotNull(dictionaryXmlFile)
+        requireNotNull(dictionaryXmlFile)
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            projectDictionaries.cacheDictionaryForTests(
+                applicationName,
+                ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, applicationBundle),
+            )
+            val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
+            assertNotNull(applicationIcon)
+            requireNotNull(applicationIcon)
+            assertFalse(
+                "Test setup must load a non-generic application icon before checking the gutter marker",
+                applicationIcon.renderedPixelsEqual(AppleScriptIcons.OPEN_DICTIONARY),
+            )
+
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "$applicationName"
+                end tell
+                """.trimIndent(),
+            )
+            val markers = myFixture.findAllGutters()
+
+            assertEquals("Application reference should create one gutter marker", 1, markers.size)
+            assertTrue(
+                "Application dictionary gutter marker should use the application bundle icon",
+                markers.single().icon.renderedPixelsEqual(applicationIcon),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+        }
+    }
+
     fun testApplicationReferenceWarningReasonWinsForKnownApplication() {
         val applicationName = "SyntheticKnownWarningApp_${System.nanoTime()}"
         val dictionaryFile =
@@ -186,17 +404,381 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testUnknownSystemEventsProcessReferenceIsWeakWarning() {
+        val unknownProcessName = "SyntheticMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "system events"
+                set value of slider 1 of group 1 of tab group 1 of window 1 of process "$unknownProcessName" to 1
+            end tell
+            """.trimIndent(),
+        )
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertTrue(
+            "unknown System Events process must be a weak warning; severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse("unknown process must not be an ERROR", severities.contains(HighlightSeverity.ERROR))
+        assertEquals(
+            "warning must appear exactly once; descriptions=$descriptions",
+            1,
+            descriptions.count { description ->
+                description == unknownProcessDescription(unknownProcessName)
+            },
+        )
+        assertTrue(
+            "warning must explain the local-discovery basis; descriptions=$descriptions",
+            descriptions.contains(unknownProcessDescription(unknownProcessName)),
+        )
+    }
+
+    fun testUnknownSystemEventsProcessReferenceInsideSimpleTellIsWeakWarning() {
+        val unknownProcessName = "SyntheticSimpleTellMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "System Events" to set frontmost of process "$unknownProcessName" to true
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertTrue(
+            "unknown System Events process in simple tell must be a weak warning; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "unknown process in simple tell must not be an ERROR; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+        assertEquals(
+            "warning must appear exactly once; descriptions=$descriptions",
+            1,
+            descriptions.count { description ->
+                description == unknownProcessDescription(unknownProcessName)
+            },
+        )
+        assertTrue(
+            "warning must explain the local-discovery basis; descriptions=$descriptions",
+            descriptions.contains(unknownProcessDescription(unknownProcessName)),
+        )
+    }
+
+    fun testUnknownSystemEventsProcessReferenceInsideNestedObjectTellIsWeakWarning() {
+        val unknownProcessName = "SyntheticNestedObjectMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        discovery.addDiscoveredApplicationName("Finder")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "System Events"
+                tell process "Finder"
+                    set value of slider 1 of group 1 of tab group 1 of window 1 of process "$unknownProcessName" to 1
+                end tell
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertTrue(
+            "unknown process inside nested object tell must still see outer System Events; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "unknown process inside nested object tell must not be an ERROR; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+        assertEquals(
+            "warning must appear exactly once; descriptions=$descriptions",
+            1,
+            descriptions.count { description ->
+                description == unknownProcessDescription(unknownProcessName)
+            },
+        )
+        assertTrue(
+            "warning must explain the local-discovery basis; descriptions=$descriptions",
+            descriptions.contains(unknownProcessDescription(unknownProcessName)),
+        )
+    }
+
+    fun testUnknownSystemEventsProcessReferenceInsideNestedApplicationTellIsNotHighlighted() {
+        val unknownProcessName = "SyntheticNestedApplicationMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        discovery.addDiscoveredApplicationName("Finder")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "System Events"
+                tell application "Finder"
+                    set value of slider 1 of group 1 of tab group 1 of window 1 of process "$unknownProcessName" to 1
+                end tell
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertFalse(
+            "nested tell application \"Finder\" must override outer System Events; " +
+                "descriptions=$descriptions",
+            descriptions.any { description -> description == unknownProcessDescription(unknownProcessName) },
+        )
+        assertFalse(
+            "nested tell application \"Finder\" must not get a weak warning; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "nested tell application \"Finder\" must not get an error; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+    }
+
+    fun testKnownSystemEventsProcessReferenceIsNotHighlighted() {
+        val knownProcessName = "SyntheticKnownProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        discovery.addDiscoveredApplicationName(knownProcessName)
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "System Events"
+                set value of slider 1 of group 1 of tab group 1 of window 1 of process "$knownProcessName" to 1
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, knownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertFalse(
+            "known System Events process must not be highlighted as unknown; descriptions=$descriptions",
+            descriptions.any { description -> description == unknownProcessDescription(knownProcessName) },
+        )
+        assertFalse(
+            "known System Events process must not get a weak warning; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "known System Events process must not get an error; severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+    }
+
+    fun testSystemEventsProcessInspectionIgnoresDynamicNames() {
+        val dynamicProcessName = "SyntheticDynamicMissingProcess_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("System Events")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            set processReferenceName to "$dynamicProcessName"
+            tell application "System Events"
+                set frontmost of process processReferenceName to true
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processReference = "process processReferenceName"
+        val processReferenceStart =
+            myFixture.editor.document.charsSequence
+                .indexOf(processReference)
+        assertTrue("expected to find '$processReference'", processReferenceStart >= 0)
+        val dynamicNameRange =
+            TextRange(
+                processReferenceStart + "process ".length,
+                processReferenceStart + processReference.length,
+            )
+        val severities =
+            highlights
+                .filter { highlight -> dynamicNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> dynamicNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertFalse(
+            "dynamic process names must not be validated as literal process references; descriptions=$descriptions",
+            descriptions.any { description -> description == unknownProcessDescription("processReferenceName") },
+        )
+        assertFalse(
+            "dynamic process names must not get a weak warning; severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "dynamic process names must not get an error; severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+    }
+
+    fun testProcessReferenceOutsideSystemEventsIsNotHighlighted() {
+        val unknownProcessName = "SyntheticOutsideSystemEvents_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        discovery.addDiscoveredApplicationName("Finder")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            tell application "Finder"
+                set targetProcess to process "$unknownProcessName"
+            end tell
+            """.trimIndent(),
+        )
+
+        val highlights = myFixture.doHighlighting()
+        val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
+        val severities =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val descriptions =
+            highlights
+                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
+                .mapNotNull { highlight -> highlight.description }
+
+        assertFalse(
+            "process-like references outside System Events must not be validated; descriptions=$descriptions",
+            descriptions.any { description -> description == unknownProcessDescription(unknownProcessName) },
+        )
+        assertFalse(
+            "process-like references outside System Events must not get a weak warning; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.WEAK_WARNING),
+        )
+        assertFalse(
+            "process-like references outside System Events must not get an error; " +
+                "severities=$severities descriptions=$descriptions",
+            severities.contains(HighlightSeverity.ERROR),
+        )
+    }
+
     fun testDatePropertyReferencesUsePropertyHighlighting() {
         val script =
             """
             on formatDate(theDate)
                 if class of theDate is date then
                     set y to year of theDate
-                    set mInt to month of theDate
-                    set dInt to day of theDate
-                    set hhInt to hours of theDate
-                    set mmInt to minutes of theDate
-                    set ssInt to seconds of theDate
+                    set calendarValue to month of theDate
+                    set datePartValue to day of theDate
+                    set hourValue to hours of theDate
+                    set minuteValue to minutes of theDate
+                    set secondValue to seconds of theDate
                 end if
             end formatDate
             """.trimIndent()
@@ -250,6 +832,184 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             "eof must use dictionary constant highlighting; keys=$constantKeys",
             constantKeys.contains(AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR),
         )
+    }
+
+    fun testClipboardFileCommandsUseSemanticHighlighting() {
+        val script =
+            """
+            set d to the clipboard as «class utf8»
+            set fn to choose file name
+            set fid to open for access fn with write permission
+            write d to fid
+            close access fid
+            """.trimIndent()
+
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Standard dictionaries were not initialized",
+            { registryService.isInitialized() },
+            10,
+        )
+        myFixture.configureByText(AppleScriptFileType, script)
+        val highlights = myFixture.doHighlighting()
+        val document = myFixture.editor.document
+
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "the clipboard",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "choose file name",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "open for access",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "write d to fid",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "close access",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "with write",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "«class utf8»",
+            AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "set d",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "set fn",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "set fid",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "write d",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+        assertHighlightingKeysContain(
+            highlights,
+            document,
+            "close access fid",
+            AppleScriptSyntaxHighlighterColors.VARIABLE,
+        )
+    }
+
+    fun testApplicationDictionaryTermsUseSemanticHighlighting() {
+        val applicationName = "SyntheticTaskListApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "task-list-codeinsight",
+                SyntheticSuiteFixtures.taskListAppXml(),
+            )
+        val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            PlatformTestUtil.waitWithEventsDispatching(
+                "Application dictionaries were not indexed",
+                { registryService.areAppDictionariesIndexed() },
+                10,
+            )
+            val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+            val dictionary = projectDictionaries.createDictionary(applicationName)
+            val makeCommand = dictionary?.findAllCommandsWithName("make")?.singleOrNull()
+            assertNotNull("synthetic dictionary must expose make command", makeCommand)
+            assertEquals("type", makeCommand?.getParameterByName("new")?.typeSpecifier)
+            val indexedClassNames =
+                SdefIndexService
+                    .getInstance()
+                    .snapshot()
+                    .applicationNameToClassNameSet[applicationName]
+                    .orEmpty()
+            assertTrue("synthetic dictionary must index to do class", indexedClassNames.contains("to do"))
+
+            val script =
+                """
+                tell application "$applicationName"
+                    activate
+                    show list "Inbox"
+                    repeat with currentLine in reverse of fileContents
+                        set newToDo to make new to do ¬
+                            with properties {name:currentLine} ¬
+                            at beginning of list "Inbox"
+                    end repeat
+                end tell
+                """.trimIndent()
+
+            myFixture.configureByText(AppleScriptFileType, script)
+            val highlights = myFixture.doHighlighting()
+            val document = myFixture.editor.document
+
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "show",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+            )
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "make",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+            )
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "to do",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR,
+            )
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "with properties",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+            )
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "at beginning",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+            )
+        } finally {
+            persistence.removeDictionaryInfo(applicationFile.path)
+        }
     }
 
     fun testMyHandlerCallUsesFunctionHighlighting() {
@@ -390,6 +1150,19 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         highlightingKeysFor(highlights, textRange)
             .mapTo(mutableSetOf()) { key -> key.externalName }
 
+    private fun assertHighlightingKeysContain(
+        highlights: List<HighlightInfo>,
+        document: Document,
+        text: String,
+        expectedKey: TextAttributesKey,
+    ) {
+        val keys = highlightingKeysFor(highlights, textRangeFor(document, text))
+        assertTrue(
+            "$text must use ${expectedKey.externalName}; keys=$keys",
+            keys.contains(expectedKey),
+        )
+    }
+
     private fun textRangeFor(
         document: Document,
         text: String,
@@ -397,6 +1170,42 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val startOffset = document.charsSequence.indexOf(text)
         assertTrue("expected to find '$text'", startOffset >= 0)
         return TextRange(startOffset, startOffset + text.length)
+    }
+
+    private fun unknownProcessDescription(processName: String): String =
+        requireNotNull(
+            AppleScriptSystemEventsProcessReferenceAnnotator.resolveWarningMessage(
+                referenceText = "process \"$processName\"",
+                isInsideSystemEventsTell = true,
+                areAppDictionariesIndexed = true,
+                isKnownApplication = { false },
+            ),
+        )
+
+    private fun Icon.renderedPixelsEqual(other: Icon): Boolean {
+        val left = renderIcon()
+        val right = other.renderIcon()
+        if (left.width != right.width || left.height != right.height) return false
+
+        for (x in 0 until left.width) {
+            for (y in 0 until left.height) {
+                if (left.getRGB(x, y) != right.getRGB(x, y)) return false
+            }
+        }
+        return true
+    }
+
+    private fun Icon.renderIcon(): BufferedImage {
+        val image =
+            BufferedImage(
+                iconWidth.coerceAtLeast(1),
+                iconHeight.coerceAtLeast(1),
+                BufferedImage.TYPE_INT_ARGB,
+            )
+        val graphics = image.createGraphics()
+        paintIcon(null, graphics, 0, 0)
+        graphics.dispose()
+        return image
     }
 
     companion object {

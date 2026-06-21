@@ -8,7 +8,9 @@ import com.intellij.lang.parser.GeneratedParserUtilBase.recursion_guard_
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.BUILT_IN_TYPE_S
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMAND_PARAMETER_SELECTOR
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.STRING_LITERAL
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.TYPE
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.WITH
 
@@ -18,28 +20,48 @@ internal object FallbackCommandSelectorParser {
         level: Int,
     ) {
         var shouldContinue = true
-        while (shouldContinue &&
-            (
-                FallbackCommandParameterTokens.isPrepositionParameterStart(builder.tokenType) ||
-                    builder.tokenType === VAR_IDENTIFIER
-            )
-        ) {
+        while (shouldContinue) {
+            val isParameterStart =
+                builder.tokenType === OF ||
+                    FallbackCommandParameterTokens.isCommandSelectorStart(builder.tokenType) ||
+                    builder.tokenType === VAR_IDENTIFIER ||
+                    matchingDictionaryParameterDefinition(builder) != null
+            if (!isParameterStart) break
+
             val marker = enter_section_(builder, level, _NONE_, "<fallback command parameter>")
-            val result =
-                parseParameterSelector(builder, level + 1) &&
-                    parseParameterValue(builder, level + 1)
+            val result = parseParameterContent(builder, level + 1)
             exit_section_(builder, level, marker, COMMAND_PARAMETER, result, false, null)
             shouldContinue = result
         }
     }
 
+    fun parseParameterContent(
+        builder: PsiBuilder,
+        level: Int,
+    ): Boolean {
+        val parameterDefinition = matchingDictionaryParameterDefinition(builder)
+        return parseParameterSelector(builder, level + 1) &&
+            parseParameterValue(builder, level + 1, parameterDefinition)
+    }
+
     fun parseSelectorTokens(builder: PsiBuilder): Boolean =
         when {
             parseDictionarySelectorTokens(builder) -> true
-            FallbackCommandParameterTokens.isPrepositionParameterStart(builder.tokenType) -> {
+            builder.tokenType === OF ||
+                FallbackCommandParameterTokens.isCommandSelectorStart(builder.tokenType) -> {
                 val selectorStart = builder.tokenType
                 builder.advanceLexer()
-                if (selectorStart === WITH && builder.tokenType === VAR_IDENTIFIER) {
+                val hasSelectorLabel =
+                    (
+                        builder.tokenType === VAR_IDENTIFIER ||
+                            builder.tokenType === BUILT_IN_TYPE_S ||
+                            builder.tokenType === TYPE
+                    ) &&
+                        (
+                            selectorStart === WITH ||
+                                FallbackCommandParameterTokens.isValueLiteralStart(builder.lookAhead(1))
+                        )
+                if (hasSelectorLabel) {
                     builder.advanceLexer()
                 }
                 true
@@ -54,12 +76,31 @@ internal object FallbackCommandSelectorParser {
     private fun parseParameterValue(
         builder: PsiBuilder,
         level: Int,
+        parameterDefinition: FallbackCommandParameterDefinition?,
     ): Boolean =
-        parseSimpleLiteralValueBeforeSelector(builder) ||
+        parseTypedDictionaryValue(builder, level + 1, parameterDefinition) ||
+            parseSimpleLiteralValueBeforeSelector(builder) ||
             FallbackCommandParameterValueBoundaries.consumeIdentifierPhraseBeforeStructuredBareSelector(builder) ||
             parseSingleIdentifierValueBeforeBareSelector(builder) ||
+            FallbackCommandParameterValueBoundaries.consumeIdentifierPhraseExpressionBeforeBoundary(builder) ||
             FallbackCommandParameterValueBoundaries.parseExpressionAtValueBoundary(builder, level + 1) ||
             parseStructuredBracketFallback(builder)
+
+    private fun parseTypedDictionaryValue(
+        builder: PsiBuilder,
+        level: Int,
+        parameterDefinition: FallbackCommandParameterDefinition?,
+    ): Boolean =
+        when (parameterDefinition?.typeSpecifier) {
+            "type" ->
+                TypeSpecifierParser.parseTypeSpecifier(
+                    builder,
+                    level + 1,
+                    parameterDefinition.applicationName,
+                )
+            "text" -> AppleScriptParser.stringLiteralExpression(builder, level + 1)
+            else -> false
+        }
 
     private fun parseStructuredBracketFallback(builder: PsiBuilder): Boolean =
         AppleScriptBracketedValueParser.isBracketStart(builder.tokenType) &&
@@ -68,7 +109,10 @@ internal object FallbackCommandSelectorParser {
     private fun parseSimpleLiteralValueBeforeSelector(builder: PsiBuilder): Boolean {
         val isBoundedLiteral =
             builder.tokenType === STRING_LITERAL &&
-                FallbackCommandParameterTokens.isParameterSelectorStart(builder.lookAhead(1))
+                (
+                    builder.lookAhead(1) === OF ||
+                        FallbackCommandParameterTokens.isParameterSelectorStart(builder.lookAhead(1))
+                )
         if (isBoundedLiteral) {
             builder.advanceLexer()
         }
@@ -110,6 +154,29 @@ internal object FallbackCommandSelectorParser {
             .map { parameterName -> parameterName.split(' ') }
             .sortedByDescending { words -> words.size }
             .any { words -> AppleScriptParserPhrases.consumeBareSelectorPhrase(builder, words) }
+    }
+
+    private fun matchingDictionaryParameterDefinition(builder: PsiBuilder): FallbackCommandParameterDefinition? {
+        val parameterDefinitions =
+            builder
+                .getUserData(
+                    AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS,
+                ).orEmpty()
+        return parameterDefinitions
+            .asSequence()
+            .sortedByDescending { (parameterName, _) -> parameterName.split(' ').size }
+            .firstOrNull { (parameterName, _) -> selectorMatches(builder, parameterName.split(' ')) }
+            ?.value
+    }
+
+    private fun selectorMatches(
+        builder: PsiBuilder,
+        words: List<String>,
+    ): Boolean {
+        val marker = builder.mark()
+        val result = AppleScriptParserPhrases.consumeBareSelectorPhrase(builder, words)
+        marker.rollbackTo()
+        return result
     }
 
     private fun parseBareParameterSelector(builder: PsiBuilder) {

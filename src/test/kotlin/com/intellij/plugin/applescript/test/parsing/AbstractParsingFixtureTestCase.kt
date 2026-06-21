@@ -34,6 +34,7 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
     @Throws(Exception::class)
     override fun setUp() {
         super.setUp()
+        beforeFixturesConfigured()
         val targetDir = File(myTargetTestDataDir)
         check(targetDir.isDirectory) { "$targetDir is not a directory" }
 
@@ -41,6 +42,8 @@ abstract class AbstractParsingFixtureTestCase : BasePlatformTestCase() {
             .listFiles { pathname -> pathname.name.endsWith("scpt") }
             ?.forEach { file -> myPsiFiles.add(myFixture.configureByFile(file.canonicalPath)) }
     }
+
+    protected open fun beforeFixturesConfigured() = Unit
 
     protected fun doParseAllInPackageTest() {
         LOG.info("Parsing files in the package: " + getMyTargetDirectoryPath())

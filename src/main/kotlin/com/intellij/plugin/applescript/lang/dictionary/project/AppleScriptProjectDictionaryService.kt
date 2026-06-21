@@ -7,6 +7,8 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
+import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
@@ -14,6 +16,7 @@ import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.psi.PsiManager
 import com.intellij.psi.xml.XmlFile
+import org.jetbrains.annotations.TestOnly
 import java.io.File
 
 /**
@@ -61,6 +64,79 @@ class AppleScriptProjectDictionaryService(
         return dictionary
     }
 
+    @Synchronized
+    fun getOrCreateDictionaryFromCachedSources(applicationName: String): ApplicationDictionary? {
+        val dictionary =
+            if (isInIgnoreList(applicationName)) {
+                null
+            } else {
+                val standardApplicationBundle = findStandardApplicationBundle(applicationName)
+                val cachedDictionary = getDictionary(applicationName)
+                cachedDictionary
+                    ?.takeUnless { it.needsBundleAwareRefresh(standardApplicationBundle) }
+                    ?: createDictionaryFromRegisteredCache(
+                        applicationName,
+                        fallbackApplicationBundle = standardApplicationBundle,
+                    )
+                    ?: createDictionaryFromGeneratedCache(
+                        applicationName,
+                        applicationBundle = standardApplicationBundle,
+                    )
+                    ?: cachedDictionary
+            }
+        return dictionary
+    }
+
+    private fun createDictionaryFromRegisteredCache(
+        applicationName: String,
+        fallbackApplicationBundle: File? = null,
+    ): ApplicationDictionary? =
+        persistenceService
+            .dictionaryInfoSnapshot
+            .firstOrNull { info ->
+                info.getApplicationName() == applicationName && info.initialized
+            }?.let { info ->
+                createDictionaryFromInfo(
+                    info.withApplicationBundleFallback(fallbackApplicationBundle),
+                    shouldCacheInProject = false,
+                )
+            }
+
+    private fun createDictionaryFromGeneratedCache(
+        applicationName: String,
+        applicationBundle: File? = findStandardApplicationBundle(applicationName),
+    ): ApplicationDictionary? {
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        if (!generatedDictionaryFile.isFile) return null
+        if (!SdefIndexService.getInstance().parseDictionaryFile(generatedDictionaryFile, applicationName)) return null
+
+        val info =
+            DictionaryInfo(
+                applicationName,
+                generatedDictionaryFile,
+                applicationBundle,
+            ).also { dictionaryInfo -> dictionaryInfo.setInitialized(true) }
+        return createDictionaryFromInfo(info, shouldCacheInProject = false)
+    }
+
+    private fun ApplicationDictionary.needsBundleAwareRefresh(standardApplicationBundle: File?): Boolean =
+        applicationBundle == null && standardApplicationBundle != null
+
+    private fun DictionaryInfo.withApplicationBundleFallback(fallbackApplicationBundle: File?): DictionaryInfo {
+        if (getApplicationFile() != null || fallbackApplicationBundle == null) return this
+        return DictionaryInfo(getApplicationName(), getDictionaryFile(), fallbackApplicationBundle)
+            .also { info -> info.setInitialized(initialized) }
+    }
+
+    private fun findStandardApplicationBundle(applicationName: String): File? =
+        ApplicationDictionary.APP_BUNDLE_DIRECTORIES
+            .asSequence()
+            .flatMap { applicationsDirectory ->
+                ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS
+                    .asSequence()
+                    .map { extension -> File("$applicationsDirectory/$applicationName.$extension") }
+            }.firstOrNull { applicationFile -> applicationFile.exists() }
+
     private fun createDictionaryFromInitializedInfo(applicationName: String): ApplicationDictionary? {
         val info = dictionaryRegistryService.getInitializedInfo(applicationName)
         if (info == null) {
@@ -69,7 +145,10 @@ class AppleScriptProjectDictionaryService(
         return info?.let(::createDictionaryFromInfo)
     }
 
-    private fun createDictionaryFromInfo(info: DictionaryInfo): ApplicationDictionary? {
+    private fun createDictionaryFromInfo(
+        info: DictionaryInfo,
+        shouldCacheInProject: Boolean = true,
+    ): ApplicationDictionary? {
         val applicationName = info.getApplicationName()
         val dictionary =
             if (info.initialized) {
@@ -92,7 +171,9 @@ class AppleScriptProjectDictionaryService(
                 null
             }
 
-        dictionary?.let { dictionaryMap[applicationName] = it }
+        if (shouldCacheInProject) {
+            dictionary?.let { dictionaryMap[applicationName] = it }
+        }
         return dictionary
     }
 
@@ -142,6 +223,19 @@ class AppleScriptProjectDictionaryService(
     fun getDictionary(applicationName: String): ApplicationDictionary? = dictionaryMap[applicationName]
 
     fun getDictionaries(): Collection<ApplicationDictionary> = dictionaryMap.values
+
+    @TestOnly
+    internal fun clearCachedDictionariesForTests() {
+        dictionaryMap.clear()
+    }
+
+    @TestOnly
+    fun cacheDictionaryForTests(
+        applicationName: String,
+        dictionary: ApplicationDictionary,
+    ) {
+        dictionaryMap[applicationName] = dictionary
+    }
 
     companion object {
         private val LOG: Logger = Logger.getInstance("#${AppleScriptProjectDictionaryService::class.java.name}")

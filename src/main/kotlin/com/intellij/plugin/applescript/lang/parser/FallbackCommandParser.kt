@@ -15,9 +15,7 @@ internal object FallbackCommandParser {
         if (recursion_guard_(builder, level, "parseWellKnownCommandFallback") &&
             builder.tokenType === VAR_IDENTIFIER
         ) {
-            result =
-                KnownFallbackCommandNameParser.parse(builder, parsedName) ||
-                GenericFallbackCommandHeadParser.parse(builder, parsedName)
+            result = GenericFallbackCommandHeadParser.parse(builder, parsedName)
         }
         return result
     }

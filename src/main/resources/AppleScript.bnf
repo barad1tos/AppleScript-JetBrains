@@ -189,7 +189,7 @@
 
 appleScriptFile ::= compilation_unit_*
 
-private compilation_unit_ ::= topBlockBodyPart|sep
+private compilation_unit_ ::= <<parseTopLevelEnd>>|topBlockBodyPart|sep
 
 private topBlockBodyPart ::= topLevelStatement | statement | expression | incompleteExpression
 {recoverWhile=topBodyPartRecover}
@@ -275,7 +275,7 @@ private resultList ::= expression
 private offendingObject ::= (referenceExpression &to) | expression
 private expectedType ::= expression
 private errorNumber ::= expression
-private errorMessage ::= expression
+private errorMessage ::= !(number|from|to|partial) expression
 
 tryStatement ::= try sep
                      blockBody?
@@ -291,7 +291,7 @@ varDeclarationListPart ::= identifier
 
 varDeclarationList ::= varAccessDeclaration (COMMA varDeclarationListPart)*
 
-private errorMessageVar ::= directParameterDeclaration|expression
+private errorMessageVar ::= !(number|from|to|partial) (directParameterDeclaration|expression)
 private errorNumberVar ::= directParameterDeclaration|expression
 private offendingObjectVar ::= directParameterDeclaration|expression
 private resultListVar ::= directParameterDeclaration|expression
@@ -617,7 +617,8 @@ private currentApplicationConstant ::= CURRENT_APPLICATION|CURRENT_APP|(CURRENT 
 private currentDateConstant ::= CURRENT DATE
 private missing_value_constant ::= MISSING_VALUE
 //private save_opt_constant ::= yes|no|ask
-private text_constant ::=  return|space|(tab !(DIGITS|of|in))|linefeed|quote
+private text_constant ::=  return|space|(tab !(DIGITS|of|in|tabDictionaryClassTail))|linefeed|quote
+private tabDictionaryClassTail ::= var_identifier (DIGITS|of|in|whose|where|STRING_LITERAL|named)
 private anythingProperty ::= anything
 private resultProperty ::= result
 private parentProperty ::= parent

@@ -11,6 +11,7 @@ object AppleScriptSyntaxHighlighterColors {
     const val APPLE_SCRIPT_LANGUAGE_LITERAL: String = "APPLE_SCRIPT_LANGUAGE_LITERAL"
     const val APPLE_SCRIPT_BUILT_IN_TYPE: String = "APPLE_SCRIPT_BUILT_IN_TYPE"
     const val APPLE_SCRIPT_HANDLER_CALL: String = "APPLE_SCRIPT_HANDLER_CALL"
+    const val APPLE_SCRIPT_VARIABLE: String = "APPLE_SCRIPT_VARIABLE"
     private const val APPLE_SCRIPT_NUMBER = "APPLE_SCRIPT_NUMBER"
     private const val APPLE_SCRIPT_STRING = "APPLE_SCRIPT_STRING"
     private const val APPLE_SCRIPT_OPERATION_SIGN = "APPLE_SCRIPT_OPERATION_SIGN"
@@ -62,6 +63,13 @@ object AppleScriptSyntaxHighlighterColors {
         )
 
     @JvmField
+    val VARIABLE: TextAttributesKey =
+        createTextAttributesKey(
+            APPLE_SCRIPT_VARIABLE,
+            DefaultLanguageHighlighterColors.LOCAL_VARIABLE,
+        )
+
+    @JvmField
     val STRING: TextAttributesKey =
         createTextAttributesKey(APPLE_SCRIPT_STRING, DefaultLanguageHighlighterColors.STRING)
 
@@ -86,7 +94,7 @@ object AppleScriptSyntaxHighlighterColors {
 
     @JvmField
     val DICTIONARY_COMMAND_ATTR: TextAttributesKey =
-        createTextAttributesKey(DICTIONARY_COMMAND, DefaultLanguageHighlighterColors.MARKUP_ATTRIBUTE)
+        createTextAttributesKey(DICTIONARY_COMMAND, DefaultLanguageHighlighterColors.FUNCTION_CALL)
 
     @JvmField
     val DICTIONARY_COMMAND_SELECTOR_ATTR: TextAttributesKey =
@@ -94,7 +102,7 @@ object AppleScriptSyntaxHighlighterColors {
 
     @JvmField
     val DICTIONARY_CLASS_ATTR: TextAttributesKey =
-        createTextAttributesKey(DICTIONARY_CLASS, DefaultLanguageHighlighterColors.NUMBER)
+        createTextAttributesKey(DICTIONARY_CLASS, DefaultLanguageHighlighterColors.CLASS_NAME)
 
     @JvmField
     val DICTIONARY_PROPERTY_ATTR: TextAttributesKey =

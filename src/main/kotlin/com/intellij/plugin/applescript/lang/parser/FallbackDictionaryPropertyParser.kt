@@ -75,15 +75,35 @@ internal object FallbackDictionaryPropertyParser {
                 FallbackDictionaryTermActions.advanceTermPair(builder)
             FallbackDictionaryPropertyPatterns.isIdentifierPairWithTerminator(builder) ->
                 FallbackDictionaryTermActions.advanceTermPair(builder)
-            else -> parseTwoWordIdentifier(builder)
+            else -> parseAnchoredPropertyPhrase(builder)
         }
 
-    private fun parseTwoWordIdentifier(builder: PsiBuilder): Boolean {
-        val result =
-            builder.lookAhead(1) === VAR_IDENTIFIER &&
-                isPropertyAnchor(builder, builder.lookAhead(2))
+    private fun parseAnchoredPropertyPhrase(builder: PsiBuilder): Boolean {
+        val marker = builder.mark()
+        var wordCount = 0
+        var shouldContinue = true
+
+        while (shouldContinue) {
+            val tokenType = builder.tokenType
+            shouldContinue =
+                tokenType === VAR_IDENTIFIER ||
+                FallbackDictionaryTermPredicates.isContextualPropertyTerm(tokenType) ||
+                (
+                    wordCount > 1 &&
+                        tokenType === TO &&
+                        builder.lookAhead(1) === VAR_IDENTIFIER
+                )
+            if (shouldContinue) {
+                builder.advanceLexer()
+                wordCount += 1
+            }
+        }
+
+        val result = wordCount > 1 && isPropertyAnchor(builder, builder.tokenType)
         if (result) {
-            FallbackDictionaryTermActions.advanceTermPair(builder)
+            marker.drop()
+        } else {
+            marker.rollbackTo()
         }
         return result
     }

@@ -2,6 +2,7 @@ package com.intellij.plugin.applescript.lang.parser
 
 import com.intellij.lang.PsiBuilder
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.CLASS
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMA
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.COUNT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DIGITS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.END
@@ -13,6 +14,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.MINUTES_CONSTANT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NAMED
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.RCURLY
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.RPAREN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SECONDS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.SET
@@ -52,7 +54,8 @@ internal object FallbackDictionaryTermPredicates {
             builder.lookAhead(1) === VAR_IDENTIFIER &&
             isClassDirectReferenceAnchor(builder.lookAhead(2))
 
-    fun isPropertyTerminatorAnchor(type: IElementType?) = type === NLS || type === RPAREN
+    fun isPropertyTerminatorAnchor(type: IElementType?) =
+        type === NLS || type === RPAREN || type === COMMA || type === RCURLY
 
     fun isClassRangeAnchor(tokenType: IElementType?): Boolean =
         tokenType === THRU || tokenType === THROUGH || tokenType === FROM || tokenType === TO

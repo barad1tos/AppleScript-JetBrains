@@ -15,8 +15,8 @@ import com.intellij.psi.tree.IElementType
  * that defines the label. The grammar only reaches this after at least one keyword label, so a
  * leading bare identifier is never read as a command call (BL-C7).
  *
- * A VAR_IDENTIFIER is taken as a label only when a parameter value clearly follows (allowlist of
- * value-start tokens). Under-matching is safe — an unrecognized value-start just leaves the
+ * A VAR_IDENTIFIER is taken as a label only when a grammar value-start token clearly follows.
+ * Under-matching is safe — an unrecognized value-start just leaves the
  * construct to the existing parse — while over-matching would mis-read existing handler calls.
  * Parser-level only: no PSI node, mirroring the Standard Additions object tokens (PARSE-04).
  */

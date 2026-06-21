@@ -6,12 +6,15 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.util.Ref
 import com.intellij.plugin.applescript.AppleScriptNames
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.COMMENT
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.DICTIONARY_COMMAND_NAME
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.END
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.NLS
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.REFERENCE_EXPRESSION
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.TO
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import java.util.Stack
 
 // Grammar-Kit generates Java code with a static import from this exact parserUtilClass.
@@ -38,6 +41,9 @@ class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserAssignmentHooks
             Key.create("applescript.parsing.fallback.command.parameter.mode")
         internal val PARSING_FALLBACK_COMMAND_PARAMETER_NAMES: Key<Set<String>> =
             Key.create("applescript.parsing.fallback.command.parameter.names")
+        internal val PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS:
+            Key<Map<String, FallbackCommandParameterDefinition>> =
+            Key.create("applescript.parsing.fallback.command.parameter.definitions")
 
         @JvmField
         val TOLD_APPLICATION_NAME_STACK: Key<Stack<String>> =
@@ -124,13 +130,56 @@ internal object SetObjectPropertyAssignmentParser {
 
     private fun hasObjectPointerBeforeAssignmentTerminator(builder: PsiBuilder): Boolean {
         var offset = 0
-        while (true) {
+        var foundObjectPointer = false
+        var reachedTerminator = false
+
+        while (!foundObjectPointer && !reachedTerminator) {
+            val tokenType = builder.lookAhead(offset)
+            when {
+                tokenType === OF || tokenType === IN -> foundObjectPointer = true
+                tokenType === TO && !isPropertyPhraseContinuationBeforePointer(builder, offset) ->
+                    reachedTerminator = true
+                tokenType === NLS || tokenType == null -> reachedTerminator = true
+            }
+            if (!foundObjectPointer && !reachedTerminator) {
+                offset += 1
+            }
+        }
+
+        return foundObjectPointer
+    }
+
+    private fun isPropertyPhraseContinuationBeforePointer(
+        builder: PsiBuilder,
+        offset: Int,
+    ): Boolean {
+        val nextTokenType = builder.lookAhead(offset + 1)
+        val hasPropertyWordAfterTo =
+            nextTokenType === VAR_IDENTIFIER ||
+                FallbackDictionaryTermPredicates.isContextualPropertyTerm(nextTokenType)
+
+        return offset > 1 &&
+            hasPropertyWordAfterTo &&
+            hasObjectPointerBeforeNextTerminator(builder, offset + 1)
+    }
+
+    private fun hasObjectPointerBeforeNextTerminator(
+        builder: PsiBuilder,
+        startOffset: Int,
+    ): Boolean {
+        var offset = startOffset
+        var foundObjectPointer = false
+        var reachedTerminator = false
+
+        while (!foundObjectPointer && !reachedTerminator) {
             when (builder.lookAhead(offset)) {
-                OF, IN -> return true
-                TO, NLS, null -> return false
+                OF, IN -> foundObjectPointer = true
+                TO, NLS, null -> reachedTerminator = true
                 else -> offset += 1
             }
         }
+
+        return foundObjectPointer
     }
 }
 
@@ -300,12 +349,33 @@ open class AppleScriptGeneratedParserFlowHooks : AppleScriptGeneratedParserComma
         ): Boolean = UseStatementParser.parseApplicationName(builder, level, tellStatementStartCondition)
 
         @JvmStatic
+        fun parseTopLevelEnd(
+            builder: PsiBuilder,
+            level: Int,
+        ): Boolean =
+            recursion_guard_(builder, level, "parseTopLevelEnd") &&
+                builder.tokenType === END &&
+                isTopLevelEndTerminator(builder) &&
+                consumeToken(builder, END)
+
+        @JvmStatic
         fun isTellStatementStart(
             builder: PsiBuilder,
             level: Int,
         ): Boolean =
             recursion_guard_(builder, level, "isTellStatementStart") &&
                 TellStatementParser.isTellStatementStart(builder)
+    }
+}
+
+private fun isTopLevelEndTerminator(builder: PsiBuilder): Boolean {
+    var offset = 1
+    while (true) {
+        when (builder.lookAhead(offset)) {
+            null -> return true
+            COMMENT, NLS -> offset += 1
+            else -> return false
+        }
     }
 }
 

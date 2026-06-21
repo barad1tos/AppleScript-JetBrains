@@ -1029,12 +1029,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // topBlockBodyPart|sep
+  // <<parseTopLevelEnd>>|topBlockBodyPart|sep
   static boolean compilation_unit_(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "compilation_unit_")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
-    result_ = topBlockBodyPart(builder_, level_ + 1);
+    result_ = parseTopLevelEnd(builder_, level_ + 1);
+    if (!result_) result_ = topBlockBodyPart(builder_, level_ + 1);
     if (!result_) result_ = sep(builder_, level_ + 1);
     exit_section_(builder_, marker_, null, result_);
     return result_;
@@ -1869,15 +1870,74 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // expression
+  // !(number|from|to|partial) expression
   static boolean errorMessage(PsiBuilder builder_, int level_) {
-    return expression(builder_, level_ + 1);
+    if (!recursion_guard_(builder_, level_, "errorMessage")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = errorMessage_0(builder_, level_ + 1);
+    result_ = result_ && expression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // !(number|from|to|partial)
+  private static boolean errorMessage_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "errorMessage_0")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_, level_, _NOT_);
+    result_ = !errorMessage_0_0(builder_, level_ + 1);
+    exit_section_(builder_, level_, marker_, result_, false, null);
+    return result_;
+  }
+
+  // number|from|to|partial
+  private static boolean errorMessage_0_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "errorMessage_0_0")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, NUMBER);
+    if (!result_) result_ = consumeToken(builder_, FROM);
+    if (!result_) result_ = consumeToken(builder_, TO);
+    if (!result_) result_ = consumeToken(builder_, PARTIAL);
+    return result_;
   }
 
   /* ********************************************************** */
-  // directParameterDeclaration|expression
+  // !(number|from|to|partial) (directParameterDeclaration|expression)
   static boolean errorMessageVar(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "errorMessageVar")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = errorMessageVar_0(builder_, level_ + 1);
+    result_ = result_ && errorMessageVar_1(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // !(number|from|to|partial)
+  private static boolean errorMessageVar_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "errorMessageVar_0")) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_, level_, _NOT_);
+    result_ = !errorMessageVar_0_0(builder_, level_ + 1);
+    exit_section_(builder_, level_, marker_, result_, false, null);
+    return result_;
+  }
+
+  // number|from|to|partial
+  private static boolean errorMessageVar_0_0(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "errorMessageVar_0_0")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, NUMBER);
+    if (!result_) result_ = consumeToken(builder_, FROM);
+    if (!result_) result_ = consumeToken(builder_, TO);
+    if (!result_) result_ = consumeToken(builder_, PARTIAL);
+    return result_;
+  }
+
+  // directParameterDeclaration|expression
+  private static boolean errorMessageVar_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "errorMessageVar_1")) return false;
     boolean result_;
     result_ = directParameterDeclaration(builder_, level_ + 1);
     if (!result_) result_ = expression(builder_, level_ + 1);
@@ -6709,6 +6769,33 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // var_identifier (DIGITS|of|in|whose|where|STRING_LITERAL|named)
+  static boolean tabDictionaryClassTail(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "tabDictionaryClassTail")) return false;
+    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, VAR_IDENTIFIER);
+    result_ = result_ && tabDictionaryClassTail_1(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
+  }
+
+  // DIGITS|of|in|whose|where|STRING_LITERAL|named
+  private static boolean tabDictionaryClassTail_1(PsiBuilder builder_, int level_) {
+    if (!recursion_guard_(builder_, level_, "tabDictionaryClassTail_1")) return false;
+    boolean result_;
+    result_ = consumeToken(builder_, DIGITS);
+    if (!result_) result_ = consumeToken(builder_, OF);
+    if (!result_) result_ = consumeToken(builder_, IN);
+    if (!result_) result_ = consumeToken(builder_, WHOSE);
+    if (!result_) result_ = consumeToken(builder_, WHERE);
+    if (!result_) result_ = consumeToken(builder_, STRING_LITERAL);
+    if (!result_) result_ = consumeToken(builder_, NAMED);
+    return result_;
+  }
+
+  /* ********************************************************** */
   // LCURLY [targetVariablePattern|expression] (COMMA targetVariablePattern|expression)* RCURLY
   public static boolean targetListLiteral(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "targetListLiteral")) return false;
@@ -6929,7 +7016,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // return|space|(tab !(DIGITS|of|in))|linefeed|quote
+  // return|space|(tab !(DIGITS|of|in|tabDictionaryClassTail))|linefeed|quote
   static boolean text_constant(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "text_constant")) return false;
     boolean result_;
@@ -6943,7 +7030,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // tab !(DIGITS|of|in)
+  // tab !(DIGITS|of|in|tabDictionaryClassTail)
   private static boolean text_constant_2(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "text_constant_2")) return false;
     boolean result_;
@@ -6954,7 +7041,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // !(DIGITS|of|in)
+  // !(DIGITS|of|in|tabDictionaryClassTail)
   private static boolean text_constant_2_1(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "text_constant_2_1")) return false;
     boolean result_;
@@ -6964,13 +7051,14 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     return result_;
   }
 
-  // DIGITS|of|in
+  // DIGITS|of|in|tabDictionaryClassTail
   private static boolean text_constant_2_1_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "text_constant_2_1_0")) return false;
     boolean result_;
     result_ = consumeToken(builder_, DIGITS);
     if (!result_) result_ = consumeToken(builder_, OF);
     if (!result_) result_ = consumeToken(builder_, IN);
+    if (!result_) result_ = tabDictionaryClassTail(builder_, level_ + 1);
     return result_;
   }
 
