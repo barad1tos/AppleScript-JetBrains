@@ -2,6 +2,19 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.9] - 2026-06-21
+
+- [Fix] Dynamic `tell application` blocks now parse correctly when the target application name comes from a variable or expression instead of a string literal.
+- [Fix] Real-world Standard Additions commands such as `choose file ... of type`, `choose from list`, `open for access`, `write ... starting at`, and `close access` no longer produce false parser errors.
+- [Fix] UI-scripting object references such as `tab group`, `process`, `window`, `group`, and `slider` keep parsing cleanly inside System Events automation scripts.
+- [Fix] Dictionary-backed command parameters now preserve selector and class highlighting while accepting valid AppleScript command tails.
+- [Fix] Valid object-reference command arguments such as `close every window` and anchored property phrases such as `require password to wake of security preferences` no longer show false parser errors.
+- [Fix] Launcher-style scripts with a final top-level `end` after conditional branches now parse without a spurious error on the last line.
+- [Fix] Semantic highlighting now better matches Script Editor-style AppleScript coloring for variables, dictionary terms, application references, handler calls, constants, and System Events process references.
+- [Fix] Literal System Events process names that are not known local applications now get a weak warning instead of being confused with parser errors.
+- [Fix] Application gutter markers now resolve real macOS app icons more reliably, including cached dictionaries and app bundles with icons stored in nested resources or extensions.
+- [Fix] Malformed generated dictionary cache files no longer evict persisted dictionary information during gutter icon refresh.
+
 ## [2.0.8] - 2026-06-20
 
 - [Fix] Valid AppleScript property-update statements no longer show false parser errors when assigning values to application object properties.

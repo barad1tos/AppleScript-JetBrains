@@ -26,6 +26,19 @@
     </p>
   ]]></description>
   <change-notes><![CDATA[
+    <h3>2.0.9</h3>
+    <ul>
+      <li>[Fix] Dynamic <code>tell application</code> blocks now parse correctly when the target application name comes from a variable or expression instead of a string literal.</li>
+      <li>[Fix] Real-world Standard Additions commands such as <code>choose file ... of type</code>, <code>choose from list</code>, <code>open for access</code>, <code>write ... starting at</code>, and <code>close access</code> no longer produce false parser errors.</li>
+      <li>[Fix] UI-scripting object references such as <code>tab group</code>, <code>process</code>, <code>window</code>, <code>group</code>, and <code>slider</code> keep parsing cleanly inside System Events automation scripts.</li>
+      <li>[Fix] Dictionary-backed command parameters now preserve selector and class highlighting while accepting valid AppleScript command tails.</li>
+      <li>[Fix] Valid object-reference command arguments such as <code>close every window</code> and anchored property phrases such as <code>require password to wake of security preferences</code> no longer show false parser errors.</li>
+      <li>[Fix] Launcher-style scripts with a final top-level <code>end</code> after conditional branches now parse without a spurious error on the last line.</li>
+      <li>[Fix] Semantic highlighting now better matches Script Editor-style AppleScript coloring for variables, dictionary terms, application references, handler calls, constants, and System Events process references.</li>
+      <li>[Fix] Literal System Events process names that are not known local applications now get a weak warning instead of being confused with parser errors.</li>
+      <li>[Fix] Application gutter markers now resolve real macOS app icons more reliably, including cached dictionaries and app bundles with icons stored in nested resources or extensions.</li>
+      <li>[Fix] Malformed generated dictionary cache files no longer evict persisted dictionary information during gutter icon refresh.</li>
+    </ul>
     <h3>2.0.8</h3>
     <ul>
       <li>[Fix] Valid AppleScript property-update statements no longer show false parser errors when assigning values to application object properties.</li>
