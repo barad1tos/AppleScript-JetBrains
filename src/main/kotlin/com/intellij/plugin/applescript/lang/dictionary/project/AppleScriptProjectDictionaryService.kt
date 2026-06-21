@@ -8,6 +8,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
 import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
@@ -64,7 +65,7 @@ class AppleScriptProjectDictionaryService(
     }
 
     @Synchronized
-    fun resolveDictionaryFromCache(applicationName: String): ApplicationDictionary? {
+    fun getOrCreateDictionaryFromCachedSources(applicationName: String): ApplicationDictionary? {
         val dictionary =
             if (isInIgnoreList(applicationName)) {
                 null
@@ -75,12 +76,10 @@ class AppleScriptProjectDictionaryService(
                     ?.takeUnless { it.needsBundleAwareRefresh(standardApplicationBundle) }
                     ?: createDictionaryFromRegisteredCache(
                         applicationName,
-                        shouldCacheInProject = false,
                         fallbackApplicationBundle = standardApplicationBundle,
                     )
                     ?: createDictionaryFromGeneratedCache(
                         applicationName,
-                        shouldCacheInProject = false,
                         applicationBundle = standardApplicationBundle,
                     )
                     ?: cachedDictionary
@@ -90,7 +89,6 @@ class AppleScriptProjectDictionaryService(
 
     private fun createDictionaryFromRegisteredCache(
         applicationName: String,
-        shouldCacheInProject: Boolean,
         fallbackApplicationBundle: File? = null,
     ): ApplicationDictionary? =
         persistenceService
@@ -100,26 +98,25 @@ class AppleScriptProjectDictionaryService(
             }?.let { info ->
                 createDictionaryFromInfo(
                     info.withApplicationBundleFallback(fallbackApplicationBundle),
-                    shouldCacheInProject,
+                    shouldCacheInProject = false,
                 )
             }
 
     private fun createDictionaryFromGeneratedCache(
         applicationName: String,
-        shouldCacheInProject: Boolean,
         applicationBundle: File? = findStandardApplicationBundle(applicationName),
     ): ApplicationDictionary? {
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         if (!generatedDictionaryFile.isFile) return null
+        if (!SdefIndexService.getInstance().parseDictionaryFile(generatedDictionaryFile, applicationName)) return null
 
         val info =
             DictionaryInfo(
                 applicationName,
                 generatedDictionaryFile,
                 applicationBundle,
-            )
-        if (!dictionaryRegistryService.initializeDictionaryFromInfoInternal(info)) return null
-        return createDictionaryFromInfo(info, shouldCacheInProject)
+            ).also { dictionaryInfo -> dictionaryInfo.setInitialized(true) }
+        return createDictionaryFromInfo(info, shouldCacheInProject = false)
     }
 
     private fun ApplicationDictionary.needsBundleAwareRefresh(standardApplicationBundle: File?): Boolean =
@@ -230,6 +227,14 @@ class AppleScriptProjectDictionaryService(
     @TestOnly
     internal fun clearCachedDictionariesForTests() {
         dictionaryMap.clear()
+    }
+
+    @TestOnly
+    fun cacheDictionaryForTests(
+        applicationName: String,
+        dictionary: ApplicationDictionary,
+    ) {
+        dictionaryMap[applicationName] = dictionary
     }
 
     companion object {

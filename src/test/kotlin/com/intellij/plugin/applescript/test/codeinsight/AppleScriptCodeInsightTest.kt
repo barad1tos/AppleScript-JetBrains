@@ -20,7 +20,6 @@ import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersisten
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
-import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
@@ -186,6 +185,45 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testCachedDictionaryLookupIgnoresMalformedGeneratedCacheWithoutRemovingPersistedInfo() {
+        val applicationName = "SyntheticMalformedCacheApp_${System.nanoTime()}"
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val registeredDictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "registered-dictionary",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val applicationFile = File(registeredDictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo = DictionaryInfo(applicationName, registeredDictionaryFile, applicationFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        generatedDictionaryFile.parentFile.mkdirs()
+        generatedDictionaryFile.writeText("<dictionary><suite>")
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+
+            val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
+
+            assertNull("Malformed generated cache must not create a transient dictionary", dictionary)
+            assertTrue(
+                "Malformed generated cache must not evict existing persisted dictionary info",
+                persistence
+                    .dictionaryInfoSnapshot
+                    .any { info ->
+                        info.getApplicationName() == applicationName &&
+                            info.getDictionaryFile().path == registeredDictionaryFile.path
+                    },
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            persistence.removeDictionaryInfo(applicationFile.path)
+            generatedDictionaryFile.delete()
+            registeredDictionaryFile.delete()
+        }
+    }
+
     fun testApplicationReferenceLineMarkerUsesGeneratedCacheApplicationBundleIcon() {
         val applicationName = "Things3"
         val applicationBundle = File("/Applications/Things3.app")
@@ -247,7 +285,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         requireNotNull(applicationIcon)
 
         try {
-            projectDictionaries.cacheDictionaryForTest(
+            projectDictionaries.cacheDictionaryForTests(
                 applicationName,
                 ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null),
             )
@@ -279,18 +317,23 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val applicationName = "SyntheticMarkerIconApp_${System.nanoTime()}"
         val dictionaryFile =
-            SyntheticSuiteFixtures.writeToTempFile(
-                "marker-icon",
-                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
-            )
-        val dictionaryInfo =
-            DictionaryInfo(applicationName, dictionaryFile, applicationBundle)
-                .also { info -> info.setInitialized(true) }
-        val persistence = SdefPersistenceService.getInstance()
+            File
+                .createTempFile("marker-icon", ".xml")
+                .also { file -> file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml()) }
+        val dictionaryXmlFile =
+            LocalFileSystem
+                .getInstance()
+                .refreshAndFindFileByIoFile(dictionaryFile)
+                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
+        assertNotNull(dictionaryXmlFile)
+        requireNotNull(dictionaryXmlFile)
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         try {
-            persistence.addDictionaryInfo(dictionaryInfo)
+            projectDictionaries.cacheDictionaryForTests(
+                applicationName,
+                ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, applicationBundle),
+            )
             val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
             assertNotNull(applicationIcon)
             requireNotNull(applicationIcon)
@@ -315,7 +358,6 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             )
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
-            persistence.removeDictionaryInfo(applicationBundle.path)
             dictionaryFile.delete()
         }
     }
@@ -559,7 +601,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertFalse(
             "nested tell application \"Finder\" must override outer System Events; " +
                 "descriptions=$descriptions",
-            descriptions.any { description -> description.contains("not known on this macOS installation") },
+            descriptions.any { description -> description == unknownProcessDescription(unknownProcessName) },
         )
         assertFalse(
             "nested tell application \"Finder\" must not get a weak warning; " +
@@ -608,7 +650,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         assertFalse(
             "known System Events process must not be highlighted as unknown; descriptions=$descriptions",
-            descriptions.any { description -> description.contains("not known on this macOS installation") },
+            descriptions.any { description -> description == unknownProcessDescription(knownProcessName) },
         )
         assertFalse(
             "known System Events process must not get a weak warning; " +
@@ -665,7 +707,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         assertFalse(
             "dynamic process names must not be validated as literal process references; descriptions=$descriptions",
-            descriptions.any { description -> description.contains("not known on this macOS installation") },
+            descriptions.any { description -> description == unknownProcessDescription("processReferenceName") },
         )
         assertFalse(
             "dynamic process names must not get a weak warning; severities=$severities descriptions=$descriptions",
@@ -711,7 +753,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         assertFalse(
             "process-like references outside System Events must not be validated; descriptions=$descriptions",
-            descriptions.any { description -> description.contains("not known on this macOS installation") },
+            descriptions.any { description -> description == unknownProcessDescription(unknownProcessName) },
         )
         assertFalse(
             "process-like references outside System Events must not get a weak warning; " +
@@ -731,8 +773,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             on formatDate(theDate)
                 if class of theDate is date then
                     set y to year of theDate
-                    set mInt to month of theDate
-                    set dInt to day of theDate
+                    set calendarValue to month of theDate
+                    set datePartValue to day of theDate
                     set hhInt to hours of theDate
                     set mmInt to minutes of theDate
                     set ssInt to seconds of theDate
@@ -1129,6 +1171,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         return TextRange(startOffset, startOffset + text.length)
     }
 
+    private fun unknownProcessDescription(processName: String): String =
+        "Process \"$processName\" is not known on this macOS installation"
+
     private fun Icon.renderedPixelsEqual(other: Icon): Boolean {
         val left = renderIcon()
         val right = other.renderIcon()
@@ -1153,17 +1198,6 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         paintIcon(null, graphics, 0, 0)
         graphics.dispose()
         return image
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun AppleScriptProjectDictionaryService.cacheDictionaryForTest(
-        applicationName: String,
-        dictionary: ApplicationDictionary,
-    ) {
-        val field = javaClass.getDeclaredField("dictionaryMap")
-        field.isAccessible = true
-        val dictionaryMap = field.get(this) as MutableMap<String, ApplicationDictionary>
-        dictionaryMap[applicationName] = dictionary
     }
 
     companion object {

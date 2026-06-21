@@ -29,7 +29,7 @@ private fun AppleScriptApplicationReference.createApplicationDictionaryMarker():
     val dictionary =
         getApplicationName()
             ?.takeUnless(String::isEmpty)
-            ?.let { appName -> dictionaryService?.resolveDictionaryFromCache(appName) }
+            ?.let { appName -> dictionaryService?.getOrCreateDictionaryFromCachedSources(appName) }
 
     return dictionary?.let {
         NavigationGutterIconBuilder
