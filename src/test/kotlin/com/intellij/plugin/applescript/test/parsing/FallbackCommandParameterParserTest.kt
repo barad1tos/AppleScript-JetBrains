@@ -66,6 +66,36 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER_SELECTOR).contains("default button"))
     }
 
+    fun testFullParserPermissiveCommandKeepsModifierConcatenationValue() {
+        val psiFile =
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                tell application "Finder"
+                    close every window
+                    tell application "Notational Velocity"
+                        activate
+                        tell application "System Events"
+                            key code 15 using shift down & command down
+                            tell application "Finder"
+                                delay 0.25
+                                set TaskP to selection as text
+                                set TaskP to quoted form of POSIX path of TaskP
+                                tell application "TaskPaper"
+                                    activate
+                                    do shell script "open -a 'TaskPaper' " & TaskP
+                                end tell
+                            end tell
+                        end tell
+                    end tell
+                end tell
+                """.trimIndent(),
+            )
+
+        assertNoParserErrors(psiFile)
+        assertTrue(psiFile.node.textsOf(COMMAND_PARAMETER).contains("using shift down & command down"))
+    }
+
     fun testFullParserErrorNumberBeforeElseIf() {
         val psiFile =
             myFixture.configureByText(

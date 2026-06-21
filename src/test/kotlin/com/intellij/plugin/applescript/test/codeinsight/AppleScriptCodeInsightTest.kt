@@ -10,6 +10,7 @@ import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.TextRange
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
@@ -708,6 +709,90 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             "close access fid",
             AppleScriptSyntaxHighlighterColors.VARIABLE,
         )
+    }
+
+    fun testApplicationDictionaryTermsUseSemanticHighlighting() {
+        val applicationName = "SyntheticTaskListApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "task-list-codeinsight",
+                SyntheticSuiteFixtures.taskListAppXml(),
+            )
+        val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+        val persistence = SdefPersistenceService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            PlatformTestUtil.waitWithEventsDispatching(
+                "Application dictionaries were not indexed",
+                { registryService.areAppDictionariesIndexed() },
+                10,
+            )
+            val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+            val dictionary = projectDictionaries.createDictionary(applicationName)
+            val makeCommand = dictionary?.findAllCommandsWithName("make")?.singleOrNull()
+            assertNotNull("synthetic dictionary must expose make command", makeCommand)
+            assertEquals("type", makeCommand?.getParameterByName("new")?.typeSpecifier)
+            val indexedClassNames =
+                SdefIndexService
+                    .getInstance()
+                    .snapshot()
+                    .applicationNameToClassNameSet[applicationName]
+                    .orEmpty()
+            assertTrue("synthetic dictionary must index to do class", indexedClassNames.contains("to do"))
+
+            val script =
+                """
+                tell application "$applicationName"
+                    activate
+                    show list "Inbox"
+                    repeat with currentLine in reverse of fileContents
+                        set newToDo to make new to do ¬
+                            with properties {name:currentLine} ¬
+                            at beginning of list "Inbox"
+                    end repeat
+                end tell
+                """.trimIndent()
+
+            myFixture.configureByText(AppleScriptFileType, script)
+            val highlights = myFixture.doHighlighting()
+            val document = myFixture.editor.document
+
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "show",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+            )
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "make",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR,
+            )
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "to do",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_CLASS_ATTR,
+            )
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "with properties",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+            )
+            assertHighlightingKeysContain(
+                highlights,
+                document,
+                "at beginning",
+                AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_SELECTOR_ATTR,
+            )
+        } finally {
+            persistence.removeDictionaryInfo(applicationFile.path)
+        }
     }
 
     fun testMyHandlerCallUsesFunctionHighlighting() {

@@ -41,6 +41,9 @@ class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserAssignmentHooks
             Key.create("applescript.parsing.fallback.command.parameter.mode")
         internal val PARSING_FALLBACK_COMMAND_PARAMETER_NAMES: Key<Set<String>> =
             Key.create("applescript.parsing.fallback.command.parameter.names")
+        internal val PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS:
+            Key<Map<String, FallbackCommandParameterDefinition>> =
+            Key.create("applescript.parsing.fallback.command.parameter.definitions")
 
         @JvmField
         val TOLD_APPLICATION_NAME_STACK: Key<Stack<String>> =

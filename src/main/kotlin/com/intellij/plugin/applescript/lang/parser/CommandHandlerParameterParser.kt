@@ -103,6 +103,8 @@ internal object CommandHandlerParameterParser {
             builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE)
         val previousNames =
             builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES)
+        val previousDefinitions =
+            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS)
         builder.putUserData(
             AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_MODE,
             fallbackParameterMode(builder, allCommandsWithName),
@@ -110,6 +112,10 @@ internal object CommandHandlerParameterParser {
         builder.putUserData(
             AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES,
             fallbackParameterNames(allCommandsWithName),
+        )
+        builder.putUserData(
+            AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS,
+            fallbackParameterDefinitions(allCommandsWithName),
         )
         return try {
             FallbackCommandParameterParser.parseParameters(builder, level + 1, parsedCommandName)
@@ -121,6 +127,10 @@ internal object CommandHandlerParameterParser {
             builder.putUserData(
                 AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_NAMES,
                 previousNames,
+            )
+            builder.putUserData(
+                AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETER_DEFINITIONS,
+                previousDefinitions,
             )
         }
     }
@@ -154,6 +164,23 @@ internal object CommandHandlerParameterParser {
         allCommandsWithName
             .flatMap { command -> command.parameters.map { parameter -> parameter.getName() } }
             .toSet()
+
+    private fun fallbackParameterDefinitions(
+        allCommandsWithName: List<AppleScriptCommand>,
+    ): Map<String, FallbackCommandParameterDefinition> =
+        buildMap {
+            for (command in allCommandsWithName) {
+                for (parameter in command.parameters) {
+                    putIfAbsent(
+                        parameter.getName(),
+                        FallbackCommandParameterDefinition(
+                            typeSpecifier = parameter.typeSpecifier,
+                            applicationName = command.dictionary.applicationName,
+                        ),
+                    )
+                }
+            }
+        }
 
     private fun isIncompleteHandlerCall(
         allCommandsWithName: List<AppleScriptCommand>,

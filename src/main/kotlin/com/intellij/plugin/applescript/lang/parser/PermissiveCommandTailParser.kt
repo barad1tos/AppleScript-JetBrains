@@ -38,6 +38,12 @@ internal object PermissiveCommandTailParser {
         builder: PsiBuilder,
         level: Int,
     ): Boolean {
+        if (!isObjectReferenceValueStart(builder) &&
+            FallbackCommandSelectorParser.parseParameterContent(builder, level + 1)
+        ) {
+            return true
+        }
+
         var advanced = false
         while (isPermissiveSelectorWord(builder.tokenType) && !isObjectReferenceValueStart(builder)) {
             builder.advanceLexer()

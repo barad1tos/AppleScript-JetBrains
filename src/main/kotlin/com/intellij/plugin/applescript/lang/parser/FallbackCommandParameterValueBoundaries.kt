@@ -155,6 +155,44 @@ internal object FallbackCommandParameterValueBoundaries {
         return shouldConsume
     }
 
+    fun consumeIdentifierPhraseExpressionBeforeBoundary(builder: PsiBuilder): Boolean {
+        val marker = builder.mark()
+        val parsed = consumeIdentifierPhraseExpression(builder)
+        val isCompleteValue = parsed && isValueBoundary(builder.tokenType)
+        if (isCompleteValue) {
+            marker.drop()
+        } else {
+            marker.rollbackTo()
+        }
+        return isCompleteValue
+    }
+
+    private fun consumeIdentifierPhraseExpression(builder: PsiBuilder): Boolean {
+        val firstOperandIdentifiers = consumeIdentifierPhraseOperand(builder)
+        var isCompleteExpression = firstOperandIdentifiers > 0
+        var hasIdentifierPhraseOperand = firstOperandIdentifiers > 1
+        while (
+            isCompleteExpression &&
+            FallbackCommandParameterTokens.isExpressionContinuationStart(builder.tokenType)
+        ) {
+            builder.advanceLexer()
+            val nextOperandIdentifiers = consumeIdentifierPhraseOperand(builder)
+            isCompleteExpression = nextOperandIdentifiers > 0
+            hasIdentifierPhraseOperand = hasIdentifierPhraseOperand || nextOperandIdentifiers > 1
+        }
+        return isCompleteExpression && hasIdentifierPhraseOperand
+    }
+
+    private fun consumeIdentifierPhraseOperand(builder: PsiBuilder): Int {
+        val identifierCount = identifierRunLength(builder)
+        if (identifierCount > 0) {
+            repeat(identifierCount) {
+                builder.advanceLexer()
+            }
+        }
+        return identifierCount
+    }
+
     private fun identifierRunLength(builder: PsiBuilder): Int {
         var offset = 0
         while (builder.lookAhead(offset) === VAR_IDENTIFIER) {
