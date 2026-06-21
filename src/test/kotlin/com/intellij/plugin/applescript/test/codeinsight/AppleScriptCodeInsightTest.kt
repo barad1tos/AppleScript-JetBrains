@@ -18,6 +18,7 @@ import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptSystemEventsProcessReferenceAnnotator
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
@@ -443,12 +444,12 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             "warning must appear exactly once; descriptions=$descriptions",
             1,
             descriptions.count { description ->
-                description == "Process \"$unknownProcessName\" is not known on this macOS installation"
+                description == unknownProcessDescription(unknownProcessName)
             },
         )
         assertTrue(
             "warning must explain the local-discovery basis; descriptions=$descriptions",
-            descriptions.contains("Process \"$unknownProcessName\" is not known on this macOS installation"),
+            descriptions.contains(unknownProcessDescription(unknownProcessName)),
         )
     }
 
@@ -496,12 +497,12 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             "warning must appear exactly once; descriptions=$descriptions",
             1,
             descriptions.count { description ->
-                description == "Process \"$unknownProcessName\" is not known on this macOS installation"
+                description == unknownProcessDescription(unknownProcessName)
             },
         )
         assertTrue(
             "warning must explain the local-discovery basis; descriptions=$descriptions",
-            descriptions.contains("Process \"$unknownProcessName\" is not known on this macOS installation"),
+            descriptions.contains(unknownProcessDescription(unknownProcessName)),
         )
     }
 
@@ -554,12 +555,12 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             "warning must appear exactly once; descriptions=$descriptions",
             1,
             descriptions.count { description ->
-                description == "Process \"$unknownProcessName\" is not known on this macOS installation"
+                description == unknownProcessDescription(unknownProcessName)
             },
         )
         assertTrue(
             "warning must explain the local-discovery basis; descriptions=$descriptions",
-            descriptions.contains("Process \"$unknownProcessName\" is not known on this macOS installation"),
+            descriptions.contains(unknownProcessDescription(unknownProcessName)),
         )
     }
 
@@ -775,9 +776,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
                     set y to year of theDate
                     set calendarValue to month of theDate
                     set datePartValue to day of theDate
-                    set hhInt to hours of theDate
-                    set mmInt to minutes of theDate
-                    set ssInt to seconds of theDate
+                    set hourValue to hours of theDate
+                    set minuteValue to minutes of theDate
+                    set secondValue to seconds of theDate
                 end if
             end formatDate
             """.trimIndent()
@@ -1172,7 +1173,14 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     private fun unknownProcessDescription(processName: String): String =
-        "Process \"$processName\" is not known on this macOS installation"
+        requireNotNull(
+            AppleScriptSystemEventsProcessReferenceAnnotator.resolveWarningMessage(
+                referenceText = "process \"$processName\"",
+                isInsideSystemEventsTell = true,
+                areAppDictionariesIndexed = true,
+                isKnownApplication = { false },
+            ),
+        )
 
     private fun Icon.renderedPixelsEqual(other: Icon): Boolean {
         val left = renderIcon()
