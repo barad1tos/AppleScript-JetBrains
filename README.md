@@ -44,7 +44,7 @@ Long-term, I’d like to move toward some of the workflow capabilities people kn
 - **Dictionary-aware code insight** — load scriptable-application dictionaries and `.sdef` / `.xml` files to drive completion, quick documentation, and application-specific terms.
 - **Navigation for real scripts** — scan handlers, properties, script objects, and larger automation files without treating AppleScript as plain text.
 - **macOS execution path** — run configurations execute scripts through the system AppleScript runtime and show results inside the IDE.
-- **Modern plugin maintenance** — targets IntelliJ Platform 2025.1 through 2026.1 with current Gradle, Kotlin, CI, and Plugin Verifier coverage.
+- **Modern plugin maintenance** — targets IntelliJ Platform 2025.1 and newer with current Gradle, Kotlin, CI, and Plugin Verifier coverage.
 
 ## Feature tour
 
@@ -71,7 +71,7 @@ Long-term, I’d like to move toward some of the workflow capabilities people kn
 ## Compatibility
 
 - Minimum: IntelliJ Platform `251` (JetBrains IDEs 2025.1)
-- Maximum: IntelliJ Platform `261.*` (JetBrains IDEs 2026.1.x)
+- Maximum: none — `until-build` is open (declared compatible with 2025.1 and all later builds; verified through 2026.1)
 - JVM target: 17
 - AppleScript execution and dictionary discovery require macOS
 
