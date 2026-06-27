@@ -5,6 +5,7 @@ import com.intellij.plugin.applescript.lang.ide.intentions.AddApplicationDiction
 import com.intellij.plugin.applescript.lang.ide.intentions.RenameParameterLabelQuickFix
 import com.intellij.plugin.applescript.psi.AppleScriptHandlerParameterLabel
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class AppleScriptIntentionsTest : BasePlatformTestCase() {
@@ -29,11 +30,34 @@ class AppleScriptIntentionsTest : BasePlatformTestCase() {
         assertFalse("Quick fix must not start in write action", quickFix.startInWriteAction())
     }
 
-    // Note: an end-to-end test that the fix actually renames the label is deferred. The fix's
-    // invoke() silently no-ops when AppleScriptPsiElementFactory.createHandlerParameterLabel
-    // returns null (a pre-existing silent-failure path, unchanged by this change), so a behavior
-    // test would assert against a known-broken rename rather than this fix's contract. Tracked
-    // separately; the tests below pin the contract the platform relies on.
+    fun testRenameParameterLabelQuickFixRenamesTheLabel() {
+        // The user invokes the fix on a handler parameter label; the label text must change
+        // in the editor (here "below" becomes "above"), which is what the user observes.
+        myFixture.configureByText(
+            AppleScriptFileType,
+            """
+            on myHandler below onlyParam
+            end myHandler
+            """.trimIndent(),
+        )
+        val label =
+            checkNotNull(PsiTreeUtil.findChildOfType(myFixture.file, AppleScriptHandlerParameterLabel::class.java)) {
+                "Expected a handler parameter label in the configured handler signature"
+            }
+        assertEquals("Test setup: starting label", "below", label.text)
+
+        RenameParameterLabelQuickFix(label, "above").invoke(project, myFixture.editor, myFixture.file)
+        PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
+
+        assertTrue(
+            "Rename fix must replace the parameter label in the editor",
+            myFixture.file.text.contains("above onlyParam"),
+        )
+        assertFalse(
+            "The old parameter label must be gone after the rename",
+            myFixture.file.text.contains("below onlyParam"),
+        )
+    }
 
     fun testRenameParameterLabelQuickFixStartsNotInWriteAction() {
         // Must be false: invoke() schedules its own invokeLater { runWriteAction { ... } },
