@@ -29,7 +29,6 @@
     <h3>2.0.10</h3>
     <ul>
       <li>[Change] The plugin now stays available on current and future JetBrains IDEs, including the upcoming 2026.2 — the fixed upper IDE-version limit was removed.</li>
-      <li>[Fix] The "Rename parameter label" quick fix now actually renames the duplicated handler parameter label; previously it did nothing.</li>
     </ul>
     <h3>2.0.9</h3>
     <ul>
