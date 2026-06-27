@@ -220,7 +220,11 @@ intellijPlatform {
         name = providers.gradleProperty("pluginName")
         ideaVersion {
             sinceBuild = providers.gradleProperty("pluginSinceBuild")
-            untilBuild = providers.gradleProperty("pluginUntilBuild")
+            // No upper bound. The 262 structure-view split (PsiTreeElementBase) is
+            // binary-compatible — FQN unchanged, JetBrains-confirmed — so the plugin stays
+            // forward-compatible. provider { null } omits the until-build attribute; leaving
+            // untilBuild unset would instead default to a MAJOR.* cap from the dev platform.
+            untilBuild = provider { null }
         }
     }
 
@@ -246,10 +250,12 @@ intellijPlatform {
     }
 
     pluginVerification {
-        // Restrict to current stable releases. recommended() pulls EAPs
-        // (e.g. 262.x) where Java code still relies on API that's been
-        // moved/removed (PsiTreeElementBase out of structureView.impl.common),
-        // so EAP branches stay out of the matrix until verified clean.
+        // Restrict to current stable releases; recommended() would pull EAPs.
+        // 262 (2026.2) stays out of the matrix not because the plugin breaks — the
+        // structure-view split (PsiTreeElementBase) is binary-compatible, FQN unchanged —
+        // but because the verifier can't be satisfied on a since-build=251 binary: the clean
+        // fix (depend on intellij.platform.structureView.impl) exists only from 262 and would
+        // break loading on 251-261. until-build is open, so users on 262+ still get the plugin.
         ides {
             // Plan 03-12 dropped 2024.3.7.1: ships Kotlin 2.0.21 in the Kotlin plugin
             // (no kotlin/coroutines/jvm/internal/SpillingKt), which our K2 2.3.21 compiler
@@ -258,8 +264,8 @@ intellijPlatform {
             // in gradle.properties; minimum supported IDE raised in CHANGELOG v1.2.0.
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.1.7.1")
             create(IntelliJPlatformType.IntellijIdeaCommunity, "2025.2.6.2")
-            // 2026.1 (build 261) is the current stable top of the matrix; pluginUntilBuild
-            // tracks it. Verifies the compatibility advertised to users dogfooding on 2026.1.
+            // 2026.1 (build 261) is the current stable top of the verified matrix and the
+            // newest IDE we actually verify against; dogfooded on 2026.1. until-build is open.
             // Uses the unified `IntellijIdea` (maven `idea`) type: Community (`ideaIC`) is no
             // longer published since 2025.3 (253) — the distribution merged into one product.
             create(IntelliJPlatformType.IntellijIdea, "2026.1.3")
