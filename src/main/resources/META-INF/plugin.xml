@@ -26,6 +26,10 @@
     </p>
   ]]></description>
   <change-notes><![CDATA[
+    <h3>2.0.10</h3>
+    <ul>
+      <li>[Change] The plugin now stays available on current and future JetBrains IDEs, including the upcoming 2026.2 — the fixed upper IDE-version limit was removed.</li>
+    </ul>
     <h3>2.0.9</h3>
     <ul>
       <li>[Fix] Dynamic <code>tell application</code> blocks now parse correctly when the target application name comes from a variable or expression instead of a string literal.</li>

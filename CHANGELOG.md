@@ -2,6 +2,10 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [2.0.10] - 2026-06-27
+
+- [Change] The plugin now stays available on current and future JetBrains IDEs, including the upcoming 2026.2 — the fixed upper IDE-version limit was removed.
+
 ## [2.0.9] - 2026-06-21
 
 - [Fix] Dynamic `tell application` blocks now parse correctly when the target application name comes from a variable or expression instead of a string literal.

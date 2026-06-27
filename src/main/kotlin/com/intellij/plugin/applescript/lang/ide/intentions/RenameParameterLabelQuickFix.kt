@@ -1,6 +1,6 @@
 package com.intellij.plugin.applescript.lang.ide.intentions
 
-import com.intellij.codeInsight.intention.impl.BaseIntentionAction
+import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.editor.Editor
@@ -14,7 +14,7 @@ import com.intellij.util.IncorrectOperationException
 class RenameParameterLabelQuickFix(
     private val myHandlerParameterLabel: AppleScriptHandlerParameterLabel,
     private val myNewLabelName: String,
-) : BaseIntentionAction() {
+) : IntentionAction {
     override fun getFamilyName(): String = "AppleScript"
 
     override fun isAvailable(
@@ -51,6 +51,8 @@ class RenameParameterLabelQuickFix(
     }
 
     override fun getText(): String = "Rename parameter label"
+
+    override fun startInWriteAction(): Boolean = false
 
     private companion object {
         private const val RENAME_PARAMETER_LABEL_COMMAND = "Rename Parameter Label"

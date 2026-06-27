@@ -13,15 +13,13 @@ object AppleScriptPsiElementFactory {
         labelName: String?,
     ): AppleScriptHandlerParameterLabel? {
         val newLabelName = labelName?.takeIf { it.isNotEmpty() } ?: "to"
-        val src = """dummyHandlerName $newLabelName "some sting val""""
+        // Build a labeled-parameters handler DEFINITION (`on h <label> p`) to host the label.
+        // The previous call-form source (`name <label> "value"`) parsed as a dictionary command
+        // call, never a labeled-parameters node, so no HANDLER_PARAMETER_LABEL existed to return
+        // and this factory always yielded null — silently breaking the rename quick fix.
+        val src = "on dummyHandler $newLabelName dummyParameter\nend dummyHandler"
         val file = createFile(project, src)
-        file.findChildByClass(AppleScriptHandlerLabeledParametersCallExpression::class.java)
-        val handlerCall =
-            file.firstChild as? AppleScriptHandlerLabeledParametersCallExpression
-                ?: return null
-        return handlerCall.children
-            .firstOrNull { it.node.elementType === AppleScriptTypes.HANDLER_PARAMETER_LABEL }
-            as? AppleScriptHandlerParameterLabel
+        return PsiTreeUtil.findChildOfType(file, AppleScriptHandlerParameterLabel::class.java)
     }
 
     @JvmStatic

@@ -13,7 +13,6 @@ import com.intellij.psi.TokenType
 import com.intellij.psi.formatter.FormatterUtil
 import com.intellij.psi.formatter.FormattingDocumentModelImpl
 import com.intellij.psi.formatter.PsiBasedFormattingModel
-import com.intellij.psi.impl.source.tree.TreeUtil
 import com.intellij.psi.tree.IElementType
 
 class AppleScriptFormattingModelBuilder : FormattingModelBuilder {
@@ -53,7 +52,7 @@ class AppleScriptFormattingModelBuilder : FormattingModelBuilder {
 
             var elementTypeToUse: IElementType =
                 if (isWhiteSpaceOrNls(leafElement)) leafElement.elementType else TokenType.WHITE_SPACE
-            val prevNode = TreeUtil.prevLeaf(leafElement)
+            val prevNode = FormatterUtil.getPreviousLeaf(leafElement)
             if (prevNode != null && isWhiteSpaceOrNls(prevNode)) {
                 elementTypeToUse = prevNode.elementType
             }
