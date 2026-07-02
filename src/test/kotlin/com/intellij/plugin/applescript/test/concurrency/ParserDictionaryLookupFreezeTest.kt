@@ -290,6 +290,73 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
         )
     }
 
+    fun testAppScopedTermLookupsStayColdUntilAppDictionariesAreReady() {
+        val applicationName = "SyntheticTermLookupResultApp_${System.nanoTime()}"
+        val applicationDictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "term-lookup-result-app",
+                SyntheticSuiteFixtures.taskListAppXml(),
+            )
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val indexService = SdefIndexService.getInstance()
+
+        runBlocking {
+            indexService.ingest(applicationName, applicationDictionaryFile)
+        }
+
+        assertAppScopedTermsHidden("before standard dictionaries are ready", applicationName, indexService)
+
+        registryService.standardReady.complete(Result.success(Unit))
+        assertAppScopedTermsHidden("before app dictionaries are ready", applicationName, indexService)
+
+        registryService.appsReady.complete(Result.success(Unit))
+        assertTrue(
+            "App class lookup must report hit once app dictionaries are ready",
+            indexService.classLookup.lookupApplicationClass(applicationName, "to do"),
+        )
+        assertTrue(
+            "App class plural lookup must report hit once app dictionaries are ready",
+            indexService.classLookup.lookupApplicationClassPluralName(applicationName, "to dos"),
+        )
+        assertTrue(
+            "App class prefix lookup must report hit once app dictionaries are ready",
+            indexService.classLookup.lookupClassWithPrefixExist(applicationName, "to"),
+        )
+        assertTrue(
+            "App class plural prefix lookup must report hit once app dictionaries are ready",
+            indexService.classLookup.lookupClassPluralWithPrefixExist(applicationName, "to"),
+        )
+        assertTrue(
+            "App property lookup must report hit once app dictionaries are ready",
+            indexService.propertyLookup.lookupApplicationProperty(applicationName, "name"),
+        )
+        assertTrue(
+            "App property prefix lookup must report hit once app dictionaries are ready",
+            indexService.propertyLookup.lookupPropertyWithPrefixExist(applicationName, "name"),
+        )
+        assertTrue(
+            "App constant lookup must report hit once app dictionaries are ready",
+            indexService.constantLookup.lookupApplicationConstant(applicationName, "active"),
+        )
+        assertTrue(
+            "App constant prefix lookup must report hit once app dictionaries are ready",
+            indexService.constantLookup.lookupConstantWithPrefixExist(applicationName, "active"),
+        )
+
+        assertFalse(
+            "Ready app class lookup must report miss for absent classes",
+            indexService.classLookup.lookupApplicationClass(applicationName, "project"),
+        )
+        assertFalse(
+            "Ready app property lookup must report miss for absent properties",
+            indexService.propertyLookup.lookupApplicationProperty(applicationName, "priority"),
+        )
+        assertFalse(
+            "Ready app constant lookup must report miss for absent constants",
+            indexService.constantLookup.lookupApplicationConstant(applicationName, "inactive"),
+        )
+    }
+
     private fun writeDictionaryXmlToTempFile(
         name: String,
         xml: String,
@@ -298,6 +365,45 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
         file.deleteOnExit()
         file.writeText(xml)
         return file
+    }
+
+    private fun assertAppScopedTermsHidden(
+        phase: String,
+        applicationName: String,
+        indexService: SdefIndexService,
+    ) {
+        assertFalse(
+            "App class lookup must stay cold $phase",
+            indexService.classLookup.lookupApplicationClass(applicationName, "to do"),
+        )
+        assertFalse(
+            "App class plural lookup must stay cold $phase",
+            indexService.classLookup.lookupApplicationClassPluralName(applicationName, "to dos"),
+        )
+        assertFalse(
+            "App class prefix lookup must stay cold $phase",
+            indexService.classLookup.lookupClassWithPrefixExist(applicationName, "to"),
+        )
+        assertFalse(
+            "App class plural prefix lookup must stay cold $phase",
+            indexService.classLookup.lookupClassPluralWithPrefixExist(applicationName, "to"),
+        )
+        assertFalse(
+            "App property lookup must stay cold $phase",
+            indexService.propertyLookup.lookupApplicationProperty(applicationName, "name"),
+        )
+        assertFalse(
+            "App property prefix lookup must stay cold $phase",
+            indexService.propertyLookup.lookupPropertyWithPrefixExist(applicationName, "name"),
+        )
+        assertFalse(
+            "App constant lookup must stay cold $phase",
+            indexService.constantLookup.lookupApplicationConstant(applicationName, "active"),
+        )
+        assertFalse(
+            "App constant prefix lookup must stay cold $phase",
+            indexService.constantLookup.lookupConstantWithPrefixExist(applicationName, "active"),
+        )
     }
 
     private fun initializedDictionaryInfo(

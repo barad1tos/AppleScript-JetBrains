@@ -22,7 +22,7 @@ internal class SdefClassLookup(
         applicationName: String,
         className: String,
     ): Boolean {
-        if (!SdefIndexReadiness.isInitialized()) return false
+        if (!SdefIndexReadiness.areAppDictionariesIndexed()) return false
         val classNameSet: Set<String>? = indexStore.applicationNameToClassNameSetMap[applicationName]
         return classNameSet != null && classNameSet.contains(className)
     }
@@ -35,7 +35,7 @@ internal class SdefClassLookup(
         applicationName: String,
         pluralName: String,
     ): Boolean {
-        if (!SdefIndexReadiness.isInitialized()) return false
+        if (!SdefIndexReadiness.areAppDictionariesIndexed()) return false
         val classNameSet: Set<String>? =
             indexStore.applicationNameToClassNamePluralSetMap[applicationName]
         return classNameSet != null && classNameSet.contains(pluralName)
@@ -49,7 +49,7 @@ internal class SdefClassLookup(
         applicationName: String,
         classNamePrefix: String,
     ): Boolean =
-        SdefIndexReadiness.isInitialized() &&
+        SdefIndexReadiness.areAppDictionariesIndexed() &&
             hasNameWithPrefix(classNamePrefix, indexStore.applicationNameToClassNameSetMap[applicationName])
 
     fun lookupStdClassPluralWithPrefixExist(namePrefix: String): Boolean =
@@ -60,7 +60,7 @@ internal class SdefClassLookup(
         applicationName: String,
         pluralNamePrefix: String,
     ): Boolean =
-        SdefIndexReadiness.isInitialized() &&
+        SdefIndexReadiness.areAppDictionariesIndexed() &&
             hasNameWithPrefix(
                 pluralNamePrefix,
                 indexStore.applicationNameToClassNamePluralSetMap[applicationName],
@@ -82,7 +82,7 @@ internal class SdefPropertyLookup(
         applicationName: String,
         propertyName: String,
     ): Boolean {
-        if (!SdefIndexReadiness.isInitialized()) return false
+        if (!SdefIndexReadiness.areAppDictionariesIndexed()) return false
         val propertyNameSet: Set<String>? = indexStore.applicationNameToPropertySetMap[applicationName]
         return propertyNameSet != null && propertyNameSet.contains(propertyName)
     }
@@ -91,7 +91,7 @@ internal class SdefPropertyLookup(
         applicationName: String,
         propertyNamePrefix: String,
     ): Boolean =
-        SdefIndexReadiness.isInitialized() &&
+        SdefIndexReadiness.areAppDictionariesIndexed() &&
             hasNameWithPrefix(propertyNamePrefix, indexStore.applicationNameToPropertySetMap[applicationName])
 }
 
@@ -106,7 +106,7 @@ internal class SdefConstantLookup(
         applicationName: String,
         constantName: String,
     ): Boolean {
-        if (!SdefIndexReadiness.isInitialized()) return false
+        if (!SdefIndexReadiness.areAppDictionariesIndexed()) return false
         val constantNameSet: Set<String>? =
             indexStore.applicationNameToEnumeratorConstantNameSetMap[applicationName]
         return constantNameSet != null && constantNameSet.contains(constantName)
@@ -120,7 +120,7 @@ internal class SdefConstantLookup(
         applicationName: String,
         constantNamePrefix: String,
     ): Boolean =
-        SdefIndexReadiness.isInitialized() &&
+        SdefIndexReadiness.areAppDictionariesIndexed() &&
             hasNameWithPrefix(
                 constantNamePrefix,
                 indexStore.applicationNameToEnumeratorConstantNameSetMap[applicationName],
