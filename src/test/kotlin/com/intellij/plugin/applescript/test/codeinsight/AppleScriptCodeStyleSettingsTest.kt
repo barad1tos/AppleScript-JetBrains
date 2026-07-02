@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.test.codeinsight
 import com.intellij.plugin.applescript.AppleScriptLanguage
 import com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptCodeStyleSettingsProvider
 import com.intellij.plugin.applescript.lang.formatter.settings.AppleScriptLanguageCodeStyleSettingsProvider
+import com.intellij.psi.codeStyle.CodeStyleSettingsManager
 import com.intellij.psi.codeStyle.LanguageCodeStyleSettingsProvider.SettingsType
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
@@ -31,11 +32,14 @@ class AppleScriptCodeStyleSettingsTest : BasePlatformTestCase() {
         assertEquals("AppleScript", provider.configurableDisplayName)
     }
 
+    fun testCodeStyleSettingsProviderReturnsAppleScriptLanguage() {
+        val provider = AppleScriptCodeStyleSettingsProvider()
+        assertEquals(AppleScriptLanguage, provider.language)
+    }
+
     fun testCodeStyleSettingsProviderCreatesConfigurable() {
         val provider = AppleScriptCodeStyleSettingsProvider()
-        val settings =
-            com.intellij.psi.codeStyle
-                .CodeStyleSettings()
+        val settings = CodeStyleSettingsManager.getInstance(project).createSettings()
         val configurable = provider.createConfigurable(settings, settings)
         assertNotNull("Configurable must not be null", configurable)
     }
