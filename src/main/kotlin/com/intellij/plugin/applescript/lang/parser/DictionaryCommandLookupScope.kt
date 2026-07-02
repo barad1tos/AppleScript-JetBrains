@@ -14,12 +14,15 @@ internal data class DictionaryCommandLookupScope(
             applicationsToImport.contains(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY)
 
     companion object {
+        // Delegates to the term-scope factory so lookup-scope snapshot semantics have a single
+        // source; the two scope types stay separate because their consumers name imports
+        // differently (applicationsToImport vs applicationsToImportFrom).
         fun of(builder: PsiBuilder): DictionaryCommandLookupScope {
-            val areThereUseStatements = ParserState.areThereUseStatements(builder)
+            val termScope = DictionaryTermLookupScope.of(builder)
             return DictionaryCommandLookupScope(
-                ParserApplicationNameStack.getTargetApplicationName(builder),
-                areThereUseStatements,
-                ParserState.usedApplicationNamesForLookup(builder, areThereUseStatements),
+                termScope.toldApplicationName,
+                termScope.areThereUseStatements,
+                termScope.applicationsToImportFrom,
             )
         }
     }

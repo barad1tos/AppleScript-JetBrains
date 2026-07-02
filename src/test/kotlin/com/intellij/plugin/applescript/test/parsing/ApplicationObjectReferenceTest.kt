@@ -1,14 +1,11 @@
 package com.intellij.plugin.applescript.test.parsing
 
 import com.intellij.lang.ASTNode
-import com.intellij.lang.PsiBuilderFactory
 import com.intellij.lang.parser.GeneratedParserUtilBase.TRUE_CONDITION
 import com.intellij.lang.parser.GeneratedParserUtilBase._COLLAPSE_
-import com.intellij.lang.parser.GeneratedParserUtilBase.adapt_builder_
 import com.intellij.lang.parser.GeneratedParserUtilBase.enter_section_
 import com.intellij.lang.parser.GeneratedParserUtilBase.exit_section_
 import com.intellij.plugin.applescript.AppleScriptFileType
-import com.intellij.plugin.applescript.AppleScriptLanguage
 import com.intellij.plugin.applescript.lang.parser.AppleScriptParser
 import com.intellij.plugin.applescript.lang.parser.AppleScriptParserDefinition
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationObjectReference
@@ -159,22 +156,7 @@ class ApplicationObjectReferenceTest : BasePlatformTestCase() {
 
     private fun parseApplicationObjectReference(text: String): ASTNode {
         val parserDefinition = AppleScriptParserDefinition()
-        val anchorFile = myFixture.configureByText(AppleScriptFileType, "")
-        val builder =
-            PsiBuilderFactory.getInstance().createBuilder(
-                project,
-                anchorFile.node,
-                parserDefinition.createLexer(project),
-                AppleScriptLanguage,
-                text,
-            )
-        val adaptedBuilder =
-            adapt_builder_(
-                parserDefinition.fileNodeType,
-                builder,
-                AppleScriptParser(),
-                AppleScriptParser.EXTENDS_SETS_,
-            )
+        val adaptedBuilder = myFixture.createAppleScriptBuilder(text)
         val marker = enter_section_(adaptedBuilder, 0, _COLLAPSE_, null)
         val result = AppleScriptParser.application_object_reference(adaptedBuilder, 0)
         assertTrue("application object reference parser should consume `$text`", adaptedBuilder.eof())

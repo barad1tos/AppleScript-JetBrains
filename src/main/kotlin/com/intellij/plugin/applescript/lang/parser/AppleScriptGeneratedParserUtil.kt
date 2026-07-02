@@ -467,7 +467,7 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
                             builder,
                             level + 1,
                             insideExpression,
-                            DictionaryTermLookupScope.of(builder),
+                            DictionaryTermLookupScope.of(builder, toldApplicationName = toldApplicationName),
                         )
                 }
             }

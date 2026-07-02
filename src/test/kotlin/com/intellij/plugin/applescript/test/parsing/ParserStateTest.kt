@@ -90,11 +90,11 @@ class ParserStateTest : BasePlatformTestCase() {
         val builder = myFixture.createAppleScriptBuilder("")
 
         ParserState.withTellSimpleObjectReference(builder) {
-            assertEquals(true, builder.getUserData(ParserState.PARSING_TELL_SIMPLE_OBJECT_REF))
+            assertEquals(true, builder.getUserData(ParserState.PARSING_TELL_SIMPLE_OBJECT_REFERENCE))
             true
         }
 
-        assertEquals(false, builder.getUserData(ParserState.PARSING_TELL_SIMPLE_OBJECT_REF))
+        assertEquals(false, builder.getUserData(ParserState.PARSING_TELL_SIMPLE_OBJECT_REFERENCE))
     }
 
     fun testUseStatementOutcomeIsMonotonic() {

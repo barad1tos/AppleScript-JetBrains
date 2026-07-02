@@ -11,9 +11,10 @@ internal data class DictionaryTermLookupScope(
         fun of(
             builder: PsiBuilder,
             areThereUseStatements: Boolean = ParserState.areThereUseStatements(builder),
+            toldApplicationName: String = ParserApplicationNameStack.getTargetApplicationName(builder),
         ): DictionaryTermLookupScope =
             DictionaryTermLookupScope(
-                ParserApplicationNameStack.getTargetApplicationName(builder),
+                toldApplicationName,
                 areThereUseStatements,
                 ParserState.usedApplicationNamesForLookup(builder, areThereUseStatements),
             )

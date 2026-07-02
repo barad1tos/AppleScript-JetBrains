@@ -19,8 +19,8 @@ import java.util.Stack
 internal object ParserState {
     val PARSING_TELL_SIMPLE_STATEMENT: Key<Boolean> =
         Key.create("applescript.parsing.tell.simple.statement")
-    val PARSING_TELL_SIMPLE_OBJECT_REF: Key<Boolean> =
-        Key.create("applescript.parsing.tell.simple.object.ref")
+    val PARSING_TELL_SIMPLE_OBJECT_REFERENCE: Key<Boolean> =
+        Key.create("applescript.parsing.tell.simple.object.reference")
     val PARSING_TELL_COMPOUND_STATEMENT: Key<Boolean> =
         Key.create("applescript.parsing.tell.compound.statement")
     val APPLICATION_NAME_PUSHED: Key<Boolean> =
@@ -36,21 +36,21 @@ internal object ParserState {
     val PARSING_LITERAL_EXPRESSION: Key<Boolean> =
         Key.create("applescript.parsing.literal.expression")
 
-    fun withTellSimpleStatement(
+    // Runners are inline with crossinline lambdas: parsing is the editor's reparse hot path, so
+    // the scoped writes compile to the same allocation-free straight-line code they replaced, and
+    // crossinline makes a non-local return that would skip the exit writes a compile error.
+    inline fun withTellSimpleStatement(
         builder: PsiBuilder,
-        parse: () -> Boolean,
+        crossinline parse: () -> Boolean,
     ): Boolean =
         withApplicationNameFrame(builder) {
-            builder.putUserData(PARSING_TELL_SIMPLE_STATEMENT, true)
-            val result = parse()
             // Explicit false, never restore: hasExitedTellSimpleStatement reads `== false`.
-            builder.putUserData(PARSING_TELL_SIMPLE_STATEMENT, false)
-            result
+            withScopedFlag(builder, PARSING_TELL_SIMPLE_STATEMENT) { parse() }
         }
 
-    fun withTellCompoundStatement(
+    inline fun withTellCompoundStatement(
         builder: PsiBuilder,
-        parse: () -> Boolean,
+        crossinline parse: () -> Boolean,
     ): Boolean {
         val wasParsingCompoundStatement = builder.getUserData(PARSING_TELL_COMPOUND_STATEMENT) == true
         return withApplicationNameFrame(builder) {
@@ -61,9 +61,9 @@ internal object ParserState {
         }
     }
 
-    fun withUsingTermsFromStatement(
+    inline fun withUsingTermsFromStatement(
         builder: PsiBuilder,
-        parse: () -> Boolean,
+        crossinline parse: () -> Boolean,
     ): Boolean {
         val wasParsingUsingTermsFrom =
             builder.getUserData(IS_PARSING_USING_TERMS_FROM_STATEMENT) == true
@@ -75,15 +75,10 @@ internal object ParserState {
         }
     }
 
-    fun withTellSimpleObjectReference(
+    inline fun withTellSimpleObjectReference(
         builder: PsiBuilder,
-        parse: () -> Boolean,
-    ): Boolean {
-        builder.putUserData(PARSING_TELL_SIMPLE_OBJECT_REF, true)
-        val result = parse()
-        builder.putUserData(PARSING_TELL_SIMPLE_OBJECT_REF, false)
-        return result
-    }
+        crossinline parse: () -> Boolean,
+    ): Boolean = withScopedFlag(builder, PARSING_TELL_SIMPLE_OBJECT_REFERENCE, parse)
 
     fun isInsideTellSimpleStatement(builder: PsiBuilder): Boolean =
         builder.getUserData(PARSING_TELL_SIMPLE_STATEMENT) == true
@@ -99,27 +94,17 @@ internal object ParserState {
         builder.getUserData(IS_PARSING_USING_TERMS_FROM_STATEMENT) == true
 
     fun isInsideTellSimpleObjectReference(builder: PsiBuilder): Boolean =
-        builder.getUserData(PARSING_TELL_SIMPLE_OBJECT_REF) == true
+        builder.getUserData(PARSING_TELL_SIMPLE_OBJECT_REFERENCE) == true
 
-    fun withAssignmentStatement(
+    inline fun withAssignmentStatement(
         builder: PsiBuilder,
-        parse: () -> Boolean,
-    ): Boolean {
-        builder.putUserData(PARSING_COMMAND_ASSIGNMENT_STATEMENT, true)
-        val result = parse()
-        builder.putUserData(PARSING_COMMAND_ASSIGNMENT_STATEMENT, false)
-        return result
-    }
+        crossinline parse: () -> Boolean,
+    ): Boolean = withScopedFlag(builder, PARSING_COMMAND_ASSIGNMENT_STATEMENT, parse)
 
-    fun withLiteralExpression(
+    inline fun withLiteralExpression(
         builder: PsiBuilder,
-        parse: () -> Boolean,
-    ): Boolean {
-        builder.putUserData(PARSING_LITERAL_EXPRESSION, true)
-        val result = parse()
-        builder.putUserData(PARSING_LITERAL_EXPRESSION, false)
-        return result
-    }
+        crossinline parse: () -> Boolean,
+    ): Boolean = withScopedFlag(builder, PARSING_LITERAL_EXPRESSION, parse)
 
     fun isInsideAssignmentStatement(builder: PsiBuilder): Boolean =
         builder.getUserData(PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true
@@ -154,11 +139,26 @@ internal object ParserState {
         areThereUseStatements: Boolean = areThereUseStatements(builder),
     ): Set<String>? = if (areThereUseStatements) builder.getUserData(USED_APPLICATION_NAMES) else null
 
-    // No try/finally: historical parsers leak state on exceptions; changing that would alter
-    // observable behavior on cancellation paths.
-    private fun withApplicationNameFrame(
+    // The two helpers below are implementation seams for the inline runners above (a Kotlin
+    // inline function cannot call private members); call the named runners, not these.
+    // No try/finally anywhere here: historical parsers leak state on exceptions; changing that
+    // would alter observable behavior on cancellation paths.
+
+    /** One implementation of the tri-state exit contract: set `true`, parse, write explicit `false`. */
+    inline fun withScopedFlag(
         builder: PsiBuilder,
-        parse: () -> Boolean,
+        flag: Key<Boolean>,
+        crossinline parse: () -> Boolean,
+    ): Boolean {
+        builder.putUserData(flag, true)
+        val result = parse()
+        builder.putUserData(flag, false)
+        return result
+    }
+
+    inline fun withApplicationNameFrame(
+        builder: PsiBuilder,
+        crossinline parse: () -> Boolean,
     ): Boolean {
         val wasApplicationNamePushed = builder.getUserData(APPLICATION_NAME_PUSHED) == true
         builder.putUserData(APPLICATION_NAME_PUSHED, false)
