@@ -28,8 +28,6 @@ class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserAssignmentHooks
             Key.create("applescript.parsing.fallback.command.parameters")
         internal val PARSING_COMMAND_ASSIGNMENT_STATEMENT: Key<Boolean> =
             Key.create("applescript.parsing.assignment.statement")
-        internal val PARSING_COMMAND_HANDLER_BOOLEAN_PARAMETER: Key<Boolean> =
-            Key.create("applescript.parsing.command.handler.boolean.parameter")
 
         // Set by FallbackCommandParser when a dictionary-independent fallback accepts an unknown
         // command head in a command-legal context. This parser-state flag lets parameter parsing
@@ -136,10 +134,17 @@ internal object SetObjectPropertyAssignmentParser {
         while (!foundObjectPointer && !reachedTerminator) {
             val tokenType = builder.lookAhead(offset)
             when {
-                tokenType === OF || tokenType === IN -> foundObjectPointer = true
-                tokenType === TO && !isPropertyPhraseContinuationBeforePointer(builder, offset) ->
+                tokenType === OF || tokenType === IN -> {
+                    foundObjectPointer = true
+                }
+
+                tokenType === TO && !isPropertyPhraseContinuationBeforePointer(builder, offset) -> {
                     reachedTerminator = true
-                tokenType === NLS || tokenType == null -> reachedTerminator = true
+                }
+
+                tokenType === NLS || tokenType == null -> {
+                    reachedTerminator = true
+                }
             }
             if (!foundObjectPointer && !reachedTerminator) {
                 offset += 1

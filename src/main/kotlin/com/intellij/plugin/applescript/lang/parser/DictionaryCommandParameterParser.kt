@@ -120,13 +120,11 @@ internal object DictionaryCommandParameterParser {
     ): Boolean {
         if (!recursion_guard_(builder, level, "parseBooleanParameter")) return false
         val marker = enter_section_(builder, level, _NONE_, "<parse Boolean Parameter>")
-        builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_BOOLEAN_PARAMETER, true)
         var result = consumeToken(builder, WITH)
         if (!result) result = consumeToken(builder, WITHOUT)
         if (!result) result = consumeToken(builder, LAND)
         result = result && parseCommandParameterSelector(builder, level + 1, command, parsedParameterSelector)
         exit_section_(builder, level, marker, null, result, false, null)
-        builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_BOOLEAN_PARAMETER, false)
         return result
     }
 
