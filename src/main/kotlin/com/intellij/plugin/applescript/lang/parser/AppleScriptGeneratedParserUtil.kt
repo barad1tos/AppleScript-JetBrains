@@ -386,22 +386,13 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
         ): Boolean {
             if (nextTokenIs(builder, NLS)) return false
             val parsedCommandName = Ref<String>()
-            val toldApplicationName = ParserApplicationNameStack.getTargetApplicationName(builder)
-            val areThereUseStatements =
-                builder.getUserData(ParserState.WAS_USE_STATEMENT_USED) == true
-            val applicationsToImport =
-                if (areThereUseStatements) {
-                    builder.getUserData(ParserState.USED_APPLICATION_NAMES)
-                } else {
-                    null
-                }
             val marker = enter_section_(builder, level, _COLLAPSE_, "<parse ApplicationDictionary Command Name>")
             val result =
                 DictionaryCommandNameParser.parseName(
                     builder,
                     level + 1,
                     parsedCommandName,
-                    DictionaryCommandLookupScope(toldApplicationName, areThereUseStatements, applicationsToImport),
+                    DictionaryCommandLookupScope.of(builder),
                 )
             exit_section_(builder, level, marker, DICTIONARY_COMMAND_NAME, result, false, null)
             return result
@@ -419,24 +410,10 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
             level: Int,
         ): Boolean {
             if (!recursion_guard_(builder, level, "parseDictionaryPropertyInner")) return false
-            val toldApplicationName = ParserApplicationNameStack.getTargetApplicationName(builder)
-            val areThereUseStatements =
-                builder.getUserData(ParserState.WAS_USE_STATEMENT_USED) == true
-            val applicationsToImportFrom =
-                if (areThereUseStatements) {
-                    builder.getUserData(ParserState.USED_APPLICATION_NAMES)
-                } else {
-                    null
-                }
-
             return DictionaryTermLookupParser.parsePropertyName(
                 builder,
                 level + 1,
-                DictionaryTermLookupScope(
-                    toldApplicationName,
-                    areThereUseStatements,
-                    applicationsToImportFrom,
-                ),
+                DictionaryTermLookupScope.of(builder),
             )
         }
 
@@ -453,24 +430,13 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
                 !tokenText.isNullOrEmpty() &&
                 AppleScriptNames.isIdentifierStart(tokenText[0])
             ) {
-                val toldApplicationName = ParserApplicationNameStack.getTargetApplicationName(builder)
                 val areThereUseStatements = checkForUseStatements.parse(builder, level + 1)
-                val applicationsToImportFrom =
-                    if (areThereUseStatements) {
-                        builder.getUserData(ParserState.USED_APPLICATION_NAMES)
-                    } else {
-                        null
-                    }
                 result =
                     DictionaryTermLookupParser.parseClassName(
                         builder,
                         level + 1,
                         isPluralForm,
-                        DictionaryTermLookupScope(
-                            toldApplicationName,
-                            areThereUseStatements,
-                            applicationsToImportFrom,
-                        ),
+                        DictionaryTermLookupScope.of(builder, areThereUseStatements),
                     )
             }
             return result
@@ -482,7 +448,7 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
             level: Int,
         ): Boolean =
             recursion_guard_(builder, level, "parseCheckForUseStatements") &&
-                builder.getUserData(ParserState.WAS_USE_STATEMENT_USED) == true
+                ParserState.areThereUseStatements(builder)
 
         @JvmStatic
         fun parseDictionaryConstant(
@@ -502,25 +468,12 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
                         ) == true ||
                         builder.getUserData(ParserState.PARSING_LITERAL_EXPRESSION) == true
                 if (ApplicationDictionary.COCOA_STANDARD_LIBRARY == toldApplicationName || insideExpression) {
-                    val areThereUseStatements =
-                        builder.getUserData(ParserState.WAS_USE_STATEMENT_USED) == true
-                    val applicationsToImportFrom =
-                        if (areThereUseStatements) {
-                            builder.getUserData(ParserState.USED_APPLICATION_NAMES)
-                        } else {
-                            null
-                        }
-
                     result =
                         DictionaryTermLookupParser.parseConstant(
                             builder,
                             level + 1,
                             insideExpression,
-                            DictionaryTermLookupScope(
-                                toldApplicationName,
-                                areThereUseStatements,
-                                applicationsToImportFrom,
-                            ),
+                            DictionaryTermLookupScope.of(builder),
                         )
                 }
             }

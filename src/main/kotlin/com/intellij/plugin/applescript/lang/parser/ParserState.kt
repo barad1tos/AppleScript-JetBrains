@@ -101,6 +101,33 @@ internal object ParserState {
     fun isInsideTellSimpleObjectReference(builder: PsiBuilder): Boolean =
         builder.getUserData(PARSING_TELL_SIMPLE_OBJECT_REF) == true
 
+    /**
+     * Write-through by design: PsiBuilder marker rollback does not rewind user data, so a use
+     * statement stays recorded even when an enclosing parse attempt rolls back.
+     */
+    fun recordUseStatementOutcome(
+        builder: PsiBuilder,
+        parsed: Boolean,
+    ) {
+        val previousPass = builder.getUserData(WAS_USE_STATEMENT_USED) == true
+        builder.putUserData(WAS_USE_STATEMENT_USED, parsed || previousPass)
+    }
+
+    fun recordUsedApplicationName(
+        builder: PsiBuilder,
+        applicationName: String,
+    ) {
+        val usedApplicationNames = builder.getUserData(USED_APPLICATION_NAMES).orEmpty() + applicationName
+        builder.putUserData(USED_APPLICATION_NAMES, usedApplicationNames)
+    }
+
+    fun areThereUseStatements(builder: PsiBuilder): Boolean = builder.getUserData(WAS_USE_STATEMENT_USED) == true
+
+    fun usedApplicationNamesForLookup(
+        builder: PsiBuilder,
+        areThereUseStatements: Boolean = areThereUseStatements(builder),
+    ): Set<String>? = if (areThereUseStatements) builder.getUserData(USED_APPLICATION_NAMES) else null
+
     // No try/finally: historical parsers leak state on exceptions; changing that would alter
     // observable behavior on cancellation paths.
     private fun withApplicationNameFrame(

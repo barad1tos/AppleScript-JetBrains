@@ -1,7 +1,9 @@
 package com.intellij.plugin.applescript.test.parsing
 
+import com.intellij.plugin.applescript.lang.parser.DictionaryCommandLookupScope
 import com.intellij.plugin.applescript.lang.parser.ParserApplicationNameStack
 import com.intellij.plugin.applescript.lang.parser.ParserState
+import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 
 class ParserStateTest : BasePlatformTestCase() {
@@ -93,5 +95,62 @@ class ParserStateTest : BasePlatformTestCase() {
         }
 
         assertEquals(false, builder.getUserData(ParserState.PARSING_TELL_SIMPLE_OBJECT_REF))
+    }
+
+    fun testUseStatementOutcomeIsMonotonic() {
+        val builder = myFixture.createAppleScriptBuilder("")
+        assertFalse(ParserState.areThereUseStatements(builder))
+
+        ParserState.recordUseStatementOutcome(builder, true)
+        assertTrue(ParserState.areThereUseStatements(builder))
+
+        // A later failed use statement must not clear the recorded scope.
+        ParserState.recordUseStatementOutcome(builder, false)
+        assertTrue(ParserState.areThereUseStatements(builder))
+    }
+
+    fun testUsedApplicationNamesAccumulate() {
+        val builder = myFixture.createAppleScriptBuilder("")
+        ParserState.recordUseStatementOutcome(builder, true)
+        ParserState.recordUsedApplicationName(builder, "Finder")
+        ParserState.recordUsedApplicationName(builder, "Music")
+
+        assertEquals(setOf("Finder", "Music"), ParserState.usedApplicationNamesForLookup(builder))
+    }
+
+    fun testUsedApplicationNamesAreNullWithoutUseStatements() {
+        val builder = myFixture.createAppleScriptBuilder("")
+        ParserState.recordUsedApplicationName(builder, "Finder")
+
+        assertNull(ParserState.usedApplicationNamesForLookup(builder))
+    }
+
+    fun testCommandLookupScopeSnapshotsBuilderState() {
+        val builder = myFixture.createAppleScriptBuilder("")
+        val beforeUse = DictionaryCommandLookupScope.of(builder)
+        assertEquals(ApplicationDictionary.COCOA_STANDARD_LIBRARY, beforeUse.toldApplicationName)
+        assertFalse(beforeUse.areThereUseStatements)
+        assertNull(beforeUse.applicationsToImport)
+
+        ParserState.recordUseStatementOutcome(builder, true)
+        ParserState.recordUsedApplicationName(builder, "Finder")
+        ParserApplicationNameStack.pushTargetApplicationName(builder, "Music")
+
+        val afterUse = DictionaryCommandLookupScope.of(builder)
+        assertEquals("Music", afterUse.toldApplicationName)
+        assertTrue(afterUse.areThereUseStatements)
+        assertEquals(setOf("Finder"), afterUse.applicationsToImport)
+    }
+
+    fun testUseRecordingSurvivesMarkerRollback() {
+        val builder = myFixture.createAppleScriptBuilder("tell")
+        val marker = builder.mark()
+        ParserState.recordUseStatementOutcome(builder, true)
+        ParserState.recordUsedApplicationName(builder, "Finder")
+        marker.rollbackTo()
+
+        // Marker rollback rewinds tokens, not user data — recorded use scope is write-through.
+        assertTrue(ParserState.areThereUseStatements(builder))
+        assertEquals(setOf("Finder"), ParserState.usedApplicationNamesForLookup(builder))
     }
 }

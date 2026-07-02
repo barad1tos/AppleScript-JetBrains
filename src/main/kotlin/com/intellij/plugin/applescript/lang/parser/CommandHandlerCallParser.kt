@@ -22,7 +22,7 @@ internal object CommandHandlerCallParser {
             isCommandHandlerCallStart(builder)
         ) {
             val parsedCommandName = Ref<String>()
-            val lookupScope = commandLookupScope(builder)
+            val lookupScope = DictionaryCommandLookupScope.of(builder)
             val commandNameResult = parseCommandNameSection(builder, level, parsedCommandName, lookupScope)
 
             if (commandNameResult) {
@@ -84,22 +84,6 @@ internal object CommandHandlerCallParser {
             !CommandHandlerAssignmentGuard.isTargetPhraseBeforeTerminator(builder) &&
             !tokenText.isNullOrEmpty() &&
             AppleScriptNames.isIdentifierStart(tokenText[0])
-    }
-
-    private fun commandLookupScope(builder: PsiBuilder): DictionaryCommandLookupScope {
-        val areThereUseStatements =
-            builder.getUserData(ParserState.WAS_USE_STATEMENT_USED) == true
-        val applicationsToImport =
-            if (areThereUseStatements) {
-                builder.getUserData(ParserState.USED_APPLICATION_NAMES)
-            } else {
-                null
-            }
-        return DictionaryCommandLookupScope(
-            ParserApplicationNameStack.getTargetApplicationName(builder),
-            areThereUseStatements,
-            applicationsToImport,
-        )
     }
 
     private fun parseCommandNameSection(
