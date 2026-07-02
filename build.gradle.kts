@@ -357,6 +357,10 @@ tasks {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellApplicationMusicTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.FallbackCommandParameterParserTest")
+                // Parser builder-state adapter guard: direct PsiBuilder-level assertions on the
+                // ParserState scoped runners (tri-state flags, application-name frames, use-scope
+                // recording). BasePlatformTestCase — heavy-by-default like its neighbors above.
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserStateTest")
                 // Phase 8 PARSE-01 (plan 08-01): RealWorldCorpusTest is the v2.0
                 // "corpus is the contract" harness — realistic production-shaped
                 // scripts asserting zero PsiErrorElement. BasePlatformTestCase boots
@@ -769,7 +773,9 @@ tasks {
                             cycle = dfs(neighbor, path)
                         }
 
-                        else -> Unit
+                        else -> {
+                            Unit
+                        }
                     }
                     if (cycle != null) break
                 }

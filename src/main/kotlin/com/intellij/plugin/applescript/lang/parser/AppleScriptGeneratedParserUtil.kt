@@ -192,7 +192,7 @@ open class AppleScriptGeneratedParserCommandHooks : GeneratedParserUtilBase() {
         ): Boolean =
             recursion_guard_(builder, level, "isHandlerLabeledParametersCallAllowed") &&
                 builder.getUserData(ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT) != true &&
-                builder.getUserData(ParserState.PARSING_TELL_SIMPLE_OBJECT_REF) != true &&
+                !ParserState.isInsideTellSimpleObjectReference(builder) &&
                 builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS) != true
 
         @JvmStatic

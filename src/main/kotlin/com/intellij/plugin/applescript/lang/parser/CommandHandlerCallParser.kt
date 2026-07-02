@@ -46,8 +46,8 @@ internal object CommandHandlerCallParser {
     ): Boolean {
         var result = false
         if (recursion_guard_(builder, level, "parseApplicationHandlerDefinitionSignature") &&
-            builder.getUserData(ParserState.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true &&
-            builder.getUserData(ParserState.PARSING_TELL_COMPOUND_STATEMENT) != true
+            ParserState.isInsideUsingTermsFromStatement(builder) &&
+            !ParserState.isInsideTellCompoundStatement(builder)
         ) {
             val parsedCommandName = Ref<String>()
             val lookupScope =
