@@ -65,26 +65,64 @@ class AppleScriptProjectDictionaryService(
     }
 
     @Synchronized
-    fun getOrCreateDictionaryFromCachedSources(applicationName: String): ApplicationDictionary? {
-        val dictionary =
-            if (isInIgnoreList(applicationName)) {
-                null
-            } else {
-                val standardApplicationBundle = findStandardApplicationBundle(applicationName)
-                val cachedDictionary = getDictionary(applicationName)
-                cachedDictionary
-                    ?.takeUnless { it.needsBundleAwareRefresh(standardApplicationBundle) }
-                    ?: createDictionaryFromRegisteredCache(
-                        applicationName,
-                        fallbackApplicationBundle = standardApplicationBundle,
-                    )
-                    ?: createDictionaryFromGeneratedCache(
-                        applicationName,
-                        applicationBundle = standardApplicationBundle,
-                    )
-                    ?: cachedDictionary
-            }
-        return dictionary
+    fun getOrCreateDictionaryFromCachedSources(applicationName: String): ApplicationDictionary? =
+        materializeDictionaryFromCachedSources(applicationName).dictionary
+
+    @Synchronized
+    internal fun materializeDictionaryFromCachedSources(
+        applicationName: String,
+    ): CachedDictionaryMaterializationResult {
+        if (isInIgnoreList(applicationName)) return CachedDictionaryMaterializationResult.Ignored
+
+        val standardApplicationBundle = findStandardApplicationBundle(applicationName)
+        val cachedDictionary = getDictionary(applicationName)
+        val freshCachedDictionary =
+            cachedDictionary?.takeUnless { it.needsBundleAwareRefresh(standardApplicationBundle) }
+        if (freshCachedDictionary != null) {
+            return CachedDictionaryMaterializationResult.Cached(freshCachedDictionary)
+        }
+
+        val registeredDictionary =
+            createDictionaryFromRegisteredCache(
+                applicationName,
+                fallbackApplicationBundle = standardApplicationBundle,
+            )
+        if (registeredDictionary != null) {
+            return CachedDictionaryMaterializationResult.Created(
+                registeredDictionary,
+                CachedDictionaryMaterializationResult.Source.RegisteredCache,
+            )
+        }
+
+        return when (
+            val generatedDictionary =
+                createDictionaryFromGeneratedCacheResult(
+                    applicationName,
+                    applicationBundle = standardApplicationBundle,
+                )
+        ) {
+            is GeneratedDictionaryCacheResult.Loaded ->
+                CachedDictionaryMaterializationResult.Created(
+                    generatedDictionary.dictionary,
+                    CachedDictionaryMaterializationResult.Source.GeneratedCache,
+                )
+
+            is GeneratedDictionaryCacheResult.ParseFailed ->
+                CachedDictionaryMaterializationResult.ParseFailed(
+                    generatedDictionary.generatedDictionaryFile,
+                    fallbackDictionary = cachedDictionary,
+                )
+
+            is GeneratedDictionaryCacheResult.MaterializationFailed ->
+                CachedDictionaryMaterializationResult.MaterializationFailed(
+                    generatedDictionary.generatedDictionaryFile,
+                    fallbackDictionary = cachedDictionary,
+                )
+
+            GeneratedDictionaryCacheResult.Missing ->
+                cachedDictionary?.let(CachedDictionaryMaterializationResult::StaleFallback)
+                    ?: CachedDictionaryMaterializationResult.Missing
+        }
     }
 
     private fun createDictionaryFromRegisteredCache(
@@ -102,13 +140,15 @@ class AppleScriptProjectDictionaryService(
                 )
             }
 
-    private fun createDictionaryFromGeneratedCache(
+    private fun createDictionaryFromGeneratedCacheResult(
         applicationName: String,
-        applicationBundle: File? = findStandardApplicationBundle(applicationName),
-    ): ApplicationDictionary? {
+        applicationBundle: File?,
+    ): GeneratedDictionaryCacheResult {
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
-        if (!generatedDictionaryFile.isFile) return null
-        if (!SdefIndexService.getInstance().parseDictionaryFile(generatedDictionaryFile, applicationName)) return null
+        if (!generatedDictionaryFile.isFile) return GeneratedDictionaryCacheResult.Missing
+        if (!SdefIndexService.getInstance().parseDictionaryFile(generatedDictionaryFile, applicationName)) {
+            return GeneratedDictionaryCacheResult.ParseFailed(generatedDictionaryFile)
+        }
 
         val info =
             DictionaryInfo(
@@ -117,6 +157,8 @@ class AppleScriptProjectDictionaryService(
                 applicationBundle,
             ).also { dictionaryInfo -> dictionaryInfo.setInitialized(true) }
         return createDictionaryFromInfo(info, shouldCacheInProject = false)
+            ?.let(GeneratedDictionaryCacheResult::Loaded)
+            ?: GeneratedDictionaryCacheResult.MaterializationFailed(generatedDictionaryFile)
     }
 
     private fun ApplicationDictionary.needsBundleAwareRefresh(standardApplicationBundle: File?): Boolean =
@@ -240,4 +282,20 @@ class AppleScriptProjectDictionaryService(
     companion object {
         private val LOG: Logger = Logger.getInstance("#${AppleScriptProjectDictionaryService::class.java.name}")
     }
+}
+
+private sealed interface GeneratedDictionaryCacheResult {
+    data class Loaded(
+        val dictionary: ApplicationDictionary,
+    ) : GeneratedDictionaryCacheResult
+
+    data class ParseFailed(
+        val generatedDictionaryFile: File,
+    ) : GeneratedDictionaryCacheResult
+
+    data class MaterializationFailed(
+        val generatedDictionaryFile: File,
+    ) : GeneratedDictionaryCacheResult
+
+    data object Missing : GeneratedDictionaryCacheResult
 }
