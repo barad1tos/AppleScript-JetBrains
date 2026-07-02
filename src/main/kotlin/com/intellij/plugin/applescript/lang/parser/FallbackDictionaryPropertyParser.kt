@@ -120,6 +120,6 @@ internal object FallbackDictionaryPropertyParser {
         tokenType: IElementType?,
     ): Boolean =
         tokenType === TO &&
-            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            builder.getUserData(ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
             AppleScriptParserTrivia.previousNonSpaceToken(builder) === SET
 }

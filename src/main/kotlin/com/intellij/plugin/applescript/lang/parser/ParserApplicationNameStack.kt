@@ -22,12 +22,12 @@ internal object ParserApplicationNameStack {
                 builder.putUserData(AppleScriptGeneratedParserUtil.TOLD_APPLICATION_NAME_STACK, it)
             }
         dictionaryNameStack.push(applicationNameString)
-        builder.putUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED, true)
+        builder.putUserData(ParserState.APPLICATION_NAME_PUSHED, true)
         return dictionaryNameStack
     }
 
     fun popApplicationNameIfWasPushed(builder: PsiBuilder) {
-        if (builder.getUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED) == true) {
+        if (builder.getUserData(ParserState.APPLICATION_NAME_PUSHED) == true) {
             val dictionaryNameStack = builder.getUserData(AppleScriptGeneratedParserUtil.TOLD_APPLICATION_NAME_STACK)
             if (!dictionaryNameStack.isNullOrEmpty()) {
                 dictionaryNameStack.pop()

@@ -65,7 +65,7 @@ internal object DictionaryDirectParameterParser {
     }
 
     private fun isParsingTellCompoundStatement(builder: PsiBuilder): Boolean =
-        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_COMPOUND_STATEMENT) == true
+        builder.getUserData(ParserState.PARSING_TELL_COMPOUND_STATEMENT) == true
 
     private fun isParameterSelectorAhead(
         builder: PsiBuilder,

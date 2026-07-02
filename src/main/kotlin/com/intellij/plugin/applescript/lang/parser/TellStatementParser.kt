@@ -22,13 +22,13 @@ internal object TellStatementParser {
     ): Boolean {
         var result = false
         if (recursion_guard_(builder, level, "tellSimpleStatement") && nextTokenIs(builder, TELL)) {
-            val pushStateBefore = builder.getUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED) == true
-            builder.putUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED, false)
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_SIMPLE_STATEMENT, true)
+            val pushStateBefore = builder.getUserData(ParserState.APPLICATION_NAME_PUSHED) == true
+            builder.putUserData(ParserState.APPLICATION_NAME_PUSHED, false)
+            builder.putUserData(ParserState.PARSING_TELL_SIMPLE_STATEMENT, true)
             result = AppleScriptParser.tellSimpleStatement(builder, level + 1)
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_SIMPLE_STATEMENT, false)
+            builder.putUserData(ParserState.PARSING_TELL_SIMPLE_STATEMENT, false)
             ParserApplicationNameStack.popApplicationNameIfWasPushed(builder)
-            builder.putUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED, pushStateBefore)
+            builder.putUserData(ParserState.APPLICATION_NAME_PUSHED, pushStateBefore)
         }
         return result
     }
@@ -40,9 +40,9 @@ internal object TellStatementParser {
         if (!recursion_guard_(builder, level, "parseTellSimpleObjectReference")) return false
         var result = nextTokenIsFast(builder, LPAREN) && AppleScriptParser.parenthesizedExpression(builder, level + 1)
         if (!result) {
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_SIMPLE_OBJECT_REF, true)
+            builder.putUserData(ParserState.PARSING_TELL_SIMPLE_OBJECT_REF, true)
             result = AppleScriptParser.expression(builder, level + 1)
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_SIMPLE_OBJECT_REF, false)
+            builder.putUserData(ParserState.PARSING_TELL_SIMPLE_OBJECT_REF, false)
         }
         return result
     }
@@ -69,15 +69,15 @@ internal object TellStatementParser {
     ): Boolean {
         var result = false
         if (recursion_guard_(builder, level, "parseTellCompoundStatement") && nextTokenIs(builder, TELL)) {
-            val pushStateBefore = builder.getUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED) == true
+            val pushStateBefore = builder.getUserData(ParserState.APPLICATION_NAME_PUSHED) == true
             val compoundStateBefore =
-                builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_COMPOUND_STATEMENT) == true
-            builder.putUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED, false)
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_COMPOUND_STATEMENT, true)
+                builder.getUserData(ParserState.PARSING_TELL_COMPOUND_STATEMENT) == true
+            builder.putUserData(ParserState.APPLICATION_NAME_PUSHED, false)
+            builder.putUserData(ParserState.PARSING_TELL_COMPOUND_STATEMENT, true)
             result = AppleScriptParser.tellCompoundStatement(builder, level + 1)
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_COMPOUND_STATEMENT, compoundStateBefore)
+            builder.putUserData(ParserState.PARSING_TELL_COMPOUND_STATEMENT, compoundStateBefore)
             ParserApplicationNameStack.popApplicationNameIfWasPushed(builder)
-            builder.putUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED, pushStateBefore)
+            builder.putUserData(ParserState.APPLICATION_NAME_PUSHED, pushStateBefore)
         }
         return result
     }
@@ -88,17 +88,17 @@ internal object TellStatementParser {
     ): Boolean {
         if (!recursion_guard_(builder, level, "parseUsingTermsFromStatement")) return false
         val oldParseUsingTermsState =
-            builder.getUserData(AppleScriptGeneratedParserUtil.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true
-        val oldPushedState = builder.getUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED) == true
-        builder.putUserData(AppleScriptGeneratedParserUtil.IS_PARSING_USING_TERMS_FROM_STATEMENT, true)
-        builder.putUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED, false)
+            builder.getUserData(ParserState.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true
+        val oldPushedState = builder.getUserData(ParserState.APPLICATION_NAME_PUSHED) == true
+        builder.putUserData(ParserState.IS_PARSING_USING_TERMS_FROM_STATEMENT, true)
+        builder.putUserData(ParserState.APPLICATION_NAME_PUSHED, false)
         val result = AppleScriptParser.usingTermsFromStatement(builder, level + 1)
         ParserApplicationNameStack.popApplicationNameIfWasPushed(builder)
         builder.putUserData(
-            AppleScriptGeneratedParserUtil.IS_PARSING_USING_TERMS_FROM_STATEMENT,
+            ParserState.IS_PARSING_USING_TERMS_FROM_STATEMENT,
             oldParseUsingTermsState,
         )
-        builder.putUserData(AppleScriptGeneratedParserUtil.APPLICATION_NAME_PUSHED, oldPushedState)
+        builder.putUserData(ParserState.APPLICATION_NAME_PUSHED, oldPushedState)
         return result
     }
 
@@ -108,7 +108,7 @@ internal object TellStatementParser {
             val previousElement = TellStatementTokenScanner.previousRelevantToken(builder)
             result =
                 previousElement === TELL ||
-                builder.getUserData(AppleScriptGeneratedParserUtil.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true &&
+                builder.getUserData(ParserState.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true &&
                 previousElement === FROM
         }
         return result
@@ -121,7 +121,7 @@ internal object TellStatementParser {
     ): Boolean {
         val toldApplicationName = ParserApplicationNameStack.peekTargetApplicationName(builder)
         val canCheckDictionary =
-            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_COMPOUND_STATEMENT) == true &&
+            builder.getUserData(ParserState.PARSING_TELL_COMPOUND_STATEMENT) == true &&
                 !StringUtil.isEmpty(toldApplicationName)
         val isCommand =
             canCheckDictionary &&
@@ -155,9 +155,9 @@ internal object TellStatementParser {
     }
 
     private fun isInTellStatement(builder: PsiBuilder): Boolean =
-        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_SIMPLE_STATEMENT) == true &&
+        builder.getUserData(ParserState.PARSING_TELL_SIMPLE_STATEMENT) == true &&
             nextTokenIs(builder, TO) ||
-            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_COMPOUND_STATEMENT) == true &&
-            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_SIMPLE_STATEMENT) == false ||
-            builder.getUserData(AppleScriptGeneratedParserUtil.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true
+            builder.getUserData(ParserState.PARSING_TELL_COMPOUND_STATEMENT) == true &&
+            builder.getUserData(ParserState.PARSING_TELL_SIMPLE_STATEMENT) == false ||
+            builder.getUserData(ParserState.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true
 }

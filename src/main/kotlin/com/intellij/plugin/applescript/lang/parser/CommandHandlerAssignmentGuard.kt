@@ -11,12 +11,12 @@ import com.intellij.psi.tree.IElementType
 
 internal object CommandHandlerAssignmentGuard {
     fun isObjectOperandBeforeTerminator(builder: PsiBuilder): Boolean =
-        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+        builder.getUserData(ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
             builder.lookAhead(1) === TO &&
             isObjectPointer(AppleScriptParserTrivia.previousNonSpaceToken(builder))
 
     fun isTargetPhraseBeforeTerminator(builder: PsiBuilder): Boolean =
-        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+        builder.getUserData(ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
             isAssignmentTargetIntroducer(AppleScriptParserTrivia.previousNonSpaceToken(builder)) &&
             hasAssignmentTerminatorAfterTargetPhrase(builder)
 

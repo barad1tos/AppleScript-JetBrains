@@ -46,8 +46,8 @@ internal object CommandHandlerCallParser {
     ): Boolean {
         var result = false
         if (recursion_guard_(builder, level, "parseApplicationHandlerDefinitionSignature") &&
-            builder.getUserData(AppleScriptGeneratedParserUtil.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true &&
-            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_COMPOUND_STATEMENT) != true
+            builder.getUserData(ParserState.IS_PARSING_USING_TERMS_FROM_STATEMENT) == true &&
+            builder.getUserData(ParserState.PARSING_TELL_COMPOUND_STATEMENT) != true
         ) {
             val parsedCommandName = Ref<String>()
             val lookupScope =
@@ -88,10 +88,10 @@ internal object CommandHandlerCallParser {
 
     private fun commandLookupScope(builder: PsiBuilder): DictionaryCommandLookupScope {
         val areThereUseStatements =
-            builder.getUserData(AppleScriptGeneratedParserUtil.WAS_USE_STATEMENT_USED) == true
+            builder.getUserData(ParserState.WAS_USE_STATEMENT_USED) == true
         val applicationsToImport =
             if (areThereUseStatements) {
-                builder.getUserData(AppleScriptGeneratedParserUtil.USED_APPLICATION_NAMES)
+                builder.getUserData(ParserState.USED_APPLICATION_NAMES)
             } else {
                 null
             }
