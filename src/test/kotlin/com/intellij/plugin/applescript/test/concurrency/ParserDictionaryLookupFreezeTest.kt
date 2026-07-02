@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
+import com.intellij.plugin.applescript.lang.dictionary.index.LookupResult
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
@@ -201,6 +202,92 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
             applicationInfo.getApplicationFile()?.path?.let(persistence::removeDictionaryInfo)
             standardInfo.getApplicationFile()?.path?.let(persistence::removeDictionaryInfo)
         }
+    }
+
+    fun testCommandLookupResultSeparatesColdMissAndHit() {
+        val applicationName = "SyntheticCommandLookupResultApp_${System.nanoTime()}"
+        val applicationDictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "command-lookup-result-app",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val standardDictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "command-lookup-result-standard-additions",
+                SyntheticSuiteFixtures.standardAdditionsMinimalXml(),
+            )
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val indexService = SdefIndexService.getInstance()
+
+        runBlocking {
+            indexService.ingest(applicationName, applicationDictionaryFile)
+            indexService.ingest(ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY, standardDictionaryFile)
+        }
+
+        assertEquals(
+            "Standard command lookup must report cold readiness before standard dictionaries are ready",
+            LookupResult.Stale,
+            indexService.commandLookup.lookupStdCommandResult("do shell script"),
+        )
+        assertEquals(
+            "Standard command prefix lookup must report cold readiness before standard dictionaries are ready",
+            LookupResult.Stale,
+            indexService.commandLookup.lookupStdCommandWithPrefixResult("do shell"),
+        )
+        assertEquals(
+            "App command lookup must report cold readiness before app dictionaries are ready",
+            LookupResult.Stale,
+            indexService.commandLookup.lookupApplicationCommandResult(applicationName, "play"),
+        )
+        assertEquals(
+            "App command prefix lookup must report cold readiness before app dictionaries are ready",
+            LookupResult.Stale,
+            indexService.commandLookup.lookupCommandWithPrefixResult(applicationName, "play"),
+        )
+
+        registryService.standardReady.complete(Result.success(Unit))
+        assertEquals(
+            "Standard command lookup must report hit once standard dictionaries are ready",
+            LookupResult.Hit,
+            indexService.commandLookup.lookupStdCommandResult("do shell script"),
+        )
+        assertEquals(
+            "Standard command prefix lookup must report hit once standard dictionaries are ready",
+            LookupResult.Hit,
+            indexService.commandLookup.lookupStdCommandWithPrefixResult("do shell"),
+        )
+        assertEquals(
+            "App command lookup must stay cold until app dictionaries are ready",
+            LookupResult.Stale,
+            indexService.commandLookup.lookupApplicationCommandResult(applicationName, "play"),
+        )
+        assertEquals(
+            "App command prefix lookup must stay cold until app dictionaries are ready",
+            LookupResult.Stale,
+            indexService.commandLookup.lookupCommandWithPrefixResult(applicationName, "play"),
+        )
+
+        registryService.appsReady.complete(Result.success(Unit))
+        assertEquals(
+            "App command lookup must report hit once app dictionaries are ready",
+            LookupResult.Hit,
+            indexService.commandLookup.lookupApplicationCommandResult(applicationName, "play"),
+        )
+        assertEquals(
+            "App command prefix lookup must report hit once app dictionaries are ready",
+            LookupResult.Hit,
+            indexService.commandLookup.lookupCommandWithPrefixResult(applicationName, "play"),
+        )
+        assertEquals(
+            "Ready app command lookup must report miss for absent commands",
+            LookupResult.Miss,
+            indexService.commandLookup.lookupApplicationCommandResult(applicationName, "pause"),
+        )
+        assertEquals(
+            "Ready app command prefix lookup must report miss for absent prefixes",
+            LookupResult.Miss,
+            indexService.commandLookup.lookupCommandWithPrefixResult(applicationName, "pa"),
+        )
     }
 
     private fun writeDictionaryXmlToTempFile(

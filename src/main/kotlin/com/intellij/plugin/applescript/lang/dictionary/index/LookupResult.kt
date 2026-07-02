@@ -16,8 +16,10 @@ sealed interface LookupResult {
     object Miss : LookupResult
 
     /**
-     * Returned when [com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService.isInitialized]
-     * is false — caller should treat as [Miss] but with diagnostic context (init has not completed yet).
+     * Returned when the relevant dictionary readiness gate is cold. Standard dictionary lookups use
+     * `isInitialized`; application dictionary lookups use `areAppDictionariesIndexed`.
+     *
+     * Callers should treat this as [Miss] with diagnostic context.
      */
     object Stale : LookupResult
 }
