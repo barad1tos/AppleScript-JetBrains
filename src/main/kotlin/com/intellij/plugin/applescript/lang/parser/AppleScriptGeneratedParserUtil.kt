@@ -191,7 +191,7 @@ open class AppleScriptGeneratedParserCommandHooks : GeneratedParserUtilBase() {
             level: Int,
         ): Boolean =
             recursion_guard_(builder, level, "isHandlerLabeledParametersCallAllowed") &&
-                builder.getUserData(ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT) != true &&
+                !ParserState.isInsideAssignmentStatement(builder) &&
                 !ParserState.isInsideTellSimpleObjectReference(builder) &&
                 builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS) != true
 
@@ -210,26 +210,22 @@ open class AppleScriptGeneratedParserCommandHooks : GeneratedParserUtilBase() {
         fun parseAssignmentStatementInner(
             builder: PsiBuilder,
             level: Int,
-        ): Boolean {
-            if (!recursion_guard_(builder, level, "parseAssignmentStatementInner")) return false
-            builder.putUserData(ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT, true)
-            val result = AppleScriptParser.assignmentStatement(builder, level + 1)
-            builder.putUserData(ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT, false)
-            return result
-        }
+        ): Boolean =
+            recursion_guard_(builder, level, "parseAssignmentStatementInner") &&
+                ParserState.withAssignmentStatement(builder) {
+                    AppleScriptParser.assignmentStatement(builder, level + 1)
+                }
 
         @JvmStatic
         fun parseLiteralExpression(
             builder: PsiBuilder,
             level: Int,
             literalExpression: Parser,
-        ): Boolean {
-            if (!recursion_guard_(builder, level, "parseLiteralExpression")) return false
-            builder.putUserData(ParserState.PARSING_LITERAL_EXPRESSION, true)
-            val result = literalExpression.parse(builder, level + 1)
-            builder.putUserData(ParserState.PARSING_LITERAL_EXPRESSION, false)
-            return result
-        }
+        ): Boolean =
+            recursion_guard_(builder, level, "parseLiteralExpression") &&
+                ParserState.withLiteralExpression(builder) {
+                    literalExpression.parse(builder, level + 1)
+                }
 
         @JvmStatic
         fun parseCommandParameterSelector(
@@ -463,10 +459,8 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
                         true ||
                         builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS) ==
                         true ||
-                        builder.getUserData(
-                            ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT,
-                        ) == true ||
-                        builder.getUserData(ParserState.PARSING_LITERAL_EXPRESSION) == true
+                        ParserState.isInsideAssignmentStatement(builder) ||
+                        ParserState.isInsideLiteralExpression(builder)
                 if (ApplicationDictionary.COCOA_STANDARD_LIBRARY == toldApplicationName || insideExpression) {
                     result =
                         DictionaryTermLookupParser.parseConstant(

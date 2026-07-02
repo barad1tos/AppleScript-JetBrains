@@ -101,6 +101,32 @@ internal object ParserState {
     fun isInsideTellSimpleObjectReference(builder: PsiBuilder): Boolean =
         builder.getUserData(PARSING_TELL_SIMPLE_OBJECT_REF) == true
 
+    fun withAssignmentStatement(
+        builder: PsiBuilder,
+        parse: () -> Boolean,
+    ): Boolean {
+        builder.putUserData(PARSING_COMMAND_ASSIGNMENT_STATEMENT, true)
+        val result = parse()
+        builder.putUserData(PARSING_COMMAND_ASSIGNMENT_STATEMENT, false)
+        return result
+    }
+
+    fun withLiteralExpression(
+        builder: PsiBuilder,
+        parse: () -> Boolean,
+    ): Boolean {
+        builder.putUserData(PARSING_LITERAL_EXPRESSION, true)
+        val result = parse()
+        builder.putUserData(PARSING_LITERAL_EXPRESSION, false)
+        return result
+    }
+
+    fun isInsideAssignmentStatement(builder: PsiBuilder): Boolean =
+        builder.getUserData(PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true
+
+    fun isInsideLiteralExpression(builder: PsiBuilder): Boolean =
+        builder.getUserData(PARSING_LITERAL_EXPRESSION) == true
+
     /**
      * Write-through by design: PsiBuilder marker rollback does not rewind user data, so a use
      * statement stays recorded even when an enclosing parse attempt rolls back.

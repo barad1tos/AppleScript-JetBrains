@@ -142,6 +142,28 @@ class ParserStateTest : BasePlatformTestCase() {
         assertEquals(setOf("Finder"), afterUse.applicationsToImport)
     }
 
+    fun testAssignmentFlagSetsTrueInsideAndExplicitFalseAfter() {
+        val builder = myFixture.createAppleScriptBuilder("")
+
+        ParserState.withAssignmentStatement(builder) {
+            assertTrue(ParserState.isInsideAssignmentStatement(builder))
+            true
+        }
+
+        assertEquals(false, builder.getUserData(ParserState.PARSING_COMMAND_ASSIGNMENT_STATEMENT))
+    }
+
+    fun testLiteralExpressionFlagSetsTrueInsideAndExplicitFalseAfter() {
+        val builder = myFixture.createAppleScriptBuilder("")
+
+        ParserState.withLiteralExpression(builder) {
+            assertTrue(ParserState.isInsideLiteralExpression(builder))
+            true
+        }
+
+        assertEquals(false, builder.getUserData(ParserState.PARSING_LITERAL_EXPRESSION))
+    }
+
     fun testUseRecordingSurvivesMarkerRollback() {
         val builder = myFixture.createAppleScriptBuilder("tell")
         val marker = builder.mark()
