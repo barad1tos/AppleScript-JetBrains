@@ -296,6 +296,19 @@ class AppleScriptProjectDictionaryService(
         dictionaryMap[applicationName] = dictionary
     }
 
+    /**
+     * Drives [materializedFromInfo] directly so the fallback-carrying `MaterializationFailed` leg can be covered.
+     * It fires only when PSI construction fails inside the private generated-cache path; the public cached-sources
+     * seam cannot stage it without a file that parses in JDOM yet is not detected as XML by the platform.
+     */
+    @TestOnly
+    internal fun materializeFromInfoForTests(
+        info: DictionaryInfo,
+        source: DictionaryMaterializationResult.Source,
+        fallbackDictionary: ApplicationDictionary?,
+    ): DictionaryMaterializationResult =
+        materializedFromInfo(info, source, shouldCacheInProject = false, fallbackDictionary = fallbackDictionary)
+
     companion object {
         private val LOG: Logger = Logger.getInstance("#${AppleScriptProjectDictionaryService::class.java.name}")
     }

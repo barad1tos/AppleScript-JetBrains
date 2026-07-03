@@ -385,6 +385,43 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testMaterializationCarriesFallbackWhenPsiConstructionFails() {
+        val applicationName = "SyntheticFallbackMaterializationApp_${System.nanoTime()}"
+        val (fallbackDictionary, dictionaryFile) =
+            syntheticProjectDictionary(
+                applicationName,
+                "materialization-fallback",
+            )
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val unreadableCacheFile = File(serializeDictionaryPathForApplication(applicationName))
+        unreadableCacheFile.delete()
+
+        val staleInitializedInfo =
+            DictionaryInfo(applicationName, unreadableCacheFile, null).also { info -> info.setInitialized(true) }
+
+        try {
+            val result =
+                projectDictionaries.materializeFromInfoForTests(
+                    staleInitializedInfo,
+                    DictionaryMaterializationResult.Source.GeneratedCache,
+                    fallbackDictionary,
+                )
+
+            when (result) {
+                is DictionaryMaterializationResult.MaterializationFailed -> {
+                    assertSame(fallbackDictionary, result.dictionary)
+                    assertEquals(unreadableCacheFile.path, result.generatedDictionaryFile.path)
+                }
+
+                else -> {
+                    fail("PSI construction failure with a stale dictionary should carry the fallback, got $result")
+                }
+            }
+        } finally {
+            dictionaryFile.delete()
+        }
+    }
+
     fun testCachedDictionaryMaterializationReportsFreshCachedDictionary() {
         val applicationName = "SyntheticCachedMaterializationApp_${System.nanoTime()}"
         val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "cached-materialization")
