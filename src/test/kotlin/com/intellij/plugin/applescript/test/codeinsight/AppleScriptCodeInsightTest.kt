@@ -292,20 +292,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
     fun testCachedDictionaryMaterializationReportsFreshCachedDictionary() {
         val applicationName = "SyntheticCachedMaterializationApp_${System.nanoTime()}"
-        val dictionaryFile =
-            SyntheticSuiteFixtures.writeToTempFile(
-                "cached-materialization",
-                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
-            )
-        val dictionaryXmlFile =
-            LocalFileSystem
-                .getInstance()
-                .refreshAndFindFileByIoFile(dictionaryFile)
-                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
-        assertNotNull(dictionaryXmlFile)
-        requireNotNull(dictionaryXmlFile)
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "cached-materialization")
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val cachedDictionary = ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null)
 
         try {
             projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
@@ -318,6 +306,25 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             projectDictionaries.clearCachedDictionariesForTests()
             dictionaryFile.delete()
         }
+    }
+
+    private fun syntheticProjectDictionary(
+        applicationName: String,
+        fixtureName: String,
+    ): Pair<ApplicationDictionaryImpl, File> {
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                fixtureName,
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val dictionaryXmlFile =
+            LocalFileSystem
+                .getInstance()
+                .refreshAndFindFileByIoFile(dictionaryFile)
+                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
+        assertNotNull(dictionaryXmlFile)
+        requireNotNull(dictionaryXmlFile)
+        return ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null) to dictionaryFile
     }
 
     fun testDictionaryMaterializationReportsIgnoredApplication() {
@@ -339,20 +346,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
     fun testDictionaryMaterializationReturnsProjectCachedDictionary() {
         val applicationName = "SyntheticOnDemandCachedApp_${System.nanoTime()}"
-        val dictionaryFile =
-            SyntheticSuiteFixtures.writeToTempFile(
-                "on-demand-cached",
-                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
-            )
-        val dictionaryXmlFile =
-            LocalFileSystem
-                .getInstance()
-                .refreshAndFindFileByIoFile(dictionaryFile)
-                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
-        assertNotNull(dictionaryXmlFile)
-        requireNotNull(dictionaryXmlFile)
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "on-demand-cached")
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val cachedDictionary = ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null)
 
         try {
             projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
@@ -367,19 +362,18 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
-    fun testDictionaryMaterializationReportsMissingWhenRegistryHasNoInfo() {
+    fun testDictionaryMaterializationReportsMissingWhenEdtGuardSkipsDiscovery() {
+        // This test runs on the EDT (BasePlatformTestCase), so the registry lookup short-circuits
+        // in ApplicationDiscoveryService.findApplicationBundleFile's dispatch-thread guard and
+        // yields no info — the guard IS the exercised path; off-EDT discovery misses are not
+        // covered here.
         val applicationName = "SyntheticUnknownRegistryApp_${System.nanoTime()}"
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
-        try {
-            assertEquals(
-                DictionaryMaterializationResult.Missing,
-                projectDictionaries.materializeDictionary(applicationName),
-            )
-        } finally {
-            ApplicationDiscoveryService.getInstance().removeFromNotFoundList(applicationName)
-            SdefPersistenceService.getInstance().removeNotScriptable(applicationName)
-        }
+        assertEquals(
+            DictionaryMaterializationResult.Missing,
+            projectDictionaries.materializeDictionary(applicationName),
+        )
     }
 
     fun testFileDictionaryMaterializationReportsMissingForUnsupportedFile() {
@@ -431,7 +425,38 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             }
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
-            persistence.removeDictionaryInfo(dictionaryFile.path)
+            // Path-based removal cannot match: dictionary-file loads register infos without an
+            // application bundle file, so clean the registry entry up by name.
+            persistence.removeDictionaryInfoByNameForTests(applicationName)
+            generatedDictionaryFile.delete()
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testFileDictionaryMaterializationReportsFailureForMalformedDictionaryFile() {
+        val applicationName = "SyntheticMalformedLoadedFileApp_${System.nanoTime()}"
+        val dictionaryFile = FileUtil.createTempFile("malformed-loaded-dictionary", ".sdef", true)
+        dictionaryFile.writeText("<dictionary><suite>")
+        val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(dictionaryFile)
+        assertNotNull(virtualFile)
+        requireNotNull(virtualFile)
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            when (val result = projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile)) {
+                is DictionaryMaterializationResult.MaterializationFailed -> {
+                    assertNull(result.dictionary)
+                }
+
+                else -> {
+                    fail("Malformed dictionary file should report MaterializationFailed, got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            persistence.removeDictionaryInfoByNameForTests(applicationName)
             generatedDictionaryFile.delete()
             dictionaryFile.delete()
         }

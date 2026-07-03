@@ -16,9 +16,8 @@ internal class DictionaryPersistenceBridge(
     val notScriptableSnapshot: Set<String>
         get() = notScriptableApplicationRegistry.snapshot
 
-    fun isDictionaryInitialized(applicationName: String): Boolean {
-        return dictionaryInfoRegistry.isInitialized(applicationName)
-    }
+    fun isDictionaryInitialized(applicationName: String): Boolean =
+        dictionaryInfoRegistry.isInitialized(applicationName)
 
     fun isNotScriptable(applicationName: String): Boolean = applicationName in notScriptableApplicationRegistry
 
@@ -35,6 +34,10 @@ internal class DictionaryPersistenceBridge(
     }
 
     fun removeDictionaryInfoByPath(path: String): Boolean = dictionaryInfoRegistry.removeByPath(path)
+
+    fun removeDictionaryInfoByName(applicationName: String) {
+        dictionaryInfoRegistry.removeInMemory(applicationName)
+    }
 
     fun loadFromState(state: AppleScriptSystemDictionaryRegistryService.PersistedState) {
         notScriptableApplicationRegistry.readFromState(state)

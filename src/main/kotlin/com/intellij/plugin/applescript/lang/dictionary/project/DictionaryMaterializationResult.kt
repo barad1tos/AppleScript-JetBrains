@@ -7,10 +7,9 @@ import java.io.File
  * Service-level outcome for materializing a project dictionary — from cached sources, from the
  * on-demand registry path, or from an explicitly loaded dictionary file.
  *
- * The public dictionary API remains nullable for existing callers; this type keeps project-cache,
- * registered-cache, generated-cache, on-demand, file-load, stale-fallback, malformed-cache,
- * materialization-failure, miss, and ignore-list states distinguishable inside the service and
- * regression tests.
+ * The public dictionary API remains nullable for existing callers; this sealed hierarchy keeps
+ * each materialization leg's success, fallback, and failure states distinguishable inside the
+ * service and regression tests.
  */
 internal sealed interface DictionaryMaterializationResult {
     val dictionary: ApplicationDictionary?
