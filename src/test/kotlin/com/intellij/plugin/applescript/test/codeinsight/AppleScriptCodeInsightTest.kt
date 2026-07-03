@@ -159,8 +159,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val applicationName = "SyntheticMarkerApp_${System.nanoTime()}"
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
 
         try {
             assertNull(projectDictionaries.getDictionary(applicationName))
@@ -198,8 +197,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val persistence = SdefPersistenceService.getInstance()
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText("<dictionary><suite>")
+        writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
 
         try {
             persistence.addDictionaryInfo(dictionaryInfo)
@@ -229,8 +227,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText("<dictionary><suite>")
+        writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
 
         try {
             when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
@@ -266,8 +263,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
 
         try {
             when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
@@ -578,8 +574,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
         val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
         assertNotNull(applicationIcon)
         requireNotNull(applicationIcon)
@@ -614,8 +609,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
         val staleDictionaryFile =
             File
                 .createTempFile("things3-stale", ".xml")
@@ -1452,6 +1446,14 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             { AppleScriptSystemDictionaryRegistryService.getInstance().isInitialized() },
             10,
         )
+    }
+
+    private fun writeGeneratedCache(
+        file: File,
+        xml: String,
+    ) {
+        file.parentFile.mkdirs()
+        file.writeText(xml)
     }
 
     private fun unknownProcessDescription(processName: String): String =
