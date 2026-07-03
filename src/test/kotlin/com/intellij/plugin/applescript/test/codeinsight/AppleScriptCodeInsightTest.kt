@@ -93,10 +93,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val range = textRangeFor(myFixture.editor.document, "NoSuchApp_xyz")
-        val severities =
-            highlights
-                .filter { highlight -> range.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val severities = severitiesFor(highlights, range)
 
         assertTrue(
             "unknown app must be a weak warning; severities=$severities",
@@ -142,11 +139,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             )
             val highlights = myFixture.doHighlighting()
             val applicationNameRange = textRangeFor(myFixture.editor.document, applicationName)
-            val applicationReferenceDescriptions =
-                highlights
-                    .filter { highlight ->
-                        applicationNameRange.intersects(highlight.startOffset, highlight.endOffset)
-                    }.mapNotNull { highlight -> highlight.description }
+            val applicationReferenceDescriptions = descriptionsFor(highlights, applicationNameRange)
 
             assertFalse(
                 "Discovered app must not be highlighted as unknown; descriptions=$applicationReferenceDescriptions",
@@ -741,11 +734,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             )
             val highlights = myFixture.doHighlighting()
             val applicationNameRange = textRangeFor(myFixture.editor.document, applicationName)
-            val descriptions =
-                highlights
-                    .filter { highlight ->
-                        applicationNameRange.intersects(highlight.startOffset, highlight.endOffset)
-                    }.mapNotNull { highlight -> highlight.description }
+            val descriptions = descriptionsFor(highlights, applicationNameRange)
 
             assertTrue(
                 "Known app warning reason must not be masked; descriptions=$descriptions",
@@ -774,14 +763,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         )
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertTrue(
             "unknown System Events process must be a weak warning; severities=$severities descriptions=$descriptions",
@@ -817,14 +800,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertTrue(
             "unknown System Events process in simple tell must be a weak warning; " +
@@ -870,14 +847,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertTrue(
             "unknown process inside nested object tell must still see outer System Events; " +
@@ -923,14 +894,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertFalse(
             "nested tell application \"Finder\" must override outer System Events; " +
@@ -968,14 +933,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, knownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertFalse(
             "known System Events process must not be highlighted as unknown; descriptions=$descriptions",
@@ -1020,14 +979,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
                 processReferenceStart + "process ".length,
                 processReferenceStart + processReference.length,
             )
-        val severities =
-            highlights
-                .filter { highlight -> dynamicNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> dynamicNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, dynamicNameRange)
+        val descriptions = descriptionsFor(highlights, dynamicNameRange)
 
         assertFalse(
             "dynamic process names must not be validated as literal process references; descriptions=$descriptions",
@@ -1061,14 +1014,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertFalse(
             "process-like references outside System Events must not be validated; descriptions=$descriptions",
@@ -1437,6 +1384,22 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertNotNull(resolveResult)
         assertEquals("myVar", resolveResult.text)
     }
+
+    private fun severitiesFor(
+        highlights: List<HighlightInfo>,
+        textRange: TextRange,
+    ): Set<HighlightSeverity> =
+        highlights
+            .filter { highlight -> textRange.intersects(highlight.startOffset, highlight.endOffset) }
+            .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+
+    private fun descriptionsFor(
+        highlights: List<HighlightInfo>,
+        textRange: TextRange,
+    ): List<String> =
+        highlights
+            .filter { highlight -> textRange.intersects(highlight.startOffset, highlight.endOffset) }
+            .mapNotNull { highlight -> highlight.description }
 
     private fun highlightingKeysFor(
         highlights: List<HighlightInfo>,
