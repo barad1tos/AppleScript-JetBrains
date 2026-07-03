@@ -613,6 +613,102 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testApplicationDiagnosisReportsReadyForDiscoveredApplication() {
+        val applicationName = "SyntheticDiscoveredDiagnosisApp_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        discovery.addDiscoveredApplicationName(applicationName)
+        awaitAppDictionaries()
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.Ready,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsReadyForInitializedPersistedApplication() {
+        val applicationName = "SyntheticInitializedDiagnosisApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "diagnosis-initialized",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo =
+            DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+                .also { info -> info.setInitialized(true) }
+        val persistence = SdefPersistenceService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            awaitAppDictionaries()
+
+            assertEquals(
+                ApplicationReferenceDiagnosis.Ready,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            persistence.removeDictionaryInfo(applicationFile.path)
+            dictionaryFile.delete()
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testUnknownApplicationReferenceOffersNoAddDictionaryQuickFix() {
+        val applicationName = "SyntheticNoFixApp_${System.nanoTime()}"
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        awaitAppDictionaries()
+        try {
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """tell application "${applicationName}_ca<caret>ret" to activate""",
+            )
+            myFixture.doHighlighting()
+            val quickFixTexts = myFixture.getAllQuickFixes().map { fix -> fix.text }
+
+            assertFalse(
+                "Unknown application weak warning must not offer the add-dictionary fix; fixes=$quickFixTexts",
+                quickFixTexts.contains(ADD_DICTIONARY_FIX_TEXT),
+            )
+        } finally {
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testNotFoundApplicationReferenceOffersAddDictionaryQuickFix() {
+        val applicationName = "SyntheticNotFoundFixApp_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        discovery.addToNotFoundList(applicationName)
+        try {
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """tell application "$applicationName<caret>" to activate""",
+            )
+            myFixture.doHighlighting()
+            val quickFixTexts = myFixture.getAllQuickFixes().map { fix -> fix.text }
+
+            assertTrue(
+                "Not-found application must offer the add-dictionary fix; fixes=$quickFixTexts",
+                quickFixTexts.contains(ADD_DICTIONARY_FIX_TEXT),
+            )
+        } finally {
+            discovery.removeFromNotFoundList(applicationName)
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
     fun testApplicationReferenceLineMarkerUsesGeneratedCacheApplicationBundleIcon() {
         val applicationName = "Things3"
         val applicationBundle = File("/Applications/Things3.app")
@@ -1541,6 +1637,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     companion object {
         private const val MY_TEST_DATA_DIR = "src/test/resources/testData/"
         private const val HANDLER_CALL_KEY = "APPLE_SCRIPT_HANDLER_CALL"
+        private const val ADD_DICTIONARY_FIX_TEXT = "Add dictionary for application"
 
         // D-03 content anchors: public Standard Additions command names that must appear in
         // BASIC completion on the std-lib fixture. assertContains (kotlin.test) is NOT on the

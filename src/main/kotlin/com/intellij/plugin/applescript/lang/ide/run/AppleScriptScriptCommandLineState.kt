@@ -10,6 +10,9 @@ class AppleScriptScriptCommandLineState(
     private val runConfiguration: AppleScriptRunConfiguration,
     env: ExecutionEnvironment,
 ) : CommandLineState(env) {
+    // Not unit-tested: this is the IntelliJ run-config adapter, and startProcess launches a real
+    // osascript process. The command/argument/quoting logic it delegates to is covered directly by
+    // AppleScriptRunCommandPlanTest; exercising startProcess itself would need a live execution env.
     @Throws(ExecutionException::class)
     override fun startProcess(): ProcessHandler {
         val commandLine = GeneralCommandLine(commandArguments())
