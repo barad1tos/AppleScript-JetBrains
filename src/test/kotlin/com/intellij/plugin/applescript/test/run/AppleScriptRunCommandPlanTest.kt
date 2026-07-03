@@ -30,6 +30,12 @@ class AppleScriptRunCommandPlanTest {
     }
 
     @Test
+    fun osascriptCommandLineDropsEmptyQuotedParameter() {
+        val command = AppleScriptRunCommandPlan.osascriptCommandLine("/tmp/s.applescript", null, "\"\" foo")
+        assertEquals(listOf("/usr/bin/osascript", "/tmp/s.applescript", "foo"), command)
+    }
+
+    @Test
     fun defaultConfigurationNameTakesLastPathSegment() {
         assertEquals(
             "script.applescript",
@@ -40,6 +46,11 @@ class AppleScriptRunCommandPlanTest {
     @Test
     fun defaultConfigurationNameReturnsWholeStringWithoutSeparator() {
         assertEquals("bare.applescript", AppleScriptRunCommandPlan.defaultConfigurationName("bare.applescript"))
+    }
+
+    @Test
+    fun defaultConfigurationNameIsEmptyForTrailingSeparator() {
+        assertEquals("", AppleScriptRunCommandPlan.defaultConfigurationName("/a/b/"))
     }
 
     @Test
