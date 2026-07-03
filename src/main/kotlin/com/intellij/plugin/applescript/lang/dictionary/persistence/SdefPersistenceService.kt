@@ -3,6 +3,7 @@ package com.intellij.plugin.applescript.lang.dictionary.persistence
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import org.jetbrains.annotations.TestOnly
 
 /**
  * Phase 4 SERVICE-02 (plan 04-02, Wave 2): typed API over the facade's persisted-state-tagged
@@ -111,6 +112,16 @@ class SdefPersistenceService {
      * resolution).
      */
     fun removeDictionaryInfo(path: String): Boolean = bridge.removeDictionaryInfoByPath(path)
+
+    /**
+     * Removes a [DictionaryInfo] by application name. Dictionary-file loads (`.sdef`/`.xml`)
+     * register infos without an application bundle file, which the path-based removal above can
+     * never match — tests clean those entries up through this hook.
+     */
+    @TestOnly
+    fun removeDictionaryInfoByNameForTests(applicationName: String) {
+        bridge.removeDictionaryInfoByName(applicationName)
+    }
 
     /**
      * Populates the facade's in-memory [DictionaryInfo] collection from the just-loaded

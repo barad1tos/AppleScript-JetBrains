@@ -15,6 +15,8 @@ private val TASK_LIST_MAKE_COMMAND_CODE = appleScriptCode('m', 'a', 'k', 'e')
 private val TASK_LIST_NAME_PROPERTY_CODE = appleScriptCode('p', 'n', 'a', 'm')
 private val TASK_LIST_TO_DO_CLASS_CODE = appleScriptCode('t', 'o', 'd', 'o')
 private val TASK_LIST_LIST_CLASS_CODE = appleScriptCode('l', 'i', 's', 't')
+private val TASK_LIST_STATUS_ENUMERATION_CODE = appleScriptCode('s', 't', 'a', 't')
+private val TASK_LIST_ACTIVE_ENUMERATOR_CODE = appleScriptCode('a', 'c', 't', 'v')
 private val TRACK_CLASS_CODE = appleScriptCode('c', 'T', 'r', 'k')
 private val TRACK_NAME_PROPERTY_CODE = appleScriptCode('p', 'n', 'a', 'm')
 private val STANDARD_ADDITIONS_SUITE_CODE = appleScriptCode('s', 't', 'd', 'a')
@@ -138,6 +140,9 @@ object SyntheticSuiteFixtures {
                 <class name="to do" plural="to dos" code="$TASK_LIST_TO_DO_CLASS_CODE" description="A task">
                     <property name="name" code="$TASK_LIST_NAME_PROPERTY_CODE" type="text"/>
                 </class>
+                <enumeration name="status" code="$TASK_LIST_STATUS_ENUMERATION_CODE">
+                    <enumerator name="active" code="$TASK_LIST_ACTIVE_ENUMERATOR_CODE" description="Active task"/>
+                </enumeration>
             </suite>
         </dictionary>
         """.trimIndent()

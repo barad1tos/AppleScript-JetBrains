@@ -69,13 +69,21 @@ internal object FallbackDictionaryPropertyParser {
 
     private fun parsePropertyIdentifier(builder: PsiBuilder): Boolean =
         when {
-            FallbackDictionaryPropertyPatterns.isContextualPropertyPairWithAnchor(builder) ->
+            FallbackDictionaryPropertyPatterns.isContextualPropertyPairWithAnchor(builder) -> {
                 FallbackDictionaryTermActions.advanceTermPair(builder)
-            FallbackDictionaryPropertyPatterns.isContextualPropertyPairWithTerminator(builder) ->
+            }
+
+            FallbackDictionaryPropertyPatterns.isContextualPropertyPairWithTerminator(builder) -> {
                 FallbackDictionaryTermActions.advanceTermPair(builder)
-            FallbackDictionaryPropertyPatterns.isIdentifierPairWithTerminator(builder) ->
+            }
+
+            FallbackDictionaryPropertyPatterns.isIdentifierPairWithTerminator(builder) -> {
                 FallbackDictionaryTermActions.advanceTermPair(builder)
-            else -> parseAnchoredPropertyPhrase(builder)
+            }
+
+            else -> {
+                parseAnchoredPropertyPhrase(builder)
+            }
         }
 
     private fun parseAnchoredPropertyPhrase(builder: PsiBuilder): Boolean {
@@ -120,6 +128,6 @@ internal object FallbackDictionaryPropertyParser {
         tokenType: IElementType?,
     ): Boolean =
         tokenType === TO &&
-            builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) == true &&
+            ParserState.isInsideAssignmentStatement(builder) &&
             AppleScriptParserTrivia.previousNonSpaceToken(builder) === SET
 }

@@ -2,14 +2,11 @@ package com.intellij.plugin.applescript.test.parsing
 
 import com.intellij.lang.ASTNode
 import com.intellij.lang.PsiBuilder
-import com.intellij.lang.PsiBuilderFactory
 import com.intellij.lang.parser.GeneratedParserUtilBase.TRUE_CONDITION
 import com.intellij.lang.parser.GeneratedParserUtilBase._COLLAPSE_
-import com.intellij.lang.parser.GeneratedParserUtilBase.adapt_builder_
 import com.intellij.lang.parser.GeneratedParserUtilBase.enter_section_
 import com.intellij.lang.parser.GeneratedParserUtilBase.exit_section_
 import com.intellij.plugin.applescript.AppleScriptFileType
-import com.intellij.plugin.applescript.AppleScriptLanguage
 import com.intellij.plugin.applescript.lang.parser.AppleScriptGeneratedParserUtil
 import com.intellij.plugin.applescript.lang.parser.AppleScriptParser
 import com.intellij.plugin.applescript.lang.parser.AppleScriptParserDefinition
@@ -364,7 +361,10 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testFallbackParametersExposeSelectorAndDirectParameterNodes() {
-        val builder = createBuilder("\"Hello\" default answer \"Name\" with title \"Prompt\" giving up after 3")
+        val builder =
+            myFixture.createAppleScriptBuilder(
+                "\"Hello\" default answer \"Name\" with title \"Prompt\" giving up after 3",
+            )
 
         val ast =
             parseWithRootSection(builder) {
@@ -383,7 +383,9 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         // dictionary is unavailable. `with title` is a WITH + identifier selector; `subtitle` and
         // `sound name` are bare-label selectors. The direct parameter is the leading string literal.
         val builder =
-            createBuilder("\"No id\" with title \"Edit Snippet\" subtitle \"Error:\" sound name \"Basso\"")
+            myFixture.createAppleScriptBuilder(
+                "\"No id\" with title \"Edit Snippet\" subtitle \"Error:\" sound name \"Basso\"",
+            )
 
         val ast =
             parseWithRootSection(builder) {
@@ -398,7 +400,10 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testLabeledNotificationTailStopsVariableValuesBeforeNextSelector() {
-        val builder = createBuilder("messageText with title titleText subtitle subtitleText sound name soundName")
+        val builder =
+            myFixture.createAppleScriptBuilder(
+                "messageText with title titleText subtitle subtitleText sound name soundName",
+            )
 
         val ast =
             parseWithRootSection(builder) {
@@ -416,7 +421,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         // A generic single-word command head accepted by the permissive command-name fallback gets
         // the unknown-command tail consumer. Without the parser-state flag, a bare unknown single
         // word still declines and falls through to the normal expression/error path.
-        val builder = createBuilder("width for labels theStrings")
+        val builder = myFixture.createAppleScriptBuilder("width for labels theStrings")
         builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_PERMISSIVE_COMMAND_ALLOWED, true)
 
         val ast =
@@ -434,7 +439,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
 
     fun testPermissiveKeywordSelectorTailProducesParameterChunks() {
         val builder =
-            createBuilder(
+            myFixture.createAppleScriptBuilder(
                 "rule width 400 placeholder text \"x\" left inset 8 total width 400 field left 100",
             )
         builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_PERMISSIVE_COMMAND_ALLOWED, true)
@@ -460,7 +465,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
         // Pitfall 1/2 guard: WITHOUT the acceptor flag, a bare unknown single word must NOT be granted
         // OptionalDirectParameter — parameterMode returns null so the fallback declines (no consumption,
         // letting a genuine error / plain-variable position fall through unharmed).
-        val builder = createBuilder("width for labels theStrings")
+        val builder = myFixture.createAppleScriptBuilder("width for labels theStrings")
 
         assertFalse(FallbackCommandParameterParser.parseParameters(builder, 0, "max"))
         assertEquals("width", builder.tokenText)
@@ -710,7 +715,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testFallbackBooleanParameterConsumesOnlyBooleanSelector() {
-        val builder = createBuilder("\"printf test\" without confirmation")
+        val builder = myFixture.createAppleScriptBuilder("\"printf test\" without confirmation")
 
         val ast =
             parseWithRootSection(builder) {
@@ -722,7 +727,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testGeneratedCommandParameterSelectorIsInactiveOutsideFallbackContext() {
-        val builder = createBuilder("default answer \"Name\"")
+        val builder = myFixture.createAppleScriptBuilder("default answer \"Name\"")
 
         assertFalse(AppleScriptParser.commandParameterSelector(builder, 0))
         assertEquals("default", builder.tokenText)
@@ -730,7 +735,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
 
     fun testCommandParameterExpressionRestoresOuterParserContext() {
         for (previousContext in COMMAND_PARAMETER_CONTEXT_VALUES) {
-            val builder = createBuilder("1")
+            val builder = myFixture.createAppleScriptBuilder("1")
             builder.putUserData(
                 AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS,
                 previousContext,
@@ -747,7 +752,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
 
     fun testDictionaryCommandParametersRestoreOuterParserContext() {
         for (previousContext in COMMAND_PARAMETER_CONTEXT_VALUES) {
-            val builder = createBuilder("")
+            val builder = myFixture.createAppleScriptBuilder("")
             val command = emptyDictionaryCommand()
             builder.putUserData(
                 AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS,
@@ -766,7 +771,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testDictionaryCommandValueStopsBeforeNextSelector() {
-        val builder = createBuilder("(lineText & linefeed) to fh starting at eof")
+        val builder = myFixture.createAppleScriptBuilder("(lineText & linefeed) to fh starting at eof")
         val command =
             dictionaryCommand(
                 name = "write",
@@ -783,7 +788,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testDictionaryNumberDirectParameterKeepsFullExpression() {
-        val builder = createBuilder("1 + upperLimit from 0 to 10")
+        val builder = myFixture.createAppleScriptBuilder("1 + upperLimit from 0 to 10")
         val command =
             dictionaryCommand(
                 name = "random number",
@@ -801,7 +806,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testDictionaryNumberDirectParameterKeepsIdentifierExpression() {
-        val builder = createBuilder("hhour * danswer")
+        val builder = myFixture.createAppleScriptBuilder("hhour * danswer")
         val command =
             dictionaryCommand(
                 name = "delay",
@@ -818,7 +823,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testDictionaryBracketedDirectParameterKeepsExpressionPsiBeforeSelector() {
-        val builder = createBuilder("{docRef} saving no")
+        val builder = myFixture.createAppleScriptBuilder("{docRef} saving no")
         val command =
             dictionaryCommand(
                 name = "close",
@@ -837,7 +842,7 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
     }
 
     fun testDictionaryModifierListDirectParameterKeepsSelectorAfterRawBracketFallback() {
-        val builder = createBuilder("{command down} using selectedWindow")
+        val builder = myFixture.createAppleScriptBuilder("{command down} using selectedWindow")
         val command =
             dictionaryCommand(
                 name = "keystroke",
@@ -852,25 +857,6 @@ class FallbackCommandParameterParserTest : BasePlatformTestCase() {
 
         assertEquals(listOf("{command down}"), ast.textsOf(DIRECT_PARAMETER_VAL))
         assertEquals(listOf("using"), ast.textsOf(COMMAND_PARAMETER_SELECTOR))
-    }
-
-    private fun createBuilder(text: String): PsiBuilder {
-        val parserDefinition = AppleScriptParserDefinition()
-        val anchorFile = myFixture.configureByText(AppleScriptFileType, "")
-        val builder =
-            PsiBuilderFactory.getInstance().createBuilder(
-                project,
-                anchorFile.node,
-                parserDefinition.createLexer(project),
-                AppleScriptLanguage,
-                text,
-            )
-        return adapt_builder_(
-            parserDefinition.fileNodeType,
-            builder,
-            AppleScriptParser(),
-            AppleScriptParser.EXTENDS_SETS_,
-        )
     }
 
     private fun parseWithRootSection(

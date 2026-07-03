@@ -13,6 +13,7 @@ import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInf
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
+import com.intellij.plugin.applescript.lang.sdef.extensionSupported
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.psi.PsiManager
 import com.intellij.psi.xml.XmlFile
@@ -54,37 +55,53 @@ class AppleScriptProjectDictionaryService(
      * application paths are consulted; null if creation failed.
      */
     @Synchronized
-    fun createDictionary(applicationName: String): ApplicationDictionary? {
-        val dictionary =
-            if (isInIgnoreList(applicationName)) {
-                null
-            } else {
-                getDictionary(applicationName) ?: createDictionaryFromInitializedInfo(applicationName)
-            }
-        return dictionary
+    fun createDictionary(applicationName: String): ApplicationDictionary? =
+        materializeDictionary(applicationName).dictionary
+
+    /**
+     * Typed variant of [createDictionary]: ignore policy, project cache, and the on-demand
+     * registry path (discovery + generation + PSI construction) reported as one outcome.
+     */
+    @Synchronized
+    internal fun materializeDictionary(applicationName: String): DictionaryMaterializationResult {
+        if (isInIgnoreList(applicationName)) return DictionaryMaterializationResult.Ignored
+        getDictionary(applicationName)?.let { return DictionaryMaterializationResult.Cached(it) }
+        return createDictionaryFromInitializedInfo(applicationName)
     }
 
     @Synchronized
-    fun getOrCreateDictionaryFromCachedSources(applicationName: String): ApplicationDictionary? {
-        val dictionary =
-            if (isInIgnoreList(applicationName)) {
-                null
-            } else {
-                val standardApplicationBundle = findStandardApplicationBundle(applicationName)
-                val cachedDictionary = getDictionary(applicationName)
-                cachedDictionary
-                    ?.takeUnless { it.needsBundleAwareRefresh(standardApplicationBundle) }
-                    ?: createDictionaryFromRegisteredCache(
-                        applicationName,
-                        fallbackApplicationBundle = standardApplicationBundle,
-                    )
-                    ?: createDictionaryFromGeneratedCache(
-                        applicationName,
-                        applicationBundle = standardApplicationBundle,
-                    )
-                    ?: cachedDictionary
-            }
-        return dictionary
+    fun getOrCreateDictionaryFromCachedSources(applicationName: String): ApplicationDictionary? =
+        materializeDictionaryFromCachedSources(applicationName).dictionary
+
+    @Synchronized
+    internal fun materializeDictionaryFromCachedSources(applicationName: String): DictionaryMaterializationResult {
+        if (isInIgnoreList(applicationName)) return DictionaryMaterializationResult.Ignored
+
+        val standardApplicationBundle = findStandardApplicationBundle(applicationName)
+        val cachedDictionary = getDictionary(applicationName)
+        val freshCachedDictionary =
+            cachedDictionary?.takeUnless { it.needsBundleAwareRefresh(standardApplicationBundle) }
+        if (freshCachedDictionary != null) {
+            return DictionaryMaterializationResult.Cached(freshCachedDictionary)
+        }
+
+        val registeredDictionary =
+            createDictionaryFromRegisteredCache(
+                applicationName,
+                fallbackApplicationBundle = standardApplicationBundle,
+            )
+        if (registeredDictionary != null) {
+            return DictionaryMaterializationResult.Created(
+                registeredDictionary,
+                DictionaryMaterializationResult.Source.RegisteredCache,
+            )
+        }
+
+        return createDictionaryFromGeneratedCache(
+            applicationName,
+            applicationBundle = standardApplicationBundle,
+            fallbackDictionary = cachedDictionary,
+        )
     }
 
     private fun createDictionaryFromRegisteredCache(
@@ -104,11 +121,17 @@ class AppleScriptProjectDictionaryService(
 
     private fun createDictionaryFromGeneratedCache(
         applicationName: String,
-        applicationBundle: File? = findStandardApplicationBundle(applicationName),
-    ): ApplicationDictionary? {
+        applicationBundle: File?,
+        fallbackDictionary: ApplicationDictionary?,
+    ): DictionaryMaterializationResult {
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
-        if (!generatedDictionaryFile.isFile) return null
-        if (!SdefIndexService.getInstance().parseDictionaryFile(generatedDictionaryFile, applicationName)) return null
+        if (!generatedDictionaryFile.isFile) {
+            return fallbackDictionary?.let(DictionaryMaterializationResult::StaleFallback)
+                ?: DictionaryMaterializationResult.Missing
+        }
+        if (!SdefIndexService.getInstance().parseDictionaryFile(generatedDictionaryFile, applicationName)) {
+            return DictionaryMaterializationResult.ParseFailed(generatedDictionaryFile, fallbackDictionary)
+        }
 
         val info =
             DictionaryInfo(
@@ -116,7 +139,12 @@ class AppleScriptProjectDictionaryService(
                 generatedDictionaryFile,
                 applicationBundle,
             ).also { dictionaryInfo -> dictionaryInfo.setInitialized(true) }
-        return createDictionaryFromInfo(info, shouldCacheInProject = false)
+        return materializedFromInfo(
+            info,
+            DictionaryMaterializationResult.Source.GeneratedCache,
+            shouldCacheInProject = false,
+            fallbackDictionary = fallbackDictionary,
+        )
     }
 
     private fun ApplicationDictionary.needsBundleAwareRefresh(standardApplicationBundle: File?): Boolean =
@@ -124,8 +152,11 @@ class AppleScriptProjectDictionaryService(
 
     private fun DictionaryInfo.withApplicationBundleFallback(fallbackApplicationBundle: File?): DictionaryInfo {
         if (getApplicationFile() != null || fallbackApplicationBundle == null) return this
-        return DictionaryInfo(getApplicationName(), getDictionaryFile(), fallbackApplicationBundle)
-            .also { info -> info.setInitialized(initialized) }
+        return DictionaryInfo(
+            getApplicationName(),
+            getDictionaryFile(),
+            fallbackApplicationBundle,
+        ).also { info -> info.setInitialized(initialized) }
     }
 
     private fun findStandardApplicationBundle(applicationName: String): File? =
@@ -137,12 +168,13 @@ class AppleScriptProjectDictionaryService(
                     .map { extension -> File("$applicationsDirectory/$applicationName.$extension") }
             }.firstOrNull { applicationFile -> applicationFile.exists() }
 
-    private fun createDictionaryFromInitializedInfo(applicationName: String): ApplicationDictionary? {
+    private fun createDictionaryFromInitializedInfo(applicationName: String): DictionaryMaterializationResult {
         val info = dictionaryRegistryService.getInitializedInfo(applicationName)
         if (info == null) {
             LOG.warn("Failed to get initialized dictionary info for $applicationName")
+            return DictionaryMaterializationResult.Missing
         }
-        return info?.let(::createDictionaryFromInfo)
+        return materializedFromInfo(info, DictionaryMaterializationResult.Source.RegistryInfo)
     }
 
     private fun createDictionaryFromInfo(
@@ -199,7 +231,9 @@ class AppleScriptProjectDictionaryService(
                 true
             }
 
-            else -> false
+            else -> {
+                false
+            }
         }
 
     /**
@@ -210,15 +244,39 @@ class AppleScriptProjectDictionaryService(
     fun createDictionaryFromFile(
         applicationName: String,
         applicationFile: VirtualFile,
-    ): ApplicationDictionary? {
+    ): ApplicationDictionary? = materializeDictionaryFromFile(applicationName, applicationFile).dictionary
+
+    /** Typed variant of [createDictionaryFromFile]: file-provider generation and PSI construction as one outcome. */
+    @Synchronized
+    internal fun materializeDictionaryFromFile(
+        applicationName: String,
+        applicationFile: VirtualFile,
+    ): DictionaryMaterializationResult {
         val appIoFile = File(applicationFile.path)
         val info = fileProvider.createAndInitializeInfo(appIoFile, applicationName)
-        if (info != null) {
-            return createDictionaryFromInfo(info)
+        if (info == null) {
+            LOG.warn("Failed to get initialized dictionary info for $applicationName from $applicationFile")
+            // The provider rejects unsupported/nonexistent inputs up front (nothing to load);
+            // any other null means generation or parsing of the loaded file failed. Report the
+            // loaded source file — the generated cache path is deleted on generation failure.
+            return if (!extensionSupported(appIoFile.extension) || !appIoFile.exists()) {
+                DictionaryMaterializationResult.Missing
+            } else {
+                DictionaryMaterializationResult.MaterializationFailed(appIoFile)
+            }
         }
-        LOG.warn("Failed to get initialized dictionary info for $applicationName from $applicationFile")
-        return null
+        return materializedFromInfo(info, DictionaryMaterializationResult.Source.LoadedFile)
     }
+
+    private fun materializedFromInfo(
+        info: DictionaryInfo,
+        source: DictionaryMaterializationResult.Source,
+        shouldCacheInProject: Boolean = true,
+        fallbackDictionary: ApplicationDictionary? = null,
+    ): DictionaryMaterializationResult =
+        createDictionaryFromInfo(info, shouldCacheInProject)
+            ?.let { dictionary -> DictionaryMaterializationResult.Created(dictionary, source) }
+            ?: DictionaryMaterializationResult.MaterializationFailed(info.getDictionaryFile(), fallbackDictionary)
 
     fun getDictionary(applicationName: String): ApplicationDictionary? = dictionaryMap[applicationName]
 

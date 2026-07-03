@@ -6,15 +6,11 @@ import com.intellij.plugin.applescript.lang.sdef.CommandParameter
 import com.intellij.plugin.applescript.lang.sdef.CommandParameterData
 import com.intellij.plugin.applescript.lang.sdef.CommandParameterImpl
 import com.intellij.plugin.applescript.lang.sdef.Suite
-import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
-import com.intellij.psi.PsiFileFactory
-import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import java.lang.reflect.Proxy
 
 private const val PLAY_COMMAND_NAME = "play"
-private const val EMPTY_DICTIONARY_XML = "<dictionary title=\"TestApp\"></dictionary>"
 
 /**
  * SDEF-02 regression fence for the now-closed D-02 overloaded-command
@@ -42,13 +38,13 @@ private const val EMPTY_DICTIONARY_XML = "<dictionary title=\"TestApp\"></dictio
  */
 class ApplicationDictionaryOverloadTest : BasePlatformTestCase() {
     fun testFirstInsertReturnsTrue() {
-        val dict = buildDictionary()
+        val dict = buildTestDictionary(project)
         val cmd = newPlayCommand(parameters = listOf("track"))
         assertTrue("First insert must return true", dict.addCommand(cmd))
     }
 
     fun testDuplicateInsertDedupes() {
-        val dict = buildDictionary()
+        val dict = buildTestDictionary(project)
         val cmd1 = newPlayCommand(parameters = listOf("track"))
         val cmd2 = newPlayCommand(parameters = listOf("track"))
         // Both have structurally-equal CommandData → second insert is a
@@ -62,7 +58,7 @@ class ApplicationDictionaryOverloadTest : BasePlatformTestCase() {
     }
 
     fun testOverloadReturnsTwo() {
-        val dict = buildDictionary()
+        val dict = buildTestDictionary(project)
         // Two commands with same name but DIFFERENT parameter signatures —
         // CommandData.equals returns false → list keeps both entries.
         val cmd1 = newPlayCommand(parameters = listOf("track"))
@@ -78,49 +74,29 @@ class ApplicationDictionaryOverloadTest : BasePlatformTestCase() {
     }
 
     fun testFindAllCommandsWithNameEmptyOnMiss() {
-        val dict = buildDictionary()
+        val dict = buildTestDictionary(project)
         assertTrue("Missing name must return empty list", dict.findAllCommandsWithName("missing").isEmpty())
     }
 
     fun testCommandCocoaClassIsParsedFromSdef() {
         val dict =
-            buildDictionary(
-                """
-                <dictionary title="TestApp">
-                    <suite name="Test Suite" code="test">
-                        <command name="close" code="clos">
-                            <cocoa class="NSCloseCommand"/>
-                        </command>
-                    </suite>
-                </dictionary>
-                """.trimIndent(),
+            buildTestDictionary(
+                project = project,
+                xmlText =
+                    """
+                    <dictionary title="TestApp">
+                        <suite name="Test Suite" code="test">
+                            <command name="close" code="clos">
+                                <cocoa class="NSCloseCommand"/>
+                            </command>
+                        </suite>
+                    </dictionary>
+                    """.trimIndent(),
             )
 
         val command = dict.findAllCommandsWithName("close").single()
 
         assertEquals("NSCloseCommand", command.cocoaClassName)
-    }
-
-    /**
-     * Build a real `ApplicationDictionaryImpl` over an empty in-memory XmlFile.
-     * `SdefParser.parse` walks the empty document tree without inserting any
-     * commands, leaving the dictionary ready for direct `addCommand` calls.
-     */
-    private fun buildDictionary(xmlText: String = EMPTY_DICTIONARY_XML): ApplicationDictionaryImpl {
-        val xmlFile =
-            PsiFileFactory
-                .getInstance(project)
-                .createFileFromText(
-                    "empty.sdef",
-                    com.intellij.lang.xml.XMLLanguage.INSTANCE,
-                    xmlText,
-                ) as XmlFile
-        return ApplicationDictionaryImpl(
-            project = project,
-            dictionaryXmlFile = xmlFile,
-            applicationName = "TestApp",
-            applicationBundleFile = null,
-        )
     }
 
     /**

@@ -345,6 +345,8 @@ tasks {
             // Parser tests include the generated parser-util JVM signature guard. No
             // BasePlatformTestCase, no fixture boot — fast enough to run on every CI build.
             includeTestsMatching("com.intellij.plugin.applescript.test.parser.*")
+            // Pure run-command planning unit tests (plain JUnit 5, no fixture boot) — fast, always run.
+            includeTestsMatching("com.intellij.plugin.applescript.test.run.*")
             // Phase 5 PSI-03 (plan 05-01): PsiGetterJvmSignatureTest is the reflection-only
             // guard for Java-visible getter names (getX/isX/setX) produced by converting
             // GROUP A interface getters to Kotlin properties. No BasePlatformTestCase, no
@@ -357,6 +359,10 @@ tasks {
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.TellApplicationMusicTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserRegressionTest")
                 includeTestsMatching("com.intellij.plugin.applescript.test.parsing.FallbackCommandParameterParserTest")
+                // Parser builder-state adapter guard: direct PsiBuilder-level assertions on the
+                // ParserState scoped runners (tri-state flags, application-name frames, use-scope
+                // recording). BasePlatformTestCase — heavy-by-default like its neighbors above.
+                includeTestsMatching("com.intellij.plugin.applescript.test.parsing.ParserStateTest")
                 // Phase 8 PARSE-01 (plan 08-01): RealWorldCorpusTest is the v2.0
                 // "corpus is the contract" harness — realistic production-shaped
                 // scripts asserting zero PsiErrorElement. BasePlatformTestCase boots
@@ -769,7 +775,9 @@ tasks {
                             cycle = dfs(neighbor, path)
                         }
 
-                        else -> Unit
+                        else -> {
+                            Unit
+                        }
                     }
                     if (cycle != null) break
                 }

@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
+import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
@@ -24,35 +25,84 @@ internal object SdefIndexReadiness {
     fun isInitialized(): Boolean = ParsableScriptSuiteRegistryHelper.isInitialized()
 
     fun areAppDictionariesIndexed(): Boolean = ParsableScriptSuiteRegistryHelper.areAppDictionariesIndexed()
+
+    /**
+     * Readiness for an application-scoped lookup. Built-in libraries (Cocoa Standard, Scripting
+     * Additions) are ready at standard initialization; real application dictionaries only become
+     * ready once installed-application indexing completes.
+     */
+    fun isReadyForApplication(applicationName: String): Boolean =
+        if (ApplicationDictionary.isBuiltInLibrary(applicationName)) isInitialized() else areAppDictionariesIndexed()
 }
 
 internal class SdefCommandLookup(
     private val serviceScope: CoroutineScope,
     private val indexStore: SdefIndexStore,
 ) {
-    fun lookupStdCommand(name: String): Boolean =
-        SdefIndexReadiness.isInitialized() &&
-            indexStore.stdCommandNameToApplicationNameSetMap.containsKey(name)
+    fun lookupStdCommand(name: String): Boolean = lookupStdCommandResult(name).isHit
+
+    fun lookupStdCommandResult(name: String): LookupResult =
+        when {
+            !SdefIndexReadiness.isInitialized() -> LookupResult.Stale
+            indexStore.stdCommandNameToApplicationNameSetMap.containsKey(name) -> LookupResult.Hit
+            else -> LookupResult.Miss
+        }
 
     fun lookupApplicationCommand(
         applicationName: String,
         commandName: String,
-    ): Boolean {
-        if (!SdefIndexReadiness.isInitialized()) return false
-        val commandNameSet: Set<String>? = indexStore.applicationNameToCommandNameSetMap[applicationName]
-        return commandNameSet != null && commandNameSet.contains(commandName)
-    }
+    ): Boolean = lookupApplicationCommandResult(applicationName, commandName).isHit
+
+    fun lookupApplicationCommandResult(
+        applicationName: String,
+        commandName: String,
+    ): LookupResult =
+        when {
+            !SdefIndexReadiness.isReadyForApplication(applicationName) -> {
+                LookupResult.Stale
+            }
+
+            commandName in (indexStore.applicationNameToCommandNameSetMap[applicationName] ?: emptySet()) -> {
+                LookupResult.Hit
+            }
+
+            else -> {
+                LookupResult.Miss
+            }
+        }
 
     fun lookupCommandWithPrefixExist(
         applicationName: String,
         commandNamePrefix: String,
-    ): Boolean =
-        SdefIndexReadiness.isInitialized() &&
-            hasNameWithPrefix(commandNamePrefix, indexStore.applicationNameToCommandNameSetMap[applicationName])
+    ): Boolean = lookupCommandWithPrefixResult(applicationName, commandNamePrefix).isHit
+
+    fun lookupCommandWithPrefixResult(
+        applicationName: String,
+        commandNamePrefix: String,
+    ): LookupResult =
+        when {
+            !SdefIndexReadiness.isReadyForApplication(applicationName) -> {
+                LookupResult.Stale
+            }
+
+            hasNameWithPrefix(commandNamePrefix, indexStore.applicationNameToCommandNameSetMap[applicationName]) -> {
+                LookupResult.Hit
+            }
+
+            else -> {
+                LookupResult.Miss
+            }
+        }
 
     fun lookupStdCommandWithPrefixExist(namePrefix: String): Boolean =
-        SdefIndexReadiness.isInitialized() &&
-            hasNameWithPrefix(namePrefix, indexStore.stdCommandNameToApplicationNameSetMap.keys)
+        lookupStdCommandWithPrefixResult(namePrefix).isHit
+
+    fun lookupStdCommandWithPrefixResult(namePrefix: String): LookupResult =
+        when {
+            !SdefIndexReadiness.isInitialized() -> LookupResult.Stale
+            hasNameWithPrefix(namePrefix, indexStore.stdCommandNameToApplicationNameSetMap.keys) -> LookupResult.Hit
+            else -> LookupResult.Miss
+        }
 
     /**
      * Resolver for standard-suite commands.
@@ -202,3 +252,6 @@ internal class SdefCommandLookup(
         return dictionary?.findAllCommandsWithName(commandName) ?: emptyList()
     }
 }
+
+private val LookupResult.isHit: Boolean
+    get() = this == LookupResult.Hit

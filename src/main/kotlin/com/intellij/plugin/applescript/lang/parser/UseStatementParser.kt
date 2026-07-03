@@ -50,8 +50,7 @@ internal object UseStatementParser {
     ): Boolean {
         if (!recursion_guard_(builder, level, "parseUseStatement")) return false
         val result = useStatement.parse(builder, level + 1)
-        val previousPass = builder.getUserData(AppleScriptGeneratedParserUtil.WAS_USE_STATEMENT_USED) == true
-        builder.putUserData(AppleScriptGeneratedParserUtil.WAS_USE_STATEMENT_USED, result || previousPass)
+        ParserState.recordUseStatementOutcome(builder, result)
         return result
     }
 
@@ -122,10 +121,7 @@ internal object UseStatementParser {
         applicationName: String?,
     ) {
         if (isImporting && !StringUtil.isEmpty(applicationName)) {
-            val usedApplicationNames: Set<String> =
-                builder.getUserData(AppleScriptGeneratedParserUtil.USED_APPLICATION_NAMES).orEmpty() +
-                    requireNotNull(applicationName)
-            builder.putUserData(AppleScriptGeneratedParserUtil.USED_APPLICATION_NAMES, usedApplicationNames)
+            ParserState.recordUsedApplicationName(builder, requireNotNull(applicationName))
         }
     }
 

@@ -91,6 +91,14 @@ interface ApplicationDictionary :
 
         const val SCRIPTING_ADDITIONS_LIBRARY: String = "Scripting Additions"
 
+        /**
+         * Built-in terminology libraries ingested during standard-dictionary initialization, before
+         * installed-application discovery. Lookups for these names are ready at standard readiness,
+         * not application-index readiness.
+         */
+        fun isBuiltInLibrary(applicationName: String): Boolean =
+            applicationName == COCOA_STANDARD_LIBRARY || applicationName == SCRIPTING_ADDITIONS_LIBRARY
+
         const val COCOA_STANDARD_LIBRARY_PATH: String =
             "/System/Library/ScriptingDefinitions/CocoaStandard.$SCRIPTING_DEFINITION_EXTENSION"
 

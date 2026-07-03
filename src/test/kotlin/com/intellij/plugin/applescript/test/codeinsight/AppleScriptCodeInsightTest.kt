@@ -7,18 +7,24 @@ import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.plugin.applescript.AppleScriptIcons
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
 import com.intellij.plugin.applescript.lang.dictionary.icons.DictionaryIconLoader
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.dictionary.project.DictionaryMaterializationResult
 import com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptSystemEventsProcessReferenceAnnotator
+import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnoser
+import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnosis
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
@@ -45,13 +51,18 @@ import javax.swing.Icon
 class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     override fun getTestDataPath(): String = File(MY_TEST_DATA_DIR).absolutePath
 
+    override fun tearDown() {
+        try {
+            // The Xcode override lives on the application-level service; reset it unconditionally so a
+            // failure between setting it and a test's own finally cannot leak into later tests.
+            XcodeDetectionService.getInstance().overrideXcodeInstalledForTests(null)
+        } finally {
+            super.tearDown()
+        }
+    }
+
     fun testCompletion() {
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Standard dictionaries were not initialized",
-            { registryService.isInitialized() },
-            10,
-        )
+        awaitStandardDictionaries()
         myFixture.configureByFile("complete/complete_std_lib_test.scpt")
         myFixture.complete(CompletionType.BASIC, 1)
         val strings = myFixture.lookupElementStrings
@@ -82,10 +93,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val range = textRangeFor(myFixture.editor.document, "NoSuchApp_xyz")
-        val severities =
-            highlights
-                .filter { highlight -> range.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+        val severities = severitiesFor(highlights, range)
 
         assertTrue(
             "unknown app must be a weak warning; severities=$severities",
@@ -106,15 +114,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
         val persistence = SdefPersistenceService.getInstance()
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         try {
             persistence.addDictionaryInfo(dictionaryInfo)
-            PlatformTestUtil.waitWithEventsDispatching(
-                "Application dictionaries were not indexed",
-                { registryService.areAppDictionariesIndexed() },
-                10,
-            )
+            awaitAppDictionaries()
             assertTrue(
                 "Synthetic dictionary must be known through discovery",
                 ApplicationDiscoveryService.getInstance().isKnownApplication(applicationName),
@@ -136,11 +139,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             )
             val highlights = myFixture.doHighlighting()
             val applicationNameRange = textRangeFor(myFixture.editor.document, applicationName)
-            val applicationReferenceDescriptions =
-                highlights
-                    .filter { highlight ->
-                        applicationNameRange.intersects(highlight.startOffset, highlight.endOffset)
-                    }.mapNotNull { highlight -> highlight.description }
+            val applicationReferenceDescriptions = descriptionsFor(highlights, applicationNameRange)
 
             assertFalse(
                 "Discovered app must not be highlighted as unknown; descriptions=$applicationReferenceDescriptions",
@@ -160,8 +159,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val applicationName = "SyntheticMarkerApp_${System.nanoTime()}"
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
 
         try {
             assertNull(projectDictionaries.getDictionary(applicationName))
@@ -199,8 +197,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val persistence = SdefPersistenceService.getInstance()
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText("<dictionary><suite>")
+        writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
 
         try {
             persistence.addDictionaryInfo(dictionaryInfo)
@@ -225,6 +222,493 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testCachedDictionaryMaterializationReportsRegisteredCacheSourceWithoutProjectCaching() {
+        val applicationName = "SyntheticRegisteredCacheApp_${System.nanoTime()}"
+        val registeredDictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "registered-cache",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(registeredDictionaryFile)
+        val applicationFile = File(registeredDictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo =
+            DictionaryInfo(applicationName, registeredDictionaryFile, applicationFile)
+                .also { info -> info.setInitialized(true) }
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        generatedDictionaryFile.delete()
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+
+            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                is DictionaryMaterializationResult.Created -> {
+                    assertEquals(DictionaryMaterializationResult.Source.RegisteredCache, result.source)
+                    assertNotNull(result.dictionary)
+                    assertNull(
+                        "Registered-cache dictionaries must not be stored in the project map",
+                        projectDictionaries.getDictionary(applicationName),
+                    )
+                }
+
+                else -> {
+                    fail("Initialized registered cache should report Created(RegisteredCache), got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            persistence.removeDictionaryInfo(applicationFile.path)
+            registeredDictionaryFile.delete()
+        }
+    }
+
+    fun testCachedDictionaryMaterializationReportsMalformedGeneratedCache() {
+        val applicationName = "SyntheticMalformedMaterializationApp_${System.nanoTime()}"
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
+
+        try {
+            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                is DictionaryMaterializationResult.ParseFailed -> {
+                    assertEquals(generatedDictionaryFile.path, result.generatedDictionaryFile.path)
+                    assertNull(result.dictionary)
+                }
+
+                else -> {
+                    fail("Malformed generated cache should report ParseFailed, got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+        }
+    }
+
+    fun testCachedDictionaryMaterializationReportsMissingWhenNoCachedSourcesExist() {
+        val applicationName = "SyntheticMissingMaterializationApp_${System.nanoTime()}"
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        generatedDictionaryFile.delete()
+
+        val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)
+
+        assertEquals(DictionaryMaterializationResult.Missing, result)
+    }
+
+    fun testCachedDictionaryMaterializationReportsGeneratedCacheSource() {
+        val applicationName = "SyntheticGeneratedMaterializationApp_${System.nanoTime()}"
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
+
+        try {
+            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                is DictionaryMaterializationResult.Created -> {
+                    assertEquals(DictionaryMaterializationResult.Source.GeneratedCache, result.source)
+                    assertNotNull(result.dictionary)
+                    assertNull(projectDictionaries.getDictionary(applicationName))
+                }
+
+                else -> {
+                    fail("Generated cache should report Created, got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+        }
+    }
+
+    fun testCachedDictionaryMaterializationReportsFreshCachedDictionary() {
+        val applicationName = "SyntheticCachedMaterializationApp_${System.nanoTime()}"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "cached-materialization")
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                is DictionaryMaterializationResult.Cached -> assertSame(cachedDictionary, result.dictionary)
+                else -> fail("Fresh project cache should report Cached, got $result")
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+        }
+    }
+
+    private fun syntheticProjectDictionary(
+        applicationName: String,
+        fixtureName: String,
+    ): Pair<ApplicationDictionaryImpl, File> {
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                fixtureName,
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val dictionaryXmlFile =
+            LocalFileSystem
+                .getInstance()
+                .refreshAndFindFileByIoFile(dictionaryFile)
+                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
+        assertNotNull(dictionaryXmlFile)
+        requireNotNull(dictionaryXmlFile)
+        return ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null) to dictionaryFile
+    }
+
+    fun testDictionaryMaterializationReportsIgnoredApplication() {
+        val applicationName = "SyntheticIgnoredApp_${System.nanoTime()}"
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        persistence.addNotScriptable(applicationName)
+        try {
+            assertEquals(
+                DictionaryMaterializationResult.Ignored,
+                projectDictionaries.materializeDictionary(applicationName),
+            )
+            assertNull(projectDictionaries.createDictionary(applicationName))
+        } finally {
+            persistence.removeNotScriptable(applicationName)
+        }
+    }
+
+    fun testDictionaryMaterializationReturnsProjectCachedDictionary() {
+        val applicationName = "SyntheticOnDemandCachedApp_${System.nanoTime()}"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "on-demand-cached")
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+            when (val result = projectDictionaries.materializeDictionary(applicationName)) {
+                is DictionaryMaterializationResult.Cached -> assertSame(cachedDictionary, result.dictionary)
+                else -> fail("Project-cached dictionary should report Cached, got $result")
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testDictionaryMaterializationReportsMissingWhenEdtGuardSkipsDiscovery() {
+        // This test runs on the EDT (BasePlatformTestCase), so the registry lookup short-circuits
+        // in ApplicationDiscoveryService.findApplicationBundleFile's dispatch-thread guard and
+        // yields no info — the guard IS the exercised path; off-EDT discovery misses are not
+        // covered here.
+        val applicationName = "SyntheticUnknownRegistryApp_${System.nanoTime()}"
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        assertEquals(
+            DictionaryMaterializationResult.Missing,
+            projectDictionaries.materializeDictionary(applicationName),
+        )
+    }
+
+    fun testFileDictionaryMaterializationReportsMissingForUnsupportedFile() {
+        val applicationName = "SyntheticUnsupportedFileApp_${System.nanoTime()}"
+        val unsupportedFile = FileUtil.createTempFile("not-a-dictionary", ".txt", true)
+        val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(unsupportedFile)
+        assertNotNull(virtualFile)
+        requireNotNull(virtualFile)
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            assertEquals(
+                DictionaryMaterializationResult.Missing,
+                projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile),
+            )
+        } finally {
+            unsupportedFile.delete()
+        }
+    }
+
+    fun testFileDictionaryMaterializationReportsLoadedFileSource() {
+        val applicationName = "SyntheticLoadedFileApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "loaded-file-dictionary",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(dictionaryFile)
+        assertNotNull(virtualFile)
+        requireNotNull(virtualFile)
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            when (val result = projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile)) {
+                is DictionaryMaterializationResult.Created -> {
+                    assertEquals(DictionaryMaterializationResult.Source.LoadedFile, result.source)
+                    assertNotNull(result.dictionary)
+                    assertNotNull(
+                        "Explicit file load must cache the dictionary in the project",
+                        projectDictionaries.getDictionary(applicationName),
+                    )
+                }
+
+                else -> {
+                    fail("Loading a dictionary file should report Created, got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            // Path-based removal cannot match: dictionary-file loads register infos without an
+            // application bundle file, so clean the registry entry up by name.
+            persistence.removeDictionaryInfoByNameForTests(applicationName)
+            generatedDictionaryFile.delete()
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testFileDictionaryMaterializationReportsFailureForMalformedDictionaryFile() {
+        val applicationName = "SyntheticMalformedLoadedFileApp_${System.nanoTime()}"
+        val dictionaryFile = FileUtil.createTempFile("malformed-loaded-dictionary", ".sdef", true)
+        dictionaryFile.writeText("<dictionary><suite>")
+        val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(dictionaryFile)
+        assertNotNull(virtualFile)
+        requireNotNull(virtualFile)
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            when (val result = projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile)) {
+                is DictionaryMaterializationResult.MaterializationFailed -> {
+                    assertNull(result.dictionary)
+                    assertEquals(
+                        "Failure must report the loaded source file, not the generated cache path",
+                        dictionaryFile.path,
+                        result.generatedDictionaryFile.path,
+                    )
+                }
+
+                else -> {
+                    fail("Malformed dictionary file should report MaterializationFailed, got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            persistence.removeDictionaryInfoByNameForTests(applicationName)
+            generatedDictionaryFile.delete()
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testApplicationDiagnosisReportsNotScriptableWhenXcodePresent() {
+        val applicationName = "SyntheticNotScriptableApp_${System.nanoTime()}"
+        val persistence = SdefPersistenceService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        persistence.addNotScriptable(applicationName)
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.NotScriptable,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            persistence.removeNotScriptable(applicationName)
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisNotScriptableWinsOverNotFound() {
+        val applicationName = "SyntheticPrecedenceApp_${System.nanoTime()}"
+        val persistence = SdefPersistenceService.getInstance()
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        persistence.addNotScriptable(applicationName)
+        discovery.addToNotFoundList(applicationName)
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.NotScriptable,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            discovery.removeFromNotFoundList(applicationName)
+            persistence.removeNotScriptable(applicationName)
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsNotFoundForDiscoveryMiss() {
+        val applicationName = "SyntheticNotFoundApp_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        discovery.addToNotFoundList(applicationName)
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.NotFound,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            discovery.removeFromNotFoundList(applicationName)
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsMissingXcodeOnMac() {
+        if (!SystemInfo.isMac) return
+        val applicationName = "SyntheticMissingXcodeApp_${System.nanoTime()}"
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(false)
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.MissingXcode,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsReadyForProjectCachedDictionary() {
+        val applicationName = "SyntheticDiagnosedCachedApp_${System.nanoTime()}"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "diagnosis-cached")
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        try {
+            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+            assertEquals(
+                ApplicationReferenceDiagnosis.Ready,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsUnknownAfterIndexing() {
+        val applicationName = "SyntheticUnknownDiagnosisApp_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        discovery.addDiscoveredApplicationName("System Events")
+        awaitAppDictionaries()
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.Unknown,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsReadyForDiscoveredApplication() {
+        val applicationName = "SyntheticDiscoveredDiagnosisApp_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        discovery.addDiscoveredApplicationName(applicationName)
+        awaitAppDictionaries()
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.Ready,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsReadyForInitializedPersistedApplication() {
+        val applicationName = "SyntheticInitializedDiagnosisApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "diagnosis-initialized",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo =
+            DictionaryInfo(applicationName, dictionaryFile, applicationFile)
+                .also { info -> info.setInitialized(true) }
+        val persistence = SdefPersistenceService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        try {
+            persistence.addDictionaryInfo(dictionaryInfo)
+            awaitAppDictionaries()
+
+            assertEquals(
+                ApplicationReferenceDiagnosis.Ready,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            persistence.removeDictionaryInfo(applicationFile.path)
+            dictionaryFile.delete()
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testUnknownApplicationReferenceOffersNoAddDictionaryQuickFix() {
+        val applicationName = "SyntheticNoFixApp_${System.nanoTime()}"
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        awaitAppDictionaries()
+        try {
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """tell application "${applicationName}_ca<caret>ret" to activate""",
+            )
+            myFixture.doHighlighting()
+            val quickFixTexts = myFixture.getAllQuickFixes().map { fix -> fix.text }
+
+            assertFalse(
+                "Unknown application weak warning must not offer the add-dictionary fix; fixes=$quickFixTexts",
+                quickFixTexts.contains(ADD_DICTIONARY_FIX_TEXT),
+            )
+        } finally {
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testNotFoundApplicationReferenceOffersAddDictionaryQuickFix() {
+        val applicationName = "SyntheticNotFoundFixApp_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        discovery.addToNotFoundList(applicationName)
+        try {
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """tell application "$applicationName<caret>" to activate""",
+            )
+            myFixture.doHighlighting()
+            val quickFixTexts = myFixture.getAllQuickFixes().map { fix -> fix.text }
+
+            assertTrue(
+                "Not-found application must offer the add-dictionary fix; fixes=$quickFixTexts",
+                quickFixTexts.contains(ADD_DICTIONARY_FIX_TEXT),
+            )
+        } finally {
+            discovery.removeFromNotFoundList(applicationName)
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
     fun testApplicationReferenceLineMarkerUsesGeneratedCacheApplicationBundleIcon() {
         val applicationName = "Things3"
         val applicationBundle = File("/Applications/Things3.app")
@@ -232,8 +716,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
         val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
         assertNotNull(applicationIcon)
         requireNotNull(applicationIcon)
@@ -268,8 +751,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        generatedDictionaryFile.parentFile.mkdirs()
-        generatedDictionaryFile.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
         val staleDictionaryFile =
             File
                 .createTempFile("things3-stale", ".xml")
@@ -388,11 +870,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             )
             val highlights = myFixture.doHighlighting()
             val applicationNameRange = textRangeFor(myFixture.editor.document, applicationName)
-            val descriptions =
-                highlights
-                    .filter { highlight ->
-                        applicationNameRange.intersects(highlight.startOffset, highlight.endOffset)
-                    }.mapNotNull { highlight -> highlight.description }
+            val descriptions = descriptionsFor(highlights, applicationNameRange)
 
             assertTrue(
                 "Known app warning reason must not be masked; descriptions=$descriptions",
@@ -407,14 +885,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testUnknownSystemEventsProcessReferenceIsWeakWarning() {
         val unknownProcessName = "SyntheticMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -426,14 +899,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         )
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertTrue(
             "unknown System Events process must be a weak warning; severities=$severities descriptions=$descriptions",
@@ -456,14 +923,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testUnknownSystemEventsProcessReferenceInsideSimpleTellIsWeakWarning() {
         val unknownProcessName = "SyntheticSimpleTellMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -474,14 +936,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertTrue(
             "unknown System Events process in simple tell must be a weak warning; " +
@@ -509,15 +965,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testUnknownSystemEventsProcessReferenceInsideNestedObjectTellIsWeakWarning() {
         val unknownProcessName = "SyntheticNestedObjectMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
         discovery.addDiscoveredApplicationName("Finder")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -532,14 +983,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertTrue(
             "unknown process inside nested object tell must still see outer System Events; " +
@@ -567,15 +1012,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testUnknownSystemEventsProcessReferenceInsideNestedApplicationTellIsNotHighlighted() {
         val unknownProcessName = "SyntheticNestedApplicationMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
         discovery.addDiscoveredApplicationName("Finder")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -590,14 +1030,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertFalse(
             "nested tell application \"Finder\" must override outer System Events; " +
@@ -619,15 +1053,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testKnownSystemEventsProcessReferenceIsNotHighlighted() {
         val knownProcessName = "SyntheticKnownProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
         discovery.addDiscoveredApplicationName(knownProcessName)
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -640,14 +1069,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, knownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertFalse(
             "known System Events process must not be highlighted as unknown; descriptions=$descriptions",
@@ -667,14 +1090,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testSystemEventsProcessInspectionIgnoresDynamicNames() {
         val dynamicProcessName = "SyntheticDynamicMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -697,14 +1115,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
                 processReferenceStart + "process ".length,
                 processReferenceStart + processReference.length,
             )
-        val severities =
-            highlights
-                .filter { highlight -> dynamicNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> dynamicNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, dynamicNameRange)
+        val descriptions = descriptionsFor(highlights, dynamicNameRange)
 
         assertFalse(
             "dynamic process names must not be validated as literal process references; descriptions=$descriptions",
@@ -723,14 +1135,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testProcessReferenceOutsideSystemEventsIsNotHighlighted() {
         val unknownProcessName = "SyntheticOutsideSystemEvents_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("Finder")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -743,14 +1150,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val highlights = myFixture.doHighlighting()
         val processNameRange = textRangeFor(myFixture.editor.document, unknownProcessName)
-        val severities =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapTo(mutableSetOf()) { highlight -> highlight.severity }
-        val descriptions =
-            highlights
-                .filter { highlight -> processNameRange.intersects(highlight.startOffset, highlight.endOffset) }
-                .mapNotNull { highlight -> highlight.description }
+        val severities = severitiesFor(highlights, processNameRange)
+        val descriptions = descriptionsFor(highlights, processNameRange)
 
         assertFalse(
             "process-like references outside System Events must not be validated; descriptions=$descriptions",
@@ -811,12 +1212,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             end appendLine
             """.trimIndent()
 
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Standard dictionaries were not initialized",
-            { registryService.isInitialized() },
-            10,
-        )
+        awaitStandardDictionaries()
         myFixture.configureByText(AppleScriptFileType, script)
         val highlights = myFixture.doHighlighting()
         val document = myFixture.editor.document
@@ -844,12 +1240,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             close access fid
             """.trimIndent()
 
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Standard dictionaries were not initialized",
-            { registryService.isInitialized() },
-            10,
-        )
+        awaitStandardDictionaries()
         myFixture.configureByText(AppleScriptFileType, script)
         val highlights = myFixture.doHighlighting()
         val document = myFixture.editor.document
@@ -938,15 +1329,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
         val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
         val persistence = SdefPersistenceService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         try {
             persistence.addDictionaryInfo(dictionaryInfo)
-            PlatformTestUtil.waitWithEventsDispatching(
-                "Application dictionaries were not indexed",
-                { registryService.areAppDictionariesIndexed() },
-                10,
-            )
+            awaitAppDictionaries()
             val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
             val dictionary = projectDictionaries.createDictionary(applicationName)
             val makeCommand = dictionary?.findAllCommandsWithName("make")?.singleOrNull()
@@ -1135,6 +1521,22 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertEquals("myVar", resolveResult.text)
     }
 
+    private fun severitiesFor(
+        highlights: List<HighlightInfo>,
+        textRange: TextRange,
+    ): Set<HighlightSeverity> =
+        highlights
+            .filter { highlight -> textRange.intersects(highlight.startOffset, highlight.endOffset) }
+            .mapTo(mutableSetOf()) { highlight -> highlight.severity }
+
+    private fun descriptionsFor(
+        highlights: List<HighlightInfo>,
+        textRange: TextRange,
+    ): List<String> =
+        highlights
+            .filter { highlight -> textRange.intersects(highlight.startOffset, highlight.endOffset) }
+            .mapNotNull { highlight -> highlight.description }
+
     private fun highlightingKeysFor(
         highlights: List<HighlightInfo>,
         textRange: TextRange,
@@ -1170,6 +1572,30 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val startOffset = document.charsSequence.indexOf(text)
         assertTrue("expected to find '$text'", startOffset >= 0)
         return TextRange(startOffset, startOffset + text.length)
+    }
+
+    private fun awaitAppDictionaries() {
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { AppleScriptSystemDictionaryRegistryService.getInstance().areAppDictionariesIndexed() },
+            10,
+        )
+    }
+
+    private fun awaitStandardDictionaries() {
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Standard dictionaries were not initialized",
+            { AppleScriptSystemDictionaryRegistryService.getInstance().isInitialized() },
+            10,
+        )
+    }
+
+    private fun writeGeneratedCache(
+        file: File,
+        xml: String,
+    ) {
+        file.parentFile.mkdirs()
+        file.writeText(xml)
     }
 
     private fun unknownProcessDescription(processName: String): String =
@@ -1211,6 +1637,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     companion object {
         private const val MY_TEST_DATA_DIR = "src/test/resources/testData/"
         private const val HANDLER_CALL_KEY = "APPLE_SCRIPT_HANDLER_CALL"
+        private const val ADD_DICTIONARY_FIX_TEXT = "Add dictionary for application"
 
         // D-03 content anchors: public Standard Additions command names that must appear in
         // BASIC completion on the std-lib fixture. assertContains (kotlin.test) is NOT on the

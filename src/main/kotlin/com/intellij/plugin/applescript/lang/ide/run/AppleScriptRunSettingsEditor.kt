@@ -36,8 +36,7 @@ class AppleScriptRunSettingsEditor(
             // requireNotNull asserts (and smart-casts) the non-null invariant.
             requireNotNull(scriptPath) { "scriptPath non-null: guarded by !StringUtil.isEmpty above" }
             scriptTextField.text = scriptPath
-            val parts = scriptPath.split("/")
-            if (parts.isNotEmpty()) configuration.name = parts.last()
+            configuration.name = AppleScriptRunCommandPlan.defaultConfigurationName(scriptPath)
         }
         configuration.scriptParameters?.let { if (it.isNotEmpty()) parametersTextField.text = it }
         configuration.scriptOptions?.let { if (it.isNotEmpty()) scriptOptionsTextField.text = it }

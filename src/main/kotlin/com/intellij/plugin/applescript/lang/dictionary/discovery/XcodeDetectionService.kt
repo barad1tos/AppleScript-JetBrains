@@ -6,6 +6,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
 import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
+import org.jetbrains.annotations.TestOnly
 import java.io.File
 import javax.script.ScriptEngineManager
 import javax.script.ScriptException
@@ -48,6 +49,8 @@ class XcodeDetectionService {
     // without Xcode installed).
     private var xCodeApplicationFile: File? = null
 
+    private var xcodeInstalledOverrideForTests: Boolean? = null
+
     /**
      * Detect whether Xcode (and the developer tools it brings, incl. the `sdef` CLI) is
      * installed on the host. Result is lazy-cached in [xCodeApplicationFile].
@@ -57,6 +60,7 @@ class XcodeDetectionService {
      * byte-for-byte from the pre-extraction SdefFileProvider body.
      */
     fun isXcodeInstalled(): Boolean {
+        xcodeInstalledOverrideForTests?.let { return it }
         val isInstalled =
             if (!SystemInfo.isMac) {
                 false
@@ -65,6 +69,12 @@ class XcodeDetectionService {
                     ?: detectXcodeApplicationFile().exists()
             }
         return isInstalled
+    }
+
+    /** Forces [isXcodeInstalled] for diagnosis tests; pass `null` to restore real detection. */
+    @TestOnly
+    fun overrideXcodeInstalledForTests(installed: Boolean?) {
+        xcodeInstalledOverrideForTests = installed
     }
 
     private fun readCachedInstallState(): Boolean? {

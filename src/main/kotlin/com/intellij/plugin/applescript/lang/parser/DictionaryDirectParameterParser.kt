@@ -65,7 +65,7 @@ internal object DictionaryDirectParameterParser {
     }
 
     private fun isParsingTellCompoundStatement(builder: PsiBuilder): Boolean =
-        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_COMPOUND_STATEMENT) == true
+        ParserState.isInsideTellCompoundStatement(builder)
 
     private fun isParameterSelectorAhead(
         builder: PsiBuilder,
@@ -110,13 +110,17 @@ internal object DictionaryDirectParameterParser {
         parameter: CommandDirectParameter,
     ): Boolean =
         when (parameter.typeSpecifier) {
-            "type" ->
+            "type" -> {
                 TypeSpecifierParser.parseTypeSpecifier(
                     builder,
                     level + 1,
                     parameter.myCommand.dictionary.applicationName,
                 )
-            else -> false
+            }
+
+            else -> {
+                false
+            }
         }
 
     private fun parseBracketedDirectValueBeforeSelector(builder: PsiBuilder): Boolean {

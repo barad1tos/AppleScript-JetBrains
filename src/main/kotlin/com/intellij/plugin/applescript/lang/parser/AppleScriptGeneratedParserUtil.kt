@@ -18,18 +18,16 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import java.util.Stack
 
 // Grammar-Kit generates Java code with a static import from this exact parserUtilClass.
-// The facade keeps parser-state keys and inherits @JvmStatic hooks from focused superclasses,
-// preserving the generated-parser ABI without hiding per-class function-count checks.
+// The facade keeps the ABI-frozen application-name stack key plus command/fallback parameter
+// keys, and inherits @JvmStatic hooks from focused superclasses, preserving the
+// generated-parser ABI without hiding per-class function-count checks. Tell/use context keys
+// live in ParserState.
 class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserAssignmentHooks() {
     companion object {
         internal val PARSING_COMMAND_HANDLER_CALL_PARAMETERS: Key<Boolean> =
             Key.create("applescript.parsing.command.handler.parameters")
         internal val PARSING_FALLBACK_COMMAND_PARAMETERS: Key<Boolean> =
             Key.create("applescript.parsing.fallback.command.parameters")
-        internal val PARSING_COMMAND_ASSIGNMENT_STATEMENT: Key<Boolean> =
-            Key.create("applescript.parsing.assignment.statement")
-        internal val PARSING_COMMAND_HANDLER_BOOLEAN_PARAMETER: Key<Boolean> =
-            Key.create("applescript.parsing.command.handler.boolean.parameter")
 
         // Set by FallbackCommandParser when a dictionary-independent fallback accepts an unknown
         // command head in a command-legal context. This parser-state flag lets parameter parsing
@@ -48,23 +46,6 @@ class AppleScriptGeneratedParserUtil : AppleScriptGeneratedParserAssignmentHooks
         @JvmField
         val TOLD_APPLICATION_NAME_STACK: Key<Stack<String>> =
             Key.create("applescript.parsing.current.dictionary.name.stack")
-
-        internal val PARSING_TELL_SIMPLE_STATEMENT: Key<Boolean> =
-            Key.create("applescript.parsing.tell.simple.statement")
-        internal val PARSING_TELL_SIMPLE_OBJECT_REF: Key<Boolean> =
-            Key.create("applescript.parsing.tell.simple.object.ref")
-        internal val PARSING_TELL_COMPOUND_STATEMENT: Key<Boolean> =
-            Key.create("applescript.parsing.tell.simple.statement")
-        internal val APPLICATION_NAME_PUSHED: Key<Boolean> =
-            Key.create("applescript.parsing.tell.statement.application.name.pushed")
-        internal val USED_APPLICATION_NAMES: Key<Set<String>> =
-            Key.create("applescript.parsing.use.statement.application.name.set")
-        internal val WAS_USE_STATEMENT_USED: Key<Boolean> =
-            Key.create("applescript.parsing.is.use.statement.used")
-        internal val IS_PARSING_USING_TERMS_FROM_STATEMENT: Key<Boolean> =
-            Key.create("applescript.parsing.is.use.statement.used")
-        internal val PARSING_LITERAL_EXPRESSION: Key<Boolean> =
-            Key.create("applescript.parsing.literal.expression")
 
         @JvmStatic
         fun parseCommandParametersExpression(
@@ -136,10 +117,17 @@ internal object SetObjectPropertyAssignmentParser {
         while (!foundObjectPointer && !reachedTerminator) {
             val tokenType = builder.lookAhead(offset)
             when {
-                tokenType === OF || tokenType === IN -> foundObjectPointer = true
-                tokenType === TO && !isPropertyPhraseContinuationBeforePointer(builder, offset) ->
+                tokenType === OF || tokenType === IN -> {
+                    foundObjectPointer = true
+                }
+
+                tokenType === TO && !isPropertyPhraseContinuationBeforePointer(builder, offset) -> {
                     reachedTerminator = true
-                tokenType === NLS || tokenType == null -> reachedTerminator = true
+                }
+
+                tokenType === NLS || tokenType == null -> {
+                    reachedTerminator = true
+                }
             }
             if (!foundObjectPointer && !reachedTerminator) {
                 offset += 1
@@ -203,8 +191,8 @@ open class AppleScriptGeneratedParserCommandHooks : GeneratedParserUtilBase() {
             level: Int,
         ): Boolean =
             recursion_guard_(builder, level, "isHandlerLabeledParametersCallAllowed") &&
-                builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT) != true &&
-                builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_TELL_SIMPLE_OBJECT_REF) != true &&
+                !ParserState.isInsideAssignmentStatement(builder) &&
+                !ParserState.isInsideTellSimpleObjectReference(builder) &&
                 builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_HANDLER_CALL_PARAMETERS) != true
 
         @JvmStatic
@@ -222,26 +210,22 @@ open class AppleScriptGeneratedParserCommandHooks : GeneratedParserUtilBase() {
         fun parseAssignmentStatementInner(
             builder: PsiBuilder,
             level: Int,
-        ): Boolean {
-            if (!recursion_guard_(builder, level, "parseAssignmentStatementInner")) return false
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT, true)
-            val result = AppleScriptParser.assignmentStatement(builder, level + 1)
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT, false)
-            return result
-        }
+        ): Boolean =
+            recursion_guard_(builder, level, "parseAssignmentStatementInner") &&
+                ParserState.withAssignmentStatement(builder) {
+                    AppleScriptParser.assignmentStatement(builder, level + 1)
+                }
 
         @JvmStatic
         fun parseLiteralExpression(
             builder: PsiBuilder,
             level: Int,
             literalExpression: Parser,
-        ): Boolean {
-            if (!recursion_guard_(builder, level, "parseLiteralExpression")) return false
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_LITERAL_EXPRESSION, true)
-            val result = literalExpression.parse(builder, level + 1)
-            builder.putUserData(AppleScriptGeneratedParserUtil.PARSING_LITERAL_EXPRESSION, false)
-            return result
-        }
+        ): Boolean =
+            recursion_guard_(builder, level, "parseLiteralExpression") &&
+                ParserState.withLiteralExpression(builder) {
+                    literalExpression.parse(builder, level + 1)
+                }
 
         @JvmStatic
         fun parseCommandParameterSelector(
@@ -398,22 +382,13 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
         ): Boolean {
             if (nextTokenIs(builder, NLS)) return false
             val parsedCommandName = Ref<String>()
-            val toldApplicationName = ParserApplicationNameStack.getTargetApplicationName(builder)
-            val areThereUseStatements =
-                builder.getUserData(AppleScriptGeneratedParserUtil.WAS_USE_STATEMENT_USED) == true
-            val applicationsToImport =
-                if (areThereUseStatements) {
-                    builder.getUserData(AppleScriptGeneratedParserUtil.USED_APPLICATION_NAMES)
-                } else {
-                    null
-                }
             val marker = enter_section_(builder, level, _COLLAPSE_, "<parse ApplicationDictionary Command Name>")
             val result =
                 DictionaryCommandNameParser.parseName(
                     builder,
                     level + 1,
                     parsedCommandName,
-                    DictionaryCommandLookupScope(toldApplicationName, areThereUseStatements, applicationsToImport),
+                    DictionaryCommandLookupScope.of(builder),
                 )
             exit_section_(builder, level, marker, DICTIONARY_COMMAND_NAME, result, false, null)
             return result
@@ -431,24 +406,10 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
             level: Int,
         ): Boolean {
             if (!recursion_guard_(builder, level, "parseDictionaryPropertyInner")) return false
-            val toldApplicationName = ParserApplicationNameStack.getTargetApplicationName(builder)
-            val areThereUseStatements =
-                builder.getUserData(AppleScriptGeneratedParserUtil.WAS_USE_STATEMENT_USED) == true
-            val applicationsToImportFrom =
-                if (areThereUseStatements) {
-                    builder.getUserData(AppleScriptGeneratedParserUtil.USED_APPLICATION_NAMES)
-                } else {
-                    null
-                }
-
             return DictionaryTermLookupParser.parsePropertyName(
                 builder,
                 level + 1,
-                DictionaryTermLookupScope(
-                    toldApplicationName,
-                    areThereUseStatements,
-                    applicationsToImportFrom,
-                ),
+                DictionaryTermLookupScope.of(builder),
             )
         }
 
@@ -465,24 +426,13 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
                 !tokenText.isNullOrEmpty() &&
                 AppleScriptNames.isIdentifierStart(tokenText[0])
             ) {
-                val toldApplicationName = ParserApplicationNameStack.getTargetApplicationName(builder)
                 val areThereUseStatements = checkForUseStatements.parse(builder, level + 1)
-                val applicationsToImportFrom =
-                    if (areThereUseStatements) {
-                        builder.getUserData(AppleScriptGeneratedParserUtil.USED_APPLICATION_NAMES)
-                    } else {
-                        null
-                    }
                 result =
                     DictionaryTermLookupParser.parseClassName(
                         builder,
                         level + 1,
                         isPluralForm,
-                        DictionaryTermLookupScope(
-                            toldApplicationName,
-                            areThereUseStatements,
-                            applicationsToImportFrom,
-                        ),
+                        DictionaryTermLookupScope.of(builder, areThereUseStatements),
                     )
             }
             return result
@@ -494,7 +444,7 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
             level: Int,
         ): Boolean =
             recursion_guard_(builder, level, "parseCheckForUseStatements") &&
-                builder.getUserData(AppleScriptGeneratedParserUtil.WAS_USE_STATEMENT_USED) == true
+                ParserState.areThereUseStatements(builder)
 
         @JvmStatic
         fun parseDictionaryConstant(
@@ -509,30 +459,15 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
                         true ||
                         builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_FALLBACK_COMMAND_PARAMETERS) ==
                         true ||
-                        builder.getUserData(
-                            AppleScriptGeneratedParserUtil.PARSING_COMMAND_ASSIGNMENT_STATEMENT,
-                        ) == true ||
-                        builder.getUserData(AppleScriptGeneratedParserUtil.PARSING_LITERAL_EXPRESSION) == true
+                        ParserState.isInsideAssignmentStatement(builder) ||
+                        ParserState.isInsideLiteralExpression(builder)
                 if (ApplicationDictionary.COCOA_STANDARD_LIBRARY == toldApplicationName || insideExpression) {
-                    val areThereUseStatements =
-                        builder.getUserData(AppleScriptGeneratedParserUtil.WAS_USE_STATEMENT_USED) == true
-                    val applicationsToImportFrom =
-                        if (areThereUseStatements) {
-                            builder.getUserData(AppleScriptGeneratedParserUtil.USED_APPLICATION_NAMES)
-                        } else {
-                            null
-                        }
-
                     result =
                         DictionaryTermLookupParser.parseConstant(
                             builder,
                             level + 1,
                             insideExpression,
-                            DictionaryTermLookupScope(
-                                toldApplicationName,
-                                areThereUseStatements,
-                                applicationsToImportFrom,
-                            ),
+                            DictionaryTermLookupScope.of(builder, toldApplicationName = toldApplicationName),
                         )
                 }
             }
