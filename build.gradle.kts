@@ -345,6 +345,8 @@ tasks {
             // Parser tests include the generated parser-util JVM signature guard. No
             // BasePlatformTestCase, no fixture boot — fast enough to run on every CI build.
             includeTestsMatching("com.intellij.plugin.applescript.test.parser.*")
+            // Pure run-command planning unit tests (plain JUnit 5, no fixture boot) — fast, always run.
+            includeTestsMatching("com.intellij.plugin.applescript.test.run.*")
             // Phase 5 PSI-03 (plan 05-01): PsiGetterJvmSignatureTest is the reflection-only
             // guard for Java-visible getter names (getX/isX/setX) produced by converting
             // GROUP A interface getters to Kotlin properties. No BasePlatformTestCase, no

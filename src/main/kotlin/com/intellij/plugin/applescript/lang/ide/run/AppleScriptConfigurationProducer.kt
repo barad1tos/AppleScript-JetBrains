@@ -25,8 +25,7 @@ class AppleScriptConfigurationProducer : LazyRunConfigurationProducer<AppleScrip
         val scriptPath = file.virtualFile?.path
         if (scriptPath != null) {
             configuration.scriptPath = scriptPath
-            val parts = scriptPath.split("/")
-            if (parts.isNotEmpty()) configuration.name = parts.last()
+            configuration.name = AppleScriptRunCommandPlan.defaultConfigurationName(scriptPath)
         }
         return shouldSetUp
     }
