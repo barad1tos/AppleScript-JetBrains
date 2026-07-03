@@ -249,14 +249,28 @@ class AppleScriptProjectDictionaryService(
     fun createDictionaryFromFile(
         applicationName: String,
         applicationFile: VirtualFile,
-    ): ApplicationDictionary? {
+    ): ApplicationDictionary? = materializeDictionaryFromFile(applicationName, applicationFile).dictionary
+
+    /** Typed variant of [createDictionaryFromFile]: file-provider generation and PSI construction as one outcome. */
+    @Synchronized
+    internal fun materializeDictionaryFromFile(
+        applicationName: String,
+        applicationFile: VirtualFile,
+    ): DictionaryMaterializationResult {
         val appIoFile = File(applicationFile.path)
         val info = fileProvider.createAndInitializeInfo(appIoFile, applicationName)
-        if (info != null) {
-            return createDictionaryFromInfo(info)
+        if (info == null) {
+            LOG.warn("Failed to get initialized dictionary info for $applicationName from $applicationFile")
+            return DictionaryMaterializationResult.Missing
         }
-        LOG.warn("Failed to get initialized dictionary info for $applicationName from $applicationFile")
-        return null
+        return createDictionaryFromInfo(info)
+            ?.let { dictionary ->
+                DictionaryMaterializationResult.Created(
+                    dictionary,
+                    DictionaryMaterializationResult.Source.LoadedFile,
+                )
+            }
+            ?: DictionaryMaterializationResult.MaterializationFailed(info.getDictionaryFile())
     }
 
     fun getDictionary(applicationName: String): ApplicationDictionary? = dictionaryMap[applicationName]

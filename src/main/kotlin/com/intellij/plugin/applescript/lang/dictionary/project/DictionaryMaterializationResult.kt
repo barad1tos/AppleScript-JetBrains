@@ -56,5 +56,6 @@ internal sealed interface DictionaryMaterializationResult {
         RegisteredCache,
         GeneratedCache,
         RegistryInfo,
+        LoadedFile,
     }
 }

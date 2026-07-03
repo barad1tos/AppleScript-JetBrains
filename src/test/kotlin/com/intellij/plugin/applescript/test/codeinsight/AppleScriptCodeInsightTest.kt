@@ -8,6 +8,7 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.util.TextRange
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.plugin.applescript.AppleScriptIcons
@@ -378,6 +379,61 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         } finally {
             ApplicationDiscoveryService.getInstance().removeFromNotFoundList(applicationName)
             SdefPersistenceService.getInstance().removeNotScriptable(applicationName)
+        }
+    }
+
+    fun testFileDictionaryMaterializationReportsMissingForUnsupportedFile() {
+        val applicationName = "SyntheticUnsupportedFileApp_${System.nanoTime()}"
+        val unsupportedFile = FileUtil.createTempFile("not-a-dictionary", ".txt", true)
+        val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(unsupportedFile)
+        assertNotNull(virtualFile)
+        requireNotNull(virtualFile)
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            assertEquals(
+                DictionaryMaterializationResult.Missing,
+                projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile),
+            )
+        } finally {
+            unsupportedFile.delete()
+        }
+    }
+
+    fun testFileDictionaryMaterializationReportsLoadedFileSource() {
+        val applicationName = "SyntheticLoadedFileApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "loaded-file-dictionary",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(dictionaryFile)
+        assertNotNull(virtualFile)
+        requireNotNull(virtualFile)
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            when (val result = projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile)) {
+                is DictionaryMaterializationResult.Created -> {
+                    assertEquals(DictionaryMaterializationResult.Source.LoadedFile, result.source)
+                    assertNotNull(result.dictionary)
+                    assertNotNull(
+                        "Explicit file load must cache the dictionary in the project",
+                        projectDictionaries.getDictionary(applicationName),
+                    )
+                }
+
+                else -> {
+                    fail("Loading a dictionary file should report Created, got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            persistence.removeDictionaryInfo(dictionaryFile.path)
+            generatedDictionaryFile.delete()
+            dictionaryFile.delete()
         }
     }
 
