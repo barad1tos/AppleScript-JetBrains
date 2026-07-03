@@ -263,6 +263,67 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testCachedMaterializationServesStaleFallbackWhenGeneratedCacheIsGone() {
+        if (!File("/System/Applications/Music.app").isDirectory) return
+
+        val applicationName = "Music"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "stale-fallback")
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        generatedDictionaryFile.delete()
+        // The macOS standard init may register a real Music dictionary; drop it so materialization
+        // reaches the generated-cache leg instead of returning Created(RegisteredCache).
+        SdefPersistenceService.getInstance().removeDictionaryInfoByNameForTests(applicationName)
+        try {
+            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                is DictionaryMaterializationResult.StaleFallback -> {
+                    assertSame(cachedDictionary, result.dictionary)
+                }
+
+                else -> {
+                    fail("Missing generated cache with a stale dictionary should serve StaleFallback, got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testCachedMaterializationServesFallbackWhenGeneratedCacheIsMalformed() {
+        if (!File("/System/Applications/Music.app").isDirectory) return
+
+        val applicationName = "Music"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "parse-fail-fallback")
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
+        // The macOS standard init may register a real Music dictionary; drop it so materialization
+        // reaches the generated-cache leg instead of returning Created(RegisteredCache).
+        SdefPersistenceService.getInstance().removeDictionaryInfoByNameForTests(applicationName)
+        try {
+            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                is DictionaryMaterializationResult.ParseFailed -> {
+                    assertSame(cachedDictionary, result.dictionary)
+                }
+
+                else -> {
+                    fail("Malformed generated cache with a stale dictionary should serve the fallback, got $result")
+                }
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            generatedDictionaryFile.delete()
+            dictionaryFile.delete()
+        }
+    }
+
     fun testCachedDictionaryMaterializationReportsMalformedGeneratedCache() {
         val applicationName = "SyntheticMalformedMaterializationApp_${System.nanoTime()}"
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
