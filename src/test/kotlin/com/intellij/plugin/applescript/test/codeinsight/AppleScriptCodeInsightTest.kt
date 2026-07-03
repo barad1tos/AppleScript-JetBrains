@@ -771,8 +771,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     fun testApplicationReferenceLineMarkerUsesGeneratedCacheApplicationBundleIcon() {
-        val applicationName = "Things3"
-        val applicationBundle = File("/Applications/Things3.app")
+        val applicationName = "Music"
+        val applicationBundle = File("/System/Applications/Music.app")
         if (!applicationBundle.isDirectory) return
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
@@ -806,8 +806,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     fun testApplicationReferenceLineMarkerRefreshesCachedDictionaryWithoutApplicationBundleIcon() {
-        val applicationName = "Things3"
-        val applicationBundle = File("/Applications/Things3.app")
+        val applicationName = "Music"
+        val applicationBundle = File("/System/Applications/Music.app")
         if (!applicationBundle.isDirectory) return
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
@@ -815,7 +815,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
         val staleDictionaryFile =
             File
-                .createTempFile("things3-stale", ".xml")
+                .createTempFile("music-stale", ".xml")
                 .also { file -> file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml()) }
         val dictionaryXmlFile =
             LocalFileSystem
