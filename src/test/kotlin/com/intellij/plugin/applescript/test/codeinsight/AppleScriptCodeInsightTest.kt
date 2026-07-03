@@ -51,6 +51,16 @@ import javax.swing.Icon
 class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     override fun getTestDataPath(): String = File(MY_TEST_DATA_DIR).absolutePath
 
+    override fun tearDown() {
+        try {
+            // The Xcode override lives on the application-level service; reset it unconditionally so a
+            // failure between setting it and a test's own finally cannot leak into later tests.
+            XcodeDetectionService.getInstance().overrideXcodeInstalledForTests(null)
+        } finally {
+            super.tearDown()
+        }
+    }
+
     fun testCompletion() {
         val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
         PlatformTestUtil.waitWithEventsDispatching(
