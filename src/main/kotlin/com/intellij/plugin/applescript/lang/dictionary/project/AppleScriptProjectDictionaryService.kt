@@ -130,6 +130,7 @@ class AppleScriptProjectDictionaryService(
                 ?: DictionaryMaterializationResult.Missing
         }
         if (!SdefIndexService.getInstance().parseDictionaryFile(generatedDictionaryFile, applicationName)) {
+            LOG.warn("Failed to parse generated dictionary cache for $applicationName at $generatedDictionaryFile")
             return DictionaryMaterializationResult.ParseFailed(generatedDictionaryFile, fallbackDictionary)
         }
 
