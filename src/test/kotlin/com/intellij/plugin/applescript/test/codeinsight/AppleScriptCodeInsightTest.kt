@@ -268,13 +268,18 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val applicationName = "Music"
         val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "stale-fallback")
+        // A null bundle is load-bearing: it forces needsBundleAwareRefresh to skip the early Cached leg.
+        assertNull(cachedDictionary.applicationBundle)
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val persistence = SdefPersistenceService.getInstance()
+        val registeredMusicInfo =
+            persistence.dictionaryInfoSnapshot.firstOrNull { it.getApplicationName() == applicationName }
 
         generatedDictionaryFile.delete()
         // The macOS standard init may register a real Music dictionary; drop it so materialization
         // reaches the generated-cache leg instead of returning Created(RegisteredCache).
-        SdefPersistenceService.getInstance().removeDictionaryInfoByNameForTests(applicationName)
+        persistence.removeDictionaryInfoByNameForTests(applicationName)
         try {
             projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
@@ -290,6 +295,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             dictionaryFile.delete()
+            registeredMusicInfo?.let { persistence.addDictionaryInfo(it) }
         }
     }
 
@@ -298,13 +304,18 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val applicationName = "Music"
         val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "parse-fail-fallback")
+        // A null bundle is load-bearing: it forces needsBundleAwareRefresh to skip the early Cached leg.
+        assertNull(cachedDictionary.applicationBundle)
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val persistence = SdefPersistenceService.getInstance()
+        val registeredMusicInfo =
+            persistence.dictionaryInfoSnapshot.firstOrNull { it.getApplicationName() == applicationName }
 
         writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
         // The macOS standard init may register a real Music dictionary; drop it so materialization
         // reaches the generated-cache leg instead of returning Created(RegisteredCache).
-        SdefPersistenceService.getInstance().removeDictionaryInfoByNameForTests(applicationName)
+        persistence.removeDictionaryInfoByNameForTests(applicationName)
         try {
             projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
@@ -321,6 +332,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             projectDictionaries.clearCachedDictionariesForTests()
             generatedDictionaryFile.delete()
             dictionaryFile.delete()
+            registeredMusicInfo?.let { persistence.addDictionaryInfo(it) }
         }
     }
 
@@ -437,6 +449,29 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             dictionaryFile.delete()
+        }
+    }
+
+    fun testDictionaryCreationFailureNamesTheRealCause() {
+        val applicationName = "SyntheticFailureReasonApp_${System.nanoTime()}"
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val missingFile = File(serializeDictionaryPathForApplication(applicationName))
+        missingFile.delete()
+
+        val missingReason = projectDictionaries.describeDictionaryCreationFailure(applicationName, missingFile, null)
+        assertTrue(missingReason, missingReason.contains("file not found in the virtual file system"))
+        assertFalse(missingReason, missingReason.contains("file is null"))
+
+        val nonXmlFile = SyntheticSuiteFixtures.writeToTempFile("non-xml-reason", "this is plain text, not xml")
+        try {
+            val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(nonXmlFile)
+            assertNotNull(virtualFile)
+            requireNotNull(virtualFile)
+            val nonXmlReason =
+                projectDictionaries.describeDictionaryCreationFailure(applicationName, nonXmlFile, virtualFile)
+            assertTrue(nonXmlReason, nonXmlReason.contains("did not resolve to an XML PSI"))
+        } finally {
+            nonXmlFile.delete()
         }
     }
 

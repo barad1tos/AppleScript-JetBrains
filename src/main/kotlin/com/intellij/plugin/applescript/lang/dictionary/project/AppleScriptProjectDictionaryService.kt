@@ -191,10 +191,7 @@ class AppleScriptProjectDictionaryService(
                         ?.takeIf { it.isValid }
                         ?.let { PsiManager.getInstance(project).findFile(it) as? XmlFile }
                 if (xmlFile == null) {
-                    LOG.warn(
-                        "Failed to create dictionary from info for application: " +
-                            "$applicationName. Reason: file is null",
-                    )
+                    LOG.warn(describeDictionaryCreationFailure(applicationName, info.getDictionaryFile(), vFile))
                 }
                 xmlFile?.let {
                     ApplicationDictionaryImpl(project, it, applicationName, info.getApplicationFile())
@@ -210,9 +207,27 @@ class AppleScriptProjectDictionaryService(
         return dictionary
     }
 
+    /**
+     * Classifies why [createDictionaryFromInfo] could not build the dictionary PSI: the null
+     * [XmlFile] has several causes, so the log must name the real one instead of "file is null".
+     */
+    internal fun describeDictionaryCreationFailure(
+        applicationName: String,
+        dictionaryFile: File,
+        virtualFile: VirtualFile?,
+    ): String {
+        val reason =
+            when {
+                virtualFile == null -> "file not found in the virtual file system"
+                !virtualFile.isValid -> "virtual file is invalid"
+                else -> "file did not resolve to an XML PSI"
+            }
+        return "Failed to create dictionary for $applicationName from $dictionaryFile: $reason"
+    }
+
     private fun logUninitializedDictionaryInfo(applicationName: String) {
         LOG.error(
-            "Attempt to create dictionary for not initialized Dictionary Info for application" +
+            "Attempt to create dictionary for not initialized Dictionary Info for application " +
                 applicationName,
         )
     }
@@ -298,8 +313,8 @@ class AppleScriptProjectDictionaryService(
 
     /**
      * Drives [materializedFromInfo] directly so the fallback-carrying `MaterializationFailed` leg can be covered.
-     * It fires only when PSI construction fails inside the private generated-cache path; the public cached-sources
-     * seam cannot stage it without a file that parses in JDOM yet is not detected as XML by the platform.
+     * That leg fires only when PSI construction fails inside the private generated-cache path; the public
+     * cached-sources seam cannot stage it without a file that parses in JDOM yet is not detected as XML.
      */
     @TestOnly
     internal fun materializeFromInfoForTests(
