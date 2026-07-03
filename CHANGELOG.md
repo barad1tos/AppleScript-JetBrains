@@ -6,6 +6,7 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 - [Fix] Application-specific dictionary terms (commands, classes, properties, and constants) are no longer briefly flagged as unknown during IDE startup while their application dictionaries are still loading — the editor now waits for application-dictionary indexing to finish before treating such a term as unresolved.
 - [Fix] The AppleScript code style page under Settings | Editor | Code Style is now bound to the AppleScript language, so its options apply to AppleScript reformatting.
+- [Fix] When a cached application dictionary fails to load, the plugin now records the specific cause and file in the IDE log instead of a generic message, so missing application completions are easier to diagnose.
 
 ## [2.0.10] - 2026-06-27
 
