@@ -266,6 +266,22 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
             LookupResult.Stale,
             indexService.commandLookup.lookupCommandWithPrefixResult(applicationName, "play"),
         )
+        assertEquals(
+            "Built-in Scripting Additions command must be ready at standard readiness, not gated on app indexing",
+            LookupResult.Hit,
+            indexService.commandLookup.lookupApplicationCommandResult(
+                ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY,
+                "do shell script",
+            ),
+        )
+        assertEquals(
+            "Built-in Scripting Additions prefix must be ready at standard readiness, not gated on app indexing",
+            LookupResult.Hit,
+            indexService.commandLookup.lookupCommandWithPrefixResult(
+                ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY,
+                "do shell",
+            ),
+        )
 
         registryService.appsReady.complete(Result.success(Unit))
         assertEquals(

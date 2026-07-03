@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
+import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
@@ -24,6 +25,14 @@ internal object SdefIndexReadiness {
     fun isInitialized(): Boolean = ParsableScriptSuiteRegistryHelper.isInitialized()
 
     fun areAppDictionariesIndexed(): Boolean = ParsableScriptSuiteRegistryHelper.areAppDictionariesIndexed()
+
+    /**
+     * Readiness for an application-scoped lookup. Built-in libraries (Cocoa Standard, Scripting
+     * Additions) are ready at standard initialization; real application dictionaries only become
+     * ready once installed-application indexing completes.
+     */
+    fun isReadyForApplication(applicationName: String): Boolean =
+        if (ApplicationDictionary.isBuiltInLibrary(applicationName)) isInitialized() else areAppDictionariesIndexed()
 }
 
 internal class SdefCommandLookup(
@@ -49,10 +58,17 @@ internal class SdefCommandLookup(
         commandName: String,
     ): LookupResult =
         when {
-            !SdefIndexReadiness.areAppDictionariesIndexed() -> LookupResult.Stale
-            commandName in (indexStore.applicationNameToCommandNameSetMap[applicationName] ?: emptySet()) ->
+            !SdefIndexReadiness.isReadyForApplication(applicationName) -> {
+                LookupResult.Stale
+            }
+
+            commandName in (indexStore.applicationNameToCommandNameSetMap[applicationName] ?: emptySet()) -> {
                 LookupResult.Hit
-            else -> LookupResult.Miss
+            }
+
+            else -> {
+                LookupResult.Miss
+            }
         }
 
     fun lookupCommandWithPrefixExist(
@@ -65,10 +81,17 @@ internal class SdefCommandLookup(
         commandNamePrefix: String,
     ): LookupResult =
         when {
-            !SdefIndexReadiness.areAppDictionariesIndexed() -> LookupResult.Stale
-            hasNameWithPrefix(commandNamePrefix, indexStore.applicationNameToCommandNameSetMap[applicationName]) ->
+            !SdefIndexReadiness.isReadyForApplication(applicationName) -> {
+                LookupResult.Stale
+            }
+
+            hasNameWithPrefix(commandNamePrefix, indexStore.applicationNameToCommandNameSetMap[applicationName]) -> {
                 LookupResult.Hit
-            else -> LookupResult.Miss
+            }
+
+            else -> {
+                LookupResult.Miss
+            }
         }
 
     fun lookupStdCommandWithPrefixExist(namePrefix: String): Boolean =
