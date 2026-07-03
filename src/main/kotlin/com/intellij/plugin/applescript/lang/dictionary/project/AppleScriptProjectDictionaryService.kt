@@ -257,13 +257,12 @@ class AppleScriptProjectDictionaryService(
         if (info == null) {
             LOG.warn("Failed to get initialized dictionary info for $applicationName from $applicationFile")
             // The provider rejects unsupported/nonexistent inputs up front (nothing to load);
-            // any other null means generation or parsing of the loaded file failed.
+            // any other null means generation or parsing of the loaded file failed. Report the
+            // loaded source file — the generated cache path is deleted on generation failure.
             return if (!extensionSupported(appIoFile.extension) || !appIoFile.exists()) {
                 DictionaryMaterializationResult.Missing
             } else {
-                DictionaryMaterializationResult.MaterializationFailed(
-                    File(serializeDictionaryPathForApplication(applicationName)),
-                )
+                DictionaryMaterializationResult.MaterializationFailed(appIoFile)
             }
         }
         return materializedFromInfo(info, DictionaryMaterializationResult.Source.LoadedFile)

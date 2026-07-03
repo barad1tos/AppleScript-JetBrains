@@ -12,8 +12,9 @@ import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionary
  * Diagnosis of an `application "Name"` reference against the host state: persisted scriptability,
  * discovery results, Xcode tooling, registry readiness, and the project dictionary cache.
  *
- * The annotator renders these states; check order and severity policy live here so severity
- * tests can assert the diagnosis directly instead of driving a full highlighting pass.
+ * The annotator renders these states; check order and diagnosis classification live here (the
+ * annotator maps states to severities) so classification tests can assert the diagnosis directly
+ * instead of driving a full highlighting pass.
  */
 internal sealed interface ApplicationReferenceDiagnosis {
     /** The reference resolves (known, pending indexing, or already project-cached). */

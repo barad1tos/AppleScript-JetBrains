@@ -10,8 +10,12 @@ import java.util.Stack
  * through PsiBuilder user data.
  *
  * Contract: flag keys are tri-state — `null` (never entered), `true` (inside), `false`
- * (entered and exited). Readers such as [TellStatementParser.isInTellStatement] distinguish
+ * (entered and exited). Readers such as [hasExitedTellSimpleStatement] distinguish
  * explicit `false` from `null`, so writers must preserve the historical write sequences.
+ *
+ * The scoped `withX` runners are NOT exception-safe by design: an exception thrown inside the
+ * block skips the exit writes and leaks the flag, matching the historical parsers' behavior on
+ * cancellation. Do not add `try`/`finally` — that would change observable exception-path state.
  *
  * [AppleScriptGeneratedParserUtil.TOLD_APPLICATION_NAME_STACK] stays in the generated-parser
  * facade: it is ABI-frozen by AppleScriptGeneratedParserUtilJvmSignatureTest.
