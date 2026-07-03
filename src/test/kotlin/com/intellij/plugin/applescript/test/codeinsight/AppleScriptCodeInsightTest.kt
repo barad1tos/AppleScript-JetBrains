@@ -263,6 +263,69 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testCachedMaterializationServesStaleFallbackWhenGeneratedCacheIsGone() {
+        if (!File("/System/Applications/Music.app").isDirectory) return
+
+        val applicationName = "Music"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "stale-fallback")
+        // A null bundle is load-bearing: it forces needsBundleAwareRefresh to skip the early Cached leg.
+        assertNull(cachedDictionary.applicationBundle)
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        generatedDictionaryFile.delete()
+        withoutRegisteredDictionaryInfo(applicationName) {
+            try {
+                projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+                when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                    is DictionaryMaterializationResult.StaleFallback -> {
+                        assertSame(cachedDictionary, result.dictionary)
+                    }
+
+                    else -> {
+                        fail("Missing generated cache with a stale dictionary should serve StaleFallback, got $result")
+                    }
+                }
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                dictionaryFile.delete()
+            }
+        }
+    }
+
+    fun testCachedMaterializationServesFallbackWhenGeneratedCacheIsMalformed() {
+        if (!File("/System/Applications/Music.app").isDirectory) return
+
+        val applicationName = "Music"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "parse-fail-fallback")
+        // A null bundle is load-bearing: it forces needsBundleAwareRefresh to skip the early Cached leg.
+        assertNull(cachedDictionary.applicationBundle)
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
+        withoutRegisteredDictionaryInfo(applicationName) {
+            try {
+                projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+                when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                    is DictionaryMaterializationResult.ParseFailed -> {
+                        assertSame(cachedDictionary, result.dictionary)
+                    }
+
+                    else -> {
+                        fail("Malformed generated cache with a stale dictionary should serve the fallback, got $result")
+                    }
+                }
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                generatedDictionaryFile.delete()
+                dictionaryFile.delete()
+            }
+        }
+    }
+
     fun testCachedDictionaryMaterializationReportsMalformedGeneratedCache() {
         val applicationName = "SyntheticMalformedMaterializationApp_${System.nanoTime()}"
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
@@ -324,6 +387,43 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testMaterializationCarriesFallbackWhenPsiConstructionFails() {
+        val applicationName = "SyntheticFallbackMaterializationApp_${System.nanoTime()}"
+        val (fallbackDictionary, dictionaryFile) =
+            syntheticProjectDictionary(
+                applicationName,
+                "materialization-fallback",
+            )
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val unreadableCacheFile = File(serializeDictionaryPathForApplication(applicationName))
+        unreadableCacheFile.delete()
+
+        val staleInitializedInfo =
+            DictionaryInfo(applicationName, unreadableCacheFile, null).also { info -> info.setInitialized(true) }
+
+        try {
+            val result =
+                projectDictionaries.materializeFromInfoForTests(
+                    staleInitializedInfo,
+                    DictionaryMaterializationResult.Source.GeneratedCache,
+                    fallbackDictionary,
+                )
+
+            when (result) {
+                is DictionaryMaterializationResult.MaterializationFailed -> {
+                    assertSame(fallbackDictionary, result.dictionary)
+                    assertEquals(unreadableCacheFile.path, result.generatedDictionaryFile.path)
+                }
+
+                else -> {
+                    fail("PSI construction failure with a stale dictionary should carry the fallback, got $result")
+                }
+            }
+        } finally {
+            dictionaryFile.delete()
+        }
+    }
+
     fun testCachedDictionaryMaterializationReportsFreshCachedDictionary() {
         val applicationName = "SyntheticCachedMaterializationApp_${System.nanoTime()}"
         val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "cached-materialization")
@@ -339,6 +439,55 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             dictionaryFile.delete()
+        }
+    }
+
+    fun testDictionaryCreationFailureNamesTheRealCause() {
+        // Exercises the classifier contract directly. The LOG.warn call-site wiring in
+        // createDictionaryFromInfo is not asserted here — capturing platform logs under
+        // BasePlatformTestCase is brittle — so this guards the reason strings, not the routing.
+        val applicationName = "SyntheticFailureReasonApp_${System.nanoTime()}"
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val missingFile = File(serializeDictionaryPathForApplication(applicationName))
+        missingFile.delete()
+
+        val missingReason = projectDictionaries.describeDictionaryCreationFailure(applicationName, missingFile, null)
+        assertTrue(missingReason, missingReason.contains("file not found in the virtual file system"))
+        assertFalse(missingReason, missingReason.contains("file is null"))
+
+        // The else branch only needs a present, valid VirtualFile — the classifier does not re-inspect
+        // XML-ness (the caller already established the XmlFile was null), so any valid file exercises it.
+        val validFile = SyntheticSuiteFixtures.writeToTempFile("valid-non-dictionary", "plain text, not a dictionary")
+        try {
+            val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(validFile)
+            assertNotNull(virtualFile)
+            requireNotNull(virtualFile)
+            val unresolvedReason =
+                projectDictionaries.describeDictionaryCreationFailure(applicationName, validFile, virtualFile)
+            assertTrue(unresolvedReason, unresolvedReason.contains("did not resolve to an XML PSI"))
+        } finally {
+            validFile.delete()
+        }
+    }
+
+    /**
+     * Runs [body] with the registered dictionary info for [applicationName] removed, restoring it
+     * afterward. macOS standard init registers real system apps such as Music; dropping the registered
+     * entry forces materialization past the RegisteredCache leg so a test exercises the generated-cache
+     * or fallback path it targets instead of passing vacuously through the registered dictionary.
+     */
+    private fun withoutRegisteredDictionaryInfo(
+        applicationName: String,
+        body: () -> Unit,
+    ) {
+        val persistence = SdefPersistenceService.getInstance()
+        val registeredInfo =
+            persistence.dictionaryInfoSnapshot.firstOrNull { it.getApplicationName() == applicationName }
+        persistence.removeDictionaryInfoByNameForTests(applicationName)
+        try {
+            body()
+        } finally {
+            registeredInfo?.let { persistence.addDictionaryInfo(it) }
         }
     }
 
@@ -710,8 +859,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     fun testApplicationReferenceLineMarkerUsesGeneratedCacheApplicationBundleIcon() {
-        val applicationName = "Things3"
-        val applicationBundle = File("/Applications/Things3.app")
+        val applicationName = "Music"
+        val applicationBundle = File("/System/Applications/Music.app")
         if (!applicationBundle.isDirectory) return
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
@@ -721,32 +870,36 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertNotNull(applicationIcon)
         requireNotNull(applicationIcon)
 
-        try {
-            assertNull(projectDictionaries.getDictionary(applicationName))
+        // Drop any registered Music info so the gutter resolves through the generated cache under test,
+        // not a registered dictionary that would supply the same bundle icon and pass vacuously.
+        withoutRegisteredDictionaryInfo(applicationName) {
+            try {
+                assertNull(projectDictionaries.getDictionary(applicationName))
 
-            myFixture.configureByText(
-                AppleScriptFileType,
-                """
-                tell application "$applicationName"
-                end tell
-                """.trimIndent(),
-            )
-            val markers = myFixture.findAllGutters()
+                myFixture.configureByText(
+                    AppleScriptFileType,
+                    """
+                    tell application "$applicationName"
+                    end tell
+                    """.trimIndent(),
+                )
+                val markers = myFixture.findAllGutters()
 
-            assertEquals("Generated cache application reference should create one gutter marker", 1, markers.size)
-            assertTrue(
-                "Generated cache gutter marker should use the application bundle icon",
-                markers.single().icon.renderedPixelsEqual(applicationIcon),
-            )
-        } finally {
-            projectDictionaries.clearCachedDictionariesForTests()
-            generatedDictionaryFile.delete()
+                assertEquals("Generated cache application reference should create one gutter marker", 1, markers.size)
+                assertTrue(
+                    "Generated cache gutter marker should use the application bundle icon",
+                    markers.single().icon.renderedPixelsEqual(applicationIcon),
+                )
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                generatedDictionaryFile.delete()
+            }
         }
     }
 
     fun testApplicationReferenceLineMarkerRefreshesCachedDictionaryWithoutApplicationBundleIcon() {
-        val applicationName = "Things3"
-        val applicationBundle = File("/Applications/Things3.app")
+        val applicationName = "Music"
+        val applicationBundle = File("/System/Applications/Music.app")
         if (!applicationBundle.isDirectory) return
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
@@ -754,7 +907,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
         val staleDictionaryFile =
             File
-                .createTempFile("things3-stale", ".xml")
+                .createTempFile("music-stale", ".xml")
                 .also { file -> file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml()) }
         val dictionaryXmlFile =
             LocalFileSystem
@@ -767,30 +920,34 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertNotNull(applicationIcon)
         requireNotNull(applicationIcon)
 
-        try {
-            projectDictionaries.cacheDictionaryForTests(
-                applicationName,
-                ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null),
-            )
+        // Drop any registered Music info so the stale project cache is refreshed through the generated
+        // cache under test, not short-circuited by a registered dictionary that already carries the icon.
+        withoutRegisteredDictionaryInfo(applicationName) {
+            try {
+                projectDictionaries.cacheDictionaryForTests(
+                    applicationName,
+                    ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null),
+                )
 
-            myFixture.configureByText(
-                AppleScriptFileType,
-                """
-                tell application "$applicationName"
-                end tell
-                """.trimIndent(),
-            )
-            val markers = myFixture.findAllGutters()
+                myFixture.configureByText(
+                    AppleScriptFileType,
+                    """
+                    tell application "$applicationName"
+                    end tell
+                    """.trimIndent(),
+                )
+                val markers = myFixture.findAllGutters()
 
-            assertEquals("Application reference should create one gutter marker", 1, markers.size)
-            assertTrue(
-                "Stale project dictionary cache should not force a generic gutter marker icon",
-                markers.single().icon.renderedPixelsEqual(applicationIcon),
-            )
-        } finally {
-            projectDictionaries.clearCachedDictionariesForTests()
-            generatedDictionaryFile.delete()
-            staleDictionaryFile.delete()
+                assertEquals("Application reference should create one gutter marker", 1, markers.size)
+                assertTrue(
+                    "Stale project dictionary cache should not force a generic gutter marker icon",
+                    markers.single().icon.renderedPixelsEqual(applicationIcon),
+                )
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                generatedDictionaryFile.delete()
+                staleDictionaryFile.delete()
+            }
         }
     }
 
