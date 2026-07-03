@@ -96,39 +96,11 @@ class AppleScriptProjectDictionaryService(
             )
         }
 
-        return when (
-            val generatedDictionary =
-                createDictionaryFromGeneratedCacheResult(
-                    applicationName,
-                    applicationBundle = standardApplicationBundle,
-                )
-        ) {
-            is GeneratedDictionaryCacheResult.Loaded -> {
-                DictionaryMaterializationResult.Created(
-                    generatedDictionary.dictionary,
-                    DictionaryMaterializationResult.Source.GeneratedCache,
-                )
-            }
-
-            is GeneratedDictionaryCacheResult.ParseFailed -> {
-                DictionaryMaterializationResult.ParseFailed(
-                    generatedDictionary.generatedDictionaryFile,
-                    fallbackDictionary = cachedDictionary,
-                )
-            }
-
-            is GeneratedDictionaryCacheResult.MaterializationFailed -> {
-                DictionaryMaterializationResult.MaterializationFailed(
-                    generatedDictionary.generatedDictionaryFile,
-                    fallbackDictionary = cachedDictionary,
-                )
-            }
-
-            GeneratedDictionaryCacheResult.Missing -> {
-                cachedDictionary?.let(DictionaryMaterializationResult::StaleFallback)
-                    ?: DictionaryMaterializationResult.Missing
-            }
-        }
+        return createDictionaryFromGeneratedCache(
+            applicationName,
+            applicationBundle = standardApplicationBundle,
+            fallbackDictionary = cachedDictionary,
+        )
     }
 
     private fun createDictionaryFromRegisteredCache(
@@ -146,14 +118,18 @@ class AppleScriptProjectDictionaryService(
                 )
             }
 
-    private fun createDictionaryFromGeneratedCacheResult(
+    private fun createDictionaryFromGeneratedCache(
         applicationName: String,
         applicationBundle: File?,
-    ): GeneratedDictionaryCacheResult {
+        fallbackDictionary: ApplicationDictionary?,
+    ): DictionaryMaterializationResult {
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
-        if (!generatedDictionaryFile.isFile) return GeneratedDictionaryCacheResult.Missing
+        if (!generatedDictionaryFile.isFile) {
+            return fallbackDictionary?.let(DictionaryMaterializationResult::StaleFallback)
+                ?: DictionaryMaterializationResult.Missing
+        }
         if (!SdefIndexService.getInstance().parseDictionaryFile(generatedDictionaryFile, applicationName)) {
-            return GeneratedDictionaryCacheResult.ParseFailed(generatedDictionaryFile)
+            return DictionaryMaterializationResult.ParseFailed(generatedDictionaryFile, fallbackDictionary)
         }
 
         val info =
@@ -163,8 +139,13 @@ class AppleScriptProjectDictionaryService(
                 applicationBundle,
             ).also { dictionaryInfo -> dictionaryInfo.setInitialized(true) }
         return createDictionaryFromInfo(info, shouldCacheInProject = false)
-            ?.let(GeneratedDictionaryCacheResult::Loaded)
-            ?: GeneratedDictionaryCacheResult.MaterializationFailed(generatedDictionaryFile)
+            ?.let { dictionary ->
+                DictionaryMaterializationResult.Created(
+                    dictionary,
+                    DictionaryMaterializationResult.Source.GeneratedCache,
+                )
+            }
+            ?: DictionaryMaterializationResult.MaterializationFailed(generatedDictionaryFile, fallbackDictionary)
     }
 
     private fun ApplicationDictionary.needsBundleAwareRefresh(standardApplicationBundle: File?): Boolean =
@@ -298,20 +279,4 @@ class AppleScriptProjectDictionaryService(
     companion object {
         private val LOG: Logger = Logger.getInstance("#${AppleScriptProjectDictionaryService::class.java.name}")
     }
-}
-
-private sealed interface GeneratedDictionaryCacheResult {
-    data class Loaded(
-        val dictionary: ApplicationDictionary,
-    ) : GeneratedDictionaryCacheResult
-
-    data class ParseFailed(
-        val generatedDictionaryFile: File,
-    ) : GeneratedDictionaryCacheResult
-
-    data class MaterializationFailed(
-        val generatedDictionaryFile: File,
-    ) : GeneratedDictionaryCacheResult
-
-    data object Missing : GeneratedDictionaryCacheResult
 }
