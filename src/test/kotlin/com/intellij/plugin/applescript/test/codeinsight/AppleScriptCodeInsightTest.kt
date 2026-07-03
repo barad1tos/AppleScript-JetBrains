@@ -272,30 +272,25 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertNull(cachedDictionary.applicationBundle)
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val persistence = SdefPersistenceService.getInstance()
-        val registeredMusicInfo =
-            persistence.dictionaryInfoSnapshot.firstOrNull { it.getApplicationName() == applicationName }
 
         generatedDictionaryFile.delete()
-        // The macOS standard init may register a real Music dictionary; drop it so materialization
-        // reaches the generated-cache leg instead of returning Created(RegisteredCache).
-        persistence.removeDictionaryInfoByNameForTests(applicationName)
-        try {
-            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+        withoutRegisteredDictionaryInfo(applicationName) {
+            try {
+                projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
-            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is DictionaryMaterializationResult.StaleFallback -> {
-                    assertSame(cachedDictionary, result.dictionary)
-                }
+                when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                    is DictionaryMaterializationResult.StaleFallback -> {
+                        assertSame(cachedDictionary, result.dictionary)
+                    }
 
-                else -> {
-                    fail("Missing generated cache with a stale dictionary should serve StaleFallback, got $result")
+                    else -> {
+                        fail("Missing generated cache with a stale dictionary should serve StaleFallback, got $result")
+                    }
                 }
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                dictionaryFile.delete()
             }
-        } finally {
-            projectDictionaries.clearCachedDictionariesForTests()
-            dictionaryFile.delete()
-            registeredMusicInfo?.let { persistence.addDictionaryInfo(it) }
         }
     }
 
@@ -308,31 +303,26 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertNull(cachedDictionary.applicationBundle)
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val persistence = SdefPersistenceService.getInstance()
-        val registeredMusicInfo =
-            persistence.dictionaryInfoSnapshot.firstOrNull { it.getApplicationName() == applicationName }
 
         writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
-        // The macOS standard init may register a real Music dictionary; drop it so materialization
-        // reaches the generated-cache leg instead of returning Created(RegisteredCache).
-        persistence.removeDictionaryInfoByNameForTests(applicationName)
-        try {
-            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+        withoutRegisteredDictionaryInfo(applicationName) {
+            try {
+                projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
-            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is DictionaryMaterializationResult.ParseFailed -> {
-                    assertSame(cachedDictionary, result.dictionary)
-                }
+                when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
+                    is DictionaryMaterializationResult.ParseFailed -> {
+                        assertSame(cachedDictionary, result.dictionary)
+                    }
 
-                else -> {
-                    fail("Malformed generated cache with a stale dictionary should serve the fallback, got $result")
+                    else -> {
+                        fail("Malformed generated cache with a stale dictionary should serve the fallback, got $result")
+                    }
                 }
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                generatedDictionaryFile.delete()
+                dictionaryFile.delete()
             }
-        } finally {
-            projectDictionaries.clearCachedDictionariesForTests()
-            generatedDictionaryFile.delete()
-            dictionaryFile.delete()
-            registeredMusicInfo?.let { persistence.addDictionaryInfo(it) }
         }
     }
 
@@ -477,6 +467,27 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             assertTrue(unresolvedReason, unresolvedReason.contains("did not resolve to an XML PSI"))
         } finally {
             validFile.delete()
+        }
+    }
+
+    /**
+     * Runs [body] with the registered dictionary info for [applicationName] removed, restoring it
+     * afterward. macOS standard init registers real system apps such as Music; dropping the registered
+     * entry forces materialization past the RegisteredCache leg so a test exercises the generated-cache
+     * or fallback path it targets instead of passing vacuously through the registered dictionary.
+     */
+    private fun withoutRegisteredDictionaryInfo(
+        applicationName: String,
+        body: () -> Unit,
+    ) {
+        val persistence = SdefPersistenceService.getInstance()
+        val registeredInfo =
+            persistence.dictionaryInfoSnapshot.firstOrNull { it.getApplicationName() == applicationName }
+        persistence.removeDictionaryInfoByNameForTests(applicationName)
+        try {
+            body()
+        } finally {
+            registeredInfo?.let { persistence.addDictionaryInfo(it) }
         }
     }
 
@@ -859,26 +870,30 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertNotNull(applicationIcon)
         requireNotNull(applicationIcon)
 
-        try {
-            assertNull(projectDictionaries.getDictionary(applicationName))
+        // Drop any registered Music info so the gutter resolves through the generated cache under test,
+        // not a registered dictionary that would supply the same bundle icon and pass vacuously.
+        withoutRegisteredDictionaryInfo(applicationName) {
+            try {
+                assertNull(projectDictionaries.getDictionary(applicationName))
 
-            myFixture.configureByText(
-                AppleScriptFileType,
-                """
-                tell application "$applicationName"
-                end tell
-                """.trimIndent(),
-            )
-            val markers = myFixture.findAllGutters()
+                myFixture.configureByText(
+                    AppleScriptFileType,
+                    """
+                    tell application "$applicationName"
+                    end tell
+                    """.trimIndent(),
+                )
+                val markers = myFixture.findAllGutters()
 
-            assertEquals("Generated cache application reference should create one gutter marker", 1, markers.size)
-            assertTrue(
-                "Generated cache gutter marker should use the application bundle icon",
-                markers.single().icon.renderedPixelsEqual(applicationIcon),
-            )
-        } finally {
-            projectDictionaries.clearCachedDictionariesForTests()
-            generatedDictionaryFile.delete()
+                assertEquals("Generated cache application reference should create one gutter marker", 1, markers.size)
+                assertTrue(
+                    "Generated cache gutter marker should use the application bundle icon",
+                    markers.single().icon.renderedPixelsEqual(applicationIcon),
+                )
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                generatedDictionaryFile.delete()
+            }
         }
     }
 
@@ -905,30 +920,34 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertNotNull(applicationIcon)
         requireNotNull(applicationIcon)
 
-        try {
-            projectDictionaries.cacheDictionaryForTests(
-                applicationName,
-                ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null),
-            )
+        // Drop any registered Music info so the stale project cache is refreshed through the generated
+        // cache under test, not short-circuited by a registered dictionary that already carries the icon.
+        withoutRegisteredDictionaryInfo(applicationName) {
+            try {
+                projectDictionaries.cacheDictionaryForTests(
+                    applicationName,
+                    ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null),
+                )
 
-            myFixture.configureByText(
-                AppleScriptFileType,
-                """
-                tell application "$applicationName"
-                end tell
-                """.trimIndent(),
-            )
-            val markers = myFixture.findAllGutters()
+                myFixture.configureByText(
+                    AppleScriptFileType,
+                    """
+                    tell application "$applicationName"
+                    end tell
+                    """.trimIndent(),
+                )
+                val markers = myFixture.findAllGutters()
 
-            assertEquals("Application reference should create one gutter marker", 1, markers.size)
-            assertTrue(
-                "Stale project dictionary cache should not force a generic gutter marker icon",
-                markers.single().icon.renderedPixelsEqual(applicationIcon),
-            )
-        } finally {
-            projectDictionaries.clearCachedDictionariesForTests()
-            generatedDictionaryFile.delete()
-            staleDictionaryFile.delete()
+                assertEquals("Application reference should create one gutter marker", 1, markers.size)
+                assertTrue(
+                    "Stale project dictionary cache should not force a generic gutter marker icon",
+                    markers.single().icon.renderedPixelsEqual(applicationIcon),
+                )
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                generatedDictionaryFile.delete()
+                staleDictionaryFile.delete()
+            }
         }
     }
 
