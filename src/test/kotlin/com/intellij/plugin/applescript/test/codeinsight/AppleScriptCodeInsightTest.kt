@@ -18,7 +18,7 @@ import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
-import com.intellij.plugin.applescript.lang.dictionary.project.CachedDictionaryMaterializationResult
+import com.intellij.plugin.applescript.lang.dictionary.project.DictionaryMaterializationResult
 import com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptSystemEventsProcessReferenceAnnotator
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
@@ -236,7 +236,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         try {
             when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is CachedDictionaryMaterializationResult.ParseFailed -> {
+                is DictionaryMaterializationResult.ParseFailed -> {
                     assertEquals(generatedDictionaryFile.path, result.generatedDictionaryFile.path)
                     assertNull(result.dictionary)
                 }
@@ -258,7 +258,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)
 
-        assertEquals(CachedDictionaryMaterializationResult.Missing, result)
+        assertEquals(DictionaryMaterializationResult.Missing, result)
     }
 
     fun testCachedDictionaryMaterializationReportsGeneratedCacheSource() {
@@ -271,8 +271,8 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         try {
             when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is CachedDictionaryMaterializationResult.Created -> {
-                    assertEquals(CachedDictionaryMaterializationResult.Source.GeneratedCache, result.source)
+                is DictionaryMaterializationResult.Created -> {
+                    assertEquals(DictionaryMaterializationResult.Source.GeneratedCache, result.source)
                     assertNotNull(result.dictionary)
                     assertNull(projectDictionaries.getDictionary(applicationName))
                 }
@@ -306,7 +306,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
             when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is CachedDictionaryMaterializationResult.Cached -> assertSame(cachedDictionary, result.dictionary)
+                is DictionaryMaterializationResult.Cached -> assertSame(cachedDictionary, result.dictionary)
                 else -> fail("Fresh project cache should report Cached, got $result")
             }
         } finally {

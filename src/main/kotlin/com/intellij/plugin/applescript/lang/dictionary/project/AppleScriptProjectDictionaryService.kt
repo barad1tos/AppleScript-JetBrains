@@ -69,17 +69,15 @@ class AppleScriptProjectDictionaryService(
         materializeDictionaryFromCachedSources(applicationName).dictionary
 
     @Synchronized
-    internal fun materializeDictionaryFromCachedSources(
-        applicationName: String,
-    ): CachedDictionaryMaterializationResult {
-        if (isInIgnoreList(applicationName)) return CachedDictionaryMaterializationResult.Ignored
+    internal fun materializeDictionaryFromCachedSources(applicationName: String): DictionaryMaterializationResult {
+        if (isInIgnoreList(applicationName)) return DictionaryMaterializationResult.Ignored
 
         val standardApplicationBundle = findStandardApplicationBundle(applicationName)
         val cachedDictionary = getDictionary(applicationName)
         val freshCachedDictionary =
             cachedDictionary?.takeUnless { it.needsBundleAwareRefresh(standardApplicationBundle) }
         if (freshCachedDictionary != null) {
-            return CachedDictionaryMaterializationResult.Cached(freshCachedDictionary)
+            return DictionaryMaterializationResult.Cached(freshCachedDictionary)
         }
 
         val registeredDictionary =
@@ -88,9 +86,9 @@ class AppleScriptProjectDictionaryService(
                 fallbackApplicationBundle = standardApplicationBundle,
             )
         if (registeredDictionary != null) {
-            return CachedDictionaryMaterializationResult.Created(
+            return DictionaryMaterializationResult.Created(
                 registeredDictionary,
-                CachedDictionaryMaterializationResult.Source.RegisteredCache,
+                DictionaryMaterializationResult.Source.RegisteredCache,
             )
         }
 
@@ -101,27 +99,31 @@ class AppleScriptProjectDictionaryService(
                     applicationBundle = standardApplicationBundle,
                 )
         ) {
-            is GeneratedDictionaryCacheResult.Loaded ->
-                CachedDictionaryMaterializationResult.Created(
+            is GeneratedDictionaryCacheResult.Loaded -> {
+                DictionaryMaterializationResult.Created(
                     generatedDictionary.dictionary,
-                    CachedDictionaryMaterializationResult.Source.GeneratedCache,
+                    DictionaryMaterializationResult.Source.GeneratedCache,
                 )
+            }
 
-            is GeneratedDictionaryCacheResult.ParseFailed ->
-                CachedDictionaryMaterializationResult.ParseFailed(
+            is GeneratedDictionaryCacheResult.ParseFailed -> {
+                DictionaryMaterializationResult.ParseFailed(
                     generatedDictionary.generatedDictionaryFile,
                     fallbackDictionary = cachedDictionary,
                 )
+            }
 
-            is GeneratedDictionaryCacheResult.MaterializationFailed ->
-                CachedDictionaryMaterializationResult.MaterializationFailed(
+            is GeneratedDictionaryCacheResult.MaterializationFailed -> {
+                DictionaryMaterializationResult.MaterializationFailed(
                     generatedDictionary.generatedDictionaryFile,
                     fallbackDictionary = cachedDictionary,
                 )
+            }
 
-            GeneratedDictionaryCacheResult.Missing ->
-                cachedDictionary?.let(CachedDictionaryMaterializationResult::StaleFallback)
-                    ?: CachedDictionaryMaterializationResult.Missing
+            GeneratedDictionaryCacheResult.Missing -> {
+                cachedDictionary?.let(DictionaryMaterializationResult::StaleFallback)
+                    ?: DictionaryMaterializationResult.Missing
+            }
         }
     }
 
@@ -241,7 +243,9 @@ class AppleScriptProjectDictionaryService(
                 true
             }
 
-            else -> false
+            else -> {
+                false
+            }
         }
 
     /**
