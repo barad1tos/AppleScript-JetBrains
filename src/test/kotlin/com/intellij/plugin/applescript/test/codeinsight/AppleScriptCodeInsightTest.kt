@@ -62,12 +62,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     fun testCompletion() {
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Standard dictionaries were not initialized",
-            { registryService.isInitialized() },
-            10,
-        )
+        awaitStandardDictionaries()
         myFixture.configureByFile("complete/complete_std_lib_test.scpt")
         myFixture.complete(CompletionType.BASIC, 1)
         val strings = myFixture.lookupElementStrings
@@ -122,15 +117,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
         val persistence = SdefPersistenceService.getInstance()
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         try {
             persistence.addDictionaryInfo(dictionaryInfo)
-            PlatformTestUtil.waitWithEventsDispatching(
-                "Application dictionaries were not indexed",
-                { registryService.areAppDictionariesIndexed() },
-                10,
-            )
+            awaitAppDictionaries()
             assertTrue(
                 "Synthetic dictionary must be known through discovery",
                 ApplicationDiscoveryService.getInstance().isKnownApplication(applicationName),
@@ -573,16 +563,11 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testApplicationDiagnosisReportsUnknownAfterIndexing() {
         val applicationName = "SyntheticUnknownDiagnosisApp_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
         val xcodeDetection = XcodeDetectionService.getInstance()
 
         xcodeDetection.overrideXcodeInstalledForTests(true)
         discovery.addDiscoveredApplicationName("System Events")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
         try {
             assertEquals(
                 ApplicationReferenceDiagnosis.Unknown,
@@ -775,14 +760,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testUnknownSystemEventsProcessReferenceIsWeakWarning() {
         val unknownProcessName = "SyntheticMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -824,14 +804,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testUnknownSystemEventsProcessReferenceInsideSimpleTellIsWeakWarning() {
         val unknownProcessName = "SyntheticSimpleTellMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -877,15 +852,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testUnknownSystemEventsProcessReferenceInsideNestedObjectTellIsWeakWarning() {
         val unknownProcessName = "SyntheticNestedObjectMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
         discovery.addDiscoveredApplicationName("Finder")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -935,15 +905,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testUnknownSystemEventsProcessReferenceInsideNestedApplicationTellIsNotHighlighted() {
         val unknownProcessName = "SyntheticNestedApplicationMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
         discovery.addDiscoveredApplicationName("Finder")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -987,15 +952,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testKnownSystemEventsProcessReferenceIsNotHighlighted() {
         val knownProcessName = "SyntheticKnownProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
         discovery.addDiscoveredApplicationName(knownProcessName)
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -1035,14 +995,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testSystemEventsProcessInspectionIgnoresDynamicNames() {
         val dynamicProcessName = "SyntheticDynamicMissingProcess_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("System Events")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -1091,14 +1046,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     fun testProcessReferenceOutsideSystemEventsIsNotHighlighted() {
         val unknownProcessName = "SyntheticOutsideSystemEvents_${System.nanoTime()}"
         val discovery = ApplicationDiscoveryService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         discovery.addDiscoveredApplicationName("Finder")
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Application dictionaries were not indexed",
-            { registryService.areAppDictionariesIndexed() },
-            10,
-        )
+        awaitAppDictionaries()
 
         myFixture.configureByText(
             AppleScriptFileType,
@@ -1179,12 +1129,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             end appendLine
             """.trimIndent()
 
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Standard dictionaries were not initialized",
-            { registryService.isInitialized() },
-            10,
-        )
+        awaitStandardDictionaries()
         myFixture.configureByText(AppleScriptFileType, script)
         val highlights = myFixture.doHighlighting()
         val document = myFixture.editor.document
@@ -1212,12 +1157,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             close access fid
             """.trimIndent()
 
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
-        PlatformTestUtil.waitWithEventsDispatching(
-            "Standard dictionaries were not initialized",
-            { registryService.isInitialized() },
-            10,
-        )
+        awaitStandardDictionaries()
         myFixture.configureByText(AppleScriptFileType, script)
         val highlights = myFixture.doHighlighting()
         val document = myFixture.editor.document
@@ -1306,15 +1246,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val applicationFile = File(dictionaryFile.parentFile, "$applicationName.app")
         val dictionaryInfo = DictionaryInfo(applicationName, dictionaryFile, applicationFile)
         val persistence = SdefPersistenceService.getInstance()
-        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
 
         try {
             persistence.addDictionaryInfo(dictionaryInfo)
-            PlatformTestUtil.waitWithEventsDispatching(
-                "Application dictionaries were not indexed",
-                { registryService.areAppDictionariesIndexed() },
-                10,
-            )
+            awaitAppDictionaries()
             val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
             val dictionary = projectDictionaries.createDictionary(applicationName)
             val makeCommand = dictionary?.findAllCommandsWithName("make")?.singleOrNull()
@@ -1538,6 +1473,22 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val startOffset = document.charsSequence.indexOf(text)
         assertTrue("expected to find '$text'", startOffset >= 0)
         return TextRange(startOffset, startOffset + text.length)
+    }
+
+    private fun awaitAppDictionaries() {
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { AppleScriptSystemDictionaryRegistryService.getInstance().areAppDictionariesIndexed() },
+            10,
+        )
+    }
+
+    private fun awaitStandardDictionaries() {
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Standard dictionaries were not initialized",
+            { AppleScriptSystemDictionaryRegistryService.getInstance().isInitialized() },
+            10,
+        )
     }
 
     private fun unknownProcessDescription(processName: String): String =
