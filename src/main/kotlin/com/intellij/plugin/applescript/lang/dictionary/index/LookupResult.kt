@@ -16,8 +16,9 @@ sealed interface LookupResult {
     object Miss : LookupResult
 
     /**
-     * Returned when the relevant dictionary readiness gate is cold. Standard dictionary lookups use
-     * `isInitialized`; application dictionary lookups use `areAppDictionariesIndexed`.
+     * Returned when the relevant dictionary readiness gate is cold. Standard-suite lookups and
+     * built-in libraries use `isInitialized`; real application dictionary lookups use
+     * `areAppDictionariesIndexed` (see `SdefIndexReadiness.isReadyForApplication`).
      *
      * Callers should treat this as [Miss] with diagnostic context.
      */
