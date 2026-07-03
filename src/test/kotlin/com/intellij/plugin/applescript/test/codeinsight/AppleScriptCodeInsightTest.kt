@@ -453,6 +453,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     fun testDictionaryCreationFailureNamesTheRealCause() {
+        // Exercises the classifier contract directly. The LOG.warn call-site wiring in
+        // createDictionaryFromInfo is not asserted here — capturing platform logs under
+        // BasePlatformTestCase is brittle — so this guards the reason strings, not the routing.
         val applicationName = "SyntheticFailureReasonApp_${System.nanoTime()}"
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
         val missingFile = File(serializeDictionaryPathForApplication(applicationName))
@@ -462,16 +465,18 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         assertTrue(missingReason, missingReason.contains("file not found in the virtual file system"))
         assertFalse(missingReason, missingReason.contains("file is null"))
 
-        val nonXmlFile = SyntheticSuiteFixtures.writeToTempFile("non-xml-reason", "this is plain text, not xml")
+        // The else branch only needs a present, valid VirtualFile — the classifier does not re-inspect
+        // XML-ness (the caller already established the XmlFile was null), so any valid file exercises it.
+        val validFile = SyntheticSuiteFixtures.writeToTempFile("valid-non-dictionary", "plain text, not a dictionary")
         try {
-            val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(nonXmlFile)
+            val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(validFile)
             assertNotNull(virtualFile)
             requireNotNull(virtualFile)
-            val nonXmlReason =
-                projectDictionaries.describeDictionaryCreationFailure(applicationName, nonXmlFile, virtualFile)
-            assertTrue(nonXmlReason, nonXmlReason.contains("did not resolve to an XML PSI"))
+            val unresolvedReason =
+                projectDictionaries.describeDictionaryCreationFailure(applicationName, validFile, virtualFile)
+            assertTrue(unresolvedReason, unresolvedReason.contains("did not resolve to an XML PSI"))
         } finally {
-            nonXmlFile.delete()
+            validFile.delete()
         }
     }
 
