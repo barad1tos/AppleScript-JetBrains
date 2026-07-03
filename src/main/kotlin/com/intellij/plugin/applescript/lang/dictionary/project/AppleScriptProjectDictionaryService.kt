@@ -54,14 +54,18 @@ class AppleScriptProjectDictionaryService(
      * application paths are consulted; null if creation failed.
      */
     @Synchronized
-    fun createDictionary(applicationName: String): ApplicationDictionary? {
-        val dictionary =
-            if (isInIgnoreList(applicationName)) {
-                null
-            } else {
-                getDictionary(applicationName) ?: createDictionaryFromInitializedInfo(applicationName)
-            }
-        return dictionary
+    fun createDictionary(applicationName: String): ApplicationDictionary? =
+        materializeDictionary(applicationName).dictionary
+
+    /**
+     * Typed variant of [createDictionary]: ignore policy, project cache, and the on-demand
+     * registry path (discovery + generation + PSI construction) reported as one outcome.
+     */
+    @Synchronized
+    internal fun materializeDictionary(applicationName: String): DictionaryMaterializationResult {
+        if (isInIgnoreList(applicationName)) return DictionaryMaterializationResult.Ignored
+        getDictionary(applicationName)?.let { return DictionaryMaterializationResult.Cached(it) }
+        return createDictionaryFromInitializedInfo(applicationName)
     }
 
     @Synchronized
@@ -181,12 +185,20 @@ class AppleScriptProjectDictionaryService(
                     .map { extension -> File("$applicationsDirectory/$applicationName.$extension") }
             }.firstOrNull { applicationFile -> applicationFile.exists() }
 
-    private fun createDictionaryFromInitializedInfo(applicationName: String): ApplicationDictionary? {
+    private fun createDictionaryFromInitializedInfo(applicationName: String): DictionaryMaterializationResult {
         val info = dictionaryRegistryService.getInitializedInfo(applicationName)
         if (info == null) {
             LOG.warn("Failed to get initialized dictionary info for $applicationName")
+            return DictionaryMaterializationResult.Missing
         }
-        return info?.let(::createDictionaryFromInfo)
+        return createDictionaryFromInfo(info)
+            ?.let { dictionary ->
+                DictionaryMaterializationResult.Created(
+                    dictionary,
+                    DictionaryMaterializationResult.Source.RegistryInfo,
+                )
+            }
+            ?: DictionaryMaterializationResult.MaterializationFailed(info.getDictionaryFile())
     }
 
     private fun createDictionaryFromInfo(

@@ -241,7 +241,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
                     assertNull(result.dictionary)
                 }
 
-                else -> fail("Malformed generated cache should report ParseFailed, got $result")
+                else -> {
+                    fail("Malformed generated cache should report ParseFailed, got $result")
+                }
             }
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
@@ -277,7 +279,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
                     assertNull(projectDictionaries.getDictionary(applicationName))
                 }
 
-                else -> fail("Generated cache should report Created, got $result")
+                else -> {
+                    fail("Generated cache should report Created, got $result")
+                }
             }
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
@@ -312,6 +316,68 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             dictionaryFile.delete()
+        }
+    }
+
+    fun testDictionaryMaterializationReportsIgnoredApplication() {
+        val applicationName = "SyntheticIgnoredApp_${System.nanoTime()}"
+        val persistence = SdefPersistenceService.getInstance()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        persistence.addNotScriptable(applicationName)
+        try {
+            assertEquals(
+                DictionaryMaterializationResult.Ignored,
+                projectDictionaries.materializeDictionary(applicationName),
+            )
+            assertNull(projectDictionaries.createDictionary(applicationName))
+        } finally {
+            persistence.removeNotScriptable(applicationName)
+        }
+    }
+
+    fun testDictionaryMaterializationReturnsProjectCachedDictionary() {
+        val applicationName = "SyntheticOnDemandCachedApp_${System.nanoTime()}"
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "on-demand-cached",
+                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
+            )
+        val dictionaryXmlFile =
+            LocalFileSystem
+                .getInstance()
+                .refreshAndFindFileByIoFile(dictionaryFile)
+                ?.let { virtualFile -> PsiManager.getInstance(project).findFile(virtualFile) as? XmlFile }
+        assertNotNull(dictionaryXmlFile)
+        requireNotNull(dictionaryXmlFile)
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val cachedDictionary = ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null)
+
+        try {
+            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+            when (val result = projectDictionaries.materializeDictionary(applicationName)) {
+                is DictionaryMaterializationResult.Cached -> assertSame(cachedDictionary, result.dictionary)
+                else -> fail("Project-cached dictionary should report Cached, got $result")
+            }
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testDictionaryMaterializationReportsMissingWhenRegistryHasNoInfo() {
+        val applicationName = "SyntheticUnknownRegistryApp_${System.nanoTime()}"
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            assertEquals(
+                DictionaryMaterializationResult.Missing,
+                projectDictionaries.materializeDictionary(applicationName),
+            )
+        } finally {
+            ApplicationDiscoveryService.getInstance().removeFromNotFoundList(applicationName)
+            SdefPersistenceService.getInstance().removeNotScriptable(applicationName)
         }
     }
 

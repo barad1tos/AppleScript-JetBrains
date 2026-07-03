@@ -55,5 +55,6 @@ internal sealed interface DictionaryMaterializationResult {
     enum class Source {
         RegisteredCache,
         GeneratedCache,
+        RegistryInfo,
     }
 }
