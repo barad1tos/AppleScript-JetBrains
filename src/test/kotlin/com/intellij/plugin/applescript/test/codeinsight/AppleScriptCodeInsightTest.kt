@@ -7,12 +7,14 @@ import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.plugin.applescript.AppleScriptFileType
 import com.intellij.plugin.applescript.AppleScriptIcons
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.discovery.XcodeDetectionService
 import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
 import com.intellij.plugin.applescript.lang.dictionary.icons.DictionaryIconLoader
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
@@ -21,6 +23,8 @@ import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersisten
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.dictionary.project.DictionaryMaterializationResult
 import com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptSystemEventsProcessReferenceAnnotator
+import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnoser
+import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnosis
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
@@ -459,6 +463,123 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             persistence.removeDictionaryInfoByNameForTests(applicationName)
             generatedDictionaryFile.delete()
             dictionaryFile.delete()
+        }
+    }
+
+    fun testApplicationDiagnosisReportsNotScriptableWhenXcodePresent() {
+        val applicationName = "SyntheticNotScriptableApp_${System.nanoTime()}"
+        val persistence = SdefPersistenceService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        persistence.addNotScriptable(applicationName)
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.NotScriptable,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            persistence.removeNotScriptable(applicationName)
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisNotScriptableWinsOverNotFound() {
+        val applicationName = "SyntheticPrecedenceApp_${System.nanoTime()}"
+        val persistence = SdefPersistenceService.getInstance()
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        persistence.addNotScriptable(applicationName)
+        discovery.addToNotFoundList(applicationName)
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.NotScriptable,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            discovery.removeFromNotFoundList(applicationName)
+            persistence.removeNotScriptable(applicationName)
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsNotFoundForDiscoveryMiss() {
+        val applicationName = "SyntheticNotFoundApp_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        discovery.addToNotFoundList(applicationName)
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.NotFound,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            discovery.removeFromNotFoundList(applicationName)
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsMissingXcodeOnMac() {
+        if (!SystemInfo.isMac) return
+        val applicationName = "SyntheticMissingXcodeApp_${System.nanoTime()}"
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(false)
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.MissingXcode,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsReadyForProjectCachedDictionary() {
+        val applicationName = "SyntheticDiagnosedCachedApp_${System.nanoTime()}"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "diagnosis-cached")
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        try {
+            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+            assertEquals(
+                ApplicationReferenceDiagnosis.Ready,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+            xcodeDetection.overrideXcodeInstalledForTests(null)
+        }
+    }
+
+    fun testApplicationDiagnosisReportsUnknownAfterIndexing() {
+        val applicationName = "SyntheticUnknownDiagnosisApp_${System.nanoTime()}"
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val registryService = AppleScriptSystemDictionaryRegistryService.getInstance()
+        val xcodeDetection = XcodeDetectionService.getInstance()
+
+        xcodeDetection.overrideXcodeInstalledForTests(true)
+        discovery.addDiscoveredApplicationName("System Events")
+        PlatformTestUtil.waitWithEventsDispatching(
+            "Application dictionaries were not indexed",
+            { registryService.areAppDictionariesIndexed() },
+            10,
+        )
+        try {
+            assertEquals(
+                ApplicationReferenceDiagnosis.Unknown,
+                ApplicationReferenceDiagnoser.diagnose(project, applicationName),
+            )
+        } finally {
+            xcodeDetection.overrideXcodeInstalledForTests(null)
         }
     }
 
