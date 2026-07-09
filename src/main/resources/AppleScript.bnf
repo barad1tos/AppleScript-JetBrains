@@ -202,7 +202,14 @@ scriptBody ::= topBlockBodyPart (sep topBlockBodyPart)* sep?
 
 incompleteExpression ::= tell expression | set objectReferenceWrapper | copy expression | if expression
 
-identifier ::= var_identifier
+identifier ::= var_identifier | softKeywordIdentifier
+
+// Soft-keyword seam: lexer keywords AppleScript does NOT reserve — osacompile accepts
+// them as plain user identifiers (loop variables, handler parameters, assignment
+// targets, expression references). Enroll ONE token per line, and only with
+// (a) an osacompile probe, (b) a realWorld corpus fixture, and (c) an audit of every
+// grammar rule that consumes the token literally (for index: indexReferenceClassForm).
+private softKeywordIdentifier ::= index
 
 referenceExpression ::= identifier
 {mixin="com.intellij.plugin.applescript.psi.impl.AppleScriptReferenceElementImpl"
