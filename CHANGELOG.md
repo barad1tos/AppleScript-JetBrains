@@ -2,6 +2,10 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [Unreleased]
+
+- [Fix] Using `index` as a variable name (for example `repeat with index from 1 to n`, handler parameters, or `item index of myList`) no longer produces cascading false parse errors — the word is now accepted everywhere AppleScript itself allows it as an identifier, while `item index 1`-style reference forms keep working.
+
 ## [2.0.11] - 2026-07-03
 
 - [Fix] Application-specific dictionary terms (commands, classes, properties, and constants) are no longer briefly flagged as unknown during IDE startup while their application dictionaries are still loading — the editor now waits for application-dictionary indexing to finish before treating such a term as unresolved.
