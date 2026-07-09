@@ -27,4 +27,9 @@ repeat with index in statusList
     set end of collected to my describe(index)
 end repeat
 
-return collected
+set picked to {}
+repeat with index from 1 to trackCount
+    set end of picked to item index of statusList
+end repeat
+
+return {collected, picked}

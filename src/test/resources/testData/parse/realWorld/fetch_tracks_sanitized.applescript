@@ -42,13 +42,13 @@ on run argv
         set dateAddedList to date added of trackRef
         set statusList to cloud status of trackRef
 
-        repeat with trackIndex from 1 to trackCount
-            set trackId to item trackIndex of idList
-            set trackName to item trackIndex of nameList
-            set trackArtist to item trackIndex of artistList
-            set albumArtist to item trackIndex of albumArtistList
-            set dateAdded to item trackIndex of dateAddedList
-            set trackStatus to item trackIndex of statusList
+        repeat with index from 1 to trackCount
+            set trackId to item index of idList
+            set trackName to item index of nameList
+            set trackArtist to item index of artistList
+            set albumArtist to item index of albumArtistList
+            set dateAdded to item index of dateAddedList
+            set trackStatus to item index of statusList
             set end of finalResult to {trackId, trackName, trackArtist, albumArtist, dateAdded, trackStatus}
         end repeat
     end tell

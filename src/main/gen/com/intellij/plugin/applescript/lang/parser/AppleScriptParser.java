@@ -3911,22 +3911,26 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // [index] indexValueExpression
+  // (index indexValueExpression) | indexValueExpression
   public static boolean indexReferenceClassForm(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "indexReferenceClassForm")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_, level_, _LEFT_, INDEX_REFERENCE_CLASS_FORM, "<index reference class form>");
     result_ = indexReferenceClassForm_0(builder_, level_ + 1);
-    result_ = result_ && indexValueExpression(builder_, level_ + 1);
+    if (!result_) result_ = indexValueExpression(builder_, level_ + 1);
     exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
-  // [index]
+  // index indexValueExpression
   private static boolean indexReferenceClassForm_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "indexReferenceClassForm_0")) return false;
-    consumeToken(builder_, INDEX);
-    return true;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, INDEX);
+    result_ = result_ && indexValueExpression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
   }
 
   /* ********************************************************** */

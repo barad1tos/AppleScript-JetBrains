@@ -531,7 +531,10 @@ indexReference ::=  (integerLiteralExpression('st'|'rd'|'th') (typeSpecifier|use
 //if toldApplicationName is not empty - check all terms from there first(property,class,constant,command)
 private classNamePrimaryExpression ::= typeSpecifier
 
-left indexReferenceClassForm ::= [index] indexValueExpression
+// Ordered alternatives instead of a greedy `[index]` optional: when `index` is a user
+// variable (soft-keyword seam), `item index of lst` must fall through to the keywordless
+// branch after `index indexValueExpression` fails, instead of dangling `index of` as an error.
+left indexReferenceClassForm ::= (index indexValueExpression) | indexValueExpression
 
 private useStatementsCondition ::= <<parseCheckForUseStatements>>
 
