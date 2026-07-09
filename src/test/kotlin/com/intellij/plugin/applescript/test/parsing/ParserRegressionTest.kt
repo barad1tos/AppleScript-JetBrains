@@ -38,9 +38,11 @@ class ParserRegressionTest : BasePlatformTestCase() {
 
     fun testIndexReferenceClassForm() {
         assertNoParserErrors("index_reference_class_form.scpt")
-        assertNotNull(
-            "expected an INDEX_REFERENCE_CLASS_FORM node for the literal `index` keyword form",
-            PsiTreeUtil.findChildOfType(myFixture.file, AppleScriptIndexReferenceClassForm::class.java),
+        val indexForm = PsiTreeUtil.findChildOfType(myFixture.file, AppleScriptIndexReferenceClassForm::class.java)
+        assertNotNull("expected an INDEX_REFERENCE_CLASS_FORM node for the literal `index` keyword form", indexForm)
+        assertTrue(
+            "keyword branch must consume the `index` literal followed by the value expression",
+            indexForm!!.text.contains("index 1"),
         )
     }
 

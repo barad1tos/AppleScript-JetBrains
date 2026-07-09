@@ -32,4 +32,24 @@ repeat with index from 1 to trackCount
     set end of picked to item index of statusList
 end repeat
 
-return {collected, picked}
+set rec to {index: 5, name: "x"}
+set recIndex to index of rec
+
+global index
+
+tell application "Music"
+    set index to 4
+    set frontIndex to index of front window
+end tell
+
+return {collected, picked, recIndex}
+
+on scope_demo()
+    local index
+    set index to 2
+    return index
+end scope_demo
+
+on move_by given index: startValue
+    return startValue
+end move_by
