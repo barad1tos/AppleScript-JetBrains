@@ -202,7 +202,15 @@ scriptBody ::= topBlockBodyPart (sep topBlockBodyPart)* sep?
 
 incompleteExpression ::= tell expression | set objectReferenceWrapper | copy expression | if expression
 
-identifier ::= var_identifier
+identifier ::= var_identifier | softKeywordIdentifier
+
+// Soft-keyword seam: lexer keywords AppleScript does NOT reserve — osacompile accepts
+// them as plain user identifiers in the probed positions (loop variables, handler
+// parameters, assignment targets, expression references; NOT universally — osacompile
+// still rejects e.g. `on index(...)` handler names). Enroll ONE token per line, and only with
+// (a) an osacompile probe, (b) a realWorld corpus fixture, and (c) an audit of every
+// grammar rule that consumes the token literally (for index: indexReferenceClassForm).
+private softKeywordIdentifier ::= index
 
 referenceExpression ::= identifier
 {mixin="com.intellij.plugin.applescript.psi.impl.AppleScriptReferenceElementImpl"
@@ -471,7 +479,7 @@ applicationReference ::= applicationName [of THE_KW? machine machineName (of THE
 
 // NOTE: the literal alternative `(APPLICATION|APP)? (STRING_LITERAL | identifier)` was removed.
 // The old Grammar-Kit generator collapsed this rule to the external call only; GK 2023.3 emits the
-// literal alternative faithfully, where `identifier ::= var_identifier` greedily matches a bare
+// literal alternative faithfully, where `identifier` (then `::= var_identifier`) greedily matches a bare
 // identifier (e.g. `folder`, `album`, `library`). Since applicationReference is the first alternative
 // of primaryReferenceExpression, that greedy match shadowed referenceForm's className/composite/index
 // path and broke object-reference parsing. The external <<parseApplicationName>> already handles
@@ -524,7 +532,10 @@ indexReference ::=  (integerLiteralExpression('st'|'rd'|'th') (typeSpecifier|use
 //if toldApplicationName is not empty - check all terms from there first(property,class,constant,command)
 private classNamePrimaryExpression ::= typeSpecifier
 
-left indexReferenceClassForm ::= [index] indexValueExpression
+// Ordered alternatives instead of a greedy `[index]` optional: when `index` is a user
+// variable (soft-keyword seam), `item index of lst` must fall through to the keywordless
+// branch after `index indexValueExpression` fails, instead of dangling `index of` as an error.
+left indexReferenceClassForm ::= (index indexValueExpression) | indexValueExpression
 
 private useStatementsCondition ::= <<parseCheckForUseStatements>>
 

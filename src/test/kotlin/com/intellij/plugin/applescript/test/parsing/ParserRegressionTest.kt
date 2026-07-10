@@ -1,5 +1,6 @@
 package com.intellij.plugin.applescript.test.parsing
 
+import com.intellij.plugin.applescript.psi.AppleScriptIndexReferenceClassForm
 import com.intellij.psi.PsiErrorElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
@@ -34,6 +35,16 @@ class ParserRegressionTest : BasePlatformTestCase() {
     fun testDoShellScript() = assertNoParserErrors("do_shell_script.scpt")
 
     fun testDateProperties() = assertNoParserErrors("date_properties.scpt")
+
+    fun testIndexReferenceClassForm() {
+        assertNoParserErrors("index_reference_class_form.scpt")
+        val indexForm = PsiTreeUtil.findChildOfType(myFixture.file, AppleScriptIndexReferenceClassForm::class.java)
+        assertNotNull("expected an INDEX_REFERENCE_CLASS_FORM node for the literal `index` keyword form", indexForm)
+        assertTrue(
+            "keyword branch must consume the `index` literal followed by the value expression",
+            indexForm!!.text.contains("index 1"),
+        )
+    }
 
     private fun assertNoParserErrors(fileName: String) {
         val psiFile: PsiFile = myFixture.configureByFile(fileName)

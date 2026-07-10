@@ -7,7 +7,7 @@ import com.intellij.psi.PsiElement;
 
 public interface AppleScriptIdentifier extends AppleScriptPsiElement {
 
-  @NotNull
+  @Nullable
   PsiElement getVarIdentifier();
 
 }

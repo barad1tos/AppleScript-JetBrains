@@ -560,12 +560,12 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // identifier COLON
   public static boolean argumentSelector(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "argumentSelector")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<argument selector>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, ARGUMENT_SELECTOR, "<argument selector>");
     result_ = identifier(builder_, level_ + 1);
     result_ = result_ && consumeToken(builder_, COLON);
-    exit_section_(builder_, marker_, ARGUMENT_SELECTOR, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -1719,7 +1719,6 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // THE_KW? identifier
   public static boolean directParameterDeclaration(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "directParameterDeclaration")) return false;
-    if (!nextTokenIs(builder_, "<direct parameter declaration>", THE_KW, VAR_IDENTIFIER)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_, level_, _NONE_, DIRECT_PARAMETER_DECLARATION, "<direct parameter declaration>");
     result_ = directParameterDeclaration_0(builder_, level_ + 1);
@@ -2220,12 +2219,12 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // argumentSelector userParameterVal
   public static boolean handlerArgument(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "handlerArgument")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<handler argument>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, HANDLER_ARGUMENT, "<handler argument>");
     result_ = argumentSelector(builder_, level_ + 1);
     result_ = result_ && userParameterVal(builder_, level_ + 1);
-    exit_section_(builder_, marker_, HANDLER_ARGUMENT, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -2265,16 +2264,16 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // handlerArgument+
   public static boolean handlerInterleavedParametersCall(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "handlerInterleavedParametersCall")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<handler interleaved parameters call>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, HANDLER_INTERLEAVED_PARAMETERS_CALL, "<handler interleaved parameters call>");
     result_ = handlerArgument(builder_, level_ + 1);
     while (result_) {
       int pos_ = current_position_(builder_);
       if (!handlerArgument(builder_, level_ + 1)) break;
       if (!empty_element_parsed_guard_(builder_, "handlerInterleavedParametersCall", pos_)) break;
     }
-    exit_section_(builder_, marker_, HANDLER_INTERLEAVED_PARAMETERS_CALL, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -2373,13 +2372,13 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // selectorId COLON userParameterVar
   public static boolean handlerInterleavedParametersSelectorPart(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "handlerInterleavedParametersSelectorPart")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<handler interleaved parameters selector part>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, HANDLER_INTERLEAVED_PARAMETERS_SELECTOR_PART, "<handler interleaved parameters selector part>");
     result_ = selectorId(builder_, level_ + 1);
     result_ = result_ && consumeToken(builder_, COLON);
     result_ = result_ && userParameterVar(builder_, level_ + 1);
-    exit_section_(builder_, marker_, HANDLER_INTERLEAVED_PARAMETERS_SELECTOR_PART, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -3401,14 +3400,15 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // var_identifier
+  // var_identifier | softKeywordIdentifier
   public static boolean identifier(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "identifier")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<identifier>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, IDENTIFIER, "<identifier>");
     result_ = consumeToken(builder_, VAR_IDENTIFIER);
-    exit_section_(builder_, marker_, IDENTIFIER, result_);
+    if (!result_) result_ = softKeywordIdentifier(builder_, level_ + 1);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -3911,22 +3911,26 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // [index] indexValueExpression
+  // (index indexValueExpression) | indexValueExpression
   public static boolean indexReferenceClassForm(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "indexReferenceClassForm")) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_, level_, _LEFT_, INDEX_REFERENCE_CLASS_FORM, "<index reference class form>");
     result_ = indexReferenceClassForm_0(builder_, level_ + 1);
-    result_ = result_ && indexValueExpression(builder_, level_ + 1);
+    if (!result_) result_ = indexValueExpression(builder_, level_ + 1);
     exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
-  // [index]
+  // index indexValueExpression
   private static boolean indexReferenceClassForm_0(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "indexReferenceClassForm_0")) return false;
-    consumeToken(builder_, INDEX);
-    return true;
+    boolean result_;
+    Marker marker_ = enter_section_(builder_);
+    result_ = consumeToken(builder_, INDEX);
+    result_ = result_ && indexValueExpression(builder_, level_ + 1);
+    exit_section_(builder_, marker_, null, result_);
+    return result_;
   }
 
   /* ********************************************************** */
@@ -5397,11 +5401,11 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // identifier
   public static boolean referenceExpression(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "referenceExpression")) return false;
-    if (!nextTokenIsFast(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIsFast(builder_, INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, REFERENCE_EXPRESSION, "<reference expression>");
     result_ = identifier(builder_, level_ + 1);
-    exit_section_(builder_, marker_, REFERENCE_EXPRESSION, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -5576,7 +5580,7 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // referenceExpression &handlerParameterLabel
   static boolean referenceIdBeforeParamLabel(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "referenceIdBeforeParamLabel")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = referenceExpression(builder_, level_ + 1);
@@ -6284,11 +6288,11 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // identifier
   public static boolean selectorId(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "selectorId")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<selector id>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, SELECTOR_ID, "<selector id>");
     result_ = identifier(builder_, level_ + 1);
-    exit_section_(builder_, marker_, SELECTOR_ID, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -6449,7 +6453,6 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // THE_KW? identifier
   public static boolean simpleFormalParameter(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "simpleFormalParameter")) return false;
-    if (!nextTokenIs(builder_, "<simple formal parameter>", THE_KW, VAR_IDENTIFIER)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_, level_, _NONE_, SIMPLE_FORMAL_PARAMETER, "<simple formal parameter>");
     result_ = simpleFormalParameter_0(builder_, level_ + 1);
@@ -6492,6 +6495,12 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
     if (!recursion_guard_(builder_, level_, "singularClassName_1")) return false;
     consumeToken(builder_, ITEM);
     return true;
+  }
+
+  /* ********************************************************** */
+  // index
+  static boolean softKeywordIdentifier(PsiBuilder builder_, int level_) {
+    return consumeToken(builder_, INDEX);
   }
 
   /* ********************************************************** */
@@ -6907,11 +6916,11 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // identifier
   public static boolean targetVariable(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "targetVariable")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<target variable>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, TARGET_VARIABLE, "<target variable>");
     result_ = identifier(builder_, level_ + 1);
-    exit_section_(builder_, marker_, TARGET_VARIABLE, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -6919,7 +6928,6 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // targetVariable|targetListLiteral|targetRecordLiteral
   static boolean targetVariablePattern(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "targetVariablePattern")) return false;
-    if (!nextTokenIs(builder_, "", LCURLY, VAR_IDENTIFIER)) return false;
     boolean result_;
     result_ = targetVariable(builder_, level_ + 1);
     if (!result_) result_ = targetListLiteral(builder_, level_ + 1);
@@ -7621,11 +7629,11 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // identifier
   public static boolean userClassName(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "userClassName")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<user class name>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, USER_CLASS_NAME, "<user class name>");
     result_ = identifier(builder_, level_ + 1);
-    exit_section_(builder_, marker_, USER_CLASS_NAME, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 
@@ -7646,7 +7654,6 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // THE_KW? referenceExpression
   static boolean userLabelReference(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "userLabelReference")) return false;
-    if (!nextTokenIs(builder_, "", THE_KW, VAR_IDENTIFIER)) return false;
     boolean result_;
     Marker marker_ = enter_section_(builder_);
     result_ = userLabelReference_0(builder_, level_ + 1);
@@ -7833,11 +7840,11 @@ public class AppleScriptParser implements PsiParser, LightPsiParser {
   // identifier
   public static boolean varDeclarationListPart(PsiBuilder builder_, int level_) {
     if (!recursion_guard_(builder_, level_, "varDeclarationListPart")) return false;
-    if (!nextTokenIs(builder_, VAR_IDENTIFIER)) return false;
+    if (!nextTokenIs(builder_, "<var declaration list part>", INDEX, VAR_IDENTIFIER)) return false;
     boolean result_;
-    Marker marker_ = enter_section_(builder_);
+    Marker marker_ = enter_section_(builder_, level_, _NONE_, VAR_DECLARATION_LIST_PART, "<var declaration list part>");
     result_ = identifier(builder_, level_ + 1);
-    exit_section_(builder_, marker_, VAR_DECLARATION_LIST_PART, result_);
+    exit_section_(builder_, level_, marker_, result_, false, null);
     return result_;
   }
 

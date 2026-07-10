@@ -27,9 +27,9 @@ public class AppleScriptIdentifierImpl extends AppleScriptPsiElementImpl impleme
   }
 
   @Override
-  @NotNull
+  @Nullable
   public PsiElement getVarIdentifier() {
-    return findNotNullChildByType(VAR_IDENTIFIER);
+    return findChildByType(VAR_IDENTIFIER);
   }
 
 }

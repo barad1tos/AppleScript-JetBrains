@@ -42,6 +42,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertNoParserErrors("fetch_tracks_sanitized.applescript")
     }
 
+    fun testSoftKeywordIndex() {
+        assertNoParserErrors("soft_keyword_index.applescript")
+    }
+
     fun testMailArchive() {
         assertNoParserErrors("mail_archive.applescript")
     }
