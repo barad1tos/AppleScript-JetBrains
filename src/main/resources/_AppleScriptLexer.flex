@@ -275,7 +275,11 @@ COMMENT=(("#".*)|("--".*)|(("(*"[^"*"](([^"*"]*("*"+[^"*"")"])?)*("*"+")")?))|"(
 
   {NLS}                            { return NLS; }
   {STARTS_BEGINS_WITH}             { return STARTS_BEGINS_WITH; }
-  {ENDS_WITH}                      { return ENDS_WITH; }
+  // Word-boundary lookahead: without it the "end with" operator alias swallows the start of
+  // `end with_local`-style handler closers (any handler named with_*). The lookahead char is
+  // not consumed. Same over-match class exists in the other multi-word operator macros above;
+  // guard them only with an osacompile-proven repro (see soft-keyword seam discipline in the BNF).
+  {ENDS_WITH} / [^a-zA-Z0-9_]      { return ENDS_WITH; }
   {DOES_NOT_CONTAIN}               { return DOES_NOT_CONTAIN; }
   {IS_IN}                          { return IS_IN; }
   {IS_NOT_IN}                      { return IS_NOT_IN; }

@@ -46,6 +46,10 @@ class RealWorldCorpusTest : BasePlatformTestCase() {
         assertNoParserErrors("soft_keyword_index.applescript")
     }
 
+    fun testEndsWithBoundary() {
+        assertNoParserErrors("ends_with_boundary.applescript")
+    }
+
     fun testMailArchive() {
         assertNoParserErrors("mail_archive.applescript")
     }
