@@ -275,10 +275,11 @@ COMMENT=(("#".*)|("--".*)|(("(*"[^"*"](([^"*"]*("*"+[^"*"")"])?)*("*"+")")?))|"(
 
   {NLS}                            { return NLS; }
   {STARTS_BEGINS_WITH}             { return STARTS_BEGINS_WITH; }
-  // Word-boundary lookahead: without it the "end with" operator alias swallows the start of
-  // `end with_local`-style handler closers (any handler named with_*). The lookahead char is
-  // not consumed. Same over-match class exists in the other multi-word operator macros above;
-  // guard them only with an osacompile-proven repro (see soft-keyword seam discipline in the BNF).
+  // Word-boundary lookahead: the operator must be followed by a non-identifier character,
+  // otherwise the "end with" alias swallows the start of `end with_local`-style handler
+  // closers (any handler named with_*). The lookahead char is not consumed. The same
+  // over-match class exists in the multi-word operator macros defined at the top of the
+  // file; guard them only with an osacompile-proven repro (soft-keyword seam discipline).
   {ENDS_WITH} / [^a-zA-Z0-9_]      { return ENDS_WITH; }
   {DOES_NOT_CONTAIN}               { return DOES_NOT_CONTAIN; }
   {IS_IN}                          { return IS_IN; }

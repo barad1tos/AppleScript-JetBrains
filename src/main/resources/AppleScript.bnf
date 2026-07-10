@@ -208,8 +208,10 @@ identifier ::= var_identifier | softKeywordIdentifier
 // them as plain user identifiers in the probed positions (loop variables, handler
 // parameters, assignment targets, expression references; NOT universally — osacompile
 // still rejects e.g. `on index(...)` handler names). Enroll ONE token per line, and only with
-// (a) an osacompile probe, (b) a realWorld corpus fixture, and (c) an audit of every
-// grammar rule that consumes the token literally (for index: indexReferenceClassForm).
+// (a) an osacompile probe, (b) a realWorld corpus fixture, (c) an audit of every
+// grammar rule that consumes the token literally (for index: indexReferenceClassForm),
+// and (d) enrollment in SOFT_KEYWORD_IDENTIFIERS (AppleScriptTokenTypesSets.kt) —
+// SoftKeywordSeamParityTest fails if the two sides drift.
 private softKeywordIdentifier ::= index
 
 referenceExpression ::= identifier
