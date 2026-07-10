@@ -27,6 +27,7 @@ import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDi
 import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnosis
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.util.AppleScriptNamesValidator
 import com.intellij.plugin.applescript.psi.AppleScriptTargetVariable
 import com.intellij.plugin.applescript.psi.sdef.impl.ApplicationDictionaryImpl
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
@@ -59,6 +60,15 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         } finally {
             super.tearDown()
         }
+    }
+
+    // Rename-to-index end-to-end is deliberately NOT tested here: CodeInsight fixture state
+    // (dictionaries loaded by earlier tests) makes the rename target order-sensitive. The
+    // changed seam is the validator; it is locked by the deterministic test below.
+    fun testNamesValidatorAcceptsSoftKeywordIndex() {
+        val validator = AppleScriptNamesValidator()
+        assertTrue("index must be a valid identifier for rename", validator.isIdentifier("index", project))
+        assertFalse("index must not be classified as a keyword", validator.isKeyword("index", project))
     }
 
     fun testCompletion() {

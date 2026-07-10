@@ -4,6 +4,8 @@ All notable changes to AppleScript-IDEA will be documented in this file.
 
 ## [Unreleased]
 
+- [Fix] Handlers whose names start with `with` (for example `on with_options()`) no longer break parsing at their closing `end with_...` line — the `end with` comparison-operator spelling no longer swallows the start of the handler name.
+- [Fix] Rename refactoring now accepts `index` as the new variable name, matching the parser-level support for `index` as an identifier.
 - [Fix] Using `index` as a variable name (for example `repeat with index from 1 to n`, handler parameters, or `item index of myList`) no longer produces cascading false parse errors — the parser now accepts the word wherever AppleScript itself allows it as an identifier, while `item index 1`-style reference forms keep working.
 
 ## [2.0.11] - 2026-07-03

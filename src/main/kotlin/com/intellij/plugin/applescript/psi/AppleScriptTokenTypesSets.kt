@@ -69,6 +69,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.HANDLER_POSITIONAL_P
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IGNORING
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.IN
+import com.intellij.plugin.applescript.psi.AppleScriptTypes.INDEX
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INSTEAD_OF
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTEGER
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.INTERNATIONAL_TEXT
@@ -362,6 +363,11 @@ object AppleScriptTokenTypesSets {
             WITH,
             WITHOUT,
         )
+
+    // IDE-side twin of the grammar's softKeywordIdentifier seam (AppleScript.bnf): lexer
+    // keywords the parser accepts as plain user identifiers. Enroll together with the seam.
+    @JvmField
+    val SOFT_KEYWORD_IDENTIFIERS: TokenSet = TokenSet.create(INDEX)
 
     @JvmField
     val HANDLER_PARAMETER_LABELS: TokenSet =
