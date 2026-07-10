@@ -26,6 +26,12 @@
     </p>
   ]]></description>
   <change-notes><![CDATA[
+    <h3>2.0.12</h3>
+    <ul>
+      <li>[Fix] Handlers whose names start with <code>with</code> (for example <code>on with_options()</code>) no longer break parsing at their closing <code>end with_...</code> line — the <code>end with</code> comparison-operator spelling no longer swallows the start of the handler name.</li>
+      <li>[Fix] Rename refactoring now accepts <code>index</code> as the new variable name, matching the parser-level support for <code>index</code> as an identifier.</li>
+      <li>[Fix] Using <code>index</code> as a variable name (for example <code>repeat with index from 1 to n</code>, handler parameters, or <code>item index of myList</code>) no longer produces cascading false parse errors — the parser now accepts the word wherever AppleScript itself allows it as an identifier, while <code>item index 1</code>-style reference forms keep working.</li>
+    </ul>
     <h3>2.0.11</h3>
     <ul>
       <li>[Fix] Application-specific dictionary terms (commands, classes, properties, and constants) are no longer briefly flagged as unknown during IDE startup while their application dictionaries are still loading — the editor now waits for application-dictionary indexing to finish before treating such a term as unresolved.</li>
