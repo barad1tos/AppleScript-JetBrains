@@ -205,8 +205,9 @@ incompleteExpression ::= tell expression | set objectReferenceWrapper | copy exp
 identifier ::= var_identifier | softKeywordIdentifier
 
 // Soft-keyword seam: lexer keywords AppleScript does NOT reserve — osacompile accepts
-// them as plain user identifiers (loop variables, handler parameters, assignment
-// targets, expression references). Enroll ONE token per line, and only with
+// them as plain user identifiers in the probed positions (loop variables, handler
+// parameters, assignment targets, expression references; NOT universally — osacompile
+// still rejects e.g. `on index(...)` handler names). Enroll ONE token per line, and only with
 // (a) an osacompile probe, (b) a realWorld corpus fixture, and (c) an audit of every
 // grammar rule that consumes the token literally (for index: indexReferenceClassForm).
 private softKeywordIdentifier ::= index

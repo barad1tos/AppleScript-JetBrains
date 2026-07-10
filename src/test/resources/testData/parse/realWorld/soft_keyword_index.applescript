@@ -1,9 +1,11 @@
 (*
     `index` is not an AppleScript reserved word: osacompile accepts it as a range/list
-    loop variable, a positional handler parameter, an assignment target, and an
-    expression operand. Regression fixture for the soft-keyword identifier seam
-    (softKeywordIdentifier in AppleScript.bnf); shapes mirror the motivating
-    GenreUpdater batch script that produced 6 false parse errors.
+    loop variable, a positional handler parameter, an assignment target, an expression
+    operand, a record-key label, a global/local declaration (head and comma tail), a
+    `given index:` label at the declaration site, a preposition-label parameter
+    variable, and a tell-block assignment/property read. Regression fixture for the
+    soft-keyword identifier seam (softKeywordIdentifier in AppleScript.bnf); core shapes
+    mirror the motivating GenreUpdater batch script that produced 6 false parse errors.
 *)
 on item_or_missing(values, position)
     if (count of values) >= position then return item position of values
@@ -45,7 +47,7 @@ end tell
 return {collected, picked, recIndex}
 
 on scope_demo()
-    local index
+    local another, index
     set index to 2
     return index
 end scope_demo
@@ -53,3 +55,7 @@ end scope_demo
 on move_by given index: startValue
     return startValue
 end move_by
+
+on jump above index
+    return index
+end jump
