@@ -67,5 +67,9 @@ class AppleScriptNamesValidator : NamesValidator {
             null
         }
 
-    private fun isIdentifier(name: String): Boolean = getTokenType(name) === AppleScriptTypes.VAR_IDENTIFIER
+    private fun isIdentifier(name: String): Boolean {
+        val tokenType = getTokenType(name)
+        return tokenType === AppleScriptTypes.VAR_IDENTIFIER ||
+            AppleScriptTokenTypesSets.SOFT_KEYWORD_IDENTIFIERS.contains(tokenType)
+    }
 }
