@@ -31,6 +31,194 @@ plugins {
     id("org.jetbrains.intellij.platform.grammarkit") version "2.16.0"
 }
 
+fun kotlinCode(source: String): String {
+    val codeMode = 0
+    val lineCommentMode = 1
+    val blockCommentMode = 2
+    val stringMode = 3
+    val rawStringMode = 4
+    val characterMode = 5
+    val code = StringBuilder(source.length)
+    val templateStringModes = mutableListOf<Int>()
+    val templateBraceDepths = mutableListOf<Int>()
+    val templateDollarThresholds = mutableListOf<Int>()
+    var mode = codeMode
+    var blockCommentDepth = 0
+    var dollarThreshold = 1
+    var index = 0
+
+    fun dollarPrefixLength(quoteIndex: Int): Int {
+        var prefixStart = quoteIndex
+        while (prefixStart > 0 && source[prefixStart - 1] == '$') prefixStart--
+        return quoteIndex - prefixStart
+    }
+
+    fun templateMarkerLength(markerIndex: Int): Int {
+        var dollarCount = 0
+        while (source.getOrNull(markerIndex + dollarCount) == '$') dollarCount++
+        return if (
+            dollarCount >= dollarThreshold &&
+            source.getOrNull(markerIndex + dollarCount) == '{'
+        ) {
+            dollarCount + 1
+        } else {
+            0
+        }
+    }
+
+    fun enterString(
+        quoteIndex: Int,
+        nextMode: Int,
+        quoteLength: Int,
+    ): Int {
+        val prefixLength = dollarPrefixLength(quoteIndex)
+        if (prefixLength >= 2) code.setLength(code.length - prefixLength)
+        dollarThreshold = maxOf(1, prefixLength)
+        code.append(' ')
+        mode = nextMode
+        return quoteIndex + quoteLength
+    }
+
+    while (index < source.length) {
+        when (mode) {
+            codeMode -> {
+                when {
+                    source.startsWith("//", index) -> {
+                        code.append(' ')
+                        mode = lineCommentMode
+                        index += 2
+                    }
+
+                    source.startsWith("/*", index) -> {
+                        code.append(' ')
+                        mode = blockCommentMode
+                        blockCommentDepth = 1
+                        index += 2
+                    }
+
+                    source.startsWith("\"\"\"", index) -> {
+                        index = enterString(index, rawStringMode, 3)
+                    }
+
+                    source[index] == '"' -> {
+                        index = enterString(index, stringMode, 1)
+                    }
+
+                    source[index] == '\'' -> {
+                        code.append(' ')
+                        mode = characterMode
+                        index++
+                    }
+
+                    source[index] == '{' && templateBraceDepths.isNotEmpty() -> {
+                        templateBraceDepths[templateBraceDepths.lastIndex]++
+                        code.append(source[index++])
+                    }
+
+                    source[index] == '}' && templateBraceDepths.isNotEmpty() -> {
+                        val lastIndex = templateBraceDepths.lastIndex
+                        if (templateBraceDepths[lastIndex] == 0) {
+                            templateBraceDepths.removeAt(lastIndex)
+                            mode = templateStringModes.removeAt(templateStringModes.lastIndex)
+                            dollarThreshold =
+                                templateDollarThresholds.removeAt(templateDollarThresholds.lastIndex)
+                            code.append(' ')
+                            index++
+                        } else {
+                            templateBraceDepths[lastIndex]--
+                            code.append(source[index++])
+                        }
+                    }
+
+                    else -> code.append(source[index++])
+                }
+            }
+
+            lineCommentMode -> {
+                if (source[index] == '\n') {
+                    code.append('\n')
+                    mode = codeMode
+                }
+                index++
+            }
+
+            blockCommentMode -> {
+                when {
+                    source.startsWith("/*", index) -> {
+                        blockCommentDepth++
+                        index += 2
+                    }
+
+                    source.startsWith("*/", index) -> {
+                        blockCommentDepth--
+                        index += 2
+                        if (blockCommentDepth == 0) mode = codeMode
+                    }
+
+                    else -> index++
+                }
+            }
+
+            stringMode -> {
+                val markerLength = templateMarkerLength(index)
+                when {
+                    source[index] == '\\' -> index += minOf(2, source.length - index)
+                    markerLength > 0 -> {
+                        templateStringModes.add(stringMode)
+                        templateBraceDepths.add(0)
+                        templateDollarThresholds.add(dollarThreshold)
+                        code.append(' ')
+                        mode = codeMode
+                        index += markerLength
+                    }
+
+                    source[index] == '"' -> {
+                        mode = codeMode
+                        index++
+                    }
+
+                    else -> index++
+                }
+            }
+
+            rawStringMode -> {
+                val markerLength = templateMarkerLength(index)
+                when {
+                    source.startsWith("\"\"\"", index) -> {
+                        mode = codeMode
+                        index += 3
+                    }
+
+                    markerLength > 0 -> {
+                        templateStringModes.add(rawStringMode)
+                        templateBraceDepths.add(0)
+                        templateDollarThresholds.add(dollarThreshold)
+                        code.append(' ')
+                        mode = codeMode
+                        index += markerLength
+                    }
+
+                    else -> index++
+                }
+            }
+
+            characterMode -> {
+                when {
+                    source[index] == '\\' -> index += minOf(2, source.length - index)
+                    source[index] == '\'' -> {
+                        mode = codeMode
+                        index++
+                    }
+
+                    else -> index++
+                }
+            }
+        }
+    }
+
+    return code.toString()
+}
+
 group = providers.gradleProperty("pluginGroup").get()
 version = providers.gradleProperty("pluginVersion").get()
 
@@ -647,12 +835,14 @@ tasks {
                     "AppleScriptProjectDictionaryService.kt",
             )
 
-        fun serviceLookupPatterns(dep: String): List<String> =
-            listOf(
-                "service<$dep>",
-                "$dep.getInstance",
-                "getService($dep::class.java)",
+        fun serviceLookupPatterns(dep: String): List<Regex> {
+            val escapedDependency = Regex.escape(dep)
+            return listOf(
+                Regex("""\bservice\s*<\s*$escapedDependency\s*>\s*\("""),
+                Regex("""\b$escapedDependency\s*\.\s*getInstance\s*\("""),
+                Regex("""\bgetService\s*\(\s*$escapedDependency\s*::\s*class\s*\.\s*java\s*\)"""),
             )
+        }
 
         val serviceLookupPatternsByService = services.associateWith(::serviceLookupPatterns)
         val serviceAnnotationPattern = Regex("""(^|\s)@Service(\s|\()""")
@@ -688,21 +878,52 @@ tasks {
             val adjacency = mutableMapOf<String, MutableSet<String>>()
             services.forEach { adjacency[it] = mutableSetOf() }
             val observedDataHops = mutableSetOf<Pair<String, String>>()
+            val fixturePatterns = serviceLookupPatterns("FixtureService")
+            val dollar = '$'.toString()
+
+            fun hasFixtureLookup(source: String): Boolean =
+                fixturePatterns.any { it.containsMatchIn(kotlinCode(source)) }
+
+            val scannerFixtures =
+                listOf(
+                    Triple("line comment", "// service<FixtureService>()", false),
+                    Triple("nested block comment", "/* outer /* service<FixtureService>() */ */", false),
+                    Triple("regular string", "val text = \"service<FixtureService>()\"", false),
+                    Triple("raw string", "val text = \"\"\"service<FixtureService>()\"\"\"", false),
+                    Triple("regular template", "val text = \"" + dollar + "{service<FixtureService>()}\"", true),
+                    Triple(
+                        "multi-dollar text",
+                        "val text = " + dollar.repeat(2) + "\"\"\"" +
+                            dollar + "{service<FixtureService>()}\"\"\"",
+                        false,
+                    ),
+                    Triple(
+                        "multi-dollar template",
+                        "val text = " + dollar.repeat(2) + "\"\"\"" +
+                            dollar.repeat(2) + "{service<FixtureService>()}\"\"\"",
+                        true,
+                    ),
+                )
+            scannerFixtures.forEach { (label, source, shouldFindLookup) ->
+                check(hasFixtureLookup(source) == shouldFindLookup) {
+                    "Kotlin source scanner misclassified the $label fixture."
+                }
+            }
 
             serviceSourceRoots.forEach { serviceSourceRoot ->
                 serviceSourceRoot.asFile
                     .walkTopDown()
                     .filter { it.isFile && it.extension == "kt" }
                     .forEach { file ->
-                        val body = file.readText()
+                        val code = kotlinCode(file.readText())
                         val owner = serviceOwnerByFile[file.nameWithoutExtension]
                         if (owner == null) {
                             val relativePath = file.relativeTo(projectDir).invariantSeparatorsPath
                             val hasTrackedServiceLookup =
                                 serviceLookupPatternsByService.values.any { patterns ->
-                                    patterns.any { body.contains(it) }
+                                    patterns.any { it.containsMatchIn(code) }
                                 }
-                            val declaresService = serviceAnnotationPattern.containsMatchIn(body)
+                            val declaresService = serviceAnnotationPattern.containsMatchIn(code)
                             if (
                                 relativePath !in filesOutsideAppServiceGraph &&
                                 (declaresService || hasTrackedServiceLookup)
@@ -718,7 +939,7 @@ tasks {
                         services.forEach { dep ->
                             if (dep == owner) return@forEach
                             val patterns = serviceLookupPatternsByService.getValue(dep)
-                            if (patterns.any { body.contains(it) }) {
+                            if (patterns.any { it.containsMatchIn(code) }) {
                                 val edge = owner to dep
                                 if (edge in dataHopAllowlist) {
                                     observedDataHops.add(edge)
