@@ -671,18 +671,6 @@ tasks {
         val dataHopAllowlist =
             setOf(
                 "SdefPersistenceService" to "AppleScriptSystemDictionaryRegistryService",
-                // Wave 3 (Phase 4 SERVICE-03, plan 04-03): SdefPersistenceService.isInUnknownList
-                // is a back-compat shim that forwards to ApplicationDiscoveryService — the not-found
-                // list moved to the discovery service (its rightful owner; it's a session-only
-                // discovery artifact, NOT a persistence artifact). The forwarder preserves the
-                // public surface of SdefPersistenceServiceTest (Wave 2) without violating the
-                // single-source-of-truth invariant. This is conceptually a session-data forwarder,
-                // NOT a service-graph dependency. Without this entry the cycle detector flags
-                // `SdefPersistenceService -> ApplicationDiscoveryService -> SdefPersistenceService`
-                // (ApplicationDiscoveryService consults SdefPersistenceService.isNotScriptable
-                // during discovery — that direction IS a real service dependency and remains
-                // tracked in the graph).
-                "SdefPersistenceService" to "ApplicationDiscoveryService",
                 // Wave 4 (Phase 4 SERVICE-04, plan 04-04): SdefFileProvider reaches back into the
                 // facade for two narrow data-hop reads:
                 //   1. AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal(name) —
@@ -714,6 +702,7 @@ tasks {
         doLast {
             val adjacency = mutableMapOf<String, MutableSet<String>>()
             services.forEach { adjacency[it] = mutableSetOf() }
+            val observedDataHops = mutableSetOf<Pair<String, String>>()
 
             serviceSourceRoots.forEach { serviceSourceRoot ->
                 serviceSourceRoot.asFile
@@ -743,14 +732,28 @@ tasks {
                         }
                         services.forEach { dep ->
                             if (dep == owner) return@forEach
-                            // Skip data-hop edges (RESEARCH §5).
-                            if (owner to dep in dataHopAllowlist) return@forEach
                             val patterns = serviceLookupPatternsByService.getValue(dep)
                             if (patterns.any { body.contains(it) }) {
-                                adjacency[owner]!!.add(dep)
+                                val edge = owner to dep
+                                if (edge in dataHopAllowlist) {
+                                    observedDataHops.add(edge)
+                                } else {
+                                    adjacency[owner]!!.add(dep)
+                                }
                             }
                         }
                     }
+            }
+
+            val staleDataHops = dataHopAllowlist - observedDataHops
+            if (staleDataHops.isNotEmpty()) {
+                error(
+                    "Stale data-hop allowlist entries detected:\n" +
+                        staleDataHops
+                            .sortedWith(compareBy({ it.first }, { it.second }))
+                            .joinToString("\n") { (owner, dep) -> "  $owner --data--> $dep" } +
+                        "\nFix: remove entries that no longer correspond to a service lookup.",
+                )
             }
 
             val white = 0
@@ -766,19 +769,20 @@ tasks {
                 path.add(node)
                 var cycle: List<String>? = null
                 for (neighbor in adjacency[node]!!) {
-                    when (color[neighbor]) {
-                        gray -> {
-                            cycle = path.dropWhile { it != neighbor } + neighbor
-                        }
+                    cycle =
+                        when (color[neighbor]) {
+                            gray -> {
+                                path.dropWhile { it != neighbor } + neighbor
+                            }
 
-                        white -> {
-                            cycle = dfs(neighbor, path)
-                        }
+                            white -> {
+                                dfs(neighbor, path)
+                            }
 
-                        else -> {
-                            Unit
+                            else -> {
+                                continue
+                            }
                         }
-                    }
                     if (cycle != null) break
                 }
                 if (cycle == null) {
