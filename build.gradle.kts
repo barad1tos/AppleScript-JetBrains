@@ -657,39 +657,24 @@ tasks {
         val serviceLookupPatternsByService = services.associateWith(::serviceLookupPatterns)
         val serviceAnnotationPattern = Regex("""(^|\s)@Service(\s|\()""")
 
-        // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
-        // back-edge from a service to the facade is a DATA dependency (reading state.X), not
-        // a service-graph dependency. RESEARCH §5 calls this out explicitly: "the back-edge
-        // from a service to the facade is modelled as a data hop, not a service hop" — the
-        // facade owns the @State-tagged PersistedState field, and the typed-API service reads
-        // it. Without this allowlist Pattern A (RESEARCH §2) is impossible to model.
+        // Explicit cross-owner lookups that are excluded from lifecycle cycle detection because
+        // they access state or behavior retained by the persisted registry facade. Each pair must
+        // remain construction-safe, be justified at its declaration, and correspond to a lookup
+        // observed by this scanner; unused entries fail as stale.
         //
-        // Add new entries here as later waves (3-5) introduce more services that read state
-        // via the facade. Never add an entry for a service-to-service edge that is a real
-        // service<X>() lookup hop — those are real service dependencies and MUST be modelled
-        // as graph edges so cycles are caught.
+        // Do not add ordinary service dependencies here. They must remain graph edges so cycles
+        // are caught.
         val dataHopAllowlist =
             setOf(
                 "SdefPersistenceService" to "AppleScriptSystemDictionaryRegistryService",
-                // Wave 4 (Phase 4 SERVICE-04, plan 04-04): SdefFileProvider reaches back into the
-                // facade for two narrow data-hop reads:
+                // SdefFileProvider reaches back into the persisted registry facade from method
+                // bodies, after service construction, for two ownership-bound operations:
                 //   1. AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal(name) —
-                //      O(1) lookup against the persisted @State-tagged dictionaryInfoMap. The facade is
-                //      the persisted-state owner (Pattern A — annotation tied to COMPONENT_NAME by
-                //      class identity; cannot move without breaking existing user caches per
-                //      PITFALLS 4.1). Wave 4 reads through this typed accessor rather than copying
-                //      the snapshot on every fetch.
+                //      reads the facade-owned in-memory registry without copying its snapshot.
                 //   2. AppleScriptSystemDictionaryRegistryService.initializeDictionaryFromInfoInternal —
-                //      delegates the parse step (parseDictionaryFile + map population) back to the
-                //      facade because the parser-index map cluster is Wave 5 SdefIndexService
-                //      territory; Wave 4 only owns file-generation.
-                //   3. AppleScriptSystemDictionaryRegistryService.newSecureSaxBuilderInternal —
-                //      XXE-hardened SAXBuilder factory. The other consumer (parseDictionaryFile) still
-                //      lives on the facade; co-location with the file-provider's mergeScriptingAdditions
-                //      moves with the parseDictionaryFile extraction in Wave 5.
-                // All three are DATA reads — the facade does not depend on SdefFileProvider's
-                // session-only file-generation state. Wave 5 may eliminate this allowlist entry once
-                // parseDictionaryFile + the parser map cluster migrate to SdefIndexService.
+                //      routes initialization through the facade-owned coordinator.
+                // The facade resolves SdefFileProvider lazily, so these method-level callbacks do
+                // not create a constructor cycle.
                 "SdefFileProvider" to "AppleScriptSystemDictionaryRegistryService",
             )
         val serviceSourceRoots =
