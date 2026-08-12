@@ -60,7 +60,7 @@ internal object TypeSpecifierParser {
 
         val marker = enter_section_(builder, level, _NONE_, DICTIONARY_CLASS_NAME, "<dictionary class name>")
         val result =
-            DictionaryTermLookupParser.parseClassName(
+            DictionaryClassLookupParser.parseClassName(
                 builder,
                 level + 1,
                 isPluralForm = false,
