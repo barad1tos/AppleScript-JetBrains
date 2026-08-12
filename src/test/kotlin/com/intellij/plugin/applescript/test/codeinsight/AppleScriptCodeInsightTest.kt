@@ -485,9 +485,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     /**
-     * Runs [body] with the registered Music dictionary info removed, restoring it afterward. This
-     * prevents cached-source materialization from returning the registered dictionary; callers
-     * arrange the project and generated cache state required by the path under test.
+     * Runs [body] with the registered Music dictionary info removed, restoring it
+     * afterward. macOS standard init registers real system apps such as Music; dropping the registered
+     * entry prevents cached-source lookup from returning that dictionary, so a test reaches the
+     * generated-cache or stale-project-cache path instead of passing vacuously.
      */
     private fun withoutRegisteredMusic(body: () -> Unit) {
         val applicationName = "Music"
