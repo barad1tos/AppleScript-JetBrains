@@ -405,12 +405,12 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
             builder: PsiBuilder,
             level: Int,
         ): Boolean {
-            if (!recursion_guard_(builder, level, "parseDictionaryPropertyInner")) return false
-            return DictionaryTermLookupParser.parsePropertyName(
-                builder,
-                level + 1,
-                DictionaryTermLookupScope.of(builder),
-            )
+            return recursion_guard_(builder, level, "parseDictionaryPropertyInner") &&
+                DictionaryPropertyLookupParser.parsePropertyName(
+                    builder,
+                    level + 1,
+                    DictionaryTermLookupScope.of(builder),
+                )
         }
 
         @JvmStatic
@@ -428,7 +428,7 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
             ) {
                 val areThereUseStatements = checkForUseStatements.parse(builder, level + 1)
                 result =
-                    DictionaryTermLookupParser.parseClassName(
+                    DictionaryClassLookupParser.parseClassName(
                         builder,
                         level + 1,
                         isPluralForm,
@@ -463,7 +463,7 @@ open class AppleScriptGeneratedParserDictionaryHooks : AppleScriptGeneratedParse
                         ParserState.isInsideLiteralExpression(builder)
                 if (ApplicationDictionary.COCOA_STANDARD_LIBRARY == toldApplicationName || insideExpression) {
                     result =
-                        DictionaryTermLookupParser.parseConstant(
+                        DictionaryConstantLookupParser.parseConstant(
                             builder,
                             level + 1,
                             insideExpression,
