@@ -24,11 +24,11 @@ import java.util.concurrent.ConcurrentHashMap
 private val LOG: Logger = Logger.getInstance("#${SdefFileProvider::class.java.name}")
 
 /**
- * Application-level owner for generated SDEF files and scripting-additions state.
+ * Application-level owner for dictionary-file loading and scripting-additions state.
  *
- * The service coordinates application dictionary generation, bundled standard suites, and
- * merged scripting-additions dictionaries. Parsing and index ingestion stay on the downstream
- * registry/index services.
+ * The service coordinates generation and bundled recovery, classifies load outcomes, applies
+ * persistence policy, and initializes dictionaries through the registry. Parsing and index
+ * ingestion stay on the downstream registry/index services.
  */
 @Service(Service.Level.APP)
 class SdefFileProvider
@@ -72,8 +72,8 @@ class SdefFileProvider
             val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
             if (facade.getDictionaryInfoByNameInternal(applicationName) != null) {
                 LOG.warn(
-                    "Dictionary for application $applicationName was already initialized. " +
-                        "Generating new dictionary file any way.",
+                    "Dictionary for application $applicationName was already registered. " +
+                        "Generating a new dictionary file anyway.",
                 )
             }
 
@@ -140,10 +140,10 @@ class SdefFileProvider
                 }
             val info = DictionaryInfo(applicationName, dictionaryFile, applicationBundle)
             if (ApplicationDiscoveryService.getInstance().removeFromNotFoundList(applicationName)) {
-                LOG.debug("Application was removed from ignored list")
+                LOG.debug("Application was removed from the not-found list")
             }
             service<SdefPersistenceService>().addDictionaryInfo(info)
-            LOG.debug("Dictionary file generated for application [$applicationName]$dictionaryFile")
+            LOG.debug("Dictionary file registered for application [$applicationName]: $dictionaryFile")
             return info
         }
 

@@ -25,7 +25,7 @@ class DictionaryLoadPolicyTest : BasePlatformTestCase() {
 
         try {
             assertNull(
-                "Legacy file interface must collapse initialization failure to null",
+                "Nullable file interface must collapse initialization failure to null",
                 SdefFileProvider.getInstance().createAndInitializeInfo(dictionaryFile, applicationName),
             )
         } finally {
@@ -124,7 +124,7 @@ class DictionaryLoadPolicyTest : BasePlatformTestCase() {
                 )
 
             assertTrue(
-                "Bundled recovery must produce a loaded dictionary; got $result",
+                "Recovery callback must produce a loaded dictionary; got $result",
                 result is DictionaryLoadResult.Loaded,
             )
             val info = (result as DictionaryLoadResult.Loaded).info
@@ -161,7 +161,7 @@ class DictionaryLoadPolicyTest : BasePlatformTestCase() {
                 result,
             )
             assertTrue(
-                "Unrecoverable application must update persisted discovery state",
+                "Missing Developer Tools recovery must update persisted discovery state",
                 SdefPersistenceService.getInstance().isNotScriptable(applicationName),
             )
         } finally {
@@ -207,7 +207,7 @@ class DictionaryLoadPolicyTest : BasePlatformTestCase() {
                 result.reason,
             )
             assertFalse(
-                "Transient cache-copy failure must not blacklist the application",
+                "Cache-copy failure must not blacklist the application",
                 SdefPersistenceService.getInstance().isNotScriptable(applicationName),
             )
         } finally {

@@ -5,11 +5,11 @@ import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInf
 /**
  * Typed result of one application-dictionary load attempt.
  *
- * Three variants give call sites an exhaustive result for each outcome:
+ * Three variants give call sites an exhaustive returned outcome:
  *  - [Empty]   no application or supported dictionary input could be resolved.
  *  - [Loaded]  a dictionary was cached, registered, and initialized.
- *  - [Failed]  generation, recovery, or initialization failed. The `cause` carries the
- *              underlying exception when available.
+ *  - [Failed]  a load step failed or `fetch` converted an unexpected load error. The `cause`
+ *              carries the underlying exception when available.
  */
 sealed interface DictionaryLoadResult {
     /** No dictionary available for the requested application. */
