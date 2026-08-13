@@ -232,11 +232,6 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
             }
         }
 
-        /**
-         * Gather all term declarations from [dictionary].
-         *
-         * @param shouldFilterCocoa if true, omit terms already present in the Standard Terminology
-         */
         private fun collectTerms(
             dictionary: ApplicationDictionary?,
             dictionaryComponents: MutableCollection<DictionaryComponent>,

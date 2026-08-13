@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.test.sdef
 
 import com.intellij.plugin.applescript.AppleScriptFileType
+import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
@@ -29,23 +30,19 @@ class DictionaryTermCatalogTest : BasePlatformTestCase() {
         assertEquals(listOf("accepted", "summary", "event", "create event"), termNames)
     }
 
+    fun testFilteredOrder() {
+        val dictionary = buildTestDictionary(project, ORDERED_TERMS, "Calendar Plus", "ordered-terms.sdef")
+        val emptyBaseline = buildTestDictionary(project, EMPTY_TERMS, "Standard Terminology", "empty-cocoa.sdef")
+
+        val termNames = DictionaryTermCatalog.missingTerms(dictionary, emptyBaseline).map { term -> term.getName() }
+
+        assertEquals(listOf("accepted", "event", "create event", "summary"), termNames)
+    }
+
     fun testCompletionKeepsProperty() {
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        projectDictionaries.clearCachedDictionariesForTests()
-        projectDictionaries.cacheDictionaryForTests(
-            "Calendar Primer",
-            buildTestDictionary(project, PRIMER_TERMS, "Calendar Primer", "calendar-primer.sdef"),
-        )
-        projectDictionaries.cacheDictionaryForTests(
-            "Calendar Plus",
-            buildTestDictionary(project, IMPORTED_TERMS, "Calendar Plus", "calendar-plus.sdef"),
-        )
-        projectDictionaries.cacheDictionaryForTests(
-            ApplicationDictionary.COCOA_STANDARD_LIBRARY,
-            buildTestDictionary(project, COCOA_TERMS, ApplicationDictionary.COCOA_STANDARD_LIBRARY, "cocoa.sdef"),
-        )
-
         try {
+            cacheCompletionDictionaries(projectDictionaries)
             myFixture.configureByText(
                 AppleScriptFileType,
                 """
@@ -63,6 +60,100 @@ class DictionaryTermCatalogTest : BasePlatformTestCase() {
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
         }
+    }
+
+    fun testCocoaRequired() {
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val discovery = ApplicationDiscoveryService.getInstance()
+        val cocoaName = ApplicationDictionary.COCOA_STANDARD_LIBRARY
+        val isCocoaMissing = discovery.isInNotFoundList(cocoaName)
+
+        try {
+            projectDictionaries.clearCachedDictionariesForTests()
+            discovery.addToNotFoundList(cocoaName)
+            projectDictionaries.cacheDictionaryForTests(
+                "Calendar Primer",
+                buildTestDictionary(project, PRIMER_TERMS, "Calendar Primer", "calendar-primer.sdef"),
+            )
+            projectDictionaries.cacheDictionaryForTests(
+                "Calendar Plus",
+                buildTestDictionary(project, IMPORTED_TERMS, "Calendar Plus", "calendar-plus.sdef"),
+            )
+            myFixture.configureByText(
+                AppleScriptFileType,
+                """
+                use application "Calendar Primer"
+                use application "Calendar Plus"
+                set selectedValue to <caret>
+                """.trimIndent(),
+            )
+
+            myFixture.completeBasic()
+            val lookupStrings = requireNotNull(myFixture.lookupElementStrings)
+
+            assertTrue("The unfiltered dictionary must remain available", lookupStrings.contains("calendar source"))
+            assertFalse("Filtered terms require a Cocoa baseline", lookupStrings.contains("shared label"))
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            if (!isCocoaMissing) discovery.removeFromNotFoundList(cocoaName)
+        }
+    }
+
+    fun testNoUseFallbacks() {
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            projectDictionaries.clearCachedDictionariesForTests()
+            projectDictionaries.cacheDictionaryForTests(
+                ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY,
+                buildTestDictionary(
+                    project,
+                    ADDITIONS_TERMS,
+                    ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY,
+                    "additions.sdef",
+                ),
+            )
+            projectDictionaries.cacheDictionaryForTests(
+                ApplicationDictionary.COCOA_STANDARD_LIBRARY,
+                buildTestDictionary(
+                    project,
+                    COCOA_TERMS,
+                    ApplicationDictionary.COCOA_STANDARD_LIBRARY,
+                    "cocoa.sdef",
+                ),
+            )
+            myFixture.configureByText(AppleScriptFileType, "set selectedValue to <caret>")
+
+            myFixture.completeBasic()
+            val lookupStrings = requireNotNull(myFixture.lookupElementStrings)
+
+            assertTrue(
+                "No-use completion must include Scripting Additions",
+                lookupStrings.contains("addition fallback"),
+            )
+            assertTrue(
+                "No-use completion must include Cocoa terms",
+                lookupStrings.contains("standard label"),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+        }
+    }
+
+    private fun cacheCompletionDictionaries(projectDictionaries: AppleScriptProjectDictionaryService) {
+        projectDictionaries.clearCachedDictionariesForTests()
+        projectDictionaries.cacheDictionaryForTests(
+            "Calendar Primer",
+            buildTestDictionary(project, PRIMER_TERMS, "Calendar Primer", "calendar-primer.sdef"),
+        )
+        projectDictionaries.cacheDictionaryForTests(
+            "Calendar Plus",
+            buildTestDictionary(project, IMPORTED_TERMS, "Calendar Plus", "calendar-plus.sdef"),
+        )
+        projectDictionaries.cacheDictionaryForTests(
+            ApplicationDictionary.COCOA_STANDARD_LIBRARY,
+            buildTestDictionary(project, COCOA_TERMS, ApplicationDictionary.COCOA_STANDARD_LIBRARY, "cocoa.sdef"),
+        )
     }
 
     companion object {
@@ -110,6 +201,22 @@ class DictionaryTermCatalogTest : BasePlatformTestCase() {
                     <enumeration name="participation status" code="psts">
                         <enumerator name="accepted" code="acpt"/>
                     </enumeration>
+                </suite>
+            </dictionary>
+            """.trimIndent()
+
+        private val EMPTY_TERMS =
+            """
+            <dictionary title="Empty Terminology">
+                <suite name="Empty Suite" code="empt"/>
+            </dictionary>
+            """.trimIndent()
+
+        private val ADDITIONS_TERMS =
+            """
+            <dictionary title="Scripting Additions Terminology">
+                <suite name="Scripting Additions Suite" code="ascr">
+                    <command name="addition fallback" code="adfb"/>
                 </suite>
             </dictionary>
             """.trimIndent()
