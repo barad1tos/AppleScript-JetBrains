@@ -7,7 +7,6 @@ import com.intellij.plugin.applescript.lang.sdef.parser.SdefParser
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 
 private val SDEF_WITH_MIXED_COMPONENTS =
@@ -68,7 +67,7 @@ class SdefParserConstructionTest : BasePlatformTestCase() {
         try {
             runTest {
                 val dispatcher = StandardTestDispatcher(testScheduler)
-                val indexService = SdefIndexService(TestScope(dispatcher), dispatcher)
+                val indexService = SdefIndexService(this, dispatcher)
                 val result = indexService.ingest(applicationName, dictionaryFile)
                 assertTrue("JDOM index ingest must accept the shared SDEF fixture", result is IngestResult.Success)
                 val snapshot = indexService.snapshot()
