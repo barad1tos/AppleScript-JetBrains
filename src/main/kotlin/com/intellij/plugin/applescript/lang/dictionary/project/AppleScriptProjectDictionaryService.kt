@@ -6,6 +6,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
+import com.intellij.plugin.applescript.lang.dictionary.discovery.standardBundleCandidates
 import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
 import com.intellij.plugin.applescript.lang.dictionary.files.serializeDictionaryPathForApplication
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
@@ -63,19 +64,19 @@ class AppleScriptProjectDictionaryService(
     fun getOrCreateDictionaryFromCachedSources(applicationName: String): ApplicationDictionary? {
         if (isInIgnoreList(applicationName)) return null
 
-        val standardApplicationBundle = findStandardApplicationBundle(applicationName)
+        val standardBundle = findStandardBundle(applicationName)
         val cachedDictionary = getDictionary(applicationName)
         val freshCachedDictionary =
-            cachedDictionary?.takeUnless { it.needsBundleAwareRefresh(standardApplicationBundle) }
+            cachedDictionary?.takeUnless { it.needsBundleAwareRefresh(standardBundle) }
         if (freshCachedDictionary != null) return freshCachedDictionary
 
         return createFromRegisteredCache(
             applicationName,
-            fallbackApplicationBundle = standardApplicationBundle,
+            fallbackApplicationBundle = standardBundle,
         )
             ?: createFromGeneratedCache(
                 applicationName,
-                applicationBundle = standardApplicationBundle,
+                applicationBundle = standardBundle,
             )
             ?: cachedDictionary
     }
@@ -130,14 +131,9 @@ class AppleScriptProjectDictionaryService(
         ).also { info -> info.setInitialized(initialized) }
     }
 
-    private fun findStandardApplicationBundle(applicationName: String): File? =
-        ApplicationDictionary.APP_BUNDLE_DIRECTORIES
-            .asSequence()
-            .flatMap { applicationsDirectory ->
-                ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS
-                    .asSequence()
-                    .map { extension -> File("$applicationsDirectory/$applicationName.$extension") }
-            }.firstOrNull { applicationFile -> applicationFile.exists() }
+    private fun findStandardBundle(applicationName: String): File? =
+        standardBundleCandidates(applicationName)
+            .firstOrNull { applicationFile -> applicationFile.exists() }
 
     private fun createFromInitializedInfo(applicationName: String): ApplicationDictionary? {
         val info = dictionaryRegistryService.getInitializedInfo(applicationName)
