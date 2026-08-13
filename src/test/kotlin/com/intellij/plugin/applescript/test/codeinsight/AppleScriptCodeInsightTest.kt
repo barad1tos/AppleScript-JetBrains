@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.util.SystemInfo
@@ -270,6 +271,40 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
+    fun testBrokenRegisteredUsesGenerated() {
+        val xmlFileType = FileTypeManager.getInstance().getFileTypeByExtension("xml")
+        usingSdefType(xmlFileType) {
+            val applicationName = "SyntheticBrokenRegisteredApp_${System.nanoTime()}"
+            val missingDictionaryFile =
+                File(FileUtil.getTempDirectory(), "missing-registered-${System.nanoTime()}.sdef")
+            assertFalse(missingDictionaryFile.exists())
+            val applicationFile = File(missingDictionaryFile.parentFile, "$applicationName.app")
+            val dictionaryInfo =
+                DictionaryInfo(applicationName, missingDictionaryFile, applicationFile)
+                    .also { info -> info.setInitialized(true) }
+            val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+            val persistence = SdefPersistenceService.getInstance()
+            val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+            writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
+            try {
+                persistence.addDictionaryInfo(dictionaryInfo)
+
+                val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
+
+                assertNotNull(dictionary)
+                assertNull(
+                    "Generated fallback dictionaries must remain transient",
+                    projectDictionaries.getDictionary(applicationName),
+                )
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                persistence.removeDictionaryInfo(applicationFile.path)
+                generatedDictionaryFile.delete()
+            }
+        }
+    }
+
     fun testMissingUsesStale() {
         if (!File("/System/Applications/Music.app").isDirectory) return
 
@@ -331,7 +366,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         withoutRegisteredMusic {
-            usingPlainSdefType {
+            usingSdefType(PlainTextFileType.INSTANCE) {
                 try {
                     writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
                     val generatedVirtualFile =
@@ -503,18 +538,25 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
-    private fun usingPlainSdefType(body: () -> Unit) {
+    private fun usingSdefType(
+        targetFileType: FileType,
+        body: () -> Unit,
+    ) {
         val fileTypeManager = FileTypeManager.getInstance()
         val sdefFileType = fileTypeManager.getFileTypeByExtension("sdef")
+        if (sdefFileType == targetFileType) {
+            body()
+            return
+        }
         ApplicationManager.getApplication().runWriteAction {
             fileTypeManager.removeAssociatedExtension(sdefFileType, "sdef")
-            fileTypeManager.associateExtension(PlainTextFileType.INSTANCE, "sdef")
+            fileTypeManager.associateExtension(targetFileType, "sdef")
         }
         try {
             body()
         } finally {
             ApplicationManager.getApplication().runWriteAction {
-                fileTypeManager.removeAssociatedExtension(PlainTextFileType.INSTANCE, "sdef")
+                fileTypeManager.removeAssociatedExtension(targetFileType, "sdef")
                 fileTypeManager.associateExtension(sdefFileType, "sdef")
             }
         }
@@ -555,6 +597,28 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             projectDictionaries.clearCachedDictionariesForTests()
             persistence.removeNotScriptable(applicationName)
             dictionaryFile.delete()
+        }
+    }
+
+    fun testNotFoundBeatsProjectCache() {
+        val xmlFileType = FileTypeManager.getInstance().getFileTypeByExtension("xml")
+        usingSdefType(xmlFileType) {
+            val applicationName = "SyntheticNotFoundCachedApp_${System.nanoTime()}"
+            val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "not-found-cached")
+            val discovery = ApplicationDiscoveryService.getInstance()
+            val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+            discovery.addToNotFoundList(applicationName)
+            try {
+                projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+                assertNull(projectDictionaries.createDictionary(applicationName))
+                assertNull(projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName))
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                discovery.removeFromNotFoundList(applicationName)
+                dictionaryFile.delete()
+            }
         }
     }
 
