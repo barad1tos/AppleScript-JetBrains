@@ -4,9 +4,13 @@ import com.intellij.codeInsight.completion.CompletionType
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInsight.generation.actions.CommentByLineCommentAction
 import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.openapi.fileTypes.FileType
+import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.io.FileUtil
@@ -21,7 +25,6 @@ import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
-import com.intellij.plugin.applescript.lang.dictionary.project.DictionaryMaterializationResult
 import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnoser
 import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnosis
 import com.intellij.plugin.applescript.lang.ide.annotator.SystemEventsProcessAnnotator
@@ -36,6 +39,7 @@ import com.intellij.psi.codeStyle.CodeStyleManager
 import com.intellij.psi.xml.XmlFile
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.util.FileContentUtil
 import java.awt.image.BufferedImage
 import java.io.File
 import javax.swing.Icon
@@ -232,13 +236,12 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
-    fun testCachedDictionaryMaterializationReportsRegisteredCacheSourceWithoutProjectCaching() {
+    fun testRegisteredBeatsGenerated() {
         val applicationName = "SyntheticRegisteredCacheApp_${System.nanoTime()}"
         val registeredDictionaryFile =
-            SyntheticSuiteFixtures.writeToTempFile(
-                "registered-cache",
-                SyntheticSuiteFixtures.musicAppPlayCommandXml(),
-            )
+            FileUtil
+                .createTempFile("registered-cache", ".xml", true)
+                .also { file -> file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml()) }
         LocalFileSystem.getInstance().refreshAndFindFileByIoFile(registeredDictionaryFile)
         val applicationFile = File(registeredDictionaryFile.parentFile, "$applicationName.app")
         val dictionaryInfo =
@@ -248,32 +251,61 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val persistence = SdefPersistenceService.getInstance()
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
-        generatedDictionaryFile.delete()
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
         try {
             persistence.addDictionaryInfo(dictionaryInfo)
 
-            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is DictionaryMaterializationResult.Created -> {
-                    assertEquals(DictionaryMaterializationResult.Source.RegisteredCache, result.source)
-                    assertNotNull(result.dictionary)
-                    assertNull(
-                        "Registered-cache dictionaries must not be stored in the project map",
-                        projectDictionaries.getDictionary(applicationName),
-                    )
-                }
+            val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
 
-                else -> {
-                    fail("Initialized registered cache should report Created(RegisteredCache), got $result")
-                }
-            }
+            assertNotNull(dictionary)
+            assertEquals(applicationFile, dictionary?.applicationBundle)
+            assertNull(
+                "Registered-cache dictionaries must not be stored in the project map",
+                projectDictionaries.getDictionary(applicationName),
+            )
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             persistence.removeDictionaryInfo(applicationFile.path)
+            generatedDictionaryFile.delete()
             registeredDictionaryFile.delete()
         }
     }
 
-    fun testCachedMaterializationServesStaleFallbackWhenGeneratedCacheIsGone() {
+    fun testBrokenRegisteredUsesGenerated() {
+        val xmlFileType = FileTypeManager.getInstance().getFileTypeByExtension("xml")
+        usingSdefType(xmlFileType) {
+            val applicationName = "SyntheticBrokenRegisteredApp_${System.nanoTime()}"
+            val missingDictionaryFile =
+                File(FileUtil.getTempDirectory(), "missing-registered-${System.nanoTime()}.sdef")
+            assertFalse(missingDictionaryFile.exists())
+            val applicationFile = File(missingDictionaryFile.parentFile, "$applicationName.app")
+            val dictionaryInfo =
+                DictionaryInfo(applicationName, missingDictionaryFile, applicationFile)
+                    .also { info -> info.setInitialized(true) }
+            val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+            val persistence = SdefPersistenceService.getInstance()
+            val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+            writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
+            try {
+                persistence.addDictionaryInfo(dictionaryInfo)
+
+                val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
+
+                assertNotNull(dictionary)
+                assertNull(
+                    "Generated fallback dictionaries must remain transient",
+                    projectDictionaries.getDictionary(applicationName),
+                )
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                persistence.removeDictionaryInfo(applicationFile.path)
+                generatedDictionaryFile.delete()
+            }
+        }
+    }
+
+    fun testMissingUsesStale() {
         if (!File("/System/Applications/Music.app").isDirectory) return
 
         val applicationName = "Music"
@@ -288,15 +320,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             try {
                 projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
-                when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                    is DictionaryMaterializationResult.StaleFallback -> {
-                        assertSame(cachedDictionary, result.dictionary)
-                    }
+                val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
 
-                    else -> {
-                        fail("Missing generated cache with a stale dictionary should serve StaleFallback, got $result")
-                    }
-                }
+                assertSame(cachedDictionary, dictionary)
             } finally {
                 projectDictionaries.clearCachedDictionariesForTests()
                 dictionaryFile.delete()
@@ -304,7 +330,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
-    fun testCachedMaterializationServesFallbackWhenGeneratedCacheIsMalformed() {
+    fun testMalformedUsesStale() {
         if (!File("/System/Applications/Music.app").isDirectory) return
 
         val applicationName = "Music"
@@ -319,15 +345,9 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             try {
                 projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
-                when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                    is DictionaryMaterializationResult.ParseFailed -> {
-                        assertSame(cachedDictionary, result.dictionary)
-                    }
+                val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
 
-                    else -> {
-                        fail("Malformed generated cache with a stale dictionary should serve the fallback, got $result")
-                    }
-                }
+                assertSame(cachedDictionary, dictionary)
             } finally {
                 projectDictionaries.clearCachedDictionariesForTests()
                 generatedDictionaryFile.delete()
@@ -336,7 +356,40 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
-    fun testCachedDictionaryMaterializationReportsMalformedGeneratedCache() {
+    fun testPsiFailureUsesStale() {
+        if (!File("/System/Applications/Music.app").isDirectory) return
+
+        val applicationName = "Music"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "psi-fail-fallback")
+        assertNull(cachedDictionary.applicationBundle)
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        withoutRegisteredMusic {
+            usingSdefType(PlainTextFileType.INSTANCE) {
+                try {
+                    writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
+                    val generatedVirtualFile =
+                        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(generatedDictionaryFile)
+                    assertNotNull(generatedVirtualFile)
+                    requireNotNull(generatedVirtualFile)
+                    FileContentUtil.reparseFiles(project, listOf(generatedVirtualFile), false)
+                    assertFalse(PsiManager.getInstance(project).findFile(generatedVirtualFile) is XmlFile)
+                    projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+                    val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
+
+                    assertSame(cachedDictionary, dictionary)
+                } finally {
+                    projectDictionaries.clearCachedDictionariesForTests()
+                    generatedDictionaryFile.delete()
+                    dictionaryFile.delete()
+                }
+            }
+        }
+    }
+
+    fun testMalformedReturnsNull() {
         val applicationName = "SyntheticMalformedMaterializationApp_${System.nanoTime()}"
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
@@ -344,35 +397,24 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
 
         try {
-            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is DictionaryMaterializationResult.ParseFailed -> {
-                    assertEquals(generatedDictionaryFile.path, result.generatedDictionaryFile.path)
-                    assertNull(result.dictionary)
-                }
-
-                else -> {
-                    fail("Malformed generated cache should report ParseFailed, got $result")
-                }
-            }
+            assertNull(projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName))
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             generatedDictionaryFile.delete()
         }
     }
 
-    fun testCachedDictionaryMaterializationReportsMissingWhenNoCachedSourcesExist() {
+    fun testNoSourcesReturnsNull() {
         val applicationName = "SyntheticMissingMaterializationApp_${System.nanoTime()}"
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         generatedDictionaryFile.delete()
 
-        val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)
-
-        assertEquals(DictionaryMaterializationResult.Missing, result)
+        assertNull(projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName))
     }
 
-    fun testCachedDictionaryMaterializationReportsGeneratedCacheSource() {
+    fun testGeneratedIsTransient() {
         val applicationName = "SyntheticGeneratedMaterializationApp_${System.nanoTime()}"
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
@@ -380,81 +422,78 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
 
         try {
-            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is DictionaryMaterializationResult.Created -> {
-                    assertEquals(DictionaryMaterializationResult.Source.GeneratedCache, result.source)
-                    assertNotNull(result.dictionary)
-                    assertNull(projectDictionaries.getDictionary(applicationName))
-                }
+            val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
 
-                else -> {
-                    fail("Generated cache should report Created, got $result")
-                }
-            }
+            assertNotNull(dictionary)
+            assertNull(projectDictionaries.getDictionary(applicationName))
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             generatedDictionaryFile.delete()
         }
     }
 
-    fun testMaterializationCarriesFallbackWhenPsiConstructionFails() {
-        val applicationName = "SyntheticFallbackMaterializationApp_${System.nanoTime()}"
-        val (fallbackDictionary, dictionaryFile) =
-            syntheticProjectDictionary(
-                applicationName,
-                "materialization-fallback",
-            )
+    fun testGeneratedBeatsStale() {
+        val applicationName = "Music"
+        val applicationBundle = File("/System/Applications/Music.app")
+        if (!applicationBundle.isDirectory) return
+
+        val (staleDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "generated-precedence")
+        assertNull(staleDictionary.applicationBundle)
+        val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val unreadableCacheFile = File(serializeDictionaryPathForApplication(applicationName))
-        unreadableCacheFile.delete()
 
-        val staleInitializedInfo =
-            DictionaryInfo(applicationName, unreadableCacheFile, null).also { info -> info.setInitialized(true) }
+        writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
+        withoutRegisteredMusic {
+            try {
+                projectDictionaries.cacheDictionaryForTests(applicationName, staleDictionary)
 
-        try {
-            val result =
-                projectDictionaries.materializeFromInfoForTests(
-                    staleInitializedInfo,
-                    DictionaryMaterializationResult.Source.GeneratedCache,
-                    fallbackDictionary,
-                )
+                val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
 
-            when (result) {
-                is DictionaryMaterializationResult.MaterializationFailed -> {
-                    assertSame(fallbackDictionary, result.dictionary)
-                    assertEquals(unreadableCacheFile.path, result.generatedDictionaryFile.path)
-                }
-
-                else -> {
-                    fail("PSI construction failure with a stale dictionary should carry the fallback, got $result")
-                }
+                assertNotNull(dictionary)
+                assertNotSame(staleDictionary, dictionary)
+                assertEquals(applicationBundle, dictionary?.applicationBundle)
+                assertSame(staleDictionary, projectDictionaries.getDictionary(applicationName))
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                generatedDictionaryFile.delete()
+                dictionaryFile.delete()
             }
-        } finally {
-            dictionaryFile.delete()
         }
     }
 
-    fun testCachedDictionaryMaterializationReportsFreshCachedDictionary() {
+    fun testProjectBeatsRegistered() {
         val applicationName = "SyntheticCachedMaterializationApp_${System.nanoTime()}"
         val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "cached-materialization")
+        val registeredDictionaryFile =
+            FileUtil
+                .createTempFile("competing-registered-cache", ".xml", true)
+                .also { file -> file.writeText(SyntheticSuiteFixtures.musicAppPlayCommandXml()) }
+        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(registeredDictionaryFile)
+        val applicationFile = File(registeredDictionaryFile.parentFile, "$applicationName.app")
+        val dictionaryInfo =
+            DictionaryInfo(applicationName, registeredDictionaryFile, applicationFile)
+                .also { info -> info.setInitialized(true) }
+        val persistence = SdefPersistenceService.getInstance()
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         try {
+            persistence.addDictionaryInfo(dictionaryInfo)
             projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
-            when (val result = projectDictionaries.materializeDictionaryFromCachedSources(applicationName)) {
-                is DictionaryMaterializationResult.Cached -> assertSame(cachedDictionary, result.dictionary)
-                else -> fail("Fresh project cache should report Cached, got $result")
-            }
+            val dictionary = projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName)
+
+            assertSame(cachedDictionary, dictionary)
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
+            persistence.removeDictionaryInfo(applicationFile.path)
+            registeredDictionaryFile.delete()
             dictionaryFile.delete()
         }
     }
 
     fun testDictionaryCreationFailureNamesTheRealCause() {
         // Exercises the classifier contract directly. The LOG.warn call-site wiring in
-        // createDictionaryFromInfo is not asserted here — capturing platform logs under
+        // createFromInfo is not asserted here — capturing platform logs under
         // BasePlatformTestCase is brittle — so this guards the reason strings, not the routing.
         val applicationName = "SyntheticFailureReasonApp_${System.nanoTime()}"
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
@@ -481,9 +520,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     /**
-     * Runs [body] with the registered Music dictionary info removed, restoring it afterward. This
-     * prevents cached-source materialization from returning the registered dictionary; callers
-     * arrange the project and generated cache state required by the path under test.
+     * Runs [body] with the registered Music dictionary info removed, restoring it
+     * afterward. macOS standard init registers real system apps such as Music; dropping the registered
+     * entry prevents cached-source lookup from returning that dictionary, so a test reaches the
+     * generated-cache or stale-project-cache path instead of passing vacuously.
      */
     private fun withoutRegisteredMusic(body: () -> Unit) {
         val applicationName = "Music"
@@ -495,6 +535,30 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
             body()
         } finally {
             registeredInfo?.let { persistence.addDictionaryInfo(it) }
+        }
+    }
+
+    private fun usingSdefType(
+        targetFileType: FileType,
+        body: () -> Unit,
+    ) {
+        val fileTypeManager = FileTypeManager.getInstance()
+        val sdefFileType = fileTypeManager.getFileTypeByExtension("sdef")
+        if (sdefFileType == targetFileType) {
+            body()
+            return
+        }
+        ApplicationManager.getApplication().runWriteAction {
+            fileTypeManager.removeAssociatedExtension(sdefFileType, "sdef")
+            fileTypeManager.associateExtension(targetFileType, "sdef")
+        }
+        try {
+            body()
+        } finally {
+            ApplicationManager.getApplication().runWriteAction {
+                fileTypeManager.removeAssociatedExtension(targetFileType, "sdef")
+                fileTypeManager.associateExtension(sdefFileType, "sdef")
+            }
         }
     }
 
@@ -517,24 +581,48 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         return ApplicationDictionaryImpl(project, dictionaryXmlFile, applicationName, null) to dictionaryFile
     }
 
-    fun testDictionaryMaterializationReportsIgnoredApplication() {
+    fun testIgnoreBeatsProjectCache() {
         val applicationName = "SyntheticIgnoredApp_${System.nanoTime()}"
+        val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "ignored-cached")
         val persistence = SdefPersistenceService.getInstance()
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         persistence.addNotScriptable(applicationName)
         try {
-            assertEquals(
-                DictionaryMaterializationResult.Ignored,
-                projectDictionaries.materializeDictionary(applicationName),
-            )
+            projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
             assertNull(projectDictionaries.createDictionary(applicationName))
+            assertNull(projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName))
         } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
             persistence.removeNotScriptable(applicationName)
+            dictionaryFile.delete()
         }
     }
 
-    fun testDictionaryMaterializationReturnsProjectCachedDictionary() {
+    fun testNotFoundBeatsProjectCache() {
+        val xmlFileType = FileTypeManager.getInstance().getFileTypeByExtension("xml")
+        usingSdefType(xmlFileType) {
+            val applicationName = "SyntheticNotFoundCachedApp_${System.nanoTime()}"
+            val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "not-found-cached")
+            val discovery = ApplicationDiscoveryService.getInstance()
+            val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+            discovery.addToNotFoundList(applicationName)
+            try {
+                projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
+
+                assertNull(projectDictionaries.createDictionary(applicationName))
+                assertNull(projectDictionaries.getOrCreateDictionaryFromCachedSources(applicationName))
+            } finally {
+                projectDictionaries.clearCachedDictionariesForTests()
+                discovery.removeFromNotFoundList(applicationName)
+                dictionaryFile.delete()
+            }
+        }
+    }
+
+    fun testProjectCacheIsReturned() {
         val applicationName = "SyntheticOnDemandCachedApp_${System.nanoTime()}"
         val (cachedDictionary, dictionaryFile) = syntheticProjectDictionary(applicationName, "on-demand-cached")
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
@@ -542,17 +630,14 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         try {
             projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
-            when (val result = projectDictionaries.materializeDictionary(applicationName)) {
-                is DictionaryMaterializationResult.Cached -> assertSame(cachedDictionary, result.dictionary)
-                else -> fail("Project-cached dictionary should report Cached, got $result")
-            }
+            assertSame(cachedDictionary, projectDictionaries.createDictionary(applicationName))
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             dictionaryFile.delete()
         }
     }
 
-    fun testDictionaryMaterializationReportsMissingWhenEdtGuardSkipsDiscovery() {
+    fun testEdtMissReturnsNull() {
         // This test runs on the EDT (BasePlatformTestCase), so the registry lookup short-circuits
         // in ApplicationDiscoveryService.findApplicationBundleFile's dispatch-thread guard and
         // yields no info — the guard IS the exercised path; off-EDT discovery misses are not
@@ -560,13 +645,10 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val applicationName = "SyntheticUnknownRegistryApp_${System.nanoTime()}"
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
-        assertEquals(
-            DictionaryMaterializationResult.Missing,
-            projectDictionaries.materializeDictionary(applicationName),
-        )
+        assertNull(projectDictionaries.createDictionary(applicationName))
     }
 
-    fun testFileDictionaryMaterializationReportsMissingForUnsupportedFile() {
+    fun testRejectsUnsupported() {
         val applicationName = "SyntheticUnsupportedFileApp_${System.nanoTime()}"
         val unsupportedFile = FileUtil.createTempFile("not-a-dictionary", ".txt", true)
         val virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(unsupportedFile)
@@ -575,16 +657,13 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         try {
-            assertEquals(
-                DictionaryMaterializationResult.Missing,
-                projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile),
-            )
+            assertNull(projectDictionaries.createDictionaryFromFile(applicationName, virtualFile))
         } finally {
             unsupportedFile.delete()
         }
     }
 
-    fun testFileDictionaryMaterializationReportsLoadedFileSource() {
+    fun testLoadedFileIsCached() {
         val applicationName = "SyntheticLoadedFileApp_${System.nanoTime()}"
         val dictionaryFile =
             SyntheticSuiteFixtures.writeToTempFile(
@@ -599,20 +678,13 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         try {
-            when (val result = projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile)) {
-                is DictionaryMaterializationResult.Created -> {
-                    assertEquals(DictionaryMaterializationResult.Source.LoadedFile, result.source)
-                    assertNotNull(result.dictionary)
-                    assertNotNull(
-                        "Explicit file load must cache the dictionary in the project",
-                        projectDictionaries.getDictionary(applicationName),
-                    )
-                }
+            val dictionary = projectDictionaries.createDictionaryFromFile(applicationName, virtualFile)
 
-                else -> {
-                    fail("Loading a dictionary file should report Created, got $result")
-                }
-            }
+            assertNotNull(dictionary)
+            assertNotNull(
+                "Explicit file load must cache the dictionary in the project",
+                projectDictionaries.getDictionary(applicationName),
+            )
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             // Path-based removal cannot match: dictionary-file loads register infos without an
@@ -623,7 +695,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         }
     }
 
-    fun testFileDictionaryMaterializationReportsFailureForMalformedDictionaryFile() {
+    fun testMalformedFileReturnsNull() {
         val applicationName = "SyntheticMalformedLoadedFileApp_${System.nanoTime()}"
         val dictionaryFile = FileUtil.createTempFile("malformed-loaded-dictionary", ".sdef", true)
         dictionaryFile.writeText("<dictionary><suite>")
@@ -635,20 +707,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         try {
-            when (val result = projectDictionaries.materializeDictionaryFromFile(applicationName, virtualFile)) {
-                is DictionaryMaterializationResult.MaterializationFailed -> {
-                    assertNull(result.dictionary)
-                    assertEquals(
-                        "Failure must report the loaded source file, not the generated cache path",
-                        dictionaryFile.path,
-                        result.generatedDictionaryFile.path,
-                    )
-                }
-
-                else -> {
-                    fail("Malformed dictionary file should report MaterializationFailed, got $result")
-                }
-            }
+            assertNull(projectDictionaries.createDictionaryFromFile(applicationName, virtualFile))
         } finally {
             projectDictionaries.clearCachedDictionariesForTests()
             persistence.removeDictionaryInfoByNameForTests(applicationName)
@@ -872,6 +931,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         val generatedDictionaryFile = File(serializeDictionaryPathForApplication(applicationName))
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        projectDictionaries.clearCachedDictionariesForTests()
         writeGeneratedCache(generatedDictionaryFile, SyntheticSuiteFixtures.musicAppPlayCommandXml())
         val applicationIcon = DictionaryIconLoader.loadFromBundle(applicationBundle, applicationName)
         assertNotNull(applicationIcon)
