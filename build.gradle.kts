@@ -907,6 +907,12 @@ tasks {
         check(dataHops.all { it.expectedLookups > 0 }) {
             "Data-hop expected lookup counts must be positive."
         }
+
+        fun isGraphEdge(
+            dataHop: DataHop?,
+            lookupCount: Int,
+        ): Boolean = dataHop == null || lookupCount > dataHop.expectedLookups
+
         val serviceSourceRoots =
             listOf(
                 layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef"),
@@ -950,6 +956,17 @@ tasks {
                 }
             }
 
+            val dataHopFixture = DataHop("FixtureOwner", "FixtureDependency", "Fixture.kt", 1)
+            check(isGraphEdge(null, 1)) {
+                "An unscoped service lookup must remain a graph edge."
+            }
+            check(!isGraphEdge(dataHopFixture, 1)) {
+                "An exact scoped data-hop count must remain excluded from graph edges."
+            }
+            check(isGraphEdge(dataHopFixture, 2)) {
+                "A same-scope data-hop overcount must become a graph edge."
+            }
+
             serviceSourceRoots.forEach { serviceSourceRoot ->
                 serviceSourceRoot.asFile
                     .walkTopDown()
@@ -986,7 +1003,7 @@ tasks {
                             if (dataHop != null) {
                                 observedDataHops[dataHop] = lookupCount
                             }
-                            if (dataHop == null || lookupCount > dataHop.expectedLookups) {
+                            if (isGraphEdge(dataHop, lookupCount)) {
                                 adjacency[owner]!!.add(dep)
                             }
                         }
