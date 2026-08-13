@@ -95,6 +95,7 @@ class SdefFileProvider
             } catch (e: CancellationException) {
                 throw e
             } catch (e: NotScriptableApplicationException) {
+                LOG.warn("Dictionary generation failed for $applicationName: ${e.message}", e)
                 service<SdefPersistenceService>().addNotScriptable(e.applicationName)
                 DictionaryLoadResult.Failed(applicationName, "Application is not scriptable", e)
             } catch (e: DeveloperToolsNotInstalledException) {
@@ -124,6 +125,7 @@ class SdefFileProvider
             try {
                 generate(applicationName, applicationFile)
             } catch (e: DeveloperToolsNotInstalledException) {
+                LOG.warn("Dictionary generation failed for $applicationName: ${e.message}", e)
                 recover(applicationName, applicationFile) ?: throw e
             }
 
