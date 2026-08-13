@@ -181,6 +181,16 @@ class SdefIndexServiceTest {
                 snapshot.isStdLibClass("application"),
                 "application class must be present in std class index after Scripting Additions ingest",
             )
+            assertEquals(
+                setOf("Scripting Additions"),
+                snapshot.stdPropertyNameToDictionarySet["name"],
+                "application property must retain its dictionary owner in the std property index",
+            )
+            assertEquals(
+                setOf("Scripting Additions"),
+                snapshot.stdEnumeratorConstantNameToApplicationNameList["active"],
+                "enumerator must retain its application owner in the std enumerator index",
+            )
         }
 
     @Test

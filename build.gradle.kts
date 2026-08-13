@@ -908,10 +908,34 @@ tasks {
             "Data-hop expected lookup counts must be positive."
         }
 
-        fun isGraphEdge(
-            dataHop: DataHop?,
+        data class DataHopLookup(
+            val dataHop: DataHop?,
+            val isGraphEdge: Boolean,
+        )
+
+        fun classifyDataHop(
+            scopeIndex: Map<Triple<String, String, String>, DataHop>,
+            owner: String,
+            dependency: String,
+            sourcePath: String,
             lookupCount: Int,
-        ): Boolean = dataHop == null || lookupCount > dataHop.expectedLookups
+        ): DataHopLookup {
+            val dataHop = scopeIndex[Triple(owner, dependency, sourcePath)]
+            return DataHopLookup(dataHop, dataHop == null || lookupCount > dataHop.expectedLookups)
+        }
+
+        fun findStaleDataHops(
+            configuredDataHops: List<DataHop>,
+            observedLookups: Map<DataHop, Int>,
+        ): List<Pair<DataHop, Int>> =
+            configuredDataHops.mapNotNull { dataHop ->
+                val lookupCount = observedLookups[dataHop] ?: 0
+                if (lookupCount < dataHop.expectedLookups) {
+                    dataHop to lookupCount
+                } else {
+                    null
+                }
+            }
 
         val serviceSourceRoots =
             listOf(
@@ -956,15 +980,43 @@ tasks {
                 }
             }
 
-            val dataHopFixture = DataHop("FixtureOwner", "FixtureDependency", "Fixture.kt", 1)
-            check(isGraphEdge(null, 1)) {
+            val firstDataHop = DataHop("FixtureOwner", "FixtureDependency", "First.kt", 1)
+            val secondDataHop = DataHop("FixtureOwner", "FixtureDependency", "Second.kt", 1)
+            val fixtureScopeIndex =
+                listOf(firstDataHop, secondDataHop).associateBy { dataHop ->
+                    Triple(dataHop.owner, dataHop.dependency, dataHop.sourcePath)
+                }
+
+            fun classifyFixture(
+                sourcePath: String,
+                lookupCount: Int,
+            ): DataHopLookup =
+                classifyDataHop(
+                    fixtureScopeIndex,
+                    "FixtureOwner",
+                    "FixtureDependency",
+                    sourcePath,
+                    lookupCount,
+                )
+
+            check(classifyFixture("Unlisted.kt", 1).isGraphEdge) {
                 "An unscoped service lookup must remain a graph edge."
             }
-            check(!isGraphEdge(dataHopFixture, 1)) {
+            check(!classifyFixture("First.kt", 1).isGraphEdge) {
                 "An exact scoped data-hop count must remain excluded from graph edges."
             }
-            check(isGraphEdge(dataHopFixture, 2)) {
+            check(!classifyFixture("Second.kt", 1).isGraphEdge) {
+                "A neighboring source path in the same service pair must retain its own allowance."
+            }
+            check(classifyFixture("First.kt", 2).isGraphEdge) {
                 "A same-scope data-hop overcount must become a graph edge."
+            }
+            val staleDataHop = DataHop("FixtureOwner", "FixtureDependency", "Stale.kt", 2)
+            check(findStaleDataHops(listOf(staleDataHop), mapOf(staleDataHop to 1)) == listOf(staleDataHop to 1)) {
+                "A scoped data-hop undercount must remain stale."
+            }
+            check(findStaleDataHops(listOf(firstDataHop), mapOf(firstDataHop to 1)).isEmpty()) {
+                "An exact scoped data-hop count must not be stale."
             }
 
             serviceSourceRoots.forEach { serviceSourceRoot ->
@@ -999,26 +1051,19 @@ tasks {
                             val lookupCount = patterns.sumOf { it.findAll(code).count() }
                             if (lookupCount == 0) return@forEach
 
-                            val dataHop = dataHopByScope[Triple(owner, dep, relativePath)]
-                            if (dataHop != null) {
-                                observedDataHops[dataHop] = lookupCount
+                            val dataHopLookup =
+                                classifyDataHop(dataHopByScope, owner, dep, relativePath, lookupCount)
+                            if (dataHopLookup.dataHop != null) {
+                                observedDataHops[dataHopLookup.dataHop] = lookupCount
                             }
-                            if (isGraphEdge(dataHop, lookupCount)) {
+                            if (dataHopLookup.isGraphEdge) {
                                 adjacency[owner]!!.add(dep)
                             }
                         }
                     }
             }
 
-            val staleDataHops =
-                dataHops.mapNotNull { dataHop ->
-                    val observedLookups = observedDataHops[dataHop] ?: 0
-                    if (observedLookups < dataHop.expectedLookups) {
-                        dataHop to observedLookups
-                    } else {
-                        null
-                    }
-                }
+            val staleDataHops = findStaleDataHops(dataHops, observedDataHops)
             if (staleDataHops.isNotEmpty()) {
                 error(
                     "Stale data-hop allowlist entries detected:\n" +

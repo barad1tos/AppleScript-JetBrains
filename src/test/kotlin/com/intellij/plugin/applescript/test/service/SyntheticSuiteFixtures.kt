@@ -12,13 +12,12 @@ private val MUSIC_SUITE_CODE = appleScriptCode('m', 'u', 's', 'c')
 private val TASK_LIST_SUITE_CODE = appleScriptCode('t', 'a', 's', 'k')
 private val TASK_LIST_SHOW_COMMAND_CODE = appleScriptCode('s', 'h', 'o', 'w')
 private val TASK_LIST_MAKE_COMMAND_CODE = appleScriptCode('m', 'a', 'k', 'e')
-private val TASK_LIST_NAME_PROPERTY_CODE = appleScriptCode('p', 'n', 'a', 'm')
+private val NAME_PROPERTY_CODE = appleScriptCode('p', 'n', 'a', 'm')
 private val TASK_LIST_TO_DO_CLASS_CODE = appleScriptCode('t', 'o', 'd', 'o')
 private val TASK_LIST_LIST_CLASS_CODE = appleScriptCode('l', 'i', 's', 't')
-private val TASK_LIST_STATUS_ENUMERATION_CODE = appleScriptCode('s', 't', 'a', 't')
-private val TASK_LIST_ACTIVE_ENUMERATOR_CODE = appleScriptCode('a', 'c', 't', 'v')
+private val STATUS_ENUMERATION_CODE = appleScriptCode('s', 't', 'a', 't')
+private val ACTIVE_ENUMERATOR_CODE = appleScriptCode('a', 'c', 't', 'v')
 private val TRACK_CLASS_CODE = appleScriptCode('c', 'T', 'r', 'k')
-private val TRACK_NAME_PROPERTY_CODE = appleScriptCode('p', 'n', 'a', 'm')
 private val STANDARD_ADDITIONS_SUITE_CODE = appleScriptCode('s', 't', 'd', 'a')
 
 /**
@@ -52,10 +51,15 @@ object SyntheticSuiteFixtures {
         <?xml version="1.0" encoding="UTF-8"?>
         <dictionary title="Standard Additions Terminology">
             <suite name="Standard Additions" code="$STANDARD_ADDITIONS_SUITE_CODE" description="Standard Additions">
-                <class name="application" code="$APPLICATION_CLASS_CODE" description="Application"/>
+                <class name="application" code="$APPLICATION_CLASS_CODE" description="Application">
+                    <property name="name" code="$NAME_PROPERTY_CODE" type="text"/>
+                </class>
                 <command name="do shell script" code="$DO_SHELL_SCRIPT_COMMAND_CODE" description="Execute a shell script">
                     <direct-parameter type="text"/>
                 </command>
+                <enumeration name="status" code="$STATUS_ENUMERATION_CODE">
+                    <enumerator name="active" code="$ACTIVE_ENUMERATOR_CODE" description="Active status"/>
+                </enumeration>
             </suite>
         </dictionary>
         """.trimIndent()
@@ -72,7 +76,7 @@ object SyntheticSuiteFixtures {
             <suite name="Music Suite" code="$MUSIC_SUITE_CODE" description="Classes and commands for Music">
                 <command name="play" code="$MUSIC_PLAY_COMMAND_CODE" description="Play the current track"/>
                 <class name="track" code="$TRACK_CLASS_CODE" description="A track in a playlist">
-                    <property name="name" code="$TRACK_NAME_PROPERTY_CODE" type="text"/>
+                    <property name="name" code="$NAME_PROPERTY_CODE" type="text"/>
                 </class>
             </suite>
         </dictionary>
@@ -115,7 +119,7 @@ object SyntheticSuiteFixtures {
             <suite name="Music Suite" code="$MUSIC_SUITE_CODE" description="Classes and commands for Music">
                 <command name="play" code="$MUSIC_PLAY_COMMAND_CODE" description="Play the current track"/>
                 <class name="track" code="$TRACK_CLASS_CODE" description="A track in a playlist">
-                    <property name="name" code="$TRACK_NAME_PROPERTY_CODE" type="text"/>
+                    <property name="name" code="$NAME_PROPERTY_CODE" type="text"/>
                 </class>
             </suite>
         </dictionary>
@@ -135,13 +139,13 @@ object SyntheticSuiteFixtures {
                     <parameter name="at" code="insh" type="specifier"/>
                 </command>
                 <class name="list" code="$TASK_LIST_LIST_CLASS_CODE" description="A task list">
-                    <property name="name" code="$TASK_LIST_NAME_PROPERTY_CODE" type="text"/>
+                    <property name="name" code="$NAME_PROPERTY_CODE" type="text"/>
                 </class>
                 <class name="to do" plural="to dos" code="$TASK_LIST_TO_DO_CLASS_CODE" description="A task">
-                    <property name="name" code="$TASK_LIST_NAME_PROPERTY_CODE" type="text"/>
+                    <property name="name" code="$NAME_PROPERTY_CODE" type="text"/>
                 </class>
-                <enumeration name="status" code="$TASK_LIST_STATUS_ENUMERATION_CODE">
-                    <enumerator name="active" code="$TASK_LIST_ACTIVE_ENUMERATOR_CODE" description="Active task"/>
+                <enumeration name="status" code="$STATUS_ENUMERATION_CODE">
+                    <enumerator name="active" code="$ACTIVE_ENUMERATOR_CODE" description="Active task"/>
                 </enumeration>
             </suite>
         </dictionary>
