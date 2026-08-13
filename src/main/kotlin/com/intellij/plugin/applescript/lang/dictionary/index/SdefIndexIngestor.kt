@@ -102,52 +102,52 @@ internal class SdefIndexIngestor(
 
         for (classTag in elements.classes) {
             parseClassElement(applicationName, classTag)
-            parseElementsForApplication(
+            indexApplicationsByElementName(
                 classTag.getChildren("property"),
                 applicationName,
-                indexStore.stdPropertyNameToDictionarySetMap,
+                indexStore.dictionariesByPropertyName,
             )
         }
 
         for (classTag in elements.classExtensions) {
             parseClassElement(applicationName, classTag)
-            parseElementsForApplication(
+            indexApplicationsByElementName(
                 classTag.getChildren("property"),
                 applicationName,
-                indexStore.stdPropertyNameToDictionarySetMap,
+                indexStore.dictionariesByPropertyName,
             )
         }
 
-        parseElementsForApplication(
+        indexApplicationsByElementName(
             elements.commands,
             applicationName,
-            indexStore.stdCommandNameToApplicationNameSetMap,
+            indexStore.applicationsByCommandName,
         )
-        parseElementsForApplication(
+        indexApplicationsByElementName(
             elements.recordTypes,
             applicationName,
-            indexStore.stdRecordNameToApplicationNameSetMap,
+            indexStore.applicationsByRecordName,
         )
 
         for (recordTag in elements.recordTypes) {
-            parseElementsForApplication(
+            indexApplicationsByElementName(
                 recordTag.getChildren("property"),
                 applicationName,
-                indexStore.stdPropertyNameToDictionarySetMap,
+                indexStore.dictionariesByPropertyName,
             )
         }
 
-        parseElementsForApplication(
+        indexApplicationsByElementName(
             elements.enumerations,
             applicationName,
-            indexStore.stdEnumerationNameToApplicationNameSetMap,
+            indexStore.applicationsByEnumerationName,
         )
 
         for (enumerationTag in elements.enumerations) {
-            parseElementsForApplication(
+            indexApplicationsByElementName(
                 enumerationTag.getChildren("enumerator"),
                 applicationName,
-                indexStore.stdEnumeratorConstantNameToApplicationNameListMap,
+                indexStore.applicationsByEnumeratorName,
             )
         }
     }
@@ -168,52 +168,52 @@ internal class SdefIndexIngestor(
 
         for (classTag in elements.classes) {
             parseClassElement(applicationName, classTag)
-            parseHashElementsForApplication(
+            indexElementNamesByApplication(
                 classTag.getChildren("property"),
                 applicationName,
-                indexStore.applicationNameToPropertySetMap,
+                indexStore.propertyNamesByApplication,
             )
         }
 
         for (classTag in elements.classExtensions) {
             parseClassElement(applicationName, classTag)
-            parseHashElementsForApplication(
+            indexElementNamesByApplication(
                 classTag.getChildren("property"),
                 applicationName,
-                indexStore.applicationNameToPropertySetMap,
+                indexStore.propertyNamesByApplication,
             )
         }
 
-        parseHashElementsForApplication(
+        indexElementNamesByApplication(
             elements.commands,
             applicationName,
-            indexStore.applicationNameToCommandNameSetMap,
+            indexStore.commandNamesByApplication,
         )
-        parseHashElementsForApplication(
+        indexElementNamesByApplication(
             elements.recordTypes,
             applicationName,
-            indexStore.applicationNameToRecordNameSetMap,
+            indexStore.recordNamesByApplication,
         )
 
         for (recordTag in elements.recordTypes) {
-            parseHashElementsForApplication(
+            indexElementNamesByApplication(
                 recordTag.getChildren("property"),
                 applicationName,
-                indexStore.applicationNameToPropertySetMap,
+                indexStore.propertyNamesByApplication,
             )
         }
 
-        parseHashElementsForApplication(
+        indexElementNamesByApplication(
             elements.enumerations,
             applicationName,
-            indexStore.applicationNameToEnumerationNameSetMap,
+            indexStore.enumerationNamesByApplication,
         )
 
         for (enumerationTag in elements.enumerations) {
-            parseHashElementsForApplication(
+            indexElementNamesByApplication(
                 enumerationTag.getChildren("enumerator"),
                 applicationName,
-                indexStore.applicationNameToEnumeratorConstantNameSetMap,
+                indexStore.enumeratorNamesByApplication,
             )
         }
     }
@@ -249,26 +249,26 @@ internal class SdefIndexIngestor(
         if (className == null || code == null) return
         pluralClassName = if (!StringUtil.isEmpty(pluralClassName)) pluralClassName else "${className}s"
 
-        updateObjectNameSetForApplication(
+        addElementNameToIndex(
             className,
             applicationName,
-            indexStore.applicationNameToClassNameSetMap,
+            indexStore.classNamesByApplication,
         )
-        updateObjectNameSetForApplication(
+        addElementNameToIndex(
             pluralClassName,
             applicationName,
-            indexStore.applicationNameToClassNamePluralSetMap,
+            indexStore.pluralClassNamesByApplication,
         )
         if (ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY == applicationName) {
-            updateApplicationNameSetFor(
+            addApplicationToIndex(
                 className,
                 applicationName,
-                indexStore.stdClassNameToApplicationNameSetMap,
+                indexStore.applicationsByClassName,
             )
-            updateApplicationNameSetFor(
+            addApplicationToIndex(
                 pluralClassName,
                 applicationName,
-                indexStore.stdClassNamePluralToApplicationNameSetMap,
+                indexStore.applicationsByPluralClassName,
             )
         }
     }
@@ -281,74 +281,74 @@ private fun File.stablePath(): String =
         absolutePath
     }
 
-private fun parseElementsForApplication(
+private fun indexApplicationsByElementName(
     xmlElements: List<Element>,
     applicationName: String,
-    objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
+    index: MutableMap<String, MutableSet<String>>,
 ) {
     for (applicationObjectTag in xmlElements) {
-        parseSimpleElementForObject(
+        addApplicationByElementName(
             applicationObjectTag,
             applicationName,
-            objectTagNameToApplicationNameListMap,
+            index,
         )
     }
 }
 
-private fun parseHashElementsForApplication(
+private fun indexElementNamesByApplication(
     xmlElements: List<Element>,
     applicationName: String,
-    objectTagNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
+    index: MutableMap<String, MutableSet<String>>,
 ) {
     for (applicationObjectTag in xmlElements) {
-        hashSimpleElementForObject(
+        addElementNameByApplication(
             applicationObjectTag,
             applicationName,
-            objectTagNameToApplicationNameListMap,
+            index,
         )
     }
 }
 
-private fun parseSimpleElementForObject(
+private fun addApplicationByElementName(
     suiteObjectElement: Element,
     applicationName: String,
-    objectNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>>,
+    index: MutableMap<String, MutableSet<String>>,
 ) {
     val objectName = suiteObjectElement.getAttributeValue("name")
     val code = suiteObjectElement.getAttributeValue("code")
     if (objectName == null || code == null) return
-    updateApplicationNameSetFor(objectName, applicationName, objectNameToApplicationNameSetMap)
+    addApplicationToIndex(objectName, applicationName, index)
 }
 
-private fun hashSimpleElementForObject(
+private fun addElementNameByApplication(
     suiteObjectElement: Element,
     applicationName: String,
-    objectNameToApplicationNameListMap: MutableMap<String, MutableSet<String>>,
+    index: MutableMap<String, MutableSet<String>>,
 ) {
     val objectName = suiteObjectElement.getAttributeValue("name")
     val code = suiteObjectElement.getAttributeValue("code")
     if (objectName == null || code == null) return
-    updateObjectNameSetForApplication(objectName, applicationName, objectNameToApplicationNameListMap)
+    addElementNameToIndex(objectName, applicationName, index)
 }
 
-private fun updateApplicationNameSetFor(
+private fun addApplicationToIndex(
     applicationObjectName: String,
     applicationName: String,
-    applicationNameSetMap: MutableMap<String, MutableSet<String>>,
+    index: MutableMap<String, MutableSet<String>>,
 ) {
     if (StringUtil.isEmpty(applicationObjectName)) return
-    applicationNameSetMap.compute(applicationObjectName) { _, existing ->
+    index.compute(applicationObjectName) { _, existing ->
         (existing ?: ConcurrentHashMap.newKeySet()).also { it.add(applicationName) }
     }
 }
 
-private fun updateObjectNameSetForApplication(
+private fun addElementNameToIndex(
     applicationObjectName: String,
     applicationName: String,
-    applicationNameSetMap: MutableMap<String, MutableSet<String>>,
+    index: MutableMap<String, MutableSet<String>>,
 ) {
     if (StringUtil.isEmpty(applicationName)) return
-    applicationNameSetMap.compute(applicationName) { _, existing ->
+    index.compute(applicationName) { _, existing ->
         (existing ?: ConcurrentHashMap.newKeySet()).also { it.add(applicationObjectName) }
     }
 }

@@ -1,23 +1,12 @@
 package com.intellij.plugin.applescript.lang.dictionary.index
 
 /**
- * Phase 4 D-03: Immutable snapshot of the SDEF index state.
+ * Immutable snapshot of the SDEF index state.
  *
- * Returned by [SdefIndexService.snapshot]. Callers
- * can hand this to lookup methods for hermetic-test reads OR observe it post-ingest in production.
- *
- * Modelled on Phase 2 [DictionaryIndexes] value container. Each field is a read-only
- * `Map<String, Set<String>>` — defensive snapshot, NOT the live mutable index.
- *
- * Field names match the EXACT names on the pre-Wave-5 facade (post-Wave-4 baseline), so a future
- * tool that round-trips a snapshot back into the live indexes (Wave 6+) gets a 1:1 mapping.
- *
- * 14 maps total:
- *  - 7 application-scoped: class, classPlural, command, record, property, enumeration, enumeratorConstant
- *  - 7 std-scoped: class, classPlural, command, record, property, enumeration, enumeratorConstant
+ * Each map is a defensive copy. Callers can use the snapshot for hermetic reads without mutating
+ * the live indexes. Property names retain the established public API.
  */
 data class SdefIndexSnapshot(
-    // ── Application-scoped maps (applicationName -> set of objectNames) ──
     val applicationNameToClassNameSet: Map<String, Set<String>>,
     val applicationNameToClassNamePluralSet: Map<String, Set<String>>,
     val applicationNameToCommandNameSet: Map<String, Set<String>>,
@@ -25,7 +14,6 @@ data class SdefIndexSnapshot(
     val applicationNameToPropertySet: Map<String, Set<String>>,
     val applicationNameToEnumerationNameSet: Map<String, Set<String>>,
     val applicationNameToEnumeratorConstantNameSet: Map<String, Set<String>>,
-    // ── Std-scoped maps (objectName -> set of applicationNames that defined it as std) ──
     val stdClassNameToApplicationNameSet: Map<String, Set<String>>,
     val stdClassNamePluralToApplicationNameSet: Map<String, Set<String>>,
     val stdCommandNameToApplicationNameSet: Map<String, Set<String>>,

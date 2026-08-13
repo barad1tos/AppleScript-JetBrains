@@ -10,8 +10,8 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.THEN
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
-internal object FallbackCommandParameterValueBoundaries {
-    fun hasBuiltInClassValueBeforeBoundary(builder: PsiBuilder): Boolean {
+internal object ParameterValueBoundaries {
+    fun hasBuiltInClassValue(builder: PsiBuilder): Boolean {
         val marker = builder.mark()
         val parsed = AppleScriptParser.builtInClassIdentifier(builder, 0)
         val hasBoundary =
@@ -27,7 +27,7 @@ internal object FallbackCommandParameterValueBoundaries {
         return hasBoundary
     }
 
-    fun parseBuiltInClassValueBeforeBoundary(
+    fun parseBuiltInClassValue(
         builder: PsiBuilder,
         level: Int,
     ): Boolean {
@@ -50,7 +50,7 @@ internal object FallbackCommandParameterValueBoundaries {
         return isCompleteValue
     }
 
-    fun hasPropertyReferenceValueBeforeBoundary(builder: PsiBuilder): Boolean {
+    fun hasPropertyReference(builder: PsiBuilder): Boolean {
         if (builder.tokenType !== BUILT_IN_PROPERTY) return false
         val marker = builder.mark()
         val parsed = AppleScriptParser.propertyReference(builder, 0)
@@ -59,7 +59,7 @@ internal object FallbackCommandParameterValueBoundaries {
         return hasBoundary
     }
 
-    fun parsePropertyReferenceValueBeforeBoundary(
+    fun parsePropertyReference(
         builder: PsiBuilder,
         level: Int,
     ): Boolean {
@@ -75,7 +75,7 @@ internal object FallbackCommandParameterValueBoundaries {
         return isCompleteValue
     }
 
-    fun parseExpressionAtValueBoundary(
+    fun parseExpression(
         builder: PsiBuilder,
         level: Int,
     ): Boolean {
@@ -90,7 +90,7 @@ internal object FallbackCommandParameterValueBoundaries {
         return isCompleteValue
     }
 
-    fun hasGrammarValueBeforeBoundary(builder: PsiBuilder): Boolean =
+    fun hasGrammarValue(builder: PsiBuilder): Boolean =
         hasValueBeforeBoundary(builder) { candidateBuilder, level ->
             AppleScriptParser.arbitraryReference(candidateBuilder, level)
         } ||
@@ -123,13 +123,13 @@ internal object FallbackCommandParameterValueBoundaries {
         return hasBoundary
     }
 
-    fun hasIdentifierPhraseBeforeCommandSelector(builder: PsiBuilder): Boolean =
+    fun hasPhraseBeforeCommandSelector(builder: PsiBuilder): Boolean =
         identifierRunLength(builder).let { identifiers ->
             identifiers > 0 &&
                 FallbackCommandParameterTokens.isCommandSelectorStart(builder.lookAhead(identifiers))
         }
 
-    fun consumeIdentifierPhraseBeforeCommandSelector(builder: PsiBuilder): Boolean {
+    fun consumePhraseBeforeSelector(builder: PsiBuilder): Boolean {
         val identifierCount = identifierRunLength(builder)
         val shouldConsume =
             identifierCount > 0 &&
@@ -142,7 +142,7 @@ internal object FallbackCommandParameterValueBoundaries {
         return shouldConsume
     }
 
-    fun consumeIdentifierPhraseBeforeStructuredBareSelector(builder: PsiBuilder): Boolean {
+    fun consumePhraseBeforeStructuredSelector(builder: PsiBuilder): Boolean {
         val identifierCount = identifierRunLength(builder)
         val shouldConsume =
             identifierCount >= 2 &&
@@ -155,9 +155,9 @@ internal object FallbackCommandParameterValueBoundaries {
         return shouldConsume
     }
 
-    fun consumeIdentifierPhraseExpressionBeforeBoundary(builder: PsiBuilder): Boolean {
+    fun consumeCompletePhraseExpression(builder: PsiBuilder): Boolean {
         val marker = builder.mark()
-        val parsed = consumeIdentifierPhraseExpression(builder)
+        val parsed = consumePhraseExpression(builder)
         val isCompleteValue = parsed && isValueBoundary(builder.tokenType)
         if (isCompleteValue) {
             marker.drop()
@@ -167,8 +167,8 @@ internal object FallbackCommandParameterValueBoundaries {
         return isCompleteValue
     }
 
-    private fun consumeIdentifierPhraseExpression(builder: PsiBuilder): Boolean {
-        val firstOperandIdentifiers = consumeIdentifierPhraseOperand(builder)
+    private fun consumePhraseExpression(builder: PsiBuilder): Boolean {
+        val firstOperandIdentifiers = consumePhraseOperand(builder)
         var isCompleteExpression = firstOperandIdentifiers > 0
         var hasIdentifierPhraseOperand = firstOperandIdentifiers > 1
         while (
@@ -176,14 +176,14 @@ internal object FallbackCommandParameterValueBoundaries {
             FallbackCommandParameterTokens.isExpressionContinuationStart(builder.tokenType)
         ) {
             builder.advanceLexer()
-            val nextOperandIdentifiers = consumeIdentifierPhraseOperand(builder)
+            val nextOperandIdentifiers = consumePhraseOperand(builder)
             isCompleteExpression = nextOperandIdentifiers > 0
             hasIdentifierPhraseOperand = hasIdentifierPhraseOperand || nextOperandIdentifiers > 1
         }
         return isCompleteExpression && hasIdentifierPhraseOperand
     }
 
-    private fun consumeIdentifierPhraseOperand(builder: PsiBuilder): Int {
+    private fun consumePhraseOperand(builder: PsiBuilder): Int {
         val identifierCount = identifierRunLength(builder)
         if (identifierCount > 0) {
             repeat(identifierCount) {

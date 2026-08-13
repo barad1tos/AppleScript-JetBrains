@@ -44,7 +44,7 @@ internal class SdefCommandLookup(
     fun lookupStdCommandResult(name: String): LookupResult =
         when {
             !SdefIndexReadiness.isInitialized() -> LookupResult.Stale
-            indexStore.stdCommandNameToApplicationNameSetMap.containsKey(name) -> LookupResult.Hit
+            indexStore.applicationsByCommandName.containsKey(name) -> LookupResult.Hit
             else -> LookupResult.Miss
         }
 
@@ -62,7 +62,7 @@ internal class SdefCommandLookup(
                 LookupResult.Stale
             }
 
-            commandName in (indexStore.applicationNameToCommandNameSetMap[applicationName] ?: emptySet()) -> {
+            commandName in (indexStore.commandNamesByApplication[applicationName] ?: emptySet()) -> {
                 LookupResult.Hit
             }
 
@@ -85,7 +85,7 @@ internal class SdefCommandLookup(
                 LookupResult.Stale
             }
 
-            hasNameWithPrefix(commandNamePrefix, indexStore.applicationNameToCommandNameSetMap[applicationName]) -> {
+            hasNameWithPrefix(commandNamePrefix, indexStore.commandNamesByApplication[applicationName]) -> {
                 LookupResult.Hit
             }
 
@@ -100,7 +100,7 @@ internal class SdefCommandLookup(
     fun lookupStdCommandWithPrefixResult(namePrefix: String): LookupResult =
         when {
             !SdefIndexReadiness.isInitialized() -> LookupResult.Stale
-            hasNameWithPrefix(namePrefix, indexStore.stdCommandNameToApplicationNameSetMap.keys) -> LookupResult.Hit
+            hasNameWithPrefix(namePrefix, indexStore.applicationsByCommandName.keys) -> LookupResult.Hit
             else -> LookupResult.Miss
         }
 
@@ -132,9 +132,9 @@ internal class SdefCommandLookup(
             return emptyList()
         }
 
-        val appNameList = indexStore.stdCommandNameToApplicationNameSetMap[commandName] ?: emptySet()
+        val applicationNames = indexStore.applicationsByCommandName[commandName] ?: emptySet()
         val result = HashSet<AppleScriptCommand>()
-        for (applicationName in appNameList) {
+        for (applicationName in applicationNames) {
             result.addAll(findApplicationCommands(project, applicationName, commandName))
         }
         return result
@@ -146,9 +146,9 @@ internal class SdefCommandLookup(
     ): Collection<AppleScriptCommand> {
         if (!SdefIndexReadiness.isInitialized()) return emptyList()
 
-        val appNameList = indexStore.stdCommandNameToApplicationNameSetMap[commandName] ?: emptySet()
+        val applicationNames = indexStore.applicationsByCommandName[commandName] ?: emptySet()
         val result = HashSet<AppleScriptCommand>()
-        for (applicationName in appNameList) {
+        for (applicationName in applicationNames) {
             result.addAll(findApplicationCommandsIfReady(project, applicationName, commandName))
         }
         return result

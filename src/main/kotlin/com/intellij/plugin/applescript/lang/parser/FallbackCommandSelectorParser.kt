@@ -80,10 +80,10 @@ internal object FallbackCommandSelectorParser {
     ): Boolean =
         parseTypedDictionaryValue(builder, level + 1, parameterDefinition) ||
             parseSimpleLiteralValueBeforeSelector(builder) ||
-            FallbackCommandParameterValueBoundaries.consumeIdentifierPhraseBeforeStructuredBareSelector(builder) ||
+            ParameterValueBoundaries.consumePhraseBeforeStructuredSelector(builder) ||
             parseSingleIdentifierValueBeforeBareSelector(builder) ||
-            FallbackCommandParameterValueBoundaries.consumeIdentifierPhraseExpressionBeforeBoundary(builder) ||
-            FallbackCommandParameterValueBoundaries.parseExpressionAtValueBoundary(builder, level + 1) ||
+            ParameterValueBoundaries.consumeCompletePhraseExpression(builder) ||
+            ParameterValueBoundaries.parseExpression(builder, level + 1) ||
             parseStructuredBracketFallback(builder)
 
     private fun parseTypedDictionaryValue(

@@ -22,9 +22,9 @@ import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInf
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.dictionary.project.DictionaryMaterializationResult
-import com.intellij.plugin.applescript.lang.ide.annotator.AppleScriptSystemEventsProcessReferenceAnnotator
 import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnoser
 import com.intellij.plugin.applescript.lang.ide.annotator.ApplicationReferenceDiagnosis
+import com.intellij.plugin.applescript.lang.ide.annotator.SystemEventsProcessAnnotator
 import com.intellij.plugin.applescript.lang.ide.highlighting.AppleScriptSyntaxHighlighterColors
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.util.AppleScriptNamesValidator
@@ -284,7 +284,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         generatedDictionaryFile.delete()
-        withoutRegisteredDictionaryInfo(applicationName) {
+        withoutRegisteredMusic {
             try {
                 projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
@@ -315,7 +315,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
         val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
 
         writeGeneratedCache(generatedDictionaryFile, "<dictionary><suite>")
-        withoutRegisteredDictionaryInfo(applicationName) {
+        withoutRegisteredMusic {
             try {
                 projectDictionaries.cacheDictionaryForTests(applicationName, cachedDictionary)
 
@@ -481,15 +481,12 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
     }
 
     /**
-     * Runs [body] with the registered dictionary info for [applicationName] removed, restoring it
-     * afterward. macOS standard init registers real system apps such as Music; dropping the registered
-     * entry forces materialization past the RegisteredCache leg so a test exercises the generated-cache
-     * or fallback path it targets instead of passing vacuously through the registered dictionary.
+     * Runs [body] with the registered Music dictionary info removed, restoring it afterward. This
+     * prevents cached-source materialization from returning the registered dictionary; callers
+     * arrange the project and generated cache state required by the path under test.
      */
-    private fun withoutRegisteredDictionaryInfo(
-        applicationName: String,
-        body: () -> Unit,
-    ) {
+    private fun withoutRegisteredMusic(body: () -> Unit) {
+        val applicationName = "Music"
         val persistence = SdefPersistenceService.getInstance()
         val registeredInfo =
             persistence.dictionaryInfoSnapshot.firstOrNull { it.getApplicationName() == applicationName }
@@ -882,7 +879,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         // Drop any registered Music info so the gutter resolves through the generated cache under test,
         // not a registered dictionary that would supply the same bundle icon and pass vacuously.
-        withoutRegisteredDictionaryInfo(applicationName) {
+        withoutRegisteredMusic {
             try {
                 assertNull(projectDictionaries.getDictionary(applicationName))
 
@@ -932,7 +929,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
         // Drop any registered Music info so the stale project cache is refreshed through the generated
         // cache under test, not short-circuited by a registered dictionary that already carries the icon.
-        withoutRegisteredDictionaryInfo(applicationName) {
+        withoutRegisteredMusic {
             try {
                 projectDictionaries.cacheDictionaryForTests(
                     applicationName,
@@ -1767,7 +1764,7 @@ class AppleScriptCodeInsightTest : BasePlatformTestCase() {
 
     private fun unknownProcessDescription(processName: String): String =
         requireNotNull(
-            AppleScriptSystemEventsProcessReferenceAnnotator.resolveWarningMessage(
+            SystemEventsProcessAnnotator.resolveWarningMessage(
                 referenceText = "process \"$processName\"",
                 isInsideSystemEventsTell = true,
                 areAppDictionariesIndexed = true,

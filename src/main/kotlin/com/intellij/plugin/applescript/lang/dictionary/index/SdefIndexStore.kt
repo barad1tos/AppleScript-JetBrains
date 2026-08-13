@@ -3,56 +3,56 @@ package com.intellij.plugin.applescript.lang.dictionary.index
 import java.util.concurrent.ConcurrentHashMap
 
 internal class SdefIndexStore {
-    val applicationNameToClassNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val applicationNameToClassNamePluralSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val applicationNameToCommandNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val applicationNameToRecordNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val applicationNameToPropertySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val applicationNameToEnumerationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val applicationNameToEnumeratorConstantNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val classNamesByApplication: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val pluralClassNamesByApplication: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val commandNamesByApplication: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val recordNamesByApplication: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val propertyNamesByApplication: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val enumerationNamesByApplication: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val enumeratorNamesByApplication: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
 
-    val stdClassNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val stdClassNamePluralToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val stdCommandNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val stdRecordNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val stdPropertyNameToDictionarySetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val stdEnumerationNameToApplicationNameSetMap: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
-    val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap<String, MutableSet<String>> =
+    val applicationsByClassName: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val applicationsByPluralClassName: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val applicationsByCommandName: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val applicationsByRecordName: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val dictionariesByPropertyName: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val applicationsByEnumerationName: MutableMap<String, MutableSet<String>> = ConcurrentHashMap()
+    val applicationsByEnumeratorName: MutableMap<String, MutableSet<String>> =
         ConcurrentHashMap()
 
     fun snapshot(): SdefIndexSnapshot =
         SdefIndexSnapshot(
             applicationNameToClassNameSet =
-                applicationNameToClassNameSetMap.mapValues { it.value.toSet() },
+                classNamesByApplication.mapValues { it.value.toSet() },
             applicationNameToClassNamePluralSet =
-                applicationNameToClassNamePluralSetMap.mapValues { it.value.toSet() },
+                pluralClassNamesByApplication.mapValues { it.value.toSet() },
             applicationNameToCommandNameSet =
-                applicationNameToCommandNameSetMap.mapValues { it.value.toSet() },
+                commandNamesByApplication.mapValues { it.value.toSet() },
             applicationNameToRecordNameSet =
-                applicationNameToRecordNameSetMap.mapValues { it.value.toSet() },
+                recordNamesByApplication.mapValues { it.value.toSet() },
             applicationNameToPropertySet =
-                applicationNameToPropertySetMap.mapValues { it.value.toSet() },
+                propertyNamesByApplication.mapValues { it.value.toSet() },
             applicationNameToEnumerationNameSet =
-                applicationNameToEnumerationNameSetMap.mapValues { it.value.toSet() },
+                enumerationNamesByApplication.mapValues { it.value.toSet() },
             applicationNameToEnumeratorConstantNameSet =
-                applicationNameToEnumeratorConstantNameSetMap
+                enumeratorNamesByApplication
                     .mapValues { it.value.toSet() },
             stdClassNameToApplicationNameSet =
-                stdClassNameToApplicationNameSetMap.mapValues { it.value.toSet() },
+                applicationsByClassName.mapValues { it.value.toSet() },
             stdClassNamePluralToApplicationNameSet =
-                stdClassNamePluralToApplicationNameSetMap
+                applicationsByPluralClassName
                     .mapValues { it.value.toSet() },
             stdCommandNameToApplicationNameSet =
-                stdCommandNameToApplicationNameSetMap.mapValues { it.value.toSet() },
+                applicationsByCommandName.mapValues { it.value.toSet() },
             stdRecordNameToApplicationNameSet =
-                stdRecordNameToApplicationNameSetMap.mapValues { it.value.toSet() },
+                applicationsByRecordName.mapValues { it.value.toSet() },
             stdPropertyNameToDictionarySet =
-                stdPropertyNameToDictionarySetMap.mapValues { it.value.toSet() },
+                dictionariesByPropertyName.mapValues { it.value.toSet() },
             stdEnumerationNameToApplicationNameSet =
-                stdEnumerationNameToApplicationNameSetMap
+                applicationsByEnumerationName
                     .mapValues { it.value.toSet() },
             stdEnumeratorConstantNameToApplicationNameList =
-                stdEnumeratorConstantNameToApplicationNameListMap
+                applicationsByEnumeratorName
                     .mapValues { it.value.toSet() },
         )
 }

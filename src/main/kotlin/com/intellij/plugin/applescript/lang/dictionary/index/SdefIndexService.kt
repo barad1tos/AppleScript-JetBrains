@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -82,7 +83,7 @@ class SdefIndexService
                     if (ok) {
                         IngestResult.Success(
                             suitesIngested = 1,
-                            commandsIndexed = indexStore.applicationNameToCommandNameSetMap[applicationName]?.size ?: 0,
+                            commandsIndexed = indexStore.commandNamesByApplication[applicationName]?.size ?: 0,
                         )
                     } else {
                         IngestResult.Failed(reason = "parseDictionaryFile returned false for $applicationName")

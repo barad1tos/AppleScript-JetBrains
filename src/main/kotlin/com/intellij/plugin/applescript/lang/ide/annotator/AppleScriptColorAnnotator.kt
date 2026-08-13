@@ -98,7 +98,7 @@ private object AppleScriptAnnotationSupport {
         element: AppleScriptReferenceElement,
         holder: AnnotationHolder,
     ) {
-        if (!AppleScriptAnnotationPredicates.isMyPositionalHandlerCallName(element)) return
+        if (!AnnotationPredicates.isMyPositionalHandlerCallName(element)) return
 
         createInfoAnnotation(holder, element, AppleScriptSyntaxHighlighterColors.HANDLER_CALL)
     }
@@ -157,7 +157,7 @@ private object AppleScriptAnnotationSupport {
         holder: AnnotationHolder,
         element: PsiElement,
     ) {
-        if (AppleScriptAnnotationPredicates.isDatePropertyReferenceTerm(element)) {
+        if (AnnotationPredicates.isDatePropertyReferenceTerm(element)) {
             createInfoAnnotation(
                 holder,
                 element,
@@ -184,9 +184,9 @@ private object AppleScriptAnnotationSupport {
     ) {
         val attributeKey =
             when {
-                AppleScriptAnnotationPredicates.isStandardDeterminerCommandReference(element) ->
+                AnnotationPredicates.isStandardDeterminerCommandReference(element) ->
                     AppleScriptSyntaxHighlighterColors.DICTIONARY_COMMAND_ATTR
-                AppleScriptAnnotationPredicates.isResolvedLocalSymbolReference(element) ->
+                AnnotationPredicates.isResolvedLocalSymbolReference(element) ->
                     AppleScriptSyntaxHighlighterColors.VARIABLE
                 else -> null
             }
@@ -203,12 +203,12 @@ private object AppleScriptAnnotationSupport {
             is AppleScriptApplicationObjectReference,
             is AppleScriptNameReference,
             ->
-                AppleScriptSystemEventsProcessReferenceAnnotator.annotate(
+                SystemEventsProcessAnnotator.annotate(
                     holder,
                     element,
                 )
             is AppleScriptApplicationReference ->
-                AppleScriptApplicationReferenceAnnotator.annotate(
+                ApplicationReferenceAnnotator.annotate(
                     holder,
                     element,
                     false,
@@ -223,7 +223,7 @@ private object AppleScriptAnnotationSupport {
         val expression = PsiTreeUtil.findChildOfType(element, AppleScriptExpression::class.java)
         val appRef = PsiTreeUtil.findChildOfType(expression, AppleScriptApplicationReference::class.java)
         if (appRef != null) {
-            AppleScriptApplicationReferenceAnnotator.annotate(holder, appRef, true)
+            ApplicationReferenceAnnotator.annotate(holder, appRef, true)
         }
         holder
             .newAnnotation(HighlightSeverity.ERROR, "Incomplete expression")
@@ -276,8 +276,8 @@ private object AppleScriptAnnotationSupport {
     ) {
         val attributeKey =
             if (
-                AppleScriptAnnotationPredicates.hasPropertyReferenceParent(element) ||
-                AppleScriptAnnotationPredicates.isClassPropertyReferenceTerm(element)
+                AnnotationPredicates.hasPropertyReferenceParent(element) ||
+                AnnotationPredicates.isClassPropertyReferenceTerm(element)
             ) {
                 AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR
             } else {
@@ -291,7 +291,7 @@ private object AppleScriptAnnotationSupport {
         element: AppleScriptDictionaryConstant,
     ) {
         val attributeKey =
-            if (AppleScriptAnnotationPredicates.hasPropertyReferenceParent(element)) {
+            if (AnnotationPredicates.hasPropertyReferenceParent(element)) {
                 AppleScriptSyntaxHighlighterColors.DICTIONARY_PROPERTY_ATTR
             } else {
                 AppleScriptSyntaxHighlighterColors.DICTIONARY_CONSTANT_ATTR
@@ -321,7 +321,7 @@ private fun createInfoAnnotation(
         .create()
 }
 
-private object AppleScriptAnnotationPredicates {
+private object AnnotationPredicates {
     fun hasPropertyReferenceParent(element: PsiElement): Boolean {
         var parent = element.parent
         while (parent != null) {

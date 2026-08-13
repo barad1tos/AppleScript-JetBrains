@@ -16,45 +16,45 @@ internal class SdefClassLookup(
 ) {
     fun lookupStdLibClass(name: String): Boolean =
         SdefIndexReadiness.isInitialized() &&
-            indexStore.stdClassNameToApplicationNameSetMap.containsKey(name)
+            indexStore.applicationsByClassName.containsKey(name)
 
     fun lookupApplicationClass(
         applicationName: String,
         className: String,
     ): Boolean {
         if (!SdefIndexReadiness.isReadyForApplication(applicationName)) return false
-        val classNameSet: Set<String>? = indexStore.applicationNameToClassNameSetMap[applicationName]
-        return classNameSet != null && classNameSet.contains(className)
+        val classNames: Set<String>? = indexStore.classNamesByApplication[applicationName]
+        return classNames != null && classNames.contains(className)
     }
 
     fun lookupStdLibClassPluralName(pluralName: String): Boolean =
         SdefIndexReadiness.isInitialized() &&
-            indexStore.stdClassNamePluralToApplicationNameSetMap.containsKey(pluralName)
+            indexStore.applicationsByPluralClassName.containsKey(pluralName)
 
     fun lookupApplicationClassPluralName(
         applicationName: String,
         pluralName: String,
     ): Boolean {
         if (!SdefIndexReadiness.isReadyForApplication(applicationName)) return false
-        val classNameSet: Set<String>? =
-            indexStore.applicationNameToClassNamePluralSetMap[applicationName]
-        return classNameSet != null && classNameSet.contains(pluralName)
+        val classNames: Set<String>? =
+            indexStore.pluralClassNamesByApplication[applicationName]
+        return classNames != null && classNames.contains(pluralName)
     }
 
     fun lookupStdClassWithPrefixExist(classNamePrefix: String): Boolean =
         SdefIndexReadiness.isInitialized() &&
-            hasNameWithPrefix(classNamePrefix, indexStore.stdClassNameToApplicationNameSetMap.keys)
+            hasNameWithPrefix(classNamePrefix, indexStore.applicationsByClassName.keys)
 
     fun lookupClassWithPrefixExist(
         applicationName: String,
         classNamePrefix: String,
     ): Boolean =
         SdefIndexReadiness.isReadyForApplication(applicationName) &&
-            hasNameWithPrefix(classNamePrefix, indexStore.applicationNameToClassNameSetMap[applicationName])
+            hasNameWithPrefix(classNamePrefix, indexStore.classNamesByApplication[applicationName])
 
     fun lookupStdClassPluralWithPrefixExist(namePrefix: String): Boolean =
         SdefIndexReadiness.isInitialized() &&
-            hasNameWithPrefix(namePrefix, indexStore.stdClassNamePluralToApplicationNameSetMap.keys)
+            hasNameWithPrefix(namePrefix, indexStore.applicationsByPluralClassName.keys)
 
     fun lookupClassPluralWithPrefixExist(
         applicationName: String,
@@ -63,7 +63,7 @@ internal class SdefClassLookup(
         SdefIndexReadiness.isReadyForApplication(applicationName) &&
             hasNameWithPrefix(
                 pluralNamePrefix,
-                indexStore.applicationNameToClassNamePluralSetMap[applicationName],
+                indexStore.pluralClassNamesByApplication[applicationName],
             )
 }
 
@@ -72,19 +72,19 @@ internal class SdefPropertyLookup(
 ) {
     fun lookupStdProperty(name: String): Boolean =
         SdefIndexReadiness.isInitialized() &&
-            indexStore.stdPropertyNameToDictionarySetMap.containsKey(name)
+            indexStore.dictionariesByPropertyName.containsKey(name)
 
     fun lookupStdPropertyWithPrefixExist(namePrefix: String): Boolean =
         SdefIndexReadiness.isInitialized() &&
-            hasNameWithPrefix(namePrefix, indexStore.stdPropertyNameToDictionarySetMap.keys)
+            hasNameWithPrefix(namePrefix, indexStore.dictionariesByPropertyName.keys)
 
     fun lookupApplicationProperty(
         applicationName: String,
         propertyName: String,
     ): Boolean {
         if (!SdefIndexReadiness.isReadyForApplication(applicationName)) return false
-        val propertyNameSet: Set<String>? = indexStore.applicationNameToPropertySetMap[applicationName]
-        return propertyNameSet != null && propertyNameSet.contains(propertyName)
+        val propertyNames: Set<String>? = indexStore.propertyNamesByApplication[applicationName]
+        return propertyNames != null && propertyNames.contains(propertyName)
     }
 
     fun lookupPropertyWithPrefixExist(
@@ -92,7 +92,7 @@ internal class SdefPropertyLookup(
         propertyNamePrefix: String,
     ): Boolean =
         SdefIndexReadiness.isReadyForApplication(applicationName) &&
-            hasNameWithPrefix(propertyNamePrefix, indexStore.applicationNameToPropertySetMap[applicationName])
+            hasNameWithPrefix(propertyNamePrefix, indexStore.propertyNamesByApplication[applicationName])
 }
 
 internal class SdefConstantLookup(
@@ -100,21 +100,21 @@ internal class SdefConstantLookup(
 ) {
     fun lookupStdConstant(name: String): Boolean =
         SdefIndexReadiness.isInitialized() &&
-            indexStore.stdEnumeratorConstantNameToApplicationNameListMap.containsKey(name)
+            indexStore.applicationsByEnumeratorName.containsKey(name)
 
     fun lookupApplicationConstant(
         applicationName: String,
         constantName: String,
     ): Boolean {
         if (!SdefIndexReadiness.isReadyForApplication(applicationName)) return false
-        val constantNameSet: Set<String>? =
-            indexStore.applicationNameToEnumeratorConstantNameSetMap[applicationName]
-        return constantNameSet != null && constantNameSet.contains(constantName)
+        val constantNames: Set<String>? =
+            indexStore.enumeratorNamesByApplication[applicationName]
+        return constantNames != null && constantNames.contains(constantName)
     }
 
     fun lookupStdConstantWithPrefixExist(namePrefix: String): Boolean =
         SdefIndexReadiness.isInitialized() &&
-            hasNameWithPrefix(namePrefix, indexStore.stdEnumeratorConstantNameToApplicationNameListMap.keys)
+            hasNameWithPrefix(namePrefix, indexStore.applicationsByEnumeratorName.keys)
 
     fun lookupConstantWithPrefixExist(
         applicationName: String,
@@ -123,6 +123,6 @@ internal class SdefConstantLookup(
         SdefIndexReadiness.isReadyForApplication(applicationName) &&
             hasNameWithPrefix(
                 constantNamePrefix,
-                indexStore.applicationNameToEnumeratorConstantNameSetMap[applicationName],
+                indexStore.enumeratorNamesByApplication[applicationName],
             )
 }

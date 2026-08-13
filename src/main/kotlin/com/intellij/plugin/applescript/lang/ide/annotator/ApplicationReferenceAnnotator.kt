@@ -8,7 +8,7 @@ import com.intellij.plugin.applescript.lang.ide.intentions.AddApplicationDiction
 import com.intellij.plugin.applescript.psi.AppleScriptApplicationReference
 import com.intellij.plugin.applescript.psi.impl.getNameFromApplicationReference
 
-internal object AppleScriptApplicationReferenceAnnotator {
+internal object ApplicationReferenceAnnotator {
     fun annotate(
         holder: AnnotationHolder,
         appRef: AppleScriptApplicationReference,
@@ -17,7 +17,7 @@ internal object AppleScriptApplicationReferenceAnnotator {
         val appName = getApplicationName(appRef) ?: return
 
         val diagnosis = ApplicationReferenceDiagnoser.diagnose(appRef.project, appName)
-        AppleScriptApplicationReferenceRenderer.annotate(holder, appRef, appName, diagnosis, error)
+        ApplicationReferenceRenderer.annotate(holder, appRef, appName, diagnosis, error)
     }
 
     private fun getApplicationName(appRef: AppleScriptApplicationReference): String? {
@@ -26,7 +26,7 @@ internal object AppleScriptApplicationReferenceAnnotator {
     }
 }
 
-private object AppleScriptApplicationReferenceRenderer {
+private object ApplicationReferenceRenderer {
     fun annotate(
         holder: AnnotationHolder,
         appRef: AppleScriptApplicationReference,
@@ -36,7 +36,7 @@ private object AppleScriptApplicationReferenceRenderer {
     ) {
         when (diagnosis) {
             ApplicationReferenceDiagnosis.Ready -> {
-                Unit
+                return
             }
 
             ApplicationReferenceDiagnosis.NotScriptable -> {

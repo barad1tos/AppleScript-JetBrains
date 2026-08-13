@@ -30,16 +30,16 @@ internal object FallbackDirectParameterParser {
         level: Int,
     ): Boolean =
         parseCompleteNumberLiteral(builder, level + 1) ||
-            FallbackCommandParameterValueBoundaries.parseBuiltInClassValueBeforeBoundary(
+            ParameterValueBoundaries.parseBuiltInClassValue(
                 builder,
                 level + 1,
             ) ||
-            FallbackCommandParameterValueBoundaries.parsePropertyReferenceValueBeforeBoundary(
+            ParameterValueBoundaries.parsePropertyReference(
                 builder,
                 level + 1,
             ) ||
-            FallbackCommandParameterValueBoundaries.parseExpressionAtValueBoundary(builder, level + 1) ||
-            FallbackCommandParameterValueBoundaries.consumeIdentifierPhraseBeforeCommandSelector(builder) ||
+            ParameterValueBoundaries.parseExpression(builder, level + 1) ||
+            ParameterValueBoundaries.consumePhraseBeforeSelector(builder) ||
             parseStructuredBracketFallback(builder)
 
     private fun parseStructuredBracketFallback(builder: PsiBuilder): Boolean =

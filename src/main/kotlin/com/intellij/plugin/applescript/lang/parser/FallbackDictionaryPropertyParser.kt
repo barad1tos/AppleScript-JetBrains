@@ -12,18 +12,21 @@ internal object FallbackDictionaryPropertyParser {
         builder: PsiBuilder,
         level: Int,
     ): Boolean {
-        if (!recursion_guard_(builder, level, "parseKeywordAsPropertyFallback")) return false
-        return parseContextualProperty(builder) ||
-            parseIdentifierThenContextualProperty(builder) ||
-            parseContextualPropertyThenIdentifier(builder)
+        return recursion_guard_(builder, level, "parseKeywordAsPropertyFallback") &&
+            (
+                parseContextualProperty(builder) ||
+                    parseIdentifierThenContextualProperty(builder) ||
+                    parseContextualPropertyThenIdentifier(builder)
+            )
     }
 
     fun parsePropertyName(
         builder: PsiBuilder,
         level: Int,
     ): Boolean {
-        if (!recursion_guard_(builder, level, "parseFallbackBareIdentifier")) return false
-        return builder.tokenType === VAR_IDENTIFIER && parseAnchoredOrPropertyIdentifier(builder)
+        return recursion_guard_(builder, level, "parseFallbackBareIdentifier") &&
+            builder.tokenType === VAR_IDENTIFIER &&
+            parseAnchoredOrPropertyIdentifier(builder)
     }
 
     private fun parseContextualProperty(builder: PsiBuilder): Boolean {
@@ -69,15 +72,15 @@ internal object FallbackDictionaryPropertyParser {
 
     private fun parsePropertyIdentifier(builder: PsiBuilder): Boolean =
         when {
-            FallbackDictionaryPropertyPatterns.isContextualPropertyPairWithAnchor(builder) -> {
+            FallbackPropertyPatterns.isContextualPropertyPairWithAnchor(builder) -> {
                 FallbackDictionaryTermActions.advanceTermPair(builder)
             }
 
-            FallbackDictionaryPropertyPatterns.isContextualPropertyPairWithTerminator(builder) -> {
+            FallbackPropertyPatterns.isContextualPropertyPairWithTerminator(builder) -> {
                 FallbackDictionaryTermActions.advanceTermPair(builder)
             }
 
-            FallbackDictionaryPropertyPatterns.isIdentifierPairWithTerminator(builder) -> {
+            FallbackPropertyPatterns.isIdentifierPairWithTerminator(builder) -> {
                 FallbackDictionaryTermActions.advanceTermPair(builder)
             }
 

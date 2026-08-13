@@ -19,7 +19,7 @@ private const val SYSTEM_EVENTS_APPLICATION_NAME = "System Events"
 // by these class terms, and this annotator only validates their literal names.
 private const val PROCESS_CLASS_NAME = "process"
 
-internal object AppleScriptSystemEventsProcessReferenceAnnotator {
+internal object SystemEventsProcessAnnotator {
     internal fun resolveWarningMessage(
         referenceText: String,
         isInsideSystemEventsTell: Boolean,
@@ -70,16 +70,13 @@ internal object AppleScriptSystemEventsProcessReferenceAnnotator {
     private fun isInsideSystemEventsTell(reference: PsiElement): Boolean {
         var ancestor = reference.parent
         while (ancestor != null) {
-            when (ancestor) {
-                is AppleScriptTellSimpleStatement -> {
-                    val applicationName = getApplicationName(ancestor)
-                    if (applicationName != null) return isSystemEventsTell(applicationName)
+            val applicationName =
+                when (ancestor) {
+                    is AppleScriptTellSimpleStatement -> getApplicationName(ancestor)
+                    is AppleScriptTellCompoundStatement -> getApplicationName(ancestor)
+                    else -> null
                 }
-                is AppleScriptTellCompoundStatement -> {
-                    val applicationName = getApplicationName(ancestor)
-                    if (applicationName != null) return isSystemEventsTell(applicationName)
-                }
-            }
+            if (applicationName != null) return isSystemEventsTell(applicationName)
             ancestor = ancestor.parent
         }
         return false
