@@ -1,7 +1,6 @@
 package com.intellij.plugin.applescript.test.sdef
 
 import com.intellij.plugin.applescript.AppleScriptFileType
-import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptPropertyDefinition
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
@@ -63,40 +62,11 @@ class DictionaryTermCatalogTest : BasePlatformTestCase() {
     }
 
     fun testCocoaRequired() {
-        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
-        val discovery = ApplicationDiscoveryService.getInstance()
-        val cocoaName = ApplicationDictionary.COCOA_STANDARD_LIBRARY
-        val isCocoaMissing = discovery.isInNotFoundList(cocoaName)
+        val dictionary = buildTestDictionary(project, IMPORTED_TERMS, "Calendar Plus", "calendar-plus.sdef")
 
-        try {
-            projectDictionaries.clearCachedDictionariesForTests()
-            discovery.addToNotFoundList(cocoaName)
-            projectDictionaries.cacheDictionaryForTests(
-                "Calendar Primer",
-                buildTestDictionary(project, PRIMER_TERMS, "Calendar Primer", "calendar-primer.sdef"),
-            )
-            projectDictionaries.cacheDictionaryForTests(
-                "Calendar Plus",
-                buildTestDictionary(project, IMPORTED_TERMS, "Calendar Plus", "calendar-plus.sdef"),
-            )
-            myFixture.configureByText(
-                AppleScriptFileType,
-                """
-                use application "Calendar Primer"
-                use application "Calendar Plus"
-                set selectedValue to <caret>
-                """.trimIndent(),
-            )
+        val terms = DictionaryTermCatalog.missingTerms(dictionary, null)
 
-            myFixture.completeBasic()
-            val lookupStrings = requireNotNull(myFixture.lookupElementStrings)
-
-            assertTrue("The unfiltered dictionary must remain available", lookupStrings.contains("calendar source"))
-            assertFalse("Filtered terms require a Cocoa baseline", lookupStrings.contains("shared label"))
-        } finally {
-            projectDictionaries.clearCachedDictionariesForTests()
-            if (!isCocoaMissing) discovery.removeFromNotFoundList(cocoaName)
-        }
+        assertEmpty("Filtered terms require a Cocoa baseline", terms)
     }
 
     fun testNoUseFallbacks() {

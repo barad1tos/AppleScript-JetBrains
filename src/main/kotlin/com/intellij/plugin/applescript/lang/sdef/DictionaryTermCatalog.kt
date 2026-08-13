@@ -11,20 +11,22 @@ internal object DictionaryTermCatalog {
 
     fun missingTerms(
         dictionary: ApplicationDictionary,
-        baseline: ApplicationDictionary,
-    ): List<DictionaryComponent> =
-        buildList {
+        baseline: ApplicationDictionary?,
+    ): List<DictionaryComponent> {
+        val availableBaseline = baseline ?: return emptyList()
+        return buildList {
             dictionary.dictionaryEnumeratorMap.values.filterTo(this) {
-                baseline.findEnumerator(it.getName()) == null
+                availableBaseline.findEnumerator(it.getName()) == null
             }
             dictionary.dictionaryClassMap.values.filterTo(this) {
-                baseline.findClass(it.getName()) == null
+                availableBaseline.findClass(it.getName()) == null
             }
             dictionary.allCommands.filterTo(this) {
-                baseline.findCommand(it.getName()) == null
+                availableBaseline.findCommand(it.getName()) == null
             }
             dictionary.dictionaryPropertyMap.values.filterTo(this) {
-                baseline.findProperty(it.getName()) == null
+                availableBaseline.findProperty(it.getName()) == null
             }
         }
+    }
 }

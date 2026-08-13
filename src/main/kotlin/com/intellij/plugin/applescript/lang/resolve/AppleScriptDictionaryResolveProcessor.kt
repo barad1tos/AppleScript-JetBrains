@@ -244,7 +244,6 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
                     dictionary.project
                         .getService(AppleScriptProjectDictionaryService::class.java)
                         ?.getCocoaStandardTerminology()
-                        ?: return
                 dictionaryComponents.addAll(DictionaryTermCatalog.missingTerms(dictionary, cocoaStandard))
             } else {
                 dictionaryComponents.addAll(DictionaryTermCatalog.allTerms(dictionary))
