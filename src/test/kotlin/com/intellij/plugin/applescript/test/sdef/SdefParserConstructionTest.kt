@@ -1,8 +1,14 @@
 package com.intellij.plugin.applescript.test.sdef
 
+import com.intellij.plugin.applescript.lang.dictionary.index.IngestResult
+import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.sdef.parser.SdefDictionaryConstructionResult
 import com.intellij.plugin.applescript.lang.sdef.parser.SdefParser
+import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 
 private val SDEF_WITH_MIXED_COMPONENTS =
     """
@@ -45,6 +51,64 @@ private val SDEF_WITH_DUPLICATES_AND_MALFORMED_SUITE =
     """.trimIndent()
 
 class SdefParserConstructionTest : BasePlatformTestCase() {
+    fun testProjectionParity() {
+        val applicationName = "Task List"
+        val dictionary =
+            buildTestDictionary(
+                project,
+                SDEF_WITH_MIXED_COMPONENTS,
+                applicationName,
+            )
+        val dictionaryFile =
+            SyntheticSuiteFixtures.writeToTempFile(
+                "projection-parity",
+                SDEF_WITH_MIXED_COMPONENTS,
+            )
+
+        try {
+            runTest {
+                val dispatcher = StandardTestDispatcher(testScheduler)
+                val indexService = SdefIndexService(TestScope(dispatcher), dispatcher)
+                val result = indexService.ingest(applicationName, dictionaryFile)
+                assertTrue("JDOM index ingest must accept the shared SDEF fixture", result is IngestResult.Success)
+                val snapshot = indexService.snapshot()
+
+                assertEquals(
+                    dictionary.dictionaryClassMap.keys,
+                    snapshot.applicationNameToClassNameSet[applicationName].orEmpty(),
+                )
+                assertEquals(
+                    dictionary.dictionaryClassMap.values
+                        .map { it.pluralClassName }
+                        .toSet(),
+                    snapshot.applicationNameToClassNamePluralSet[applicationName].orEmpty(),
+                )
+                assertEquals(
+                    dictionary.dictionaryCommandMap.keys,
+                    snapshot.applicationNameToCommandNameSet[applicationName].orEmpty(),
+                )
+                assertEquals(
+                    dictionary.dictionaryRecordMap.keys,
+                    snapshot.applicationNameToRecordNameSet[applicationName].orEmpty(),
+                )
+                assertEquals(
+                    dictionary.dictionaryPropertyMap.keys,
+                    snapshot.applicationNameToPropertySet[applicationName].orEmpty(),
+                )
+                assertEquals(
+                    dictionary.dictionaryEnumerationMap.keys,
+                    snapshot.applicationNameToEnumerationNameSet[applicationName].orEmpty(),
+                )
+                assertEquals(
+                    dictionary.dictionaryEnumeratorMap.keys,
+                    snapshot.applicationNameToEnumeratorConstantNameSet[applicationName].orEmpty(),
+                )
+            }
+        } finally {
+            dictionaryFile.delete()
+        }
+    }
+
     fun testParseRootTagReportsAndAppliesSuiteConstruction() {
         val dictionary = buildTestDictionary(project)
         val rootTag = requireNotNull(buildTestXmlFile(project, SDEF_WITH_MIXED_COMPONENTS).rootTag)
