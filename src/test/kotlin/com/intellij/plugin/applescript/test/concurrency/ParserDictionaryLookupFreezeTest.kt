@@ -15,7 +15,6 @@ import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.test.service.SyntheticSuiteFixtures
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -24,7 +23,6 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlin.system.measureTimeMillis
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
     private lateinit var testScope: TestScope
 
@@ -234,6 +232,22 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
             LookupResult.Stale,
             indexService.commandLookup.lookupStdCommandWithPrefixResult("do shell"),
         )
+        assertFalse(
+            "Standard property lookup must stay cold before standard dictionaries are ready",
+            indexService.propertyLookup.lookupStdProperty("name"),
+        )
+        assertFalse(
+            "Standard property prefix lookup must stay cold before standard dictionaries are ready",
+            indexService.propertyLookup.lookupStdPropertyWithPrefixExist("name"),
+        )
+        assertFalse(
+            "Standard constant lookup must stay cold before standard dictionaries are ready",
+            indexService.constantLookup.lookupStdConstant("active"),
+        )
+        assertFalse(
+            "Standard constant prefix lookup must stay cold before standard dictionaries are ready",
+            indexService.constantLookup.lookupStdConstantWithPrefixExist("active"),
+        )
         assertEquals(
             "App command lookup must report cold readiness before app dictionaries are ready",
             LookupResult.Stale,
@@ -255,6 +269,22 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
             "Standard command prefix lookup must report hit once standard dictionaries are ready",
             LookupResult.Hit,
             indexService.commandLookup.lookupStdCommandWithPrefixResult("do shell"),
+        )
+        assertTrue(
+            "Standard property lookup must report hit once standard dictionaries are ready",
+            indexService.propertyLookup.lookupStdProperty("name"),
+        )
+        assertTrue(
+            "Standard property prefix lookup must report hit once standard dictionaries are ready",
+            indexService.propertyLookup.lookupStdPropertyWithPrefixExist("name"),
+        )
+        assertTrue(
+            "Standard constant lookup must report hit once standard dictionaries are ready",
+            indexService.constantLookup.lookupStdConstant("active"),
+        )
+        assertTrue(
+            "Standard constant prefix lookup must report hit once standard dictionaries are ready",
+            indexService.constantLookup.lookupStdConstantWithPrefixExist("active"),
         )
         assertEquals(
             "App command lookup must stay cold until app dictionaries are ready",

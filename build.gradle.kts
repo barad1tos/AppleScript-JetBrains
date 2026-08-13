@@ -990,11 +990,13 @@ tasks {
             fun classifyFixture(
                 sourcePath: String,
                 lookupCount: Int,
+                owner: String = "FixtureOwner",
+                dependency: String = "FixtureDependency",
             ): DataHopLookup =
                 classifyDataHop(
                     fixtureScopeIndex,
-                    "FixtureOwner",
-                    "FixtureDependency",
+                    owner,
+                    dependency,
                     sourcePath,
                     lookupCount,
                 )
@@ -1007,6 +1009,12 @@ tasks {
             }
             check(!classifyFixture("Second.kt", 1).isGraphEdge) {
                 "A neighboring source path in the same service pair must retain its own allowance."
+            }
+            check(classifyFixture("First.kt", 1, owner = "OtherOwner").isGraphEdge) {
+                "A data-hop allowance must not match another owner."
+            }
+            check(classifyFixture("First.kt", 1, dependency = "OtherDependency").isGraphEdge) {
+                "A data-hop allowance must not match another dependency."
             }
             check(classifyFixture("First.kt", 2).isGraphEdge) {
                 "A same-scope data-hop overcount must become a graph edge."
