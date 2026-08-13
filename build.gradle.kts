@@ -844,19 +844,34 @@ tasks {
             )
         }
 
-        val serviceLookupPatternsByService = services.associateWith(::serviceLookupPatterns)
+        val lookupPatternsByService = services.associateWith(::serviceLookupPatterns)
         val serviceAnnotationPattern = Regex("""(^|\s)@Service(\s|\()""")
 
+        data class DataHop(
+            val owner: String,
+            val dependency: String,
+            val sourcePath: String,
+            val expectedLookups: Int,
+        )
+
         // Explicit cross-owner lookups that are excluded from lifecycle cycle detection because
-        // they access state or behavior retained by the persisted registry facade. Each pair must
-        // remain construction-safe, be justified at its declaration, and correspond to a lookup
-        // observed by this scanner; unused entries fail as stale.
+        // they access state or behavior retained by the persisted registry facade. Each entry is
+        // scoped to one owned source file and an exact lookup count: additional lookups become
+        // ordinary graph edges, while missing lookups fail as stale. Every entry must remain
+        // construction-safe and be justified at its declaration.
         //
         // Do not add ordinary service dependencies here. They must remain graph edges so cycles
         // are caught.
-        val dataHopAllowlist =
-            setOf(
-                "SdefPersistenceService" to "AppleScriptSystemDictionaryRegistryService",
+        val dataHops =
+            listOf(
+                DataHop(
+                    owner = "SdefPersistenceService",
+                    dependency = "AppleScriptSystemDictionaryRegistryService",
+                    sourcePath =
+                        "src/main/kotlin/com/intellij/plugin/applescript/lang/dictionary/persistence/" +
+                            "SdefPersistenceService.kt",
+                    expectedLookups = 1,
+                ),
                 // SdefFileProvider reaches back into the persisted registry facade from method
                 // bodies, after service construction, for two ownership-bound operations:
                 //   1. AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal(name) —
@@ -865,8 +880,33 @@ tasks {
                 //      routes initialization through the facade-owned coordinator.
                 // The facade resolves SdefFileProvider lazily, so these method-level callbacks do
                 // not create a constructor cycle.
-                "SdefFileProvider" to "AppleScriptSystemDictionaryRegistryService",
+                DataHop(
+                    owner = "SdefFileProvider",
+                    dependency = "AppleScriptSystemDictionaryRegistryService",
+                    sourcePath =
+                        "src/main/kotlin/com/intellij/plugin/applescript/lang/dictionary/files/" +
+                            "SdefFileProvider.kt",
+                    expectedLookups = 5,
+                ),
+                DataHop(
+                    owner = "SdefFileProvider",
+                    dependency = "AppleScriptSystemDictionaryRegistryService",
+                    sourcePath =
+                        "src/main/kotlin/com/intellij/plugin/applescript/lang/dictionary/files/" +
+                            "ScriptingAdditionsMerger.kt",
+                    expectedLookups = 1,
+                ),
             )
+        val dataHopByScope =
+            dataHops.associateBy { dataHop ->
+                Triple(dataHop.owner, dataHop.dependency, dataHop.sourcePath)
+            }
+        check(dataHopByScope.size == dataHops.size) {
+            "Duplicate data-hop scopes detected; each owner, dependency, and source path must be unique."
+        }
+        check(dataHops.all { it.expectedLookups > 0 }) {
+            "Data-hop expected lookup counts must be positive."
+        }
         val serviceSourceRoots =
             listOf(
                 layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef"),
@@ -877,7 +917,7 @@ tasks {
         doLast {
             val adjacency = mutableMapOf<String, MutableSet<String>>()
             services.forEach { adjacency[it] = mutableSetOf() }
-            val observedDataHops = mutableSetOf<Pair<String, String>>()
+            val observedDataHops = mutableMapOf<DataHop, Int>()
             val fixturePatterns = serviceLookupPatterns("FixtureService")
             val dollar = '$'.toString()
 
@@ -916,11 +956,11 @@ tasks {
                     .filter { it.isFile && it.extension == "kt" }
                     .forEach { file ->
                         val code = kotlinCode(file.readText())
+                        val relativePath = file.relativeTo(projectDir).invariantSeparatorsPath
                         val owner = serviceOwnerByFile[file.nameWithoutExtension]
                         if (owner == null) {
-                            val relativePath = file.relativeTo(projectDir).invariantSeparatorsPath
                             val hasTrackedServiceLookup =
-                                serviceLookupPatternsByService.values.any { patterns ->
+                                lookupPatternsByService.values.any { patterns ->
                                     patterns.any { it.containsMatchIn(code) }
                                 }
                             val declaresService = serviceAnnotationPattern.containsMatchIn(code)
@@ -938,27 +978,41 @@ tasks {
                         }
                         services.forEach { dep ->
                             if (dep == owner) return@forEach
-                            val patterns = serviceLookupPatternsByService.getValue(dep)
-                            if (patterns.any { it.containsMatchIn(code) }) {
-                                val edge = owner to dep
-                                if (edge in dataHopAllowlist) {
-                                    observedDataHops.add(edge)
-                                } else {
-                                    adjacency[owner]!!.add(dep)
-                                }
+                            val patterns = lookupPatternsByService.getValue(dep)
+                            val lookupCount = patterns.sumOf { it.findAll(code).count() }
+                            if (lookupCount == 0) return@forEach
+
+                            val dataHop = dataHopByScope[Triple(owner, dep, relativePath)]
+                            if (dataHop != null) {
+                                observedDataHops[dataHop] = lookupCount
+                            }
+                            if (dataHop == null || lookupCount > dataHop.expectedLookups) {
+                                adjacency[owner]!!.add(dep)
                             }
                         }
                     }
             }
 
-            val staleDataHops = dataHopAllowlist - observedDataHops
+            val staleDataHops =
+                dataHops.mapNotNull { dataHop ->
+                    val observedLookups = observedDataHops[dataHop] ?: 0
+                    if (observedLookups < dataHop.expectedLookups) {
+                        dataHop to observedLookups
+                    } else {
+                        null
+                    }
+                }
             if (staleDataHops.isNotEmpty()) {
                 error(
                     "Stale data-hop allowlist entries detected:\n" +
                         staleDataHops
-                            .sortedWith(compareBy({ it.first }, { it.second }))
-                            .joinToString("\n") { (owner, dep) -> "  $owner --data--> $dep" } +
-                        "\nFix: remove entries that no longer correspond to a service lookup.",
+                            .sortedWith(compareBy({ it.first.owner }, { it.first.dependency }, { it.first.sourcePath }))
+                            .joinToString("\n") { (dataHop, observed) ->
+                                "  ${dataHop.owner} --data--> ${dataHop.dependency} " +
+                                    "at ${dataHop.sourcePath} " +
+                                    "expected=${dataHop.expectedLookups} observed=$observed"
+                            } +
+                        "\nFix: remove or update entries that no longer match their source lookup count.",
                 )
             }
 
@@ -1018,11 +1072,19 @@ tasks {
                     logger.lifecycle("  $owner -> ${deps.joinToString(", ")}")
                 }
             }
-            if (dataHopAllowlist.isNotEmpty()) {
-                logger.lifecycle("Data-hop edges (allowlisted — NOT counted as service-graph edges):")
-                dataHopAllowlist.forEach { (owner, dep) ->
-                    logger.lifecycle("  $owner --data--> $dep")
-                }
+            if (observedDataHops.isNotEmpty()) {
+                logger.lifecycle("Observed data-hop allowances:")
+                dataHops
+                    .sortedWith(compareBy({ it.owner }, { it.dependency }, { it.sourcePath }))
+                    .forEach { dataHop ->
+                        val observedLookups = observedDataHops[dataHop] ?: return@forEach
+                        logger.lifecycle(
+                            "  ${dataHop.owner} --data--> ${dataHop.dependency} " +
+                                "at ${dataHop.sourcePath} " +
+                                "allowed=${minOf(observedLookups, dataHop.expectedLookups)} " +
+                                "observed=$observedLookups",
+                        )
+                    }
             }
         }
     }
