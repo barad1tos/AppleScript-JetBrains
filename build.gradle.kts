@@ -864,6 +864,9 @@ tasks {
         // are caught.
         val dataHops =
             listOf(
+                // SdefPersistenceService resolves the registry facade and its persistence bridge
+                // lazily from method/property access, after service construction. The lookup
+                // therefore preserves facade-owned state without creating a constructor cycle.
                 DataHop(
                     owner = "SdefPersistenceService",
                     dependency = "AppleScriptSystemDictionaryRegistryService",
