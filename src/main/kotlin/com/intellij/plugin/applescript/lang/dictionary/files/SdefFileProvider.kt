@@ -24,11 +24,11 @@ import java.util.concurrent.ConcurrentHashMap
 private val LOG: Logger = Logger.getInstance("#${SdefFileProvider::class.java.name}")
 
 /**
- * Application-level owner for generated SDEF files and scripting-additions state.
+ * Application-level owner for dictionary-file loading and scripting-additions state.
  *
- * The service coordinates application dictionary generation, bundled standard suites, and
- * merged scripting-additions dictionaries. Parsing and index ingestion stay on the downstream
- * registry/index services.
+ * The service coordinates generation and bundled recovery, classifies load outcomes, applies
+ * persistence policy, and initializes dictionaries through the registry. Parsing and index
+ * ingestion stay on the downstream registry/index services.
  */
 @Service(Service.Level.APP)
 class SdefFileProvider
@@ -45,21 +45,9 @@ class SdefFileProvider
                     discoveryService.findApplicationBundleFile(applicationName)
                         ?: return@withContext DictionaryLoadResult.Empty
                 try {
-                    val info =
-                        createAndInitializeInfo(applicationFile, applicationName)
-                            ?: return@withContext DictionaryLoadResult.Empty
-                    DictionaryLoadResult.Loaded(info)
+                    loadDictionary(applicationFile, applicationName)
                 } catch (e: CancellationException) {
                     throw e
-                } catch (e: NotScriptableApplicationException) {
-                    service<SdefPersistenceService>().addNotScriptable(applicationName)
-                    DictionaryLoadResult.Failed(applicationName, "Application is not scriptable", e)
-                } catch (e: DeveloperToolsNotInstalledException) {
-                    DictionaryLoadResult.Failed(
-                        applicationName,
-                        "Developer Tools not installed (sdef CLI unavailable)",
-                        e,
-                    )
                 } catch (e: IllegalStateException) {
                     LOG.error("Failed to fetch dictionary for $applicationName", e)
                     DictionaryLoadResult.Failed(applicationName, "Unexpected error: ${e.message}", e)
@@ -70,29 +58,115 @@ class SdefFileProvider
             }
 
         @Synchronized
+        internal fun loadDictionary(
+            applicationIoFile: File,
+            applicationName: String,
+            generateDictionaryFile: (String, File) -> File? = SdefDictionaryFileGenerator::generateDictionaryFile,
+            recoverDictionaryFile: (String, File) -> File? = { name, file ->
+                SdefDictionaryFileGenerator.recoverDictionaryFile(name, file)
+            },
+        ): DictionaryLoadResult {
+            if (!extensionSupported(applicationIoFile.extension) || !applicationIoFile.exists()) {
+                return DictionaryLoadResult.Empty
+            }
+            val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
+            if (facade.getDictionaryInfoByNameInternal(applicationName) != null) {
+                LOG.warn(
+                    "Dictionary for application $applicationName was already registered. " +
+                        "Generating a new dictionary file anyway.",
+                )
+            }
+
+            return try {
+                val dictionaryFile =
+                    generateFile(
+                        applicationName,
+                        applicationIoFile,
+                        generateDictionaryFile,
+                        recoverDictionaryFile,
+                    ) ?: return DictionaryLoadResult.Failed(
+                        applicationName,
+                        "Dictionary file generation failed",
+                    )
+                initializeDictionary(
+                    facade,
+                    registerDictionary(applicationName, applicationIoFile, dictionaryFile),
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: NotScriptableApplicationException) {
+                LOG.warn("Dictionary generation failed for $applicationName: ${e.message}", e)
+                service<SdefPersistenceService>().addNotScriptable(e.applicationName)
+                DictionaryLoadResult.Failed(applicationName, "Application is not scriptable", e)
+            } catch (e: DeveloperToolsNotInstalledException) {
+                failedDeveloperToolsLoad(applicationName, e)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+                LOG.warn("Dictionary generation was interrupted for $applicationName", e)
+                DictionaryLoadResult.Failed(applicationName, "Dictionary generation interrupted", e)
+            } catch (e: IOException) {
+                LOG.warn("Dictionary file loading failed for $applicationName", e)
+                DictionaryLoadResult.Failed(applicationName, "Dictionary file I/O error: ${e.message}", e)
+            }
+        }
+
+        @Synchronized
         fun createAndInitializeInfo(
             applicationIoFile: File,
             applicationName: String,
-        ): DictionaryInfo? {
-            val createdDictionaryInfo =
-                if (!extensionSupported(applicationIoFile.extension) || !applicationIoFile.exists()) {
-                    null
-                } else {
-                    val facade = AppleScriptSystemDictionaryRegistryService.getInstance()
-                    if (facade.getDictionaryInfoByNameInternal(applicationName) != null) {
-                        LOG.warn(
-                            "Dictionary for application $applicationName was already initialized. " +
-                                "Generating new dictionary file any way.",
-                        )
-                    }
-                    val dictionaryInfo =
-                        SdefDictionaryFileGenerator.createDictionaryInfoForApplication(
-                            applicationName,
-                            applicationIoFile,
-                        )
-                    dictionaryInfo?.takeIf { facade.initializeDictionaryFromInfoInternal(it) }
+        ): DictionaryInfo? = (loadDictionary(applicationIoFile, applicationName) as? DictionaryLoadResult.Loaded)?.info
+
+        private fun generateFile(
+            applicationName: String,
+            applicationFile: File,
+            generate: (String, File) -> File?,
+            recover: (String, File) -> File?,
+        ): File? =
+            try {
+                generate(applicationName, applicationFile)
+            } catch (e: DeveloperToolsNotInstalledException) {
+                LOG.warn("Dictionary generation failed for $applicationName: ${e.message}", e)
+                recover(applicationName, applicationFile) ?: throw e
+            }
+
+        private fun registerDictionary(
+            applicationName: String,
+            applicationFile: File,
+            dictionaryFile: File,
+        ): DictionaryInfo {
+            val applicationBundle =
+                applicationFile.takeIf {
+                    ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(applicationFile.extension)
                 }
-            return createdDictionaryInfo
+            val info = DictionaryInfo(applicationName, dictionaryFile, applicationBundle)
+            if (ApplicationDiscoveryService.getInstance().removeFromNotFoundList(applicationName)) {
+                LOG.debug("Application was removed from the not-found list")
+            }
+            service<SdefPersistenceService>().addDictionaryInfo(info)
+            LOG.debug("Dictionary file registered for application [$applicationName]: $dictionaryFile")
+            return info
+        }
+
+        private fun initializeDictionary(
+            facade: AppleScriptSystemDictionaryRegistryService,
+            info: DictionaryInfo,
+        ): DictionaryLoadResult =
+            if (facade.initializeDictionaryFromInfoInternal(info)) {
+                DictionaryLoadResult.Loaded(info)
+            } else {
+                DictionaryLoadResult.Failed(info.getApplicationName(), "Dictionary initialization failed")
+            }
+
+        private fun failedDeveloperToolsLoad(
+            applicationName: String,
+            cause: DeveloperToolsNotInstalledException,
+        ): DictionaryLoadResult.Failed {
+            service<SdefPersistenceService>().addNotScriptable(applicationName)
+            return DictionaryLoadResult.Failed(
+                applicationName,
+                "Developer Tools not installed (sdef CLI unavailable)",
+                cause,
+            )
         }
 
         fun initializeScriptingAdditions() {
