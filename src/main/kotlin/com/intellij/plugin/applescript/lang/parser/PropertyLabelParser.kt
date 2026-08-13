@@ -39,6 +39,6 @@ internal object PropertyLabelParser {
     // plain identifier (`count`, `class`, `id`, ...). The label position before `:` is unambiguous,
     // so the broader contextual-property-term set is safe to accept here.
     private fun isLabelWord(tokenType: IElementType?): Boolean =
-        FallbackDictionaryAnchorPredicates.isMultiWordNounWord(tokenType) ||
+        FallbackDictionaryAnchors.isMultiWordNounWord(tokenType) ||
             FallbackDictionaryTermPredicates.isContextualPropertyTerm(tokenType)
 }

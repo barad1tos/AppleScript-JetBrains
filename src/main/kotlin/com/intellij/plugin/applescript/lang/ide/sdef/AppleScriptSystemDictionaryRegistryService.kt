@@ -58,7 +58,7 @@ class AppleScriptSystemDictionaryRegistryService
         },
     ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()) {
         private val dictionaryInfoRegistry = DictionaryInfoRegistry()
-        private val notScriptableApplicationRegistry = NotScriptableApplicationRegistry()
+        private val notScriptableRegistry = NotScriptableRegistry()
         private val persistence: SdefPersistenceService
             get() = SdefPersistenceService.getInstance()
         private val discovery: ApplicationDiscoveryService
@@ -69,15 +69,15 @@ class AppleScriptSystemDictionaryRegistryService
         internal val persistenceBridge =
             DictionaryPersistenceBridge(
                 dictionaryInfoRegistry = dictionaryInfoRegistry,
-                notScriptableApplicationRegistry = notScriptableApplicationRegistry,
+                notScriptableRegistry = notScriptableRegistry,
                 markDiscoveredApplication = { applicationName ->
                     discovery.addDiscoveredApplicationName(applicationName)
                 },
             )
         private val initializationCoordinator =
-            DictionaryInitializationCoordinator(
+            InitializationCoordinator(
                 dictionaryInfoRegistry = dictionaryInfoRegistry,
-                notScriptableApplicationRegistry = notScriptableApplicationRegistry,
+                notScriptableRegistry = notScriptableRegistry,
                 applicationDiscovery = { discovery },
                 dictionaryFiles = { dictionaryFiles },
                 areAppDictionariesIndexed = ::areAppDictionariesIndexed,
@@ -112,7 +112,7 @@ class AppleScriptSystemDictionaryRegistryService
         // External callers now use the typed file-provider service directly.
 
         // Phase 4 SERVICE-05 (plan 04-05, Wave 5): the 14 parser-index ConcurrentHashMap fields
-        // (applicationNameTo*Map + std*Map; class, classPlural, command, record, property,
+        // (application-scoped and reverse indexes for class, classPlural, command, record, property,
         // enumeration, enumeratorConstant — 7 application-scoped + 7 std-scoped) migrated to
         // [SdefIndexService]. The parser-facing lookup methods now route through focused
         // Dictionary*Registry parser facades directly to the index service. The XML parsing pipeline
@@ -250,7 +250,7 @@ class AppleScriptSystemDictionaryRegistryService
 
         /**
          * Phase 4 SERVICE-04 (Wave 4) internal helper: exposes
-         * [DictionaryInitializationCoordinator.initializeDictionaryFromInfo] for migrated
+         * [InitializationCoordinator.initializeDictionaryFromInfo] for migrated
          * dictionary-initialization call sites. The coordinator owns parse-and-mark cleanup.
          */
         internal fun initializeDictionaryFromInfoInternal(dictionaryInfo: DictionaryInfo): Boolean =

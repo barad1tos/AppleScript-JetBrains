@@ -7,11 +7,11 @@ import com.intellij.plugin.applescript.lang.dictionary.files.SdefFileProvider
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import java.io.File
 
-private val LOG: Logger = Logger.getInstance("#${DictionaryInitializationCoordinator::class.java.name}")
+private val LOG: Logger = Logger.getInstance("#${InitializationCoordinator::class.java.name}")
 
-internal class DictionaryInitializationCoordinator(
+internal class InitializationCoordinator(
     private val dictionaryInfoRegistry: DictionaryInfoRegistry,
-    private val notScriptableApplicationRegistry: NotScriptableApplicationRegistry,
+    private val notScriptableRegistry: NotScriptableRegistry,
     private val applicationDiscovery: () -> ApplicationDiscoveryService,
     private val dictionaryFiles: () -> SdefFileProvider,
     private val areAppDictionariesIndexed: () -> Boolean,
@@ -54,7 +54,7 @@ internal class DictionaryInitializationCoordinator(
 
     private fun shouldSkipInitializedInfoLookup(applicationName: String): Boolean =
         StringUtil.isEmptyOrSpaces(applicationName) ||
-            applicationName in notScriptableApplicationRegistry ||
+            applicationName in notScriptableRegistry ||
             applicationDiscovery().isInNotFoundList(applicationName)
 
     private fun findInitializedInfo(applicationName: String): DictionaryInfo? =

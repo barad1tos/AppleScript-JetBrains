@@ -104,17 +104,17 @@ internal object FallbackCommandParameterParser {
         FallbackCommandParameterTokens.isStructuredDirectParameterStart(tokenType)
 
     fun isBuiltInClassDirectParameterStart(builder: PsiBuilder): Boolean =
-        FallbackCommandParameterValueBoundaries.hasBuiltInClassValueBeforeBoundary(builder)
+        ParameterValueBoundaries.hasBuiltInClassValue(builder)
 
     fun isPropertyReferenceDirectParameterStart(builder: PsiBuilder): Boolean =
-        FallbackCommandParameterValueBoundaries.hasPropertyReferenceValueBeforeBoundary(builder)
+        ParameterValueBoundaries.hasPropertyReference(builder)
 
     fun isGrammarValueDirectParameterStart(builder: PsiBuilder): Boolean =
         builder.tokenType !== VAR_IDENTIFIER &&
-            FallbackCommandParameterValueBoundaries.hasGrammarValueBeforeBoundary(builder)
+            ParameterValueBoundaries.hasGrammarValue(builder)
 
     fun isIdentifierPhraseDirectParameterStart(builder: PsiBuilder): Boolean =
-        FallbackCommandParameterValueBoundaries.hasIdentifierPhraseBeforeCommandSelector(builder)
+        ParameterValueBoundaries.hasPhraseBeforeCommandSelector(builder)
 
     fun parseSelectorTokens(builder: PsiBuilder): Boolean = FallbackCommandSelectorParser.parseSelectorTokens(builder)
 }

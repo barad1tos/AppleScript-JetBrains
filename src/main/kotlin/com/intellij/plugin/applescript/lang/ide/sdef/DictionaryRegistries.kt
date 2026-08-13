@@ -50,7 +50,7 @@ internal class DictionaryInfoRegistry {
     fun isInitialized(name: String): Boolean = dictionaryInfoMap[name]?.initialized == true
 }
 
-internal class NotScriptableApplicationRegistry {
+internal class NotScriptableRegistry {
     private val applicationNames: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     val snapshot: HashSet<String>

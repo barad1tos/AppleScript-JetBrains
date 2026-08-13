@@ -5,7 +5,6 @@ import com.intellij.plugin.applescript.lang.dictionary.index.LookupResult
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexSnapshot
 import com.intellij.plugin.applescript.lang.dictionary.index.hasNameWithPrefix
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -40,7 +39,6 @@ import org.junit.jupiter.api.Test
  * once hermetic-test seams exist for every service, CI can run unit tests without
  * `-PincludeHeavyTests=true`.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class SdefIndexServiceTest {
     /**
      * Builds a freshly-constructed service whose dispatcher is bound to [scheduler] — the

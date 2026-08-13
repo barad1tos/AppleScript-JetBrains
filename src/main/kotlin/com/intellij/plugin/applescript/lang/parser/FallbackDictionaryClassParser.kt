@@ -111,7 +111,7 @@ internal object FallbackDictionaryClassParser {
     private fun isClassWordAfterContinuation(tokenType: IElementType?): Boolean =
         tokenType === VAR_IDENTIFIER ||
             FallbackDictionaryTermPredicates.isFallbackAnchorForClass(tokenType) ||
-            FallbackDictionaryAnchorPredicates.isClassDirectReferenceAnchor(tokenType)
+            FallbackDictionaryAnchors.isClassDirectReferenceAnchor(tokenType)
 
     private fun parseTwoWordIdentifier(builder: PsiBuilder): Boolean {
         val result =

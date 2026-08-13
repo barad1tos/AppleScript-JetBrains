@@ -4,7 +4,7 @@ import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInf
 
 internal class DictionaryPersistenceBridge(
     private val dictionaryInfoRegistry: DictionaryInfoRegistry,
-    private val notScriptableApplicationRegistry: NotScriptableApplicationRegistry,
+    private val notScriptableRegistry: NotScriptableRegistry,
     private val markDiscoveredApplication: (String) -> Unit,
 ) {
     val dictionaryInfoSnapshot: List<DictionaryInfo>
@@ -14,22 +14,22 @@ internal class DictionaryPersistenceBridge(
         get() = dictionaryInfoRegistry.cachedApplicationNamesSnapshot
 
     val notScriptableSnapshot: Set<String>
-        get() = notScriptableApplicationRegistry.snapshot
+        get() = notScriptableRegistry.snapshot
 
     fun isDictionaryInitialized(applicationName: String): Boolean =
         dictionaryInfoRegistry.isInitialized(applicationName)
 
-    fun isNotScriptable(applicationName: String): Boolean = applicationName in notScriptableApplicationRegistry
+    fun isNotScriptable(applicationName: String): Boolean = applicationName in notScriptableRegistry
 
-    fun addNotScriptable(applicationName: String): Boolean = notScriptableApplicationRegistry.add(applicationName)
+    fun addNotScriptable(applicationName: String): Boolean = notScriptableRegistry.add(applicationName)
 
-    fun removeNotScriptable(applicationName: String): Boolean = notScriptableApplicationRegistry.remove(applicationName)
+    fun removeNotScriptable(applicationName: String): Boolean = notScriptableRegistry.remove(applicationName)
 
     fun addDictionaryInfo(info: DictionaryInfo): Boolean {
         val applicationName = info.getApplicationName()
         val wasAbsent = dictionaryInfoRegistry.add(info)
         markDiscoveredApplication(applicationName)
-        notScriptableApplicationRegistry.remove(applicationName)
+        notScriptableRegistry.remove(applicationName)
         return wasAbsent
     }
 
@@ -40,7 +40,7 @@ internal class DictionaryPersistenceBridge(
     }
 
     fun loadFromState(state: AppleScriptSystemDictionaryRegistryService.PersistedState) {
-        notScriptableApplicationRegistry.readFromState(state)
+        notScriptableRegistry.readFromState(state)
         dictionaryInfoRegistry.readFromState(state).forEach { info ->
             addDictionaryInfo(info)
         }
@@ -48,6 +48,6 @@ internal class DictionaryPersistenceBridge(
 
     fun writeToState(state: AppleScriptSystemDictionaryRegistryService.PersistedState) {
         dictionaryInfoRegistry.writeToState(state)
-        notScriptableApplicationRegistry.writeToState(state)
+        notScriptableRegistry.writeToState(state)
     }
 }

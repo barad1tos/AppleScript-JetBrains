@@ -63,7 +63,7 @@ object SyntheticSuiteFixtures {
     /**
      * Music.app-shaped suite for app-command tests. One command (`play`) + one class (`track`).
      * The applicationName at parseDictionaryFile time MUST be "Music" to populate the
-     * applicationNameToCommandNameSet entry with key "Music".
+     * commandNamesByApplication entry with key "Music".
      */
     fun musicAppPlayCommandXml(): String =
         """

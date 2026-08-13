@@ -27,7 +27,7 @@ import com.intellij.plugin.applescript.psi.AppleScriptTypes.TAB
 import com.intellij.plugin.applescript.psi.AppleScriptTypes.VAR_IDENTIFIER
 import com.intellij.psi.tree.IElementType
 
-internal object FallbackDictionaryAnchorPredicates {
+internal object FallbackDictionaryAnchors {
     fun isClassDirectReferenceAnchor(tokenType: IElementType?): Boolean =
         tokenType === AS ||
             tokenType === OF ||

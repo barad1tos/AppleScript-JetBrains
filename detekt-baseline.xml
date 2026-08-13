@@ -87,21 +87,8 @@
     <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider$if (ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS.contains(appExtension)) applicationIoFile else null</ID>
     <ID>MaxLineLength:SdefFileProvider.kt$SdefFileProvider.Companion$fun</ID>
     <ID>MaxLineLength:SdefFileTypeRegistrar.kt$SdefFileTypeRegistrar.Companion$fun</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$applicationNameToClassNamePluralSet = applicationNameToClassNamePluralSetMap.mapValues { it.value.toSet() }</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$applicationNameToEnumerationNameSet = applicationNameToEnumerationNameSetMap.mapValues { it.value.toSet() }</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseElementsForApplication(classTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseElementsForApplication(recordTag.getChildren("property"), applicationName, stdPropertyNameToDictionarySetMap)</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseHashElementsForApplication(classTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$parseHashElementsForApplication(recordTag.getChildren("property"), applicationName, applicationNameToPropertySetMap)</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$private val applicationNameToEnumeratorConstantNameSetMap: MutableMap&lt;String, MutableSet&lt;String>> = ConcurrentHashMap()</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$private val stdClassNamePluralToApplicationNameSetMap: MutableMap&lt;String, MutableSet&lt;String>> = ConcurrentHashMap()</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$private val stdEnumerationNameToApplicationNameSetMap: MutableMap&lt;String, MutableSet&lt;String>> = ConcurrentHashMap()</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$private val stdEnumeratorConstantNameToApplicationNameListMap: MutableMap&lt;String, MutableSet&lt;String>> = ConcurrentHashMap()</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$stdCommandNameToApplicationNameSet = stdCommandNameToApplicationNameSetMap.mapValues { it.value.toSet() }</ID>
     <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService$val className = if (isExtends) classElement.getAttributeValue("extends") else classElement.getAttributeValue("name")</ID>
     <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService.Companion$fun</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService.Companion$hashSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)</ID>
-    <ID>MaxLineLength:SdefIndexService.kt$SdefIndexService.Companion$parseSimpleElementForObject(applicationObjectTag, applicationName, objectTagNameToApplicationNameListMap)</ID>
     <ID>MaxLineLength:SdefParser.kt$SdefParser$parsedDictionary.setName(requireNotNull(dicTitle) { "dicTitle non-null: guarded by !StringUtil.isEmpty above" })</ID>
     <ID>MaxLineLength:SdefPersistenceService.kt$SdefPersistenceService$*</ID>
     <ID>MaxLineLength:SdefPersistenceService.kt$SdefPersistenceService$fun</ID>

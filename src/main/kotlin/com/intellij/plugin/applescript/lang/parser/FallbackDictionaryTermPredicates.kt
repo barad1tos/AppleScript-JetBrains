@@ -29,7 +29,7 @@ import com.intellij.psi.tree.IElementType
 
 internal object FallbackDictionaryTermPredicates {
     fun isFallbackAnchorForProperty(tokenType: IElementType?): Boolean =
-        tokenType === OF || tokenType === IN || FallbackDictionaryAnchorPredicates.isPropertyComparisonAnchor(tokenType)
+        tokenType === OF || tokenType === IN || FallbackDictionaryAnchors.isPropertyComparisonAnchor(tokenType)
 
     fun isFallbackAnchorForClass(tokenType: IElementType?): Boolean =
         tokenType === OF ||
@@ -45,7 +45,7 @@ internal object FallbackDictionaryTermPredicates {
     fun isClassContinuationKeyword(tokenType: IElementType?): Boolean = tokenType === SET
 
     fun isClassTermToken(type: IElementType?): Boolean =
-        isVariableIdentifier(type) || FallbackDictionaryAnchorPredicates.isSpecifierTerm(type)
+        isVariableIdentifier(type) || FallbackDictionaryAnchors.isSpecifierTerm(type)
 
     fun isClassDirectSelectorAnchor(type: IElementType?) = type === STRING_LITERAL || type === NAMED
 
@@ -68,10 +68,10 @@ internal object FallbackDictionaryTermPredicates {
             tokenType === MINUTES_CONSTANT ||
             tokenType === SECONDS ||
             tokenType === END ||
-            FallbackDictionaryAnchorPredicates.isSpecifierTerm(tokenType)
+            FallbackDictionaryAnchors.isSpecifierTerm(tokenType)
 
     private fun isClassDirectReferenceAnchor(tokenType: IElementType?): Boolean =
-        FallbackDictionaryAnchorPredicates.isClassDirectReferenceAnchor(tokenType)
+        FallbackDictionaryAnchors.isClassDirectReferenceAnchor(tokenType)
 
     private fun isVariableIdentifier(tokenType: IElementType?): Boolean = tokenType === VAR_IDENTIFIER
 }

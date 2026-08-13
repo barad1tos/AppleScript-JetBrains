@@ -821,7 +821,7 @@ tasks {
                 ) +
                 serviceWithOwnedFiles(
                     "AppleScriptSystemDictionaryRegistryService",
-                    "DictionaryInitializationCoordinator",
+                    "InitializationCoordinator",
                     "DictionaryRegistries",
                     "StandardDictionaryInitializer",
                 )

@@ -81,7 +81,7 @@ internal object ApplicationObjectReferenceParser {
         builder: PsiBuilder,
         termWordCount: Int,
     ): Boolean =
-        FallbackDictionaryAnchorPredicates.isMultiWordNounWord(builder.tokenType) ||
+        FallbackDictionaryAnchors.isMultiWordNounWord(builder.tokenType) ||
             (
                 termWordCount > 0 &&
                     builder.tokenType === SET &&
