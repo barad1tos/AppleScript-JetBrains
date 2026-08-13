@@ -1,6 +1,6 @@
 package com.intellij.plugin.applescript.test.concurrency
 
-import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryReadinessTracker
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryStartupActions
 import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryStartupPipeline
 import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryStartupResult

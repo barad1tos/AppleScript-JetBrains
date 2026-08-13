@@ -18,6 +18,7 @@ import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegi
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.util.xmlb.annotations.CollectionBean
 import com.intellij.util.xmlb.annotations.XCollection
 import kotlinx.coroutines.CompletableDeferred
@@ -28,8 +29,9 @@ import kotlinx.coroutines.launch
 import org.jetbrains.annotations.VisibleForTesting
 
 /*
- * Owns the persisted dictionary component identity and startup readiness gates. Dictionary
- * discovery, file generation, and parser index data live in typed collaborators.
+ * Owns the persisted dictionary component identity and publishes startup readiness through
+ * DictionaryReadinessTracker. Dictionary discovery, file generation, and parser index data live
+ * in typed collaborators.
  */
 @Service(Service.Level.APP)
 @State(
@@ -56,6 +58,7 @@ class AppleScriptSystemDictionaryRegistryService
         startupFailureReporter: (RuntimeException) -> Unit = { failure ->
             LOG.warn("Dictionary startup failed; readiness gates will be completed as failed", failure)
         },
+        private val readiness: DictionaryReadinessTracker = DictionaryReadinessTracker.getInstance(),
     ) : SimplePersistentStateComponent<AppleScriptSystemDictionaryRegistryService.PersistedState>(PersistedState()) {
         private val dictionaryInfoRegistry = DictionaryInfoRegistry()
         private val notScriptableRegistry = NotScriptableRegistry()
@@ -65,7 +68,6 @@ class AppleScriptSystemDictionaryRegistryService
             get() = ApplicationDiscoveryService.getInstance()
         private val dictionaryFiles: SdefFileProvider
             get() = SdefFileProvider.getInstance()
-        private val readiness = DictionaryReadinessTracker()
         internal val persistenceBridge =
             DictionaryPersistenceBridge(
                 dictionaryInfoRegistry = dictionaryInfoRegistry,
@@ -194,11 +196,6 @@ class AppleScriptSystemDictionaryRegistryService
          * @return `true` if [appsReady] completed successfully; `false` if pending OR failed.
          */
         fun areAppDictionariesIndexed(): Boolean = readiness.areAppsReady()
-
-        /**
-         * Bounded-wait helper for standard dictionary readiness.
-         */
-        internal suspend fun awaitStandardReadyInternal(): Result<Unit> = readiness.awaitStandardReady()
 
         /**
          * Bounded-wait helper for application dictionary readiness.

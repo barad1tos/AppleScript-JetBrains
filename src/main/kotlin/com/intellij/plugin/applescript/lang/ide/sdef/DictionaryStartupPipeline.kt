@@ -1,5 +1,6 @@
 package com.intellij.plugin.applescript.lang.ide.sdef
 
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext

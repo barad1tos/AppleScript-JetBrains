@@ -1,44 +1,47 @@
-package com.intellij.plugin.applescript.lang.ide.sdef
+package com.intellij.plugin.applescript.lang.dictionary.readiness
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.Service
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.jetbrains.annotations.VisibleForTesting
 
-internal class DictionaryReadinessTracker {
+@Service(Service.Level.APP)
+class DictionaryReadinessTracker internal constructor() {
     @VisibleForTesting
     internal val standardReady: CompletableDeferred<Result<Unit>> = CompletableDeferred()
 
     @VisibleForTesting
     internal val appsReady: CompletableDeferred<Result<Unit>> = CompletableDeferred()
 
-    fun isStandardReady(): Boolean = standardReady.isSuccessful()
+    internal fun isStandardReady(): Boolean = standardReady.isSuccessful()
 
-    fun areAppsReady(): Boolean = appsReady.isSuccessful()
+    internal fun areAppsReady(): Boolean = appsReady.isSuccessful()
 
-    suspend fun awaitStandardReady(): Result<Unit> = standardReady.await()
+    internal suspend fun awaitStandardReady(): Result<Unit> = standardReady.await()
 
-    suspend fun awaitAppsReady(): Result<Unit> = appsReady.await()
+    internal suspend fun awaitAppsReady(): Result<Unit> = appsReady.await()
 
-    fun completeStandardReady() {
+    internal fun completeStandardReady() {
         standardReady.complete(Result.success(Unit))
     }
 
-    fun completeAppsReady() {
+    internal fun completeAppsReady() {
         appsReady.complete(Result.success(Unit))
     }
 
-    fun completeFailures() {
-        completeFailureIfPending(
+    internal fun completeFailures() {
+        failIfPending(
             deferred = standardReady,
             message = "standardReady init failed",
         )
-        completeFailureIfPending(
+        failIfPending(
             deferred = appsReady,
             message = "appsReady init failed",
         )
     }
 
-    private fun completeFailureIfPending(
+    private fun failIfPending(
         deferred: CompletableDeferred<Result<Unit>>,
         message: String,
     ) {
@@ -49,4 +52,9 @@ internal class DictionaryReadinessTracker {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     private fun CompletableDeferred<Result<Unit>>.isSuccessful(): Boolean = isCompleted && getCompleted().isSuccess
+
+    companion object {
+        internal fun getInstance(): DictionaryReadinessTracker =
+            ApplicationManager.getApplication().getService(DictionaryReadinessTracker::class.java)
+    }
 }

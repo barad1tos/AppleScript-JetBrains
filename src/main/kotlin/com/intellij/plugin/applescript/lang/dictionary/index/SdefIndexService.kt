@@ -4,7 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -32,12 +32,11 @@ private val LOG: Logger = Logger.getInstance("#${SdefIndexService::class.java.na
  *
  * Cycle-prevention:
  *
- * `isInitialized()` + `areAppDictionariesIndexed()` stay on the registry service because it owns
- * the readiness gates. SdefIndexService consults those predicates through
- * [ParsableScriptSuiteRegistryHelper], which is not in the service list scanned by
- * `verifyServiceDependencyGraph`. This avoids the
- * `SdefIndexService -> AppleScriptSystemDictionaryRegistryService` back-edge that DFS would
- * otherwise detect as a cycle.
+ * [DictionaryReadinessTracker] owns the readiness gates as a dependency-free application service.
+ * [DictionaryStartupActivity][com.intellij.plugin.applescript.lang.ide.sdef.DictionaryStartupActivity]
+ * starts the registry producer from the project lifecycle. The registry completes the gates while
+ * index lookups only observe them, so the service graph records two forward edges to one leaf
+ * instead of hiding an index-to-registry back-edge.
  *
  * Dependencies (real service-graph edges):
  * - service<AppleScriptProjectDictionaryService> — accessed from `findApplicationCommands` to

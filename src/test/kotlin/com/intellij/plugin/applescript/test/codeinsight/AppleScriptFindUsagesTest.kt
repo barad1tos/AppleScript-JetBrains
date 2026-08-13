@@ -9,6 +9,7 @@ import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.psi.AppleScriptDirectParameterDeclaration
 import com.intellij.plugin.applescript.psi.AppleScriptHandler
@@ -22,14 +23,12 @@ import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil.findChildrenOfType
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import java.io.File
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class AppleScriptFindUsagesTest : BasePlatformTestCase() {
     private lateinit var testScope: TestScope
 
@@ -39,7 +38,13 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
         super.setUp()
         testScope = TestScope()
         val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val readiness = DictionaryReadinessTracker()
         Disposer.register(testRootDisposable) { testScope.cancel() }
+        ApplicationManager.getApplication().replaceService(
+            DictionaryReadinessTracker::class.java,
+            readiness,
+            testRootDisposable,
+        )
         ApplicationManager.getApplication().replaceService(
             SdefIndexService::class.java,
             SdefIndexService(testScope),
@@ -47,7 +52,11 @@ class AppleScriptFindUsagesTest : BasePlatformTestCase() {
         )
         ApplicationManager.getApplication().replaceService(
             AppleScriptSystemDictionaryRegistryService::class.java,
-            AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher),
+            AppleScriptSystemDictionaryRegistryService(
+                testScope,
+                testDispatcher,
+                readiness = readiness,
+            ),
             testRootDisposable,
         )
         project.replaceService(

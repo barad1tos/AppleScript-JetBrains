@@ -9,6 +9,7 @@ import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.persistence.SdefPersistenceService
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.plugin.applescript.lang.parser.DictionaryCommandRegistry
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
@@ -30,7 +31,13 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
         super.setUp()
         testScope = TestScope()
         val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val readiness = DictionaryReadinessTracker()
         Disposer.register(testRootDisposable) { testScope.cancel() }
+        ApplicationManager.getApplication().replaceService(
+            DictionaryReadinessTracker::class.java,
+            readiness,
+            testRootDisposable,
+        )
         ApplicationManager.getApplication().replaceService(
             SdefIndexService::class.java,
             SdefIndexService(testScope),
@@ -41,6 +48,7 @@ class ParserDictionaryLookupFreezeTest : BasePlatformTestCase() {
             AppleScriptSystemDictionaryRegistryService(
                 testScope,
                 testDispatcher,
+                readiness = readiness,
             ),
             testRootDisposable,
         )
