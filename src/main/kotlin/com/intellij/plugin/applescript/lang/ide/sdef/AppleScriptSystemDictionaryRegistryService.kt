@@ -29,8 +29,9 @@ import kotlinx.coroutines.launch
 import org.jetbrains.annotations.VisibleForTesting
 
 /*
- * Owns the persisted dictionary component identity and startup readiness gates. Dictionary
- * discovery, file generation, and parser index data live in typed collaborators.
+ * Owns the persisted dictionary component identity and publishes startup readiness through
+ * DictionaryReadinessTracker. Dictionary discovery, file generation, and parser index data live
+ * in typed collaborators.
  */
 @Service(Service.Level.APP)
 @State(

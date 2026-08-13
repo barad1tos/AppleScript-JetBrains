@@ -17,8 +17,8 @@ sealed interface LookupResult {
 
     /**
      * Returned when the relevant dictionary readiness gate is cold. Standard-suite lookups and
-     * built-in libraries use standard readiness; real application dictionary lookups wait until
-     * application dictionaries are ready (see `SdefIndexReadiness.isApplicationReady`).
+     * built-in libraries use standard readiness; real application dictionary lookups remain stale
+     * until application dictionaries are ready (see `SdefIndexReadiness.isApplicationReady`).
      *
      * Callers should treat this as [Miss] with diagnostic context.
      */
