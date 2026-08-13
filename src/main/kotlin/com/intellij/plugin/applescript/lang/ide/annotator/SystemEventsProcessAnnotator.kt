@@ -70,16 +70,13 @@ internal object SystemEventsProcessAnnotator {
     private fun isInsideSystemEventsTell(reference: PsiElement): Boolean {
         var ancestor = reference.parent
         while (ancestor != null) {
-            when (ancestor) {
-                is AppleScriptTellSimpleStatement -> {
-                    val applicationName = getApplicationName(ancestor)
-                    if (applicationName != null) return isSystemEventsTell(applicationName)
+            val applicationName =
+                when (ancestor) {
+                    is AppleScriptTellSimpleStatement -> getApplicationName(ancestor)
+                    is AppleScriptTellCompoundStatement -> getApplicationName(ancestor)
+                    else -> null
                 }
-                is AppleScriptTellCompoundStatement -> {
-                    val applicationName = getApplicationName(ancestor)
-                    if (applicationName != null) return isSystemEventsTell(applicationName)
-                }
-            }
+            if (applicationName != null) return isSystemEventsTell(applicationName)
             ancestor = ancestor.parent
         }
         return false
