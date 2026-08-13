@@ -31,6 +31,194 @@ plugins {
     id("org.jetbrains.intellij.platform.grammarkit") version "2.16.0"
 }
 
+fun kotlinCode(source: String): String {
+    val codeMode = 0
+    val lineCommentMode = 1
+    val blockCommentMode = 2
+    val stringMode = 3
+    val rawStringMode = 4
+    val characterMode = 5
+    val code = StringBuilder(source.length)
+    val templateStringModes = mutableListOf<Int>()
+    val templateBraceDepths = mutableListOf<Int>()
+    val templateDollarThresholds = mutableListOf<Int>()
+    var mode = codeMode
+    var blockCommentDepth = 0
+    var dollarThreshold = 1
+    var index = 0
+
+    fun dollarPrefixLength(quoteIndex: Int): Int {
+        var prefixStart = quoteIndex
+        while (prefixStart > 0 && source[prefixStart - 1] == '$') prefixStart--
+        return quoteIndex - prefixStart
+    }
+
+    fun templateMarkerLength(markerIndex: Int): Int {
+        var dollarCount = 0
+        while (source.getOrNull(markerIndex + dollarCount) == '$') dollarCount++
+        return if (
+            dollarCount >= dollarThreshold &&
+            source.getOrNull(markerIndex + dollarCount) == '{'
+        ) {
+            dollarCount + 1
+        } else {
+            0
+        }
+    }
+
+    fun enterString(
+        quoteIndex: Int,
+        nextMode: Int,
+        quoteLength: Int,
+    ): Int {
+        val prefixLength = dollarPrefixLength(quoteIndex)
+        if (prefixLength >= 2) code.setLength(code.length - prefixLength)
+        dollarThreshold = maxOf(1, prefixLength)
+        code.append(' ')
+        mode = nextMode
+        return quoteIndex + quoteLength
+    }
+
+    while (index < source.length) {
+        when (mode) {
+            codeMode -> {
+                when {
+                    source.startsWith("//", index) -> {
+                        code.append(' ')
+                        mode = lineCommentMode
+                        index += 2
+                    }
+
+                    source.startsWith("/*", index) -> {
+                        code.append(' ')
+                        mode = blockCommentMode
+                        blockCommentDepth = 1
+                        index += 2
+                    }
+
+                    source.startsWith("\"\"\"", index) -> {
+                        index = enterString(index, rawStringMode, 3)
+                    }
+
+                    source[index] == '"' -> {
+                        index = enterString(index, stringMode, 1)
+                    }
+
+                    source[index] == '\'' -> {
+                        code.append(' ')
+                        mode = characterMode
+                        index++
+                    }
+
+                    source[index] == '{' && templateBraceDepths.isNotEmpty() -> {
+                        templateBraceDepths[templateBraceDepths.lastIndex]++
+                        code.append(source[index++])
+                    }
+
+                    source[index] == '}' && templateBraceDepths.isNotEmpty() -> {
+                        val lastIndex = templateBraceDepths.lastIndex
+                        if (templateBraceDepths[lastIndex] == 0) {
+                            templateBraceDepths.removeAt(lastIndex)
+                            mode = templateStringModes.removeAt(templateStringModes.lastIndex)
+                            dollarThreshold =
+                                templateDollarThresholds.removeAt(templateDollarThresholds.lastIndex)
+                            code.append(' ')
+                            index++
+                        } else {
+                            templateBraceDepths[lastIndex]--
+                            code.append(source[index++])
+                        }
+                    }
+
+                    else -> code.append(source[index++])
+                }
+            }
+
+            lineCommentMode -> {
+                if (source[index] == '\n') {
+                    code.append('\n')
+                    mode = codeMode
+                }
+                index++
+            }
+
+            blockCommentMode -> {
+                when {
+                    source.startsWith("/*", index) -> {
+                        blockCommentDepth++
+                        index += 2
+                    }
+
+                    source.startsWith("*/", index) -> {
+                        blockCommentDepth--
+                        index += 2
+                        if (blockCommentDepth == 0) mode = codeMode
+                    }
+
+                    else -> index++
+                }
+            }
+
+            stringMode -> {
+                val markerLength = templateMarkerLength(index)
+                when {
+                    source[index] == '\\' -> index += minOf(2, source.length - index)
+                    markerLength > 0 -> {
+                        templateStringModes.add(stringMode)
+                        templateBraceDepths.add(0)
+                        templateDollarThresholds.add(dollarThreshold)
+                        code.append(' ')
+                        mode = codeMode
+                        index += markerLength
+                    }
+
+                    source[index] == '"' -> {
+                        mode = codeMode
+                        index++
+                    }
+
+                    else -> index++
+                }
+            }
+
+            rawStringMode -> {
+                val markerLength = templateMarkerLength(index)
+                when {
+                    source.startsWith("\"\"\"", index) -> {
+                        mode = codeMode
+                        index += 3
+                    }
+
+                    markerLength > 0 -> {
+                        templateStringModes.add(rawStringMode)
+                        templateBraceDepths.add(0)
+                        templateDollarThresholds.add(dollarThreshold)
+                        code.append(' ')
+                        mode = codeMode
+                        index += markerLength
+                    }
+
+                    else -> index++
+                }
+            }
+
+            characterMode -> {
+                when {
+                    source[index] == '\\' -> index += minOf(2, source.length - index)
+                    source[index] == '\'' -> {
+                        mode = codeMode
+                        index++
+                    }
+
+                    else -> index++
+                }
+            }
+        }
+    }
+
+    return code.toString()
+}
+
 group = providers.gradleProperty("pluginGroup").get()
 version = providers.gradleProperty("pluginVersion").get()
 
@@ -647,61 +835,36 @@ tasks {
                     "AppleScriptProjectDictionaryService.kt",
             )
 
-        fun serviceLookupPatterns(dep: String): List<String> =
-            listOf(
-                "service<$dep>",
-                "$dep.getInstance",
-                "getService($dep::class.java)",
+        fun serviceLookupPatterns(dep: String): List<Regex> {
+            val escapedDependency = Regex.escape(dep)
+            return listOf(
+                Regex("""\bservice\s*<\s*$escapedDependency\s*>\s*\("""),
+                Regex("""\b$escapedDependency\s*\.\s*getInstance\s*\("""),
+                Regex("""\bgetService\s*\(\s*$escapedDependency\s*::\s*class\s*\.\s*java\s*\)"""),
             )
+        }
 
         val serviceLookupPatternsByService = services.associateWith(::serviceLookupPatterns)
         val serviceAnnotationPattern = Regex("""(^|\s)@Service(\s|\()""")
 
-        // Phase 4 SERVICE-02 (Wave 2) data-hop allowlist. Pairs of (owner, dep) where the
-        // back-edge from a service to the facade is a DATA dependency (reading state.X), not
-        // a service-graph dependency. RESEARCH §5 calls this out explicitly: "the back-edge
-        // from a service to the facade is modelled as a data hop, not a service hop" — the
-        // facade owns the @State-tagged PersistedState field, and the typed-API service reads
-        // it. Without this allowlist Pattern A (RESEARCH §2) is impossible to model.
+        // Explicit cross-owner lookups that are excluded from lifecycle cycle detection because
+        // they access state or behavior retained by the persisted registry facade. Each pair must
+        // remain construction-safe, be justified at its declaration, and correspond to a lookup
+        // observed by this scanner; unused entries fail as stale.
         //
-        // Add new entries here as later waves (3-5) introduce more services that read state
-        // via the facade. Never add an entry for a service-to-service edge that is a real
-        // service<X>() lookup hop — those are real service dependencies and MUST be modelled
-        // as graph edges so cycles are caught.
+        // Do not add ordinary service dependencies here. They must remain graph edges so cycles
+        // are caught.
         val dataHopAllowlist =
             setOf(
                 "SdefPersistenceService" to "AppleScriptSystemDictionaryRegistryService",
-                // Wave 3 (Phase 4 SERVICE-03, plan 04-03): SdefPersistenceService.isInUnknownList
-                // is a back-compat shim that forwards to ApplicationDiscoveryService — the not-found
-                // list moved to the discovery service (its rightful owner; it's a session-only
-                // discovery artifact, NOT a persistence artifact). The forwarder preserves the
-                // public surface of SdefPersistenceServiceTest (Wave 2) without violating the
-                // single-source-of-truth invariant. This is conceptually a session-data forwarder,
-                // NOT a service-graph dependency. Without this entry the cycle detector flags
-                // `SdefPersistenceService -> ApplicationDiscoveryService -> SdefPersistenceService`
-                // (ApplicationDiscoveryService consults SdefPersistenceService.isNotScriptable
-                // during discovery — that direction IS a real service dependency and remains
-                // tracked in the graph).
-                "SdefPersistenceService" to "ApplicationDiscoveryService",
-                // Wave 4 (Phase 4 SERVICE-04, plan 04-04): SdefFileProvider reaches back into the
-                // facade for two narrow data-hop reads:
+                // SdefFileProvider reaches back into the persisted registry facade from method
+                // bodies, after service construction, for two ownership-bound operations:
                 //   1. AppleScriptSystemDictionaryRegistryService.getDictionaryInfoByNameInternal(name) —
-                //      O(1) lookup against the persisted @State-tagged dictionaryInfoMap. The facade is
-                //      the persisted-state owner (Pattern A — annotation tied to COMPONENT_NAME by
-                //      class identity; cannot move without breaking existing user caches per
-                //      PITFALLS 4.1). Wave 4 reads through this typed accessor rather than copying
-                //      the snapshot on every fetch.
+                //      reads the facade-owned in-memory registry without copying its snapshot.
                 //   2. AppleScriptSystemDictionaryRegistryService.initializeDictionaryFromInfoInternal —
-                //      delegates the parse step (parseDictionaryFile + map population) back to the
-                //      facade because the parser-index map cluster is Wave 5 SdefIndexService
-                //      territory; Wave 4 only owns file-generation.
-                //   3. AppleScriptSystemDictionaryRegistryService.newSecureSaxBuilderInternal —
-                //      XXE-hardened SAXBuilder factory. The other consumer (parseDictionaryFile) still
-                //      lives on the facade; co-location with the file-provider's mergeScriptingAdditions
-                //      moves with the parseDictionaryFile extraction in Wave 5.
-                // All three are DATA reads — the facade does not depend on SdefFileProvider's
-                // session-only file-generation state. Wave 5 may eliminate this allowlist entry once
-                // parseDictionaryFile + the parser map cluster migrate to SdefIndexService.
+                //      routes initialization through the facade-owned coordinator.
+                // The facade resolves SdefFileProvider lazily, so these method-level callbacks do
+                // not create a constructor cycle.
                 "SdefFileProvider" to "AppleScriptSystemDictionaryRegistryService",
             )
         val serviceSourceRoots =
@@ -714,21 +877,53 @@ tasks {
         doLast {
             val adjacency = mutableMapOf<String, MutableSet<String>>()
             services.forEach { adjacency[it] = mutableSetOf() }
+            val observedDataHops = mutableSetOf<Pair<String, String>>()
+            val fixturePatterns = serviceLookupPatterns("FixtureService")
+            val dollar = '$'.toString()
+
+            fun hasFixtureLookup(source: String): Boolean =
+                fixturePatterns.any { it.containsMatchIn(kotlinCode(source)) }
+
+            val scannerFixtures =
+                listOf(
+                    Triple("line comment", "// service<FixtureService>()", false),
+                    Triple("nested block comment", "/* outer /* service<FixtureService>() */ */", false),
+                    Triple("regular string", "val text = \"service<FixtureService>()\"", false),
+                    Triple("raw string", "val text = \"\"\"service<FixtureService>()\"\"\"", false),
+                    Triple("regular template", "val text = \"" + dollar + "{service<FixtureService>()}\"", true),
+                    Triple(
+                        "multi-dollar text",
+                        "val text = " + dollar.repeat(2) + "\"\"\"" +
+                            dollar + "{service<FixtureService>()}\"\"\"",
+                        false,
+                    ),
+                    Triple(
+                        "multi-dollar template",
+                        "val text = " + dollar.repeat(2) + "\"\"\"" +
+                            dollar.repeat(2) + "{service<FixtureService>()}\"\"\"",
+                        true,
+                    ),
+                )
+            scannerFixtures.forEach { (label, source, shouldFindLookup) ->
+                check(hasFixtureLookup(source) == shouldFindLookup) {
+                    "Kotlin source scanner misclassified the $label fixture."
+                }
+            }
 
             serviceSourceRoots.forEach { serviceSourceRoot ->
                 serviceSourceRoot.asFile
                     .walkTopDown()
                     .filter { it.isFile && it.extension == "kt" }
                     .forEach { file ->
-                        val body = file.readText()
+                        val code = kotlinCode(file.readText())
                         val owner = serviceOwnerByFile[file.nameWithoutExtension]
                         if (owner == null) {
                             val relativePath = file.relativeTo(projectDir).invariantSeparatorsPath
                             val hasTrackedServiceLookup =
                                 serviceLookupPatternsByService.values.any { patterns ->
-                                    patterns.any { body.contains(it) }
+                                    patterns.any { it.containsMatchIn(code) }
                                 }
-                            val declaresService = serviceAnnotationPattern.containsMatchIn(body)
+                            val declaresService = serviceAnnotationPattern.containsMatchIn(code)
                             if (
                                 relativePath !in filesOutsideAppServiceGraph &&
                                 (declaresService || hasTrackedServiceLookup)
@@ -743,14 +938,28 @@ tasks {
                         }
                         services.forEach { dep ->
                             if (dep == owner) return@forEach
-                            // Skip data-hop edges (RESEARCH §5).
-                            if (owner to dep in dataHopAllowlist) return@forEach
                             val patterns = serviceLookupPatternsByService.getValue(dep)
-                            if (patterns.any { body.contains(it) }) {
-                                adjacency[owner]!!.add(dep)
+                            if (patterns.any { it.containsMatchIn(code) }) {
+                                val edge = owner to dep
+                                if (edge in dataHopAllowlist) {
+                                    observedDataHops.add(edge)
+                                } else {
+                                    adjacency[owner]!!.add(dep)
+                                }
                             }
                         }
                     }
+            }
+
+            val staleDataHops = dataHopAllowlist - observedDataHops
+            if (staleDataHops.isNotEmpty()) {
+                error(
+                    "Stale data-hop allowlist entries detected:\n" +
+                        staleDataHops
+                            .sortedWith(compareBy({ it.first }, { it.second }))
+                            .joinToString("\n") { (owner, dep) -> "  $owner --data--> $dep" } +
+                        "\nFix: remove entries that no longer correspond to a service lookup.",
+                )
             }
 
             val white = 0
@@ -766,19 +975,20 @@ tasks {
                 path.add(node)
                 var cycle: List<String>? = null
                 for (neighbor in adjacency[node]!!) {
-                    when (color[neighbor]) {
-                        gray -> {
-                            cycle = path.dropWhile { it != neighbor } + neighbor
-                        }
+                    cycle =
+                        when (color[neighbor]) {
+                            gray -> {
+                                path.dropWhile { it != neighbor } + neighbor
+                            }
 
-                        white -> {
-                            cycle = dfs(neighbor, path)
-                        }
+                            white -> {
+                                dfs(neighbor, path)
+                            }
 
-                        else -> {
-                            Unit
+                            else -> {
+                                continue
+                            }
                         }
-                    }
                     if (cycle != null) break
                 }
                 if (cycle == null) {
