@@ -28,14 +28,18 @@ private const val APP_DEPTH_SEARCH: Int = 3
 
 private val LOG: Logger = Logger.getInstance("#${ApplicationDiscoveryService::class.java.name}")
 
-private fun findStandardApplicationFile(applicationName: String): File? =
+internal fun standardBundleCandidates(applicationName: String): Sequence<File> =
     ApplicationDictionary.APP_BUNDLE_DIRECTORIES
         .asSequence()
         .flatMap { applicationsDirectory ->
             ApplicationDictionary.SUPPORTED_APPLICATION_EXTENSIONS
                 .asSequence()
                 .map { extension -> File("$applicationsDirectory/$applicationName.$extension") }
-        }.firstOrNull { applicationFile -> applicationFile.exists() && applicationFile.isFile }
+        }
+
+private fun findStandardBundle(applicationName: String): File? =
+    standardBundleCandidates(applicationName)
+        .firstOrNull { applicationFile -> applicationFile.exists() && applicationFile.isFile }
 
 private fun findRecursiveApplicationFile(applicationName: String): File? =
     ApplicationDictionary.APP_BUNDLE_DIRECTORIES
@@ -266,7 +270,7 @@ class ApplicationDiscoveryService
                     }
 
                     else ->
-                        findStandardApplicationFile(applicationName)
+                        findStandardBundle(applicationName)
                             ?: findRecursiveApplicationFile(applicationName)
                 }
 
