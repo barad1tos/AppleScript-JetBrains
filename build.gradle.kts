@@ -805,7 +805,8 @@ tasks {
         ): Map<String, String> = (listOf(service) + ownedFiles).associateWith { service }
 
         val serviceOwnerByFile =
-            serviceWithOwnedFiles("SdefFileTypeRegistrar") +
+            serviceWithOwnedFiles("DictionaryReadinessTracker") +
+                serviceWithOwnedFiles("SdefFileTypeRegistrar") +
                 serviceWithOwnedFiles("SdefPersistenceService") +
                 serviceWithOwnedFiles("ApplicationDiscoveryService") +
                 serviceWithOwnedFiles("XcodeDetectionService") +
@@ -817,6 +818,7 @@ tasks {
                 ) +
                 serviceWithOwnedFiles(
                     "SdefIndexService",
+                    "SdefCommandLookup",
                     "SdefIndexStore",
                 ) +
                 serviceWithOwnedFiles(
@@ -945,6 +947,12 @@ tasks {
                 layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/ide/sdef"),
                 layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/dictionary"),
             )
+        val indexSourceRoot =
+            layout.projectDirectory.dir("src/main/kotlin/com/intellij/plugin/applescript/lang/dictionary/index")
+        val indexViolationPattern =
+            Regex(
+                """\bcom\.intellij\.plugin\.applescript\.lang\.(parser|ide)\.""",
+            )
         serviceSourceRoots.forEach { inputs.dir(it) }
 
         doLast {
@@ -956,6 +964,8 @@ tasks {
 
             fun hasFixtureLookup(source: String): Boolean =
                 fixturePatterns.any { it.containsMatchIn(kotlinCode(source)) }
+
+            fun hasIndexViolation(source: String): Boolean = indexViolationPattern.containsMatchIn(kotlinCode(source))
 
             val scannerFixtures =
                 listOf(
@@ -981,6 +991,27 @@ tasks {
                 check(hasFixtureLookup(source) == shouldFindLookup) {
                     "Kotlin source scanner misclassified the $label fixture."
                 }
+            }
+            check(
+                hasIndexViolation(
+                    "import com.intellij.plugin.applescript.lang.parser.ParserDependency",
+                ),
+            ) {
+                "A parser import from the dictionary index must be rejected."
+            }
+            check(
+                !hasIndexViolation(
+                    "val text = \"com.intellij.plugin.applescript.lang.ide.FakeDependency\"",
+                ),
+            ) {
+                "A package name inside a string must not create a false dependency violation."
+            }
+            check(
+                !hasIndexViolation(
+                    "// com.intellij.plugin.applescript.lang.parser.FakeDependency",
+                ),
+            ) {
+                "A package name inside a comment must not create a false dependency violation."
             }
 
             val firstDataHop = DataHop("FixtureOwner", "FixtureDependency", "First.kt", 1)
@@ -1028,6 +1059,22 @@ tasks {
             }
             check(findStaleDataHops(listOf(firstDataHop), mapOf(firstDataHop to 1)).isEmpty()) {
                 "An exact scoped data-hop count must not be stale."
+            }
+
+            val indexViolations =
+                indexSourceRoot.asFile
+                    .walkTopDown()
+                    .filter { it.isFile && it.extension == "kt" }
+                    .filter { file -> hasIndexViolation(file.readText()) }
+                    .map { it.relativeTo(projectDir).invariantSeparatorsPath }
+                    .sorted()
+                    .toList()
+            if (indexViolations.isNotEmpty()) {
+                error(
+                    "Dictionary index dependency-direction violations detected:\n" +
+                        indexViolations.joinToString("\n") { "  $it" } +
+                        "\nFix: move shared dictionary state to a neutral dictionary module.",
+                )
             }
 
             serviceSourceRoots.forEach { serviceSourceRoot ->

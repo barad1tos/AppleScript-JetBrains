@@ -8,10 +8,10 @@ package com.intellij.plugin.applescript.test.concurrency
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -24,7 +24,6 @@ import org.junit.Assume
  *
  * Heavy-gated because it exercises IntelliJ threading behavior.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class EdtBridgeGuardTest : BasePlatformTestCase() {
     private lateinit var testScope: TestScope
 
@@ -35,10 +34,20 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
         )
         super.setUp()
         testScope = TestScope()
+        val readiness = DictionaryReadinessTracker()
         Disposer.register(testRootDisposable) { testScope.cancel() }
         ApplicationManager.getApplication().replaceService(
+            DictionaryReadinessTracker::class.java,
+            readiness,
+            testRootDisposable,
+        )
+        ApplicationManager.getApplication().replaceService(
             AppleScriptSystemDictionaryRegistryService::class.java,
-            AppleScriptSystemDictionaryRegistryService(testScope, StandardTestDispatcher(testScope.testScheduler)),
+            AppleScriptSystemDictionaryRegistryService(
+                testScope,
+                StandardTestDispatcher(testScope.testScheduler),
+                readiness = readiness,
+            ),
             testRootDisposable,
         )
     }

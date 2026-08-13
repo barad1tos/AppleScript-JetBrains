@@ -4,7 +4,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
-import com.intellij.plugin.applescript.lang.parser.ParsableScriptSuiteRegistryHelper
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.plugin.applescript.lang.sdef.AppleScriptCommand
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import kotlinx.coroutines.CoroutineScope
@@ -22,17 +22,24 @@ private val LOG: Logger = Logger.getInstance("#${SdefCommandLookup::class.java.n
 private val COMMAND_READY_TIMEOUT: Duration = 2.seconds
 
 internal object SdefIndexReadiness {
-    fun isInitialized(): Boolean = ParsableScriptSuiteRegistryHelper.isInitialized()
+    private val tracker: DictionaryReadinessTracker
+        get() = DictionaryReadinessTracker.getInstance()
 
-    fun areAppDictionariesIndexed(): Boolean = ParsableScriptSuiteRegistryHelper.areAppDictionariesIndexed()
+    fun isStandardReady(): Boolean = tracker.isStandardReady()
+
+    fun areAppsReady(): Boolean = tracker.areAppsReady()
 
     /**
      * Readiness for an application-scoped lookup. Built-in libraries (Cocoa Standard, Scripting
      * Additions) are ready at standard initialization; real application dictionaries only become
      * ready once installed-application indexing completes.
      */
-    fun isReadyForApplication(applicationName: String): Boolean =
-        if (ApplicationDictionary.isBuiltInLibrary(applicationName)) isInitialized() else areAppDictionariesIndexed()
+    fun isApplicationReady(applicationName: String): Boolean =
+        if (ApplicationDictionary.isBuiltInLibrary(applicationName)) isStandardReady() else areAppsReady()
+
+    suspend fun awaitStandardReady(): Result<Unit> = tracker.awaitStandardReady()
+
+    suspend fun awaitAppsReady(): Result<Unit> = tracker.awaitAppsReady()
 }
 
 internal class SdefCommandLookup(
@@ -43,7 +50,7 @@ internal class SdefCommandLookup(
 
     fun lookupStdCommandResult(name: String): LookupResult =
         when {
-            !SdefIndexReadiness.isInitialized() -> LookupResult.Stale
+            !SdefIndexReadiness.isStandardReady() -> LookupResult.Stale
             indexStore.applicationsByCommandName.containsKey(name) -> LookupResult.Hit
             else -> LookupResult.Miss
         }
@@ -58,7 +65,7 @@ internal class SdefCommandLookup(
         commandName: String,
     ): LookupResult =
         when {
-            !SdefIndexReadiness.isReadyForApplication(applicationName) -> {
+            !SdefIndexReadiness.isApplicationReady(applicationName) -> {
                 LookupResult.Stale
             }
 
@@ -81,7 +88,7 @@ internal class SdefCommandLookup(
         commandNamePrefix: String,
     ): LookupResult =
         when {
-            !SdefIndexReadiness.isReadyForApplication(applicationName) -> {
+            !SdefIndexReadiness.isApplicationReady(applicationName) -> {
                 LookupResult.Stale
             }
 
@@ -99,7 +106,7 @@ internal class SdefCommandLookup(
 
     fun lookupStdCommandWithPrefixResult(namePrefix: String): LookupResult =
         when {
-            !SdefIndexReadiness.isInitialized() -> LookupResult.Stale
+            !SdefIndexReadiness.isStandardReady() -> LookupResult.Stale
             hasNameWithPrefix(namePrefix, indexStore.applicationsByCommandName.keys) -> LookupResult.Hit
             else -> LookupResult.Miss
         }
@@ -118,7 +125,7 @@ internal class SdefCommandLookup(
         val isOnDispatchThread = ApplicationManager.getApplication().isDispatchThread
         val isReady =
             if (isOnDispatchThread) {
-                SdefIndexReadiness.isInitialized()
+                SdefIndexReadiness.isStandardReady()
             } else {
                 isStandardReady()
             }
@@ -144,7 +151,7 @@ internal class SdefCommandLookup(
         project: Project,
         commandName: String,
     ): Collection<AppleScriptCommand> {
-        if (!SdefIndexReadiness.isInitialized()) return emptyList()
+        if (!SdefIndexReadiness.isStandardReady()) return emptyList()
 
         val applicationNames = indexStore.applicationsByCommandName[commandName] ?: emptySet()
         val result = HashSet<AppleScriptCommand>()
@@ -169,7 +176,7 @@ internal class SdefCommandLookup(
         val isOnDispatchThread = ApplicationManager.getApplication().isDispatchThread
         val isReady =
             if (isOnDispatchThread) {
-                SdefIndexReadiness.areAppDictionariesIndexed()
+                SdefIndexReadiness.areAppsReady()
             } else {
                 isAppReady()
             }
@@ -191,17 +198,17 @@ internal class SdefCommandLookup(
         applicationName: String,
         commandName: String,
     ): List<AppleScriptCommand> {
-        if (!SdefIndexReadiness.areAppDictionariesIndexed()) return emptyList()
+        if (!SdefIndexReadiness.areAppsReady()) return emptyList()
         return findApplicationCommandsInCachedProjectDictionary(project, applicationName, commandName)
     }
 
     private fun isStandardReady(): Boolean =
-        SdefIndexReadiness.isInitialized() ||
-            awaitReady("standardReady", ParsableScriptSuiteRegistryHelper::awaitStandardReady)
+        SdefIndexReadiness.isStandardReady() ||
+            awaitReady("standardReady", SdefIndexReadiness::awaitStandardReady)
 
     private fun isAppReady(): Boolean =
-        SdefIndexReadiness.areAppDictionariesIndexed() ||
-            awaitReady("appsReady", ParsableScriptSuiteRegistryHelper::awaitAppsReady)
+        SdefIndexReadiness.areAppsReady() ||
+            awaitReady("appsReady", SdefIndexReadiness::awaitAppsReady)
 
     private fun awaitReady(
         gateName: String,

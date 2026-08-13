@@ -8,10 +8,10 @@ package com.intellij.plugin.applescript.test.concurrency
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
@@ -33,7 +33,6 @@ import org.junit.Assume
  *
  * Heavy-gated per Phase 1 D-09 convention.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 class AppCommandGatingTest : BasePlatformTestCase() {
     private lateinit var testDispatcher: TestDispatcher
     private lateinit var testScope: TestScope
@@ -50,7 +49,18 @@ class AppCommandGatingTest : BasePlatformTestCase() {
     }
 
     fun testStandardReadyAloneDoesNotUnblockAppCommands() {
-        val service = AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher)
+        val readiness = DictionaryReadinessTracker()
+        ApplicationManager.getApplication().replaceService(
+            DictionaryReadinessTracker::class.java,
+            readiness,
+            testRootDisposable,
+        )
+        val service =
+            AppleScriptSystemDictionaryRegistryService(
+                testScope,
+                testDispatcher,
+                readiness = readiness,
+            )
         ApplicationManager.getApplication().replaceService(
             AppleScriptSystemDictionaryRegistryService::class.java,
             service,
@@ -70,7 +80,7 @@ class AppCommandGatingTest : BasePlatformTestCase() {
         )
 
         // findApplicationCommands MUST NOT return contents — its gate is appsReady, not
-        // standardReady. The index lookup bridges through the facade-owned readiness gates and
+        // standardReady. The index lookup reads the shared readiness gates and
         // returns emptyList() while appsReady is incomplete.
         // Plan 03-11 (Layer 5): the prior `assertFalse(...isDispatchThread)` pre-check was
         // structurally incompatible with BasePlatformTestCase's EDT-by-default threading model

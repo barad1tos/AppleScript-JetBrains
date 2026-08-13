@@ -11,7 +11,9 @@ import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDisc
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ProgressTaskCompat
 import com.intellij.plugin.applescript.lang.dictionary.filetype.SdefFileTypeRegistrar
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
+import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.plugin.applescript.lang.ide.sdef.DictionaryStartupActivity
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
 import kotlinx.coroutines.CoroutineDispatcher
@@ -19,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.TestDispatcher
@@ -69,6 +72,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
     private lateinit var testScope: TestScope
     private lateinit var pendingDiscoveryTasks: ArrayDeque<Runnable>
     private lateinit var discoveryDispatcher: CoroutineDispatcher
+    private lateinit var readiness: DictionaryReadinessTracker
     private val noOpProgressTask =
         object : ProgressTaskCompat {
             override fun show(displayName: String) = Unit
@@ -86,6 +90,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
         // Discovery uses an explicit queue so runCurrent can observe standardReady
         // before the test releases the application walk.
         testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        readiness = DictionaryReadinessTracker()
         pendingDiscoveryTasks = ArrayDeque()
         discoveryDispatcher =
             object : CoroutineDispatcher() {
@@ -96,6 +101,11 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                     pendingDiscoveryTasks.addLast(block)
                 }
             }
+        ApplicationManager.getApplication().replaceService(
+            DictionaryReadinessTracker::class.java,
+            readiness,
+            testRootDisposable,
+        )
         ApplicationManager.getApplication().replaceService(
             ApplicationDiscoveryService::class.java,
             ApplicationDiscoveryService(discoveryDispatcher),
@@ -110,7 +120,12 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
     }
 
     private fun newTestService(): AppleScriptSystemDictionaryRegistryService =
-        AppleScriptSystemDictionaryRegistryService(testScope, testDispatcher, noOpProgressTask)
+        AppleScriptSystemDictionaryRegistryService(
+            testScope,
+            testDispatcher,
+            noOpProgressTask,
+            readiness = readiness,
+        )
 
     private fun advanceThroughFullInitialization() {
         testScope.runCurrent()
@@ -131,6 +146,22 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
     fun testConstructorAcceptsTestScopeAndIoDispatcher() {
         val service = newTestService()
         assertNotNull(service)
+    }
+
+    fun testIndexFirstStartupCompletesReadiness() {
+        val indexService = SdefIndexService.getInstance()
+        assertFalse("index-first access must not complete standard readiness", readiness.isStandardReady())
+        assertFalse("index-first access must not complete application readiness", readiness.areAppsReady())
+
+        val activity = DictionaryStartupActivity { newTestService() }
+        runBlocking {
+            activity.execute(project)
+        }
+        advanceThroughFullInitialization()
+
+        assertSame("startup must preserve the existing index service", indexService, SdefIndexService.getInstance())
+        assertTrue("startup activity must complete standard readiness", readiness.isStandardReady())
+        assertTrue("startup activity must complete application readiness", readiness.areAppsReady())
     }
 
     /**
@@ -176,6 +207,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                 testDispatcher,
                 noOpProgressTask,
                 daemonRestartScheduler = { daemonRestartCount++ },
+                readiness = readiness,
             )
 
         advanceThroughFullInitialization()
@@ -225,7 +257,13 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                 testRootDisposable,
             )
 
-            val service = AppleScriptSystemDictionaryRegistryService(scope, dispatcher, noOpProgressTask)
+            val service =
+                AppleScriptSystemDictionaryRegistryService(
+                    scope,
+                    dispatcher,
+                    noOpProgressTask,
+                    readiness = readiness,
+                )
             repeat(5) {
                 scheduler.runCurrent()
             }
@@ -282,6 +320,7 @@ class CoroutineColdStartTest : BasePlatformTestCase() {
                     dispatcher,
                     noOpProgressTask,
                     startupFailureReporter = reportedFailures::add,
+                    readiness = readiness,
                 )
             repeat(5) {
                 scheduler.runCurrent()
