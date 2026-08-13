@@ -7,6 +7,7 @@ import com.intellij.openapi.util.KeyWithDefaultValue
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.sdef.ApplicationDictionary
 import com.intellij.plugin.applescript.lang.sdef.DictionaryComponent
+import com.intellij.plugin.applescript.lang.sdef.DictionaryTermCatalog
 import com.intellij.plugin.applescript.psi.AppleScriptBuiltInClassIdentifier
 import com.intellij.plugin.applescript.psi.AppleScriptDictionaryClassIdentifierPlural
 import com.intellij.plugin.applescript.psi.AppleScriptDictionaryClassName
@@ -182,20 +183,20 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
 
     fun getFilteredResult(): List<DictionaryComponent> {
         val result = ArrayList<DictionaryComponent>()
-        var filterStdCocoaTerminologyFlag = false // true once we've collected from a non-additions dictionary
+        var shouldFilterCocoa = false
         val dictionaryRegistry = myProject.getService(AppleScriptProjectDictionaryService::class.java)
         for (collectedDictionary in collectedDictionaries) {
-            collectAllComponentsFromDictionary(collectedDictionary, result, filterStdCocoaTerminologyFlag)
-            filterStdCocoaTerminologyFlag = filterStdCocoaTerminologyFlag ||
+            collectTerms(collectedDictionary, result, shouldFilterCocoa)
+            shouldFilterCocoa = shouldFilterCocoa ||
                 collectedDictionary.getName() != ApplicationDictionary.SCRIPTING_ADDITIONS_LIBRARY
         }
         if (dictionaryRegistry != null) {
-            appendResultsIfNeeded(
+            appendFallbackTerms(
                 result,
                 myProject,
                 mySortedUseStatements.isNotEmpty(),
                 collectedDictionaries.contains(dictionaryRegistry.getScriptingAdditionsTerminology()),
-                filterStdCocoaTerminologyFlag,
+                shouldFilterCocoa,
             )
         }
         return result
@@ -211,80 +212,42 @@ class AppleScriptDictionaryResolveProcessor : AppleScriptPsiScopeProcessor {
         private val LOG: Logger =
             Logger.getInstance("#${AppleScriptDictionaryResolveProcessor::class.java.name}")
 
-        private fun appendResultsIfNeeded(
+        private fun appendFallbackTerms(
             result: MutableCollection<DictionaryComponent>,
             project: Project,
-            areThereUseStatements: Boolean,
-            filterStandardAdditions: Boolean,
-            filterCocoaStandard: Boolean,
+            hasUseStatements: Boolean,
+            shouldFilterAdditions: Boolean,
+            shouldFilterCocoa: Boolean,
         ) {
             val dictionaryRegistry =
                 project.getService(AppleScriptProjectDictionaryService::class.java)
                     ?: return
-            if (!filterStandardAdditions && !areThereUseStatements) {
+            if (!shouldFilterAdditions && !hasUseStatements) {
                 val scriptAdditions = dictionaryRegistry.getScriptingAdditionsTerminology()
-                collectAllComponentsFromDictionary(scriptAdditions, result, false)
+                collectTerms(scriptAdditions, result, false)
             }
-            if (!filterCocoaStandard) {
+            if (!shouldFilterCocoa) {
                 val cocoaStandardTerminology = dictionaryRegistry.getCocoaStandardTerminology()
-                collectAllComponentsFromDictionary(cocoaStandardTerminology, result, false)
+                collectTerms(cocoaStandardTerminology, result, false)
             }
         }
 
-        /**
-         * Gather all term declarations from [importedDict].
-         *
-         * @param withCocoaStdLibFiltering if true, omit terms already present in the Standard Terminology
-         */
-        private fun collectAllComponentsFromDictionary(
-            importedDict: ApplicationDictionary?,
+        private fun collectTerms(
+            dictionary: ApplicationDictionary?,
             dictionaryComponents: MutableCollection<DictionaryComponent>,
-            withCocoaStdLibFiltering: Boolean,
+            shouldFilterCocoa: Boolean,
         ) {
-            if (importedDict == null) {
-                return
-            }
+            if (dictionary == null) return
 
-            if (withCocoaStdLibFiltering) {
-                collectComponentsMissingFromCocoa(importedDict, dictionaryComponents)
+            if (shouldFilterCocoa) {
+                val cocoaStandard =
+                    dictionary.project
+                        .getService(AppleScriptProjectDictionaryService::class.java)
+                        ?.getCocoaStandardTerminology()
+                dictionaryComponents.addAll(DictionaryTermCatalog.missingTerms(dictionary, cocoaStandard))
             } else {
-                collectAllComponents(importedDict, dictionaryComponents)
+                dictionaryComponents.addAll(DictionaryTermCatalog.allTerms(dictionary))
             }
-        }
-
-        private fun collectComponentsMissingFromCocoa(
-            importedDict: ApplicationDictionary,
-            dictionaryComponents: MutableCollection<DictionaryComponent>,
-        ) {
-            val cocoaStandard =
-                importedDict.project
-                    .getService(AppleScriptProjectDictionaryService::class.java)
-                    ?.getCocoaStandardTerminology()
-
-            if (cocoaStandard != null) {
-                importedDict.dictionaryEnumeratorMap.values.filterTo(dictionaryComponents) {
-                    cocoaStandard.findEnumerator(it.getName()) == null
-                }
-                importedDict.dictionaryClassMap.values.filterTo(dictionaryComponents) {
-                    cocoaStandard.findClass(it.getName()) == null
-                }
-                importedDict.allCommands.filterTo(dictionaryComponents) {
-                    cocoaStandard.findCommand(it.getName()) == null
-                }
-                importedDict.dictionaryPropertyMap.values.filterTo(dictionaryComponents) {
-                    cocoaStandard.findCommand(it.getName()) == null
-                }
-            }
-        }
-
-        private fun collectAllComponents(
-            importedDict: ApplicationDictionary,
-            dictionaryComponents: MutableCollection<DictionaryComponent>,
-        ) {
-            dictionaryComponents.addAll(importedDict.dictionaryEnumeratorMap.values)
-            dictionaryComponents.addAll(importedDict.dictionaryPropertyMap.values)
-            dictionaryComponents.addAll(importedDict.dictionaryClassMap.values)
-            dictionaryComponents.addAll(importedDict.allCommands)
         }
     }
 }
