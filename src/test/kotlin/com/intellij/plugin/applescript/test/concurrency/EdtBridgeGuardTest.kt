@@ -1,8 +1,3 @@
-// AUDIT 2026-05-24: scanned for EDT-context pre-check assumptions. Found `isDispatchThread`
-// references at lines 44 and 61 — both are POSITIVE assertions inside `invokeAndWait { ... }`
-// blocks (asserting "we ARE on the EDT now", which IS true after invokeAndWait jumps to EDT).
-// These are correct usage, NOT the defective pattern fixed in Plan 03-11. File is compatible
-// with BasePlatformTestCase's EDT-by-default threading model.
 package com.intellij.plugin.applescript.test.concurrency
 
 import com.intellij.openapi.application.ApplicationManager
@@ -16,11 +11,12 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import org.junit.Assume
+import kotlin.system.measureTimeMillis
 
 /**
- * Proves the EDT guard at facade entry returns `emptyList()` when called from the EDT.
- * Without the guard, a future EDT caller would block the IDE for 2 seconds on the
- * `runBlockingCancellable` bridge.
+ * Proves the index lookup guards return immediately with `emptyList()` on the EDT.
+ * Without them, a future EDT caller would block the IDE for 2 seconds on the bounded
+ * readiness bridge.
  *
  * Heavy-gated because it exercises IntelliJ threading behavior.
  */
@@ -52,15 +48,22 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
         )
     }
 
-    fun testFindStdCommandsReturnsEmptyWhenCalledFromEdt() {
+    fun testStdLookupReturnsOnEdt() {
         var resultFromEdt: Collection<*>? = null
-        ApplicationManager.getApplication().invokeAndWait {
-            assertTrue(
-                "Pre-check: must be on EDT here",
-                ApplicationManager.getApplication().isDispatchThread,
-            )
-            resultFromEdt = SdefIndexService.getInstance().findStdCommands(project, "anything")
-        }
+        val elapsedMillis =
+            measureTimeMillis {
+                ApplicationManager.getApplication().invokeAndWait {
+                    assertTrue(
+                        "Pre-check: must be on EDT here",
+                        ApplicationManager.getApplication().isDispatchThread,
+                    )
+                    resultFromEdt = SdefIndexService.getInstance().findStdCommands(project, "anything")
+                }
+            }
+        assertTrue(
+            "EDT standard lookup must return before the 2s readiness timeout; elapsed=${elapsedMillis}ms",
+            elapsedMillis < MAX_EDT_LOOKUP_MILLIS,
+        )
         assertNotNull(resultFromEdt)
         assertTrue(
             "EDT guard must return emptyList() to avoid 2s freeze",
@@ -68,19 +71,30 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
         )
     }
 
-    fun testFindApplicationCommandsReturnsEmptyWhenCalledFromEdt() {
+    fun testAppLookupReturnsOnEdt() {
         var resultFromEdt: List<*>? = null
-        ApplicationManager.getApplication().invokeAndWait {
-            assertTrue(
-                "Pre-check: must be on EDT here",
-                ApplicationManager.getApplication().isDispatchThread,
-            )
-            resultFromEdt = SdefIndexService.getInstance().findApplicationCommands(project, "Music", "play")
-        }
+        val elapsedMillis =
+            measureTimeMillis {
+                ApplicationManager.getApplication().invokeAndWait {
+                    assertTrue(
+                        "Pre-check: must be on EDT here",
+                        ApplicationManager.getApplication().isDispatchThread,
+                    )
+                    resultFromEdt = SdefIndexService.getInstance().findApplicationCommands(project, "Music", "play")
+                }
+            }
+        assertTrue(
+            "EDT application lookup must return before the 2s readiness timeout; elapsed=${elapsedMillis}ms",
+            elapsedMillis < MAX_EDT_LOOKUP_MILLIS,
+        )
         assertNotNull(resultFromEdt)
         assertTrue(
             "EDT guard must return emptyList() to avoid 2s freeze",
             resultFromEdt!!.isEmpty(),
         )
+    }
+
+    companion object {
+        private const val MAX_EDT_LOOKUP_MILLIS = 1_000L
     }
 }
