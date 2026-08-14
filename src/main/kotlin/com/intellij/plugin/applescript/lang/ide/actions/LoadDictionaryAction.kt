@@ -166,7 +166,7 @@ private fun queueDictionaryLoads(
     loadQueue: DictionaryLoadQueue,
     requests: List<DictionaryLoadRequest>,
     loadInfo: (String, VirtualFile) -> Unit,
-    publishDictionaries: () -> Unit = {},
+    publishDictionaries: () -> Unit,
 ) {
     loadQueue.submit { taskFinished ->
         object : Task.Backgroundable(project, LOAD_TASK_TITLE, true) {
