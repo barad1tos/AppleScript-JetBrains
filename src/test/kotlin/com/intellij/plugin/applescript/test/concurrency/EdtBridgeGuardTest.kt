@@ -221,12 +221,11 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
             fail("Expected IllegalStateException, got ${thrown?.javaClass?.name}")
             return
         }
-        val contextualFailure = thrown
         assertEquals(
             "Failed to load dictionary 'BrokenRequest' from ${failingFile.path}",
-            contextualFailure.message,
+            thrown.message,
         )
-        assertSame(failure, contextualFailure.cause)
+        assertSame(failure, thrown.cause)
     }
 
     fun testPartialLoadPublishes() {
