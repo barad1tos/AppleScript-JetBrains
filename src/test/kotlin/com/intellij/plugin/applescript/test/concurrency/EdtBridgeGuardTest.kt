@@ -1,16 +1,32 @@
 package com.intellij.plugin.applescript.test.concurrency
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.io.FileUtil
 import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
+import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
+import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
+import com.intellij.plugin.applescript.lang.ide.actions.DictionaryLoadQueue
+import com.intellij.plugin.applescript.lang.ide.actions.loadSelectedDictionaries
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
+import com.intellij.testFramework.LightVirtualFile
+import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import org.junit.Assume
+import java.lang.reflect.Proxy
+import java.util.concurrent.CancellationException
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.system.measureTimeMillis
 
 /**
@@ -92,6 +108,176 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
             "EDT guard must return emptyList() to avoid 2s freeze",
             resultFromEdt!!.isEmpty(),
         )
+    }
+
+    fun testManualLoadThreading() {
+        val application = ApplicationManager.getApplication()
+        assertTrue("fixture must invoke the action boundary on EDT", application.isDispatchThread)
+        val dictionaryFile = FileUtil.createTempFile("manual-load", ".sdef", true)
+        dictionaryFile.writeText("<dictionary/>")
+        val loadThread = CompletableFuture<Boolean>()
+        val loadedName = CompletableFuture<String>()
+        val publishThread = CompletableFuture<Boolean>()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            loadSelectedDictionaries(
+                project = project,
+                files = listOf(LightVirtualFile("Calendar.sdef", "<dictionary/>")),
+                singleApplicationName = "Calendar",
+                loadInfo = { applicationName, _ ->
+                    loadThread.complete(application.isDispatchThread)
+                    loadedName.complete(applicationName)
+                    DictionaryInfo(applicationName, dictionaryFile, null).also { it.setInitialized(true) }
+                },
+                afterPublish = {
+                    publishThread.complete(application.isDispatchThread)
+                },
+            )
+
+            waitForCompletion("dictionary load did not finish", loadedName)
+            assertEquals("Calendar", loadedName.getNow(null))
+            assertFalse("manual dictionary loading must run outside EDT", loadThread.getNow(true))
+            waitForCompletion("dictionary publish callback did not finish", publishThread)
+            assertTrue("loaded dictionary PSI must be published on EDT", publishThread.getNow(false))
+            assertNotNull(
+                "manual load must publish into the project cache",
+                projectDictionaries.getDictionary("Calendar"),
+            )
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testManualLoadCancellation() {
+        val finished = CompletableFuture<Boolean>()
+
+        loadSelectedDictionaries(
+            project = project,
+            files = listOf(LightVirtualFile("Calendar.sdef", "<dictionary/>")),
+            singleApplicationName = "Calendar",
+            loadInfo = { _, _ -> throw CancellationException("test cancellation") },
+            afterPublish = {
+                finished.complete(true)
+            },
+        )
+
+        waitForCompletion("cancelled dictionary load did not finish", finished)
+        assertTrue(finished.getNow(false))
+    }
+
+    fun testManualRequestOrder() {
+        val firstDictionaryFile = FileUtil.createTempFile("manual-load-first", ".sdef", true)
+        val secondDictionaryFile = FileUtil.createTempFile("manual-load-second", ".sdef", true)
+        firstDictionaryFile.writeText("<dictionary/>")
+        secondDictionaryFile.writeText("<dictionary/>")
+        val secondLoadStarted = CountDownLatch(1)
+        val allowFirstReturn = CountDownLatch(1)
+        val publishedLoads = CopyOnWriteArrayList<String>()
+        val completedLoads = CompletableFuture<Boolean>()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            loadSelectedDictionaries(
+                project = project,
+                files = listOf(LightVirtualFile("Calendar.sdef", "<dictionary/>")),
+                singleApplicationName = "Calendar",
+                loadInfo = { applicationName, _ ->
+                    if (secondLoadStarted.await(250, TimeUnit.MILLISECONDS)) {
+                        assertTrue(allowFirstReturn.await(5, TimeUnit.SECONDS))
+                    }
+                    DictionaryInfo(applicationName, firstDictionaryFile, null).also { it.setInitialized(true) }
+                },
+                afterPublish = {
+                    publishedLoads.add("first")
+                    if (publishedLoads.size == 2) completedLoads.complete(true)
+                },
+            )
+            loadSelectedDictionaries(
+                project = project,
+                files = listOf(LightVirtualFile("Calendar.sdef", "<dictionary/>")),
+                singleApplicationName = "Calendar",
+                loadInfo = { applicationName, _ ->
+                    secondLoadStarted.countDown()
+                    DictionaryInfo(applicationName, secondDictionaryFile, null).also { it.setInitialized(true) }
+                },
+                afterPublish = {
+                    publishedLoads.add("second")
+                    allowFirstReturn.countDown()
+                    if (publishedLoads.size == 2) completedLoads.complete(true)
+                },
+            )
+
+            waitForCompletion("manual dictionary loads did not finish", completedLoads)
+            assertEquals(listOf("first", "second"), publishedLoads)
+        } finally {
+            allowFirstReturn.countDown()
+            projectDictionaries.clearCachedDictionariesForTests()
+            firstDictionaryFile.delete()
+            secondDictionaryFile.delete()
+        }
+    }
+
+    fun testManualLoadQueueOrder() {
+        val startedTasks = mutableListOf<String>()
+        val taskCompletions = mutableMapOf<String, () -> Unit>()
+        val loadQueue = DictionaryLoadQueue { task -> startedTasks.add(task.title) }
+
+        fun submitTask(title: String) {
+            loadQueue.submit { taskFinished ->
+                taskCompletions[title] = taskFinished
+                object : Task.Backgroundable(project, title, true) {
+                    override fun run(indicator: ProgressIndicator) = Unit
+                }
+            }
+        }
+
+        submitTask("first")
+        submitTask("second")
+        assertEquals(listOf("first"), startedTasks)
+
+        taskCompletions.getValue("first").invoke()
+        assertEquals(listOf("first", "second"), startedTasks)
+        taskCompletions.getValue("second").invoke()
+    }
+
+    fun testQueueDropsDisposedLoads() {
+        var isDisposed = false
+        val disposedProject =
+            Proxy.newProxyInstance(
+                Project::class.java.classLoader,
+                arrayOf(Project::class.java),
+            ) { _, method, _ ->
+                check(method.name == "isDisposed") { "Unexpected project call: ${method.name}" }
+                isDisposed
+            } as Project
+        val startedTasks = mutableListOf<String>()
+        val taskCompletions = mutableMapOf<String, () -> Unit>()
+        val loadQueue = DictionaryLoadQueue { task -> startedTasks.add(task.title) }
+
+        fun submitTask(title: String) {
+            loadQueue.submit { taskFinished ->
+                taskCompletions[title] = taskFinished
+                object : Task.Backgroundable(disposedProject, title, true) {
+                    override fun run(indicator: ProgressIndicator) = Unit
+                }
+            }
+        }
+
+        submitTask("first")
+        submitTask("second")
+        isDisposed = true
+        taskCompletions.getValue("first").invoke()
+
+        assertEquals(listOf("first"), startedTasks)
+    }
+
+    private fun waitForCompletion(
+        message: String,
+        completion: CompletableFuture<*>,
+    ) {
+        PlatformTestUtil.waitWithEventsDispatching(message, completion::isDone, 5)
     }
 
     companion object {
