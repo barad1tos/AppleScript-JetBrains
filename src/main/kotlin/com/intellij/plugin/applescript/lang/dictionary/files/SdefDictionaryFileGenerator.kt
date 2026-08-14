@@ -1,5 +1,6 @@
 package com.intellij.plugin.applescript.lang.dictionary.files
 
+import com.intellij.execution.process.OSProcessUtil
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
@@ -103,11 +104,8 @@ internal object SdefDictionaryFileGenerator {
         val shellCommand = arrayOf("/bin/bash", "-c", " $cmdName \"$appFilePath\" > $serializePath")
         LOG.debug("executing command: ${shellCommand.contentToString()}")
         val execStart = System.currentTimeMillis()
-        val isFinished =
-            Runtime
-                .getRuntime()
-                .exec(shellCommand)
-                .waitFor(DICTIONARY_GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        val process = Runtime.getRuntime().exec(shellCommand)
+        val isFinished = waitForProcess(process, DICTIONARY_GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         val execEnd = System.currentTimeMillis()
         if (!isFinished) {
             if (service<XcodeDetectionService>().isXcodeInstalled()) {
@@ -138,3 +136,94 @@ private data class DictionaryGenerationRequest(
     val serializePath: String,
     val isDictionaryFile: Boolean,
 )
+
+internal fun waitForProcess(
+    process: Process,
+    timeout: Long,
+    timeUnit: TimeUnit,
+    killTree: (Process) -> Boolean = OSProcessUtil::killProcessTree,
+): Boolean =
+    try {
+        process.waitFor(timeout, timeUnit).also { isFinished ->
+            if (!isFinished) terminateProcessTree(process, killTree)
+        }
+    } catch (interruption: InterruptedException) {
+        terminateProcessTree(process, killTree).forEach(interruption::addSuppressed)
+        throw interruption
+    }
+
+private fun terminateProcessTree(
+    process: Process,
+    killTree: (Process) -> Boolean,
+): List<Throwable> {
+    val issues = mutableListOf<TerminationIssue>()
+    val descendantLookup = processAttempt { process.descendants().use { it.toList().asReversed() } }
+    val platformKill = processAttempt { killTree(process) }
+    platformKill.exceptionOrNull()?.let { issues += TerminationIssue("platform tree kill failed", it) }
+    if (platformKill.getOrDefault(false)) return emptyList()
+
+    descendantLookup.exceptionOrNull()?.let { issues += TerminationIssue("descendant discovery failed", it) }
+    val descendants = descendantLookup.getOrDefault(emptyList())
+    descendants.mapNotNullTo(issues, ::terminateHandle)
+
+    val parentLookup = processAttempt(process::toHandle)
+    parentLookup.exceptionOrNull()?.let { issues += TerminationIssue("parent handle lookup failed", it) }
+    val parent = parentLookup.getOrNull()
+    if (parent != null) {
+        terminateHandle(parent)?.let(issues::add)
+    }
+
+    logTerminationIssues(process, issues)
+    return issues.mapNotNull(TerminationIssue::cause)
+}
+
+private fun terminateHandle(handle: ProcessHandle): TerminationIssue? {
+    val termination =
+        processAttempt {
+            if (!handle.destroyForcibly() && handle.isAlive) {
+                TerminationIssue("forced termination was rejected for PID ${handle.pid()}")
+            } else {
+                null
+            }
+        }
+    return termination.getOrNull()
+        ?: termination.exceptionOrNull()?.let {
+            TerminationIssue("forced termination failed for PID ${handle.pid()}", it)
+        }
+}
+
+private fun logTerminationIssues(
+    process: Process,
+    issues: List<TerminationIssue>,
+) {
+    if (issues.isEmpty()) return
+
+    val processId = processAttempt { process.pid().toString() }.getOrDefault("unknown")
+    val message =
+        "Dictionary process-tree termination was incomplete for PID $processId: " +
+            issues.joinToString { it.message }
+    val primaryCause = issues.firstNotNullOfOrNull(TerminationIssue::cause)
+    if (primaryCause == null) {
+        LOG.warn(message)
+    } else {
+        LOG.warn(message, primaryCause)
+    }
+}
+
+private data class TerminationIssue(
+    val message: String,
+    val cause: Throwable? = null,
+)
+
+private inline fun <T> processAttempt(action: () -> T): Result<T> =
+    try {
+        Result.success(action())
+    } catch (failure: IllegalStateException) {
+        Result.failure(failure)
+    } catch (failure: IllegalArgumentException) {
+        Result.failure(failure)
+    } catch (failure: UnsupportedOperationException) {
+        Result.failure(failure)
+    } catch (failure: SecurityException) {
+        Result.failure(failure)
+    }
