@@ -1,5 +1,6 @@
 package com.intellij.plugin.applescript.lang.dictionary.files
 
+import com.intellij.execution.process.OSProcessUtil
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
@@ -103,11 +104,8 @@ internal object SdefDictionaryFileGenerator {
         val shellCommand = arrayOf("/bin/bash", "-c", " $cmdName \"$appFilePath\" > $serializePath")
         LOG.debug("executing command: ${shellCommand.contentToString()}")
         val execStart = System.currentTimeMillis()
-        val isFinished =
-            Runtime
-                .getRuntime()
-                .exec(shellCommand)
-                .waitFor(DICTIONARY_GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        val process = Runtime.getRuntime().exec(shellCommand)
+        val isFinished = waitForProcess(process, DICTIONARY_GENERATION_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         val execEnd = System.currentTimeMillis()
         if (!isFinished) {
             if (service<XcodeDetectionService>().isXcodeInstalled()) {
@@ -138,3 +136,30 @@ private data class DictionaryGenerationRequest(
     val serializePath: String,
     val isDictionaryFile: Boolean,
 )
+
+internal fun waitForProcess(
+    process: Process,
+    timeout: Long,
+    timeUnit: TimeUnit,
+    killTree: (Process) -> Boolean = OSProcessUtil::killProcessTree,
+): Boolean =
+    try {
+        process.waitFor(timeout, timeUnit).also { isFinished ->
+            if (!isFinished) terminateProcessTree(process, killTree)
+        }
+    } catch (interruption: InterruptedException) {
+        terminateProcessTree(process, killTree)
+        throw interruption
+    }
+
+private fun terminateProcessTree(
+    process: Process,
+    killTree: (Process) -> Boolean,
+) {
+    if (killTree(process)) return
+
+    process.descendants().use { descendants ->
+        descendants.toList().asReversed().forEach(ProcessHandle::destroyForcibly)
+    }
+    process.destroyForcibly()
+}
