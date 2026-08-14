@@ -107,12 +107,17 @@ private fun createChooserDescriptor(chooseMultiple: Boolean): FileChooserDescrip
         chooseMultiple,
     )
 
+internal class DictionaryLoadEffects(
+    val loadInfo: ((String, VirtualFile) -> DictionaryInfo?)? = null,
+    val restartDaemon: (() -> Unit)? = null,
+    val afterPublish: () -> Unit = {},
+)
+
 internal fun loadSelectedDictionaries(
     project: Project,
     files: List<VirtualFile>,
     singleApplicationName: String?,
-    loadInfo: ((String, VirtualFile) -> DictionaryInfo?)? = null,
-    afterPublish: () -> Unit = {},
+    effects: DictionaryLoadEffects = DictionaryLoadEffects(),
 ) {
     val supportedFiles = files.filter { extensionSupported(it.extension) }
     val dictionaryRequests =
@@ -138,7 +143,7 @@ internal fun loadSelectedDictionaries(
         loadQueue = loadQueue,
         requests = dictionaryRequests,
         loadInfo = { applicationName, file ->
-            (loadInfo ?: dictionaryService::loadDictionaryInfo)(applicationName, file)?.let(loadedInfos::add)
+            (effects.loadInfo ?: dictionaryService::loadDictionaryInfo)(applicationName, file)?.let(loadedInfos::add)
         },
         publishDictionaries = {
             if (!project.isDisposed) {
@@ -146,9 +151,12 @@ internal fun loadSelectedDictionaries(
                 generateSequence(loadedInfos::poll).forEach { info ->
                     if (dictionaryService.createFromLoadedInfo(info) != null) hasCreatedDictionary = true
                 }
-                if (hasCreatedDictionary) DaemonCodeAnalyzer.getInstance(project).settingsChanged()
+                if (hasCreatedDictionary) {
+                    effects.restartDaemon?.invoke()
+                        ?: DaemonCodeAnalyzer.getInstance(project).settingsChanged()
+                }
             }
-            afterPublish()
+            effects.afterPublish()
         },
     )
 }

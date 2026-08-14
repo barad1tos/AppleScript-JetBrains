@@ -1,6 +1,7 @@
 package com.intellij.plugin.applescript.test.concurrency
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.progress.EmptyProgressIndicator
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -10,6 +11,7 @@ import com.intellij.plugin.applescript.lang.dictionary.index.SdefIndexService
 import com.intellij.plugin.applescript.lang.dictionary.persistence.DictionaryInfo
 import com.intellij.plugin.applescript.lang.dictionary.project.AppleScriptProjectDictionaryService
 import com.intellij.plugin.applescript.lang.dictionary.readiness.DictionaryReadinessTracker
+import com.intellij.plugin.applescript.lang.ide.actions.DictionaryLoadEffects
 import com.intellij.plugin.applescript.lang.ide.actions.DictionaryLoadQueue
 import com.intellij.plugin.applescript.lang.ide.actions.loadSelectedDictionaries
 import com.intellij.plugin.applescript.lang.ide.sdef.AppleScriptSystemDictionaryRegistryService
@@ -125,14 +127,17 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
                 project = project,
                 files = listOf(LightVirtualFile("Calendar.sdef", "<dictionary/>")),
                 singleApplicationName = "Calendar",
-                loadInfo = { applicationName, _ ->
-                    loadThread.complete(application.isDispatchThread)
-                    loadedName.complete(applicationName)
-                    DictionaryInfo(applicationName, dictionaryFile, null).also { it.setInitialized(true) }
-                },
-                afterPublish = {
-                    publishThread.complete(application.isDispatchThread)
-                },
+                effects =
+                    DictionaryLoadEffects(
+                        loadInfo = { applicationName, _ ->
+                            loadThread.complete(application.isDispatchThread)
+                            loadedName.complete(applicationName)
+                            DictionaryInfo(applicationName, dictionaryFile, null).also { it.setInitialized(true) }
+                        },
+                        afterPublish = {
+                            publishThread.complete(application.isDispatchThread)
+                        },
+                    ),
             )
 
             waitForCompletion("dictionary load did not finish", loadedName)
@@ -157,14 +162,132 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
             project = project,
             files = listOf(LightVirtualFile("Calendar.sdef", "<dictionary/>")),
             singleApplicationName = "Calendar",
-            loadInfo = { _, _ -> throw CancellationException("test cancellation") },
-            afterPublish = {
-                finished.complete(true)
-            },
+            effects =
+                DictionaryLoadEffects(
+                    loadInfo = { _, _ -> throw CancellationException("test cancellation") },
+                    afterPublish = {
+                        finished.complete(true)
+                    },
+                ),
         )
 
         waitForCompletion("cancelled dictionary load did not finish", finished)
         assertTrue(finished.getNow(false))
+    }
+
+    fun testPartialLoadPublishes() {
+        val dictionaryFile = FileUtil.createTempFile("partial-manual-load", ".sdef", true)
+        dictionaryFile.writeText("<dictionary/>")
+        val loadedApplication = "SyntheticPartialSuccess_${System.nanoTime()}"
+        val failedApplication = "SyntheticPartialFailure_${System.nanoTime()}"
+        val attemptedApplications = CopyOnWriteArrayList<String>()
+        val finished = CompletableFuture<Boolean>()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+
+        try {
+            loadSelectedDictionaries(
+                project = project,
+                files =
+                    listOf(
+                        LightVirtualFile("$loadedApplication.app", ""),
+                        LightVirtualFile("$failedApplication.app", ""),
+                    ),
+                singleApplicationName = null,
+                effects =
+                    DictionaryLoadEffects(
+                        loadInfo = { applicationName, _ ->
+                            attemptedApplications.add(applicationName)
+                            if (applicationName == loadedApplication) {
+                                DictionaryInfo(applicationName, dictionaryFile, null).also { it.setInitialized(true) }
+                            } else {
+                                null
+                            }
+                        },
+                        afterPublish = { finished.complete(true) },
+                    ),
+            )
+
+            waitForCompletion("partial dictionary load did not finish", finished)
+            assertEquals(listOf(loadedApplication, failedApplication), attemptedApplications)
+            assertNotNull(
+                "a successful dictionary must remain available when another selected file fails",
+                projectDictionaries.getDictionary(loadedApplication),
+            )
+            assertNull(projectDictionaries.getDictionary(failedApplication))
+        } finally {
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+        }
+    }
+
+    fun testDisposedLoadSkipsPublish() {
+        val dictionaryFile = FileUtil.createTempFile("disposed-manual-load", ".sdef", true)
+        dictionaryFile.writeText("<dictionary/>")
+        val loadStarted = CountDownLatch(1)
+        val allowLoadToFinish = CountDownLatch(1)
+        val publishFinished = CompletableFuture<Boolean>()
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        var daemonRestarts = 0
+        var isDisposed = false
+        var queuedTask: Task.Backgroundable? = null
+        val loadQueue = DictionaryLoadQueue { task -> queuedTask = task }
+        val projectProxy =
+            Proxy.newProxyInstance(
+                Project::class.java.classLoader,
+                arrayOf(Project::class.java),
+            ) { _, method, arguments ->
+                when (method.name) {
+                    "isDisposed" -> isDisposed
+                    "getService" ->
+                        when (arguments?.single()) {
+                            AppleScriptProjectDictionaryService::class.java -> projectDictionaries
+                            DictionaryLoadQueue::class.java -> loadQueue
+                            else -> null
+                        }
+
+                    else -> error("Unexpected project call: ${method.name}")
+                }
+            } as Project
+
+        try {
+            loadSelectedDictionaries(
+                project = projectProxy,
+                files = listOf(LightVirtualFile("Calendar.app", "")),
+                singleApplicationName = null,
+                effects =
+                    DictionaryLoadEffects(
+                        loadInfo = { applicationName, _ ->
+                            loadStarted.countDown()
+                            assertTrue(allowLoadToFinish.await(5, TimeUnit.SECONDS))
+                            DictionaryInfo(applicationName, dictionaryFile, null).also { it.setInitialized(true) }
+                        },
+                        restartDaemon = { daemonRestarts++ },
+                        afterPublish = { publishFinished.complete(true) },
+                    ),
+            )
+
+            val task = requireNotNull(queuedTask)
+            val worker =
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    task.run(EmptyProgressIndicator())
+                }
+            assertTrue("dictionary load did not start", loadStarted.await(5, TimeUnit.SECONDS))
+            isDisposed = true
+            allowLoadToFinish.countDown()
+            worker.get(5, TimeUnit.SECONDS)
+            task.onFinished()
+
+            assertTrue(publishFinished.getNow(false))
+            assertEquals("disposed loads must not restart highlighting", 0, daemonRestarts)
+            assertNull(
+                "a dictionary loaded after project disposal must not enter the project cache",
+                projectDictionaries.getDictionary("Calendar"),
+            )
+        } finally {
+            allowLoadToFinish.countDown()
+            projectDictionaries.clearCachedDictionariesForTests()
+            dictionaryFile.delete()
+        }
     }
 
     fun testManualRequestOrder() {
@@ -183,30 +306,36 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
                 project = project,
                 files = listOf(LightVirtualFile("Calendar.sdef", "<dictionary/>")),
                 singleApplicationName = "Calendar",
-                loadInfo = { applicationName, _ ->
-                    if (secondLoadStarted.await(250, TimeUnit.MILLISECONDS)) {
-                        assertTrue(allowFirstReturn.await(5, TimeUnit.SECONDS))
-                    }
-                    DictionaryInfo(applicationName, firstDictionaryFile, null).also { it.setInitialized(true) }
-                },
-                afterPublish = {
-                    publishedLoads.add("first")
-                    if (publishedLoads.size == 2) completedLoads.complete(true)
-                },
+                effects =
+                    DictionaryLoadEffects(
+                        loadInfo = { applicationName, _ ->
+                            if (secondLoadStarted.await(250, TimeUnit.MILLISECONDS)) {
+                                assertTrue(allowFirstReturn.await(5, TimeUnit.SECONDS))
+                            }
+                            DictionaryInfo(applicationName, firstDictionaryFile, null).also { it.setInitialized(true) }
+                        },
+                        afterPublish = {
+                            publishedLoads.add("first")
+                            if (publishedLoads.size == 2) completedLoads.complete(true)
+                        },
+                    ),
             )
             loadSelectedDictionaries(
                 project = project,
                 files = listOf(LightVirtualFile("Calendar.sdef", "<dictionary/>")),
                 singleApplicationName = "Calendar",
-                loadInfo = { applicationName, _ ->
-                    secondLoadStarted.countDown()
-                    DictionaryInfo(applicationName, secondDictionaryFile, null).also { it.setInitialized(true) }
-                },
-                afterPublish = {
-                    publishedLoads.add("second")
-                    allowFirstReturn.countDown()
-                    if (publishedLoads.size == 2) completedLoads.complete(true)
-                },
+                effects =
+                    DictionaryLoadEffects(
+                        loadInfo = { applicationName, _ ->
+                            secondLoadStarted.countDown()
+                            DictionaryInfo(applicationName, secondDictionaryFile, null).also { it.setInitialized(true) }
+                        },
+                        afterPublish = {
+                            publishedLoads.add("second")
+                            allowFirstReturn.countDown()
+                            if (publishedLoads.size == 2) completedLoads.complete(true)
+                        },
+                    ),
             )
 
             waitForCompletion("manual dictionary loads did not finish", completedLoads)
