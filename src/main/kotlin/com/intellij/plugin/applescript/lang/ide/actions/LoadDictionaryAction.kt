@@ -180,6 +180,11 @@ private fun queueDictionaryLoads(
                         throw error
                     } catch (error: CancellationException) {
                         throw ProcessCanceledException(error)
+                    } catch (error: RuntimeException) {
+                        throw IllegalStateException(
+                            "Failed to load dictionary '${request.applicationName}' from ${request.file.path}",
+                            error,
+                        )
                     }
                     indicator.fraction = (index + 1).toDouble() / requests.size
                 }

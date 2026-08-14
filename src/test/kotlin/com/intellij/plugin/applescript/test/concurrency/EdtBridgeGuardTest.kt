@@ -175,6 +175,60 @@ class EdtBridgeGuardTest : BasePlatformTestCase() {
         assertTrue(finished.getNow(false))
     }
 
+    fun testLoadFailureAddsContext() {
+        val firstFile = LightVirtualFile("SuccessfulRequest.app", "")
+        val failingFile = LightVirtualFile("BrokenRequest.app", "")
+        val failure = IllegalArgumentException("broken registry")
+        var queuedTask: Task.Backgroundable? = null
+        val loadQueue = DictionaryLoadQueue { task -> queuedTask = task }
+        val projectDictionaries = project.getService(AppleScriptProjectDictionaryService::class.java)
+        val projectProxy =
+            Proxy.newProxyInstance(
+                Project::class.java.classLoader,
+                arrayOf(Project::class.java),
+            ) { _, method, arguments ->
+                when (method.name) {
+                    "isDisposed" -> false
+                    "getService" ->
+                        when (arguments?.single()) {
+                            AppleScriptProjectDictionaryService::class.java -> projectDictionaries
+                            DictionaryLoadQueue::class.java -> loadQueue
+                            else -> null
+                        }
+
+                    else -> error("Unexpected project call: ${method.name}")
+                }
+            } as Project
+
+        loadSelectedDictionaries(
+            project = projectProxy,
+            files = listOf(firstFile, failingFile),
+            singleApplicationName = null,
+            effects =
+                DictionaryLoadEffects(
+                    loadInfo = { applicationName, _ ->
+                        if (applicationName == failingFile.nameWithoutExtension) throw failure
+                        null
+                    },
+                ),
+        )
+
+        val thrown =
+            runCatching {
+                requireNotNull(queuedTask).run(EmptyProgressIndicator())
+            }.exceptionOrNull()
+        if (thrown !is IllegalStateException) {
+            fail("Expected IllegalStateException, got ${thrown?.javaClass?.name}")
+            return
+        }
+        val contextualFailure = thrown
+        assertEquals(
+            "Failed to load dictionary 'BrokenRequest' from ${failingFile.path}",
+            contextualFailure.message,
+        )
+        assertSame(failure, contextualFailure.cause)
+    }
+
     fun testPartialLoadPublishes() {
         val dictionaryFile = FileUtil.createTempFile("partial-manual-load", ".sdef", true)
         dictionaryFile.writeText("<dictionary/>")
