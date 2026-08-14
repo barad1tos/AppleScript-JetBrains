@@ -2,6 +2,12 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
+## [Unreleased]
+
+- [Fix] Imported application properties now remain available in completion when Cocoa terminology contains a command with the same name; only matching properties are filtered out.
+- [Fix] Manually loading application dictionaries no longer freezes the IDE while generation and parsing run, and failures now identify the exact application and source file.
+- [Fix] Timed-out or interrupted dictionary generation now terminates the complete process tree, preventing orphaned subprocesses while preserving the original load failure.
+
 ## [2.0.12] - 2026-07-10
 
 - [Fix] Handlers whose names start with `with` (for example `on with_options()`) no longer break parsing at their closing `end with_...` line — the `end with` comparison-operator spelling no longer swallows the start of the handler name.
