@@ -1,8 +1,10 @@
 package com.intellij.plugin.applescript.lang.dictionary.project
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Computable
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.plugin.applescript.lang.dictionary.discovery.ApplicationDiscoveryService
@@ -226,14 +228,25 @@ class AppleScriptProjectDictionaryService(
     fun createDictionaryFromFile(
         applicationName: String,
         applicationFile: VirtualFile,
-    ): ApplicationDictionary? {
+    ): ApplicationDictionary? = loadDictionaryInfo(applicationName, applicationFile)?.let(::createFromInfo)
+
+    internal fun loadDictionaryInfo(
+        applicationName: String,
+        applicationFile: VirtualFile,
+    ): DictionaryInfo? {
         val appIoFile = File(applicationFile.path)
         val info = fileProvider.createAndInitializeInfo(appIoFile, applicationName)
         if (info == null) {
             LOG.warn("Failed to get initialized dictionary info for $applicationName from $applicationFile")
-            return null
         }
-        return createFromInfo(info)
+        return info
+    }
+
+    @Synchronized
+    internal fun createFromLoadedInfo(info: DictionaryInfo): ApplicationDictionary? {
+        val application = ApplicationManager.getApplication()
+        application.assertIsDispatchThread()
+        return application.runReadAction(Computable { createFromInfo(info) })
     }
 
     fun getDictionary(applicationName: String): ApplicationDictionary? = dictionaryMap[applicationName]
