@@ -92,6 +92,25 @@ class DictionaryProcessTest : TestCase() {
         assertKillFallback { throw IllegalStateException("Synthetic platform kill failure") }
     }
 
+    fun testReparentedChildKilled() {
+        if (!SystemInfo.isUnix) return
+
+        val processTree = startProcessTree()
+        try {
+            assertFalse(
+                "Fallback must preserve the timed-out result",
+                waitForProcess(processTree.parent, 100, TimeUnit.MILLISECONDS) { process ->
+                    process.destroyForcibly()
+                    assertTrue("Platform kill fixture must stop the parent", process.waitFor(5, TimeUnit.SECONDS))
+                    false
+                },
+            )
+            assertTreeStopped(processTree)
+        } finally {
+            processTree.stop()
+        }
+    }
+
     private fun assertKillFallback(killTree: (Process) -> Boolean) {
         val processTree = startProcessTree()
         try {

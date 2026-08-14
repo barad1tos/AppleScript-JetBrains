@@ -157,11 +157,11 @@ private fun terminateProcessTree(
     killTree: (Process) -> Boolean,
 ): List<Throwable> {
     val issues = mutableListOf<TerminationIssue>()
+    val descendantLookup = processAttempt { process.descendants().use { it.toList().asReversed() } }
     val platformKill = processAttempt { killTree(process) }
     platformKill.exceptionOrNull()?.let { issues += TerminationIssue("platform tree kill failed", it) }
     if (platformKill.getOrDefault(false)) return emptyList()
 
-    val descendantLookup = processAttempt { process.descendants().use { it.toList().asReversed() } }
     descendantLookup.exceptionOrNull()?.let { issues += TerminationIssue("descendant discovery failed", it) }
     val descendants = descendantLookup.getOrDefault(emptyList())
     descendants.mapNotNullTo(issues, ::terminateHandle)
