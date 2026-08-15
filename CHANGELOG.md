@@ -2,7 +2,7 @@
 
 All notable changes to AppleScript-IDEA will be documented in this file.
 
-## [Unreleased]
+## [2.0.13] - 2026-08-15
 
 - [Fix] Imported application properties now remain available in completion when Cocoa terminology contains a command with the same name; only matching properties are filtered out.
 - [Fix] Manually loading application dictionaries no longer freezes the IDE while generation and parsing run, and failures now identify the exact application and source file.

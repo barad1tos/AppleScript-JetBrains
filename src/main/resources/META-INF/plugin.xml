@@ -26,6 +26,12 @@
     </p>
   ]]></description>
   <change-notes><![CDATA[
+    <h3>2.0.13</h3>
+    <ul>
+      <li>[Fix] Imported application properties now remain available in completion when Cocoa terminology contains a command with the same name; only matching properties are filtered out.</li>
+      <li>[Fix] Manually loading application dictionaries no longer freezes the IDE while generation and parsing run, and failures now identify the exact application and source file.</li>
+      <li>[Fix] Timed-out or interrupted dictionary generation now terminates the complete process tree, preventing orphaned subprocesses while preserving the original load failure.</li>
+    </ul>
     <h3>2.0.12</h3>
     <ul>
       <li>[Fix] Handlers whose names start with <code>with</code> (for example <code>on with_options()</code>) no longer break parsing at their closing <code>end with_...</code> line — the <code>end with</code> comparison-operator spelling no longer swallows the start of the handler name.</li>
